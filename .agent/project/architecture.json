@@ -1,0 +1,63 @@
+{
+  "_": "SOURCE DE VÉRITÉ de l'architecture. Lu par le gate, pas seulement par l'humain. Reprend le mapping des couches du plan d'architecture V3, §12.1. Modifier ce fichier change ce que le gate accepte — donc c'est une décision, et une décision s'écrit d'abord dans JOURNAL.md.",
+
+  "root": ".",
+  "aliases": { "@liveplace/*": "packages/*/src" },
+
+  "layers": [
+    {
+      "name": "shared",
+      "_": "Utilitaires PURS et sans métier : lecture d'environnement, type Result, logger. N'importe rien. `apps/*/src/shared/**` est le pendant local d'une app (§3.3), même règle.",
+      "match": ["packages/shared/**", "apps/*/src/shared/**"],
+      "canImport": []
+    },
+    {
+      "name": "domain",
+      "_": "Le métier pur : règles de jauge, palette, coordonnées, rôles, délai OBS, rétention, et les PORTS (CanvasCore, DurableStore, SessionVerifier, Transport). Le protocole en fait partie : c'est le contrat, il ne connaît que Zod.",
+      "match": ["packages/domain/**", "packages/protocol/**"],
+      "canImport": ["shared"]
+    },
+    {
+      "name": "usecase",
+      "_": "Un cas d'usage = une intention. Reçoit ses dépendances en paramètre, sous la forme des ports déclarés dans domain. Ne sait jamais qu'il y a Redis derrière. Côté web, c'est `state/` : le store reçoit un transport, il ne connaît pas `net/`.",
+      "match": ["apps/*/src/usecase/**", "apps/web/src/state/**"],
+      "canImport": ["domain", "shared"]
+    },
+    {
+      "name": "infra",
+      "_": "Le concret : ioredis, Convex, WebSocket, JWT. Implémente les ports. Seule couche autorisée à connaître un fournisseur.",
+      "match": [
+        "packages/redis-core/**",
+        "packages/durable/**",
+        "apps/*/src/infra/**",
+        "apps/web/src/net/**"
+      ],
+      "canImport": ["domain", "shared"]
+    },
+    {
+      "name": "ui",
+      "_": "Composants React et routes Start. Consomment le store, jamais `net/`. Affichent, et n'ont aucun pouvoir de décision : le web affiche, le gateway décide (§10.3).",
+      "match": ["apps/web/src/ui/**", "apps/web/src/routes/**"],
+      "canImport": ["domain", "usecase", "shared"]
+    },
+    {
+      "name": "app",
+      "_": "Le câblage : main.ts, config.ts (env parsé, fail-closed), construction de l'objet deps. La seule couche autorisée à voir les deux côtés, parce que c'est son rôle d'assembler.",
+      "match": ["apps/*/src/app/**", "tools/bench/**"],
+      "canImport": ["domain", "usecase", "infra", "ui", "shared"]
+    }
+  ],
+
+  "rules": {
+    "noCycles": true,
+    "noOrphans": false,
+    "entryPoints": ["apps/*/src/app/**", "tools/bench/**", "**/*.test.ts", "**/*.test.tsx"],
+
+    "_unlayeredFilesAllowed": "Chemins EXACTS, pas des globs. Chaque fichier de configuration racine ajouté au dépôt devra y être inscrit nommément (apps/web/vite.config.ts, les tsup.config.ts…). C'est voulu : cette liste doit rester lisible d'un coup d'œil.",
+    "unlayeredFilesAllowed": ["vitest.config.ts"],
+
+    "maxDuplicationPercent": 3,
+    "duplicationWindow": 8,
+    "duplicationIgnore": ["**/*.test.ts", "**/*.test.tsx"]
+  }
+}

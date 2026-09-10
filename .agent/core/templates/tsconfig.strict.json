@@ -1,0 +1,28 @@
+{
+  "_": "À étendre depuis le tsconfig du projet : { \"extends\": \"./.agent/core/templates/tsconfig.strict.json\" }. C'est le levier le plus rentable du socle : 94 % des erreurs de compilation produites par un LLM sont des erreurs de types, et chaque option ci-dessous supprime une classe entière d'erreurs à la génération, gratuitement, à chaque tour.",
+  "compilerOptions": {
+    "strict": true,
+
+    "noUncheckedIndexedAccess": true,
+    "_noUncheckedIndexedAccess": "`arr[0]` devient `T | undefined`. C'est LA supposition que fait un modèle en permanence — l'index existe — et la première source de `cannot read property of undefined` en production.",
+
+    "exactOptionalPropertyTypes": true,
+    "_exactOptionalPropertyTypes": "Interdit de passer `undefined` explicitement à un champ `?`. Sans ça, « absent » et « présent mais undefined » se confondent, et les deux chemins divergent en silence.",
+
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "_noImplicitReturns": "Une branche qui ne retourne rien dans une fonction qui retourne : le cas typique d'un `switch` complété par un modèle sans traiter la dernière branche.",
+
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "_noUnused": "Du code mort produit par une génération abandonnée en cours de route. Le laisser, c'est laisser un doublon en germe.",
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true,
+    "_forceConsistentCasing": "Un import en `./User` qui résout `./user` marche sous macOS et casse en CI Linux. Erreur classique, coûteuse, invisible en local."
+  }
+}

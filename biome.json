@@ -1,0 +1,105 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!.agent",
+      "!**/dist",
+      "!**/.output",
+      "!**/_generated",
+      "!**/*.gen.ts"
+    ]
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+
+      "complexity": {
+        "noExcessiveCognitiveComplexity": { "level": "error", "options": { "maxAllowedComplexity": 12 } },
+        "noUselessCatch": "error",
+        "noForEach": "off"
+      },
+
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noUnreachable": "error"
+      },
+
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noEmptyBlockStatements": "error",
+        "noDoubleEquals": "error"
+      },
+
+      "style": {
+        "noNonNullAssertion": "error",
+        "useNamingConvention": {
+          "level": "error",
+          "options": {
+            "strictCase": false,
+            "conventions": [
+              { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] },
+              { "selector": { "kind": "function" }, "formats": ["camelCase"] },
+              { "selector": { "kind": "variable" }, "formats": ["camelCase", "CONSTANT_CASE", "PascalCase"] }
+            ]
+          }
+        },
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": { "filenameCases": ["kebab-case", "PascalCase"], "requireAscii": true }
+        },
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["node:*", "fs", "path", "ioredis", "convex", "convex/*", "ws", "pino"],
+                "message": "Fournisseur concret interdit hors de la couche infra. Le usecase déclare un port (packages/domain), infra l'implémente, app câble. (Inversion des dépendances, §3.3)"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      "includes": [
+        "packages/redis-core/**",
+        "packages/durable/**",
+        "apps/*/src/infra/**",
+        "apps/*/src/app/**",
+        "apps/web/src/net/**",
+        "tools/bench/**",
+        "*.config.ts"
+      ],
+      "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
+    },
+    {
+      "includes": ["apps/web/src/routes/**"],
+      "linter": { "rules": { "style": { "useFilenamingConvention": "off" } } }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "style": { "noRestrictedImports": "off" }
+        }
+      }
+    }
+  ],
+
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
+
+  "javascript": { "formatter": { "quoteStyle": "double" } },
+
+  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+}

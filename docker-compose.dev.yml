@@ -1,0 +1,21 @@
+# Poste de développement (§11.7) : Redis seul. Les trois apps tournent en `pnpm dev`.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Le port est publié ici, contrairement à la production où aucun port ne l'est :
+# les tests de packages/redis-core tournent contre ce Redis-là, depuis l'hôte.
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: liveplace-dev-redis
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy noeviction
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+
+volumes:
+  redis-dev-data:

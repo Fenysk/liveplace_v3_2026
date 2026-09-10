@@ -1,0 +1,11 @@
+05e17b646a817240c206186f94f8f4c70974d5dc  VERSION
+0b88d6dd3b4130344fabc2a929df2ac8174805f6  checks/test-integrity.mjs
+33aca2c77516beb235df58995a354756bf184c17  calibrate.mjs
+6061a6b92982d7878d88f1783c0d722f31ad0f34  checks/core-integrity.mjs
+8529c17b3606f0cf7e1bcb537fe8d3610718f6c9  checks/lexique.mjs
+88372498607eb11c371ecd416629bef97d4d69d2  checks/architecture.mjs
+ad691283cd3c6d7456310b9771e669f4fb7c3787  templates/tsconfig.strict.json
+bf5fa9f4d9da90bd8850144e17b5e2b8008f18a5  lib/scan.mjs
+bf6e365bc6ea07a59a94d25f6802b3e2f68414a2  templates/biome.jsonc
+d37c9963159605a91ce4456a464549fe7c342233  gate.mjs
+d8cec072156944dead348d4ac785be99fa8cbfac  checks/duplication.mjs

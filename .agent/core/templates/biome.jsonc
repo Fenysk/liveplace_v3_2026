@@ -1,0 +1,105 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // La part de Biome dans le socle : tout ce qui se voit dans la FORME du code,
+  // fichier par fichier. C'est beaucoup, c'est instantané, et c'est déjà écrit —
+  // ne jamais réimplémenter en check maison ce que Biome sait faire.
+  //
+  // Ce que Biome ne peut PAS faire, et pourquoi ce n'est pas un manque :
+  //   · cycles d'import, duplication entre fichiers, fichier placé dans la
+  //     mauvaise couche → il faut le GRAPHE du projet    → checks du socle
+  //   · « dire user et non account »                      → il faut le DOMAINE  → lexique.json
+  //
+  // Les noms de règles bougent entre versions (nursery → stable). Après copie :
+  //   npx biome check .          ← une règle inconnue est signalée immédiatement
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+
+      "complexity": {
+        // Le vrai levier « KISS » mesurable. La complexité cognitive pénalise
+        // CHAQUE niveau d'imbrication : trois `if` imbriqués coûtent 1+2+3 = 6,
+        // les mêmes en clauses de garde coûtent 1+1+1 = 3. Baisser le seuil ne
+        // demande pas « écris des guard clauses », ça les rend nécessaires.
+        // 15 est le défaut de Biome ; 12 est serré sans être punitif.
+        "noExcessiveCognitiveComplexity": { "level": "error", "options": { "maxAllowedComplexity": 12 } },
+        "noUselessCatch": "error",
+        "noForEach": "off" // question de style, pas de dérive : ne pas dépenser de crédit là-dessus
+      },
+
+      "correctness": {
+        // Du code mort est un doublon en germe : la prochaine session le lira,
+        // le croira vivant, et en fera une variante.
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noUnreachable": "error"
+      },
+
+      "suspicious": {
+        // Les échappatoires. Chacune convertit une erreur de compilation —
+        // gratuite, immédiate — en erreur d'exécution chez l'utilisateur.
+        "noExplicitAny": "error",
+        "noEmptyBlockStatements": "error", // attrape `catch {}` : le chemin d'erreur silencieux
+        "noDoubleEquals": "error"
+      },
+
+      "style": {
+        "noNonNullAssertion": "error", // le `!` : une affirmation que le compilateur n'a pas vérifiée
+
+        // Biome tranche la CASSE, le lexique du socle tranche le SENS.
+        // Les deux sont nécessaires : `FetchUserData` est mal cassé ET mal nommé.
+        "useNamingConvention": {
+          "level": "error",
+          "options": {
+            "strictCase": false,
+            "conventions": [
+              { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] },
+              { "selector": { "kind": "function" }, "formats": ["camelCase"] },
+              { "selector": { "kind": "variable" }, "formats": ["camelCase", "CONSTANT_CASE", "PascalCase"] }
+            ]
+          }
+        },
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": { "filenameCases": ["kebab-case", "PascalCase"], "requireAscii": true }
+        },
+
+        // Complément exact du check `architecture` du socle : celui-ci ne juge que
+        // les imports INTERNES (il ignore les paquets npm, par construction).
+        // Ici on ferme l'autre moitié : quelle couche a le droit de connaître
+        // quel fournisseur. Adapter les paquets à la stack réelle.
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["node:*", "fs", "path", "pg", "mysql*", "@prisma/*", "stripe", "aws-sdk", "@aws-sdk/*"],
+                "message": "Fournisseur concret interdit hors de la couche infra. Le usecase déclare un port, infra l'implémente, app câble. (Inversion des dépendances)"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // La seule couche autorisée à connaître un fournisseur.
+      "includes": ["src/infra/**", "src/app/**"],
+      "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
+    },
+    {
+      // Les tests ont le droit d'être répétitifs et verbeux : leur lisibilité
+      // vaut mieux que leur élégance, et ils sont supposés être explicites.
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+      "linter": { "rules": { "complexity": { "noExcessiveCognitiveComplexity": "off" } } }
+    }
+  ],
+
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 }
+}

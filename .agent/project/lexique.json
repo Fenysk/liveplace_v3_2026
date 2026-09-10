@@ -1,0 +1,58 @@
+{
+  "_": "SOURCE DE VÉRITÉ de la nomenclature — le langage du projet. C'est la section 14 du plan d'architecture V3, transcrite au format du socle, comme l'exige le §12.1. Les tables `nouns` et `verbs` du gabarit ont été REMPLACÉES, pas complétées : le socle canonisait `delete`, le §14 le bannit au profit de `clear`. Ajouter un synonyme « juste pour cette fois » EST le mécanisme de la dérive : ça passe par JOURNAL.md.",
+
+  "_matching": "Un nom banni est signalé s'il apparaît dans N'IMPORTE QUEL mot d'un identifiant déclaré. Un verbe banni ne l'est qu'en TÊTE d'un identifiant d'au moins deux mots. D'où les absences volontaires ci-dessous : `color` n'est pas banni (il casserait `colorIndex`), ni `name` (il casserait `displayName`), ni `user` (il casserait `userId`).",
+
+  "nouns": [
+    { "canonical": "canvas",       "definition": "Le tableau d'un streamer, identifié par un `canvasId` OPAQUE qui n'est jamais un `userId` (D-14).", "banned": ["board"] },
+    { "canonical": "cell",         "definition": "Une position (x, y) sur le canvas.",                                   "banned": ["coord", "coords"] },
+    { "canonical": "cellKey",      "definition": "Le nom d'une case, indépendant de la taille : y × CELL_STRIDE + x. Ne sert JAMAIS à indexer `state` (D-15).", "banned": [] },
+    { "canonical": "stateOffset",  "definition": "La position d'une case dans `state` : y × width + x. Ne sert JAMAIS de nom de clé (D-15).", "banned": [] },
+    { "canonical": "pixel",        "definition": "La couleur visible d'une case, portée par `colorIndex`. Jamais de #hex sur le fil.", "banned": [] },
+    { "canonical": "palette",      "definition": "La liste des couleurs, indexée. Index 0 = transparent.",               "banned": ["colors"] },
+    { "canonical": "batch",        "definition": "Un lot de pixels dans une frame `place`. Réservé aux poses.",          "banned": ["group"] },
+    { "canonical": "event",        "definition": "Une opération validée, canonique, portant une `version`. Vit dans le stream et l'archive.", "banned": ["delta", "update", "change"] },
+    { "canonical": "version",      "definition": "Le curseur unique du système : reconnexion, resync, archive, restauration (D-05).", "banned": ["revision", "seq", "sequence"] },
+    { "canonical": "frame",        "definition": "Un message WebSocket. `CellsFrame` est un lot de cases envoyé au client — ce n'est PAS un `event` : il est conflaté et couvre une plage de versions.", "banned": [] },
+    { "canonical": "gauge",        "definition": "Le compteur de pixels disponibles, en `charges`, rechargé par `refill`.", "banned": ["quota", "cooldown", "credits"] },
+    { "canonical": "guest",        "definition": "Qui regarde sans compte. Lecture seule. Jamais la chaîne \"anon\" en base (AP-11).", "banned": ["anon", "anonymous"] },
+    { "canonical": "viewer",       "definition": "Qui a un compte. Le mot `user` désigne la personne, jamais le rôle.",  "banned": [] },
+    { "canonical": "owner",        "definition": "Le streamer sur son canvas.",                                          "banned": ["admin", "streamer"] },
+    { "canonical": "moderator",    "definition": "Quelqu'un qui peut modérer sans posséder le canvas.",                  "banned": [] },
+    { "canonical": "userId",       "definition": "L'identifiant d'une personne, égal au `twitchId`, immuable. Jamais le `login`, jamais le `displayName`.", "banned": [] },
+    { "canonical": "login",        "definition": "Le pseudo Twitch en minuscules. Sert UNIQUEMENT dans les URL. Peut changer : ne sert jamais de clé. Ne désigne JAMAIS l'action de se connecter.", "banned": ["username", "nickname", "handle"] },
+    { "canonical": "displayName",  "definition": "Le nom affiché, au propre. Sert uniquement à l'affichage.",            "banned": ["pseudo"] },
+    { "canonical": "cleared",      "definition": "La pierre tombale versionnée qui empêche un pixel supprimé de réapparaître (D-16).", "banned": ["deleted", "hidden", "tombstone"] },
+    { "canonical": "snapshot",     "definition": "La copie complète de l'état, avec son `tier` (working, hourly, daily, weekly).", "banned": ["backup", "dump"] },
+    { "canonical": "chunk",        "definition": "Le lot d'événements archivé dans Convex, dont le contenu compressé est le `payload`. Jamais une subdivision spatiale.", "banned": [] },
+    { "canonical": "payload",      "definition": "Le contenu compressé d'un `chunk`.",                                   "banned": [] },
+    { "canonical": "tile",         "definition": "RÉSERVÉ, n'existe pas encore : une subdivision spatiale du canvas. Ne jamais appeler ça un `chunk`.", "banned": [] },
+    { "canonical": "still",        "definition": "RÉSERVÉ, n'existe pas encore : une image d'un timelapse. Ne jamais appeler ça une `frame`.", "banned": [] },
+    { "canonical": "obsDelay",     "definition": "Le délai de la vue OBS, appliqué par le client (D-08). L'instant d'affichage d'une case est `showAt`.", "banned": ["buffer", "lag"] },
+    { "canonical": "session",      "definition": "Le jeton du navigateur, cookie `lp_session` signé HS256. Le mot `token` est réservé au token Twitch, qu'on ne garde pas.", "banned": ["token"] }
+  ],
+
+  "verbs": [
+    { "canonical": "place",   "meaning": "Poser des pixels sur le canvas.",                                          "banned": ["draw", "paint", "put"] },
+    { "canonical": "clear",   "meaning": "Retirer des pixels par modération : `clearUser`, `clearArea`. Restaure ce qu'il y avait dessous.", "banned": ["delete", "remove", "erase"] },
+    { "canonical": "restore", "meaning": "Remettre le pixel d'en dessous — et, pour `restore.lua`, réécrire un état complet.", "banned": [] },
+    { "canonical": "ban",     "meaning": "Interdire de poser sur ce canvas. L'inverse est `unban`.",                  "banned": ["block"] },
+    { "canonical": "conflate","meaning": "Fusionner plusieurs changements d'une même case dans un tick (D-13).",      "banned": ["merge", "dedupe"] },
+    { "canonical": "resync",  "meaning": "Rattraper ce qu'on a manqué depuis `lastVersion`.",                         "banned": ["catchup", "replay"] },
+    { "canonical": "get",     "meaning": "Lire UNE ressource par son identifiant.",                                   "banned": ["find", "load"] },
+    { "canonical": "list",    "meaning": "Lire une collection. Vide = résultat valide, pas une erreur.",              "banned": ["read", "fetch", "getAll", "fetchAll"] },
+    { "canonical": "signIn",  "meaning": "L'action de se connecter. Le mot `login` est pris : c'est le pseudo.",      "banned": ["login", "authenticate"] },
+    { "canonical": "signOut", "meaning": "L'action de se déconnecter.",                                               "banned": ["logout"] }
+  ],
+
+  "bannedNames": [
+    "util", "utils", "helper", "helpers", "manager", "handler", "processor",
+    "data", "datas", "info", "infos", "misc", "common", "stuff", "thing", "things",
+    "temp", "tmp", "old", "new", "v2", "final", "wrapper"
+  ],
+  "_bannedNames": "Ces mots ne décrivent pas une responsabilité, ils décrivent l'absence de décision. `data` est explicitement interdit par le §14 : le contenu d'un chunk s'appelle `payload`. `service` a été retiré de la liste du gabarit — le plan parle de « trois services applicatifs » (D-03) et le mot y a un sens précis.",
+
+  "booleanPrefixes": ["is", "has", "can", "should", "will", "was", "did"],
+
+  "ignore": ["packages/durable/convex/_generated/**", "**/*.gen.ts", "**/*.generated.ts"]
+}

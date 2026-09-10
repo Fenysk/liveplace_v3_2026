@@ -1,0 +1,16 @@
+# LF partout, dans le dépôt ET dans les copies de travail.
+#
+# Sans cette ligne, git convertit en CRLF au checkout sous Windows. Le MANIFEST du socle
+# est une empreinte SHA1 des fichiers de .agent/core/ tels qu'installés, en LF : après un
+# clone sous Windows, chaque fichier du noyau aurait une empreinte différente et le check
+# `core-integrity` échouerait en accusant une modification à la main qui n'a jamais eu lieu.
+# Le même raisonnement vaut pour les scripts Lua et tout ce qui part dans une image Linux.
+* text=auto eol=lf
+
+# Fichiers binaires : jamais de conversion.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
