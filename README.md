@@ -6,7 +6,7 @@ Une URL par streamer, la même page dans le navigateur et dans une source Naviga
 ## Où vivent les décisions
 
 Le **quoi** est dans le cahier des charges, le **comment** dans le plan d'architecture V3 —
-les deux dans le vault Obsidian, figés jusqu'au bilan du 4 octobre 2026.
+les deux dans le vault Obsidian (dossier LivePlace, à chercher toi-même), figés jusqu'au bilan du 4 octobre 2026.
 
 Ce dépôt ne redit ni l'un ni l'autre. Ce qu'il contient de normatif :
 

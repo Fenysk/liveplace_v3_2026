@@ -11,6 +11,18 @@ Format : 5 lignes maximum. Si ça demande plus, la décision n'est pas mûre.
 
 ---
 
+## 2026-09-10 — Un alias par package, pas un joker au milieu
+
+**Contexte.** Le §12.1 prescrit `@liveplace/*` → `packages/*/src`. Le résolveur du socle ne retire qu'un `*` en fin de cible : avec le joker au milieu, aucun import inter-packages ne se résout et le contrôle des couches passe au vert sans rien vérifier. Constaté par une sonde — `domain` important `redis-core` n'était pas signalé.
+**Décision.** Cinq alias explicites, un par package. La sonde échoue désormais avec le bon message ; le gate mord.
+**Renoncement.** Pas de correctif dans `.agent/core/` : c'est une limite du socle, elle se remonte en amont. Et plus jamais de gate déclaré vert sans avoir vérifié qu'il sait échouer.
+
+## 2026-09-10 — LF partout, imposé par `.gitattributes`
+
+**Contexte.** Git convertit en CRLF au checkout sous Windows. Le MANIFEST du socle est une empreinte des fichiers de `.agent/core/` en LF : après un clone, `core-integrity` accuserait une modification à la main qui n'a jamais eu lieu.
+**Décision.** `* text=auto eol=lf` à la racine. Vaut aussi pour les scripts Lua et tout ce qui part dans une image Linux.
+**Renoncement.** Pas de réglage git global par machine : la règle appartient au dépôt, pas au poste.
+
 ## 2026-09-10 — Collisions connues du lexique, laissées ouvertes
 
 **Contexte.** Le check est aveugle au contexte. Trois mots que le §14 bannit dans un sens précis mordront ailleurs : `grid` (l'overlay du §9.3), `buffer` (le tampon du gateway, §6.1), `token` (le token bucket, §6.3).

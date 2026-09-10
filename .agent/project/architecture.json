@@ -2,7 +2,15 @@
   "_": "SOURCE DE VÉRITÉ de l'architecture. Lu par le gate, pas seulement par l'humain. Reprend le mapping des couches du plan d'architecture V3, §12.1. Modifier ce fichier change ce que le gate accepte — donc c'est une décision, et une décision s'écrit d'abord dans JOURNAL.md.",
 
   "root": ".",
-  "aliases": { "@liveplace/*": "packages/*/src" },
+
+  "_aliases": "Un alias PAR package, jamais `@liveplace/*` → `packages/*/src`. Le résolveur du socle ne retire qu'un `*` en FIN de cible : avec le joker au milieu, aucun import inter-packages ne se résout, et le contrôle des couches devient silencieusement aveugle là où il compte le plus. Vérifié par une sonde le 2026-09-10, voir JOURNAL.",
+  "aliases": {
+    "@liveplace/protocol": "packages/protocol/src",
+    "@liveplace/domain": "packages/domain/src",
+    "@liveplace/redis-core": "packages/redis-core/src",
+    "@liveplace/durable": "packages/durable/src",
+    "@liveplace/shared": "packages/shared/src"
+  },
 
   "layers": [
     {
