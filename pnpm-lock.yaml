@@ -25,7 +25,11 @@ importers:
 
   packages/durable: {}
 
-  packages/protocol: {}
+  packages/protocol:
+    dependencies:
+      zod:
+        specifier: ^4.6.4
+        version: 4.6.4
 
   packages/redis-core: {}
 
@@ -608,6 +612,9 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  zod@4.6.4:
+    resolution: {integrity: sha512-AXSD6hvGdvRjajG/l1cC+d6IrhH+sjmPKtYeQdJIK8MFJl3LyClzS+o/YsVC+zQZPupAaeH5skwwm8YqYH7BqA==}
+
 snapshots:
 
   '@biomejs/biome@2.5.12':
@@ -974,3 +981,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  zod@4.6.4: {}
