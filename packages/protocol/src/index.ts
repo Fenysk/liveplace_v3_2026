@@ -52,7 +52,7 @@ export type BroadcastCell = EventCell & {
 const RequestIdSchema = z.string();
 const CanvasIdSchema = z.string();
 const UserIdSchema = z.string();
-const LoginSchema = z.string();
+const TwitchLoginSchema = z.string();
 const DisplayNameSchema = z.string();
 const CursorSchema = z.string();
 const TimestampSchema = z.number();
@@ -95,7 +95,7 @@ const RejectedPixelSchema = z.object({
 
 const InspectEntrySchema = z.object({
   userId: UserIdSchema,
-  login: LoginSchema,
+  login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
@@ -192,7 +192,7 @@ const WelcomeFrameSchema = z.object({
   version: VersionSchema,
   you: z.object({
     userId: UserIdSchema.optional(),
-    login: LoginSchema.optional(),
+    login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
     role: RoleSchema,
   }),
