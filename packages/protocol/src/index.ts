@@ -1,12 +1,12 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
+import { ROLES, type Timestamp } from "@liveplace/domain";
+import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
 // --- Constantes et types de base --------------------------------------
 
 export const PROTOCOL_VERSION = 1;
-
-export type Timestamp = number; // ms depuis epoch
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -59,7 +59,7 @@ const TimestampSchema = z.number();
 const VersionSchema = z.number().int().nonnegative();
 const CoordinateSchema = z.number().int().nonnegative();
 const ColorIndexSchema = z.number().int().min(0).max(255);
-const RoleSchema = z.enum(["owner", "moderator", "viewer", "guest"]);
+const RoleSchema = z.enum(ROLES);
 
 const PixelSchema = z.object({
   x: CoordinateSchema,
@@ -253,12 +253,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
 
 export type ServerFrame = z.infer<typeof ServerFrameSchema>;
 
-// --- Result et codecs ----------------------------------------------------
-// Result<T, E> n'existe encore nulle part ailleurs dans le repo (domain et
-// shared sont vides au J3) : déclaré ici en attendant, forme canonique du
-// skill CONTRAT (union discriminée, jamais un booléen + champs optionnels).
-
-export type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
+// --- Codecs ----------------------------------------------------------------
 
 export function decodeClientFrame(raw: unknown): Result<ClientFrame> {
   const parsed = ClientFrameSchema.safeParse(raw);
