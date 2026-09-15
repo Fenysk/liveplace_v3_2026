@@ -2,14 +2,52 @@
 
 Append-only. On ajoute en haut, on ne réécrit jamais, on ne supprime jamais.
 
-Une entrée existe pour **une seule raison** : une décision a changé ce que le gate accepte
-(architecture.json, lexique.json, un seuil, une règle désactivée). Tout le reste — ce qui a
-été fait, ce qui marche — se lit dans le code et dans le gate. Un journal qui raconte le
-travail devient un doublon du dépôt, et un doublon dérive.
+Une entrée existe pour **deux raisons seulement** : une décision a changé ce que le gate accepte
+(architecture.json, lexique.json, un seuil, une règle désactivée), ou elle contredit un plan
+(plan d'architecture, plan du jour). Tout le reste — ce qui a été fait, ce qui marche — se lit
+dans le code et dans le gate. Un journal qui raconte le travail devient un doublon du dépôt,
+et un doublon dérive.
 
 Format : 5 lignes maximum. Si ça demande plus, la décision n'est pas mûre.
+Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-MM-JJ)`.
 
 ---
+
+## 2026-09-15 — Écart : `BROADCAST_HZ` n'est pas dans `domain`
+
+**Contexte.** Le plan du jour 4 (bloc B) range `BROADCAST_HZ = 10` avec les valeurs de `domain`.
+**Décision.** Il n'y entre pas. C'est un réglage de transport, et le §11.5 en fait une variable d'environnement du gateway (défaut `10`), parsée dans son `app/config.ts` au J5.
+**Renoncement.** Pas de constante dans `domain` que seul le gateway lirait : le §11.5 sépare l'infrastructure (env) du jeu (`domain`).
+
+## 2026-09-15 — Écart : la taille de palette vient de l'appelant, pas de `meta`
+
+**Contexte.** Le §5.3 (étape 3) valide « `meta` en main » un pixel hors palette, mais `meta` (§5.1) ne porte pas la taille de la palette.
+**Décision.** `client.ts` passe `PALETTE.length` (`domain`) à `place.lua` à chaque appel, comme `nowMs`. Le schéma du §5.1 ne change pas.
+**Renoncement.** Pas de champ `paletteSize` dans `meta` : la palette est provisoire, et chaque canvas déjà créé garderait une taille périmée sans migration.
+
+## 2026-09-15 — Écart : `place.lua` refuse lui-même un canvas pas prêt
+
+**Contexte.** Le §5.5 confie la vérification de `meta.ready` au seul gateway, que le §6.1 oublie ensuite (incohérence n°3 de fin de plan).
+**Décision.** Étape 0 de `place.lua` : `meta` absent ou `ready ≠ "1"` renvoie `canvas_not_found` sans rien écrire. Le gateway vérifiera aussi au J5.
+**Renoncement.** Pas de confiance au seul appelant : une pose pendant un restore écrirait dans un état qui va être écrasé.
+
+## 2026-09-15 — Écart : la recharge ignore une horloge qui recule
+
+**Contexte.** La formule du §5.3 (étape 4) donne un nombre de recharges négatif si `nowMs < at`, par exemple après une correction NTP du gateway : la jauge baisserait et `at` reculerait.
+**Décision.** `refills = max(0, floor((nowMs - at) / refillMs))`, dans `refillGauge` (`domain`) et dans `place.lua`, chacun avec son test.
+**Renoncement.** Pas de rejet de la pose quand l'horloge recule : le viewer n'y est pour rien, et quelques millisecondes d'écart ne méritent pas une erreur.
+
+## 2026-09-15 — Le JOURNAL consigne aussi les écarts aux plans
+
+**Contexte.** Le plan d'architecture veut que toute décision prise en route soit ici, pour le bilan du 4 octobre. Or l'ancienne règle d'entrée n'acceptait que ce qui change le gate : les écarts se dispersaient dans les journaux Obsidian quotidiens.
+**Décision.** Une décision qui contredit un plan a son entrée, et le code qui la porte a le marqueur `Écart §x.y (JOURNAL AAAA-MM-JJ)`. Au bilan, `grep -rn "Écart §"` se compare à ce fichier.
+**Renoncement.** Pas de note « écarts » dans Obsidian : hors du dépôt, elle dériverait du code. Les choix d'implémentation où le plan est muet restent dans le code.
+
+## 2026-09-15 — `redis-core` dépend d'ioredis, et le gate exige le Redis de dev
+
+**Contexte.** §5.6 : scripts chargés par `defineCommand` d'ioredis, testés contre un vrai Redis (D-19). Le gate lance `pnpm test`, donc ces tests.
+**Décision.** `ioredis` en dépendance de `packages/redis-core` seul. Sans `docker compose -f docker-compose.dev.yml up -d`, l'étape `tests` échoue avec un message qui le dit.
+**Renoncement.** Pas de `skip` quand Redis est absent : un gate vert qui n'a pas testé le Lua est aveugle là où la justesse compte le plus.
 
 ## 2026-09-10 — Un alias par package, pas un joker au milieu
 

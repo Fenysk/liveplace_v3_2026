@@ -29,7 +29,7 @@ export const GAUGE_MAX = 10;
 export const REFILL_MS = 10_000;
 export const REFILL_CHARGES = 1;
 
-// §5.3 étape 4. `max(0, …)` : une horloge qui recule ne vide pas la jauge.
+// Écart §5.3 (JOURNAL 2026-09-15) : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
 export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: GaugeParams): Gauge {
   if (!gauge) return { charges: params.gaugeMax, at: nowMs };
   const refills = Math.max(0, Math.floor((nowMs - gauge.at) / params.refillMs));
