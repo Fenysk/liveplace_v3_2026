@@ -64,12 +64,14 @@ Faire passer le gate en l'affaiblissant, sous toutes ses formes :
 
 Un gate qu'on peut affaiblir n'est plus une preuve, c'est un avis — donc plus rien.
 
-Et deux règles de conduite qui ne se vérifient pas mécaniquement :
+Et trois règles de conduite qui ne se vérifient pas mécaniquement :
 
 - **Un diff ne contient que ce que la tâche exige.** Pas d'amélioration opportuniste
   de code qui marchait : ça devient une tâche à part, avec son propre gate.
 - **On ne crée un nom que si la recherche est revenue vide.** Chercher d'abord,
   nommer ensuite. C'est là que naissent la duplication et la dérive de vocabulaire.
+- **Commentaires ultra concis.** Une ligne, seulement le non-évident (un piège, une
+  référence `§`/`D-xx`). Jamais de paraphrase du code ni de bandeau décoratif.
 
 ## Commandes
 
