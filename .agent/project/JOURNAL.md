@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-16 — Écart D-12 : Convex en région EU
+
+**Contexte.** D-12 choisit la région US (~30 % moins cher à l'usage), et la région ne se change plus après la création du projet.
+**Décision.** Projet créé en EU le 10/09, définitif : au plus près du VPS (Allemagne), car le loader SSR de `/{login}` lit Convex à chaque chargement de page (§9.1). Le risque du §13 (données de viewers européens en région US) tombe avec.
+**Renoncement.** Pas d'économie US : Convex hors du chemin chaud ne veut pas dire hors de la latence du chargement de page.
+
 ## 2026-09-15 — Écart : `BROADCAST_HZ` n'est pas dans `domain`
 
 **Contexte.** Le plan du jour 4 (bloc B) range `BROADCAST_HZ = 10` avec les valeurs de `domain`.
