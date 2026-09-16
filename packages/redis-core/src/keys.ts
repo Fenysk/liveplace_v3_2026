@@ -7,7 +7,7 @@ export const EVENTS_MAXLEN = 20_000; // `MAXLEN ~` à chaque XADD, rien d'autre 
 export const GAUGE_TTL_SECONDS = 30 * 24 * 3600; // glissant, jauge expirée = pleine
 export const REQ_TTL_SECONDS = 120;
 
-export function canvasKeys(canvasId: string) {
+export function buildCanvasKeys(canvasId: string) {
   const prefix = `cv:${canvasId}:`;
   // Le Lua construit `hist:` et `cells:` en concaténant ces préfixes.
   const histPrefix = `${prefix}hist:`;

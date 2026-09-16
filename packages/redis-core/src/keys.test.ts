@@ -1,11 +1,11 @@
 import { type CellKey, toCellKey } from "@liveplace/domain";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { canvasKeys } from "./keys";
+import { buildCanvasKeys } from "./keys";
 
-describe("canvasKeys (§5.1)", () => {
+describe("buildCanvasKeys (§5.1)", () => {
   const canvasId = "canvas-1";
   const prefix = `cv:${canvasId}:`;
-  const keys = canvasKeys(canvasId);
+  const keys = buildCanvasKeys(canvasId);
   const names = [
     keys.meta,
     keys.state,

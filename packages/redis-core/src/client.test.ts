@@ -13,7 +13,7 @@ import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type CanvasMeta, createCanvasCore, type Placement } from "./client";
-import { canvasKeys, HIST_DEPTH } from "./keys";
+import { buildCanvasKeys, HIST_DEPTH } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
 const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
@@ -51,7 +51,7 @@ describe("createCanvas (§5.6)", () => {
   // Crée un canvas prêt : meta complète, state de width × height octets à zéro, version 0
   it("creates a ready canvas with a zeroed state at version 0", async () => {
     const canvasId = uniqueCanvasId();
-    const keys = canvasKeys(canvasId);
+    const keys = buildCanvasKeys(canvasId);
 
     await core.createCanvas(canvasId, meta);
 
@@ -68,7 +68,7 @@ describe("createCanvas (§5.6)", () => {
   // Ne réinitialise jamais un canvas existant (idempotent)
   it("never resets an existing canvas", async () => {
     const canvasId = uniqueCanvasId();
-    const keys = canvasKeys(canvasId);
+    const keys = buildCanvasKeys(canvasId);
     await core.createCanvas(canvasId, meta);
     await redis.setrange(keys.state, 0, "\x05");
     await redis.incr(keys.version);
@@ -88,7 +88,7 @@ describe("place (§5.3)", () => {
   const readyCanvas = async () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
-    return { canvasId, keys: canvasKeys(canvasId) };
+    return { canvasId, keys: buildCanvasKeys(canvasId) };
   };
 
   const placement = (overrides: Partial<Placement> = {}): Placement => ({

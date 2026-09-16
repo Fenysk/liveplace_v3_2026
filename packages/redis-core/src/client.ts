@@ -5,7 +5,7 @@ import { CELL_STRIDE, type GaugeParams, PALETTE, type Timestamp } from "@livepla
 import { type ClientFrame, decodeServerFrame, type ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
-import { canvasKeys, EVENTS_MAXLEN, GAUGE_TTL_SECONDS, HIST_DEPTH, REQ_TTL_SECONDS } from "./keys";
+import { buildCanvasKeys, EVENTS_MAXLEN, GAUGE_TTL_SECONDS, HIST_DEPTH, REQ_TTL_SECONDS } from "./keys";
 
 declare module "ioredis" {
   interface RedisCommander<Context> {
@@ -33,7 +33,7 @@ export function createCanvasCore(redis: Redis) {
   return {
     // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
     async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
-      const keys = canvasKeys(canvasId);
+      const keys = buildCanvasKeys(canvasId);
       const transaction = redis.multi();
       for (const [field, value] of Object.entries(meta)) transaction.hsetnx(keys.meta, field, value);
       await transaction
@@ -46,7 +46,7 @@ export function createCanvasCore(redis: Redis) {
     // L'ordre des arguments est celui que lit place.lua.
     async place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">> {
       const { userId, requestId, nowMs, pixels } = placement;
-      const keys = canvasKeys(canvasId);
+      const keys = buildCanvasKeys(canvasId);
       const [status, ack] = await redis.place(
         keys.meta,
         keys.state,
