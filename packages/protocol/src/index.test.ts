@@ -13,9 +13,7 @@ describe("protocol frames", () => {
     const result = decodeClientFrame(raw);
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.t).toBe("hello");
-    }
+    if (result.ok) expect(result.value.t).toBe("hello");
   });
 
   it("rejects a hello frame with the wrong protocolVersion", () => {
@@ -45,8 +43,6 @@ describe("protocol frames", () => {
     const result = decodeClientFrame(raw);
 
     expect(result.ok).toBe(true);
-    if (result.ok && result.value.t === "place") {
-      expect(result.value.pixels.length).toBe(3);
-    }
+    if (result.ok && result.value.t === "place") expect(result.value.pixels.length).toBe(3);
   });
 });

@@ -94,9 +94,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       if (!results) throw new Error(`getSnapshot ${canvasId} : transaction annulée`);
       const state = unwrap(results[0]);
       const version = unwrap(results[1]);
-      if (!Buffer.isBuffer(state) || typeof version !== "string") {
+      if (!Buffer.isBuffer(state) || typeof version !== "string")
         throw new Error(`getSnapshot ${canvasId} : état ou version illisible`);
-      }
       return { state, version: Number(version) };
     },
 

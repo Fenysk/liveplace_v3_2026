@@ -94,6 +94,26 @@ diffs illisibles et de régressions sans rapport avec la demande.
 → **Un diff ne contient que ce que la tâche exige.** Ce qui mérite d'être refactoré
 devient une tâche à part, avec son propre gate.
 
+**9. Les accolades de `if` mal dosées.**
+- 1 action : jamais d'accolades, quelle que soit la condition.
+- Plusieurs actions : accolades obligatoires.
+
+```ts
+// ✅ 1 action : pas d'accolades
+if (!ok) throw new Error("error");
+
+// ❌ Accolades inutiles pour une seule action
+if (!ok) {
+  throw new Error("error");
+}
+
+// ✅ Deux actions ou plus : accolades obligatoires
+if (condition) {
+  actionOne();
+  actionTwo();
+}
+```
+
 ## Avant de dire « c'est écrit »
 
 - Le diff ne contient rien que la tâche n'exigeait pas.
