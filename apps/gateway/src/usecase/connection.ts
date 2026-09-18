@@ -8,7 +8,7 @@ import {
   type Session,
   type Timestamp,
 } from "@liveplace/domain";
-import type { CanvasCore, ClientSocket } from "@liveplace/domain/ports";
+import type { CanvasCore, ClientConnection, ClientSocket } from "@liveplace/domain/ports";
 import {
   type CellsFrame,
   type ClientFrame,
@@ -36,11 +36,6 @@ export type ConnectionDeps = {
   broadcast: Broadcast;
   now: () => Timestamp;
 };
-
-export interface Connection {
-  receive(text: string): Promise<void>;
-  close(): Promise<void>;
-}
 
 const parseJson = (text: string): unknown => {
   try {
@@ -84,7 +79,7 @@ export function createConnection(
   deps: ConnectionDeps,
   socket: ClientSocket,
   session: Session | null,
-): Connection {
+): ClientConnection {
   let state: State = { status: "awaitingHello" };
   let queue: Promise<void> = Promise.resolve();
 

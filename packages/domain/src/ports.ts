@@ -34,6 +34,12 @@ export interface SessionVerifier {
   verify(cookieHeader: string | undefined): Promise<Session | null>;
 }
 
+// Une connexion vue de la socket : le pendant de `ClientSocket`, pour que l'infra n'importe pas le usecase.
+export interface ClientConnection {
+  receive(text: string): Promise<void>;
+  close(): Promise<void>;
+}
+
 // Une socket vue du gateway.
 export interface ClientSocket {
   sendFrame(frame: ServerFrame): void;
