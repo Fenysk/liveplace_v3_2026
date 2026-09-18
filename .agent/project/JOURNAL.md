@@ -13,6 +13,18 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-16 — Le gateway dépend de `ws`, `jose` et `tsx` ; `zod` entre dans `shared`
+
+**Contexte.** §6 nomme `ws`. §10.2 veut un JWT HS256 vérifié localement, sans nommer d'outil. Node 22 ne lance pas nos sources (imports sans extension). §3.1 range la lecture d'env (Zod) dans `shared`.
+**Décision.** `ws`, `jose`, `ioredis` et `zod` dans `apps/gateway`, `tsx` en dev. `zod` dans `packages/shared`.
+**Renoncement.** Pas de HMAC écrit à la main : épingler l'algorithme et vérifier `exp` sont les deux trous que `jose` ferme. `pino` attend le déploiement.
+
+## 2026-09-16 — Écart §12.1 : les ports s'importent par `@liveplace/domain/ports`
+
+**Contexte.** `CanvasCore` (§3.3) a besoin d'`Event` et de l'`ack`, déclarés dans `protocol`, qui importe déjà `domain/src/index.ts` (§4.1). Le check `architecture` voit les cycles fichier par fichier, `import type` compris : un port dans `index.ts` ferait `domain → protocol → domain`.
+**Décision.** Les ports vivent dans `packages/domain/src/ports.ts`, que `index.ts` n'importe jamais. Point d'entrée `./ports` dans `domain/package.json`, chemin `@liveplace/domain/*` dans `tsconfig.json`. Les alias du gate et de Vitest le résolvent déjà.
+**Renoncement.** Pas d'`Event` déplacé dans `domain` (réécrit le J3, et l'`ack` resterait un type réseau). Pas de ports dans `protocol` (écart au §3.3).
+
 ## 2026-09-16 — Écart D-12 : Convex en région EU
 
 **Contexte.** D-12 choisit la région US (~30 % moins cher à l'usage), et la région ne se change plus après la création du projet.

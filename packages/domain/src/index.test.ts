@@ -6,11 +6,40 @@ import {
   type GaugeParams,
   PALETTE,
   refillGauge,
+  roleFor,
+  type Session,
   type StateOffset,
   TRANSPARENT_COLOR_INDEX,
   toCellKey,
   toStateOffset,
 } from "./index";
+
+describe("roleFor (§10.3)", () => {
+  const meta = { ownerId: "owner-1" };
+  const session = (userId: string): Session => ({ userId, login: userId, displayName: userId });
+
+  // Donne guest sans session, quoi que dise isModerator
+  it("gives guest without a session, whatever isModerator says", () => {
+    expect(roleFor(null, meta, false)).toBe("guest");
+    expect(roleFor(null, meta, true)).toBe("guest");
+  });
+
+  // Donne owner au propriétaire du canvas, même s'il est aussi modérateur
+  it("gives owner to the canvas owner, even if also a moderator", () => {
+    expect(roleFor(session(meta.ownerId), meta, false)).toBe("owner");
+    expect(roleFor(session(meta.ownerId), meta, true)).toBe("owner");
+  });
+
+  // Donne moderator à un modérateur qui ne possède pas le canvas
+  it("gives moderator to a moderator who does not own the canvas", () => {
+    expect(roleFor(session("moderator-1"), meta, true)).toBe("moderator");
+  });
+
+  // Donne viewer à toute autre personne connectée
+  it("gives viewer to anyone else signed in", () => {
+    expect(roleFor(session("user-1"), meta, false)).toBe("viewer");
+  });
+});
 
 describe("refillGauge", () => {
   // refillCharges ≠ 1 : un oubli du `× refillCharges` ne passerait pas.

@@ -1,8 +1,9 @@
 // Client typé du noyau Redis (§5.6).
 
 import { readFileSync } from "node:fs";
-import { CELL_STRIDE, type GaugeParams, PALETTE, type Timestamp } from "@liveplace/domain";
-import { type ClientFrame, decodeServerFrame, type ServerFrame } from "@liveplace/protocol";
+import { type CanvasMeta, CELL_STRIDE, PALETTE } from "@liveplace/domain";
+import type { AckFrame, Placement } from "@liveplace/domain/ports";
+import { decodeServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
 import { buildCanvasKeys, EVENTS_MAXLEN, GAUGE_TTL_SECONDS, HIST_DEPTH, REQ_TTL_SECONDS } from "./keys";
@@ -12,17 +13,6 @@ declare module "ioredis" {
     place(...args: (string | number)[]): RedisResult<[status: string, ack?: string], Context>;
   }
 }
-
-export type CanvasMeta = GaugeParams & { ownerId: string; width: number; height: number; obsDelayMs: number };
-
-export type Placement = {
-  userId: string;
-  requestId: string;
-  nowMs: Timestamp;
-  pixels: Extract<ClientFrame, { t: "place" }>["pixels"];
-};
-
-export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
 
 export function createCanvasCore(redis: Redis) {
   redis.defineCommand("place", {

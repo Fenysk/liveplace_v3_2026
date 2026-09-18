@@ -3,16 +3,18 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
+  type CanvasMeta,
   PALETTE,
   refillGauge,
   TRANSPARENT_COLOR_INDEX,
   toCellKey,
   toStateOffset,
 } from "@liveplace/domain";
+import type { Placement } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type CanvasMeta, createCanvasCore, type Placement } from "./client";
+import { createCanvasCore } from "./client";
 import { buildCanvasKeys, HIST_DEPTH } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.

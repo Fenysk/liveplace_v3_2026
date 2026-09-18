@@ -12,7 +12,8 @@
     "skipLibCheck": true,
 
     "paths": {
-      "@liveplace/*": ["./packages/*/src"]
+      "@liveplace/*": ["./packages/*/src"],
+      "@liveplace/domain/*": ["./packages/domain/src/*"]
     },
 
     "strict": true,

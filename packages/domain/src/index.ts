@@ -5,6 +5,21 @@ export type Timestamp = number; // ms depuis epoch
 export const ROLES = ["owner", "moderator", "viewer", "guest"] as const;
 export type Role = (typeof ROLES)[number];
 
+// Cookie `lp_session` vérifié (§10.2).
+export type Session = { userId: string; login: string; displayName: string };
+
+// §10.3
+export function roleFor(
+  session: Session | null,
+  meta: Pick<CanvasMeta, "ownerId">,
+  isModerator: boolean,
+): Role {
+  if (!session) return "guest";
+  if (session.userId === meta.ownerId) return "owner";
+  if (isModerator) return "moderator";
+  return "viewer";
+}
+
 // D-15 : deux index d'une même case, jamais interchangeables.
 export type CellKey = number & { readonly __brand: "CellKey" };
 export type StateOffset = number & { readonly __brand: "StateOffset" };
@@ -24,6 +39,9 @@ export function toCellKey(x: number, y: number): CellKey {
 // Jauge stockée (§5.1), pas la frame `gauge`.
 export type Gauge = { charges: number; at: Timestamp };
 export type GaugeParams = { gaugeMax: number; refillMs: number; refillCharges: number };
+
+// `cv:<id>:meta` sans `ready` (§5.1).
+export type CanvasMeta = GaugeParams & { ownerId: string; width: number; height: number; obsDelayMs: number };
 
 export const GAUGE_MAX = 10;
 export const REFILL_MS = 10_000;
