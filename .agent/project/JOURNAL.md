@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-18 — `useNamingConvention` désactivé sur la seule lecture d'env
+
+**Contexte.** Le §11.5 fixe les noms des variables (`REDIS_URL`, `SESSION_SECRET`…) et veut que le boot nomme la variable manquante telle qu'elle est écrite dans Dokploy. Biome exige des propriétés en camelCase et refuse donc le schéma Zod de `config.ts`.
+**Décision.** Override Biome sur `apps/*/src/app/config.ts` et son test seulement : `useNamingConvention` off. Le reste du dépôt garde la règle.
+**Renoncement.** Pas de schéma en camelCase : l'erreur dirait `sessionSecret` quand la variable à corriger s'appelle `SESSION_SECRET`. Pas de `biome-ignore` en ligne, qui est interdit.
+
 ## 2026-09-16 — Le gateway dépend de `ws`, `jose` et `tsx` ; `zod` entre dans `shared`
 
 **Contexte.** §6 nomme `ws`. §10.2 veut un JWT HS256 vérifié localement, sans nommer d'outil. Node 22 ne lance pas nos sources (imports sans extension). §3.1 range la lecture d'env (Zod) dans `shared`.

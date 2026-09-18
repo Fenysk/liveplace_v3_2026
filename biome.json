@@ -83,6 +83,10 @@
       "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
     },
     {
+      "includes": ["apps/*/src/app/config.ts", "apps/*/src/app/config.test.ts"],
+      "linter": { "rules": { "style": { "useNamingConvention": "off" } } }
+    },
+    {
       "includes": ["apps/web/src/routes/**"],
       "linter": { "rules": { "style": { "useFilenamingConvention": "off" } } }
     },

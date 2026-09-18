@@ -2,3 +2,8 @@ packages:
   - "apps/*"
   - "packages/*"
   - "tools/*"
+
+# esbuild (sous tsx) : son binaire vient d'un paquet par plateforme, le script d'installation
+# ne sert qu'à le vérifier. On ne l'exécute pas.
+allowBuilds:
+  esbuild: false
