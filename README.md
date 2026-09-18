@@ -32,13 +32,34 @@ s'écrit dans le JOURNAL avant de toucher aux données du socle.
 
 ```
 docker compose -f docker-compose.dev.yml up -d
+cp .env.example .env
+pnpm --filter @liveplace/gateway dev
 ```
 
-Puis `cp .env.example .env` et remplir. Twitch accepte `http://localhost:3000/auth/twitch/callback`
-comme redirect : l'OAuth marche en local, sans tunnel.
+Le premier lance Redis seul. Le `.env` se remplit à la main : le gateway ne lit que `REDIS_URL`
+et `SESSION_SECRET`, et refuse de démarrer sans eux. Le dernier lance le gateway sur `:8080`
+(`/ws` et `/healthz`).
+
+Redis s'adresse en `127.0.0.1`, jamais `localhost` : sous Windows, `wslrelay` écoute aussi en
+IPv6 sur le même port. Et `pnpm gate` exige ce Redis de dev, parce que les tests de
+`redis-core` tournent contre un vrai Redis.
+
+Twitch accepte `http://localhost:3000/auth/twitch/callback` comme redirect : l'OAuth marchera en
+local, sans tunnel.
 
 ## L'état du dépôt
 
-Jour 2 du bloc 1. Le squelette et les rails sont posés, il n'y a pas encore une ligne de
-métier. Le contenu de chaque package arrive à son jour, dans l'ordre de construction du
+Au 18 septembre 2026, jour 6 du bloc 1.
+
+| Morceau | Ce qu'il fait aujourd'hui |
+|---|---|
+| `packages/protocol` | Les frames client ↔ serveur, leurs schémas Zod, les codecs. |
+| `packages/domain` | Les règles pures (jauge, palette, coordonnées, rôles) et les ports (`@liveplace/domain/ports`). |
+| `packages/shared` | Le type `Result` et la lecture d'env fail-closed. |
+| `packages/redis-core` | `place.lua` et le client typé : créer, lire, poser, s'abonner. Testé contre un vrai Redis. |
+| `apps/gateway` | Le serveur WebSocket : `hello` → `welcome` + snapshot, `place` → `ack`, diffusion conflatée au tick, session par cookie. |
+| `packages/durable`, `apps/web`, `apps/worker`, `tools/bench` | Vides. |
+
+Rien n'est encore déployé, et il n'y a ni page web, ni connexion Twitch, ni modération, ni
+worker. Le contenu de chaque morceau arrive à son jour, dans l'ordre de construction du
 cahier des charges §4.
