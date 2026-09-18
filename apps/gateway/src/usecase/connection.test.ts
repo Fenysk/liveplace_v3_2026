@@ -1,0 +1,257 @@
+import type { CanvasMeta, Session } from "@liveplace/domain";
+import type { AckFrame, ClientSocket, LiveMessage, Placement } from "@liveplace/domain/ports";
+import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
+import { describe, expect, it } from "vitest";
+import { createBroadcast } from "./broadcast";
+import { createConnection } from "./connection";
+
+const canvasId = "canvas-1";
+const now = 1_700_000_000_000;
+
+const meta: CanvasMeta = {
+  ownerId: "owner-1",
+  width: 4,
+  height: 4,
+  gaugeMax: 3,
+  refillMs: 1000,
+  refillCharges: 1,
+  obsDelayMs: 5000,
+};
+
+const session: Session = { userId: "user-1", login: "user1", displayName: "User 1" };
+
+const ack: AckFrame = {
+  t: "ack",
+  requestId: "request-1",
+  version: 3,
+  accepted: 1,
+  rejected: [],
+  gauge: { charges: 2, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs },
+};
+
+const hello = (overrides: Record<string, unknown> = {}) =>
+  JSON.stringify({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui", ...overrides });
+
+const place = () =>
+  JSON.stringify({ t: "place", requestId: ack.requestId, pixels: [{ x: 1, y: 2, colorIndex: 3 }] });
+
+const event = (version: number, x: number, colorIndex: number): Event => ({
+  version,
+  kind: "place",
+  authorId: "user-2",
+  occurredAt: now,
+  cells: [{ x, y: 2, colorIndex, previousColorIndex: 0, placedAt: now }],
+});
+
+type SetupOptions = { session?: Session | null; version?: number; duringSnapshot?: () => void };
+
+const setup = (options: SetupOptions = {}) => {
+  const placements: Placement[] = [];
+  let publishTo: ((message: LiveMessage) => void) | null = null;
+  const core = {
+    async getCanvas(asked: string) {
+      return asked === canvasId ? meta : null;
+    },
+    async isModerator() {
+      return false;
+    },
+    async getSnapshot() {
+      options.duringSnapshot?.();
+      return { state: new Uint8Array(meta.width * meta.height), version: options.version ?? 0 };
+    },
+    async place(_asked: string, placement: Placement) {
+      placements.push(placement);
+      return { ok: true as const, value: ack };
+    },
+    async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
+      publishTo = onMessage;
+      return async () => {
+        publishTo = null;
+      };
+    },
+  };
+
+  const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
+  const closed: number[] = [];
+  const socket: ClientSocket = {
+    sendFrame: (frame) => {
+      sent.push(frame);
+    },
+    sendSnapshot: (state) => {
+      sent.push({ snapshot: state });
+    },
+    close: (code) => {
+      closed.push(code);
+    },
+  };
+
+  const broadcast = createBroadcast(core);
+  const connection = createConnection(
+    { core, broadcast, now: () => now },
+    socket,
+    options.session === undefined ? session : options.session,
+  );
+  return {
+    connection,
+    broadcast,
+    sent,
+    closed,
+    placements,
+    publish: (published: Event) => publishTo?.({ e: published }),
+  };
+};
+
+describe("createConnection (§6.1)", () => {
+  // Répond au hello par un welcome puis le snapshot binaire
+  it("answers hello with a welcome, then the binary snapshot", async () => {
+    const { connection, sent } = setup();
+
+    await connection.receive(hello());
+
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({
+      t: "welcome",
+      canvas: { canvasId, width: meta.width, height: meta.height, ownerId: meta.ownerId },
+      params: { gaugeMax: meta.gaugeMax, obsDelayMs: meta.obsDelayMs },
+      version: 0,
+      you: { userId: session.userId, login: session.login, role: "viewer" },
+    });
+    expect(sent[1]).toEqual({ snapshot: new Uint8Array(meta.width * meta.height) });
+  });
+
+  // Refuse une autre version de protocole, avec le bon code (§4.1)
+  it("refuses another protocol version with the right code", async () => {
+    const { connection, sent, closed } = setup();
+
+    await connection.receive(hello({ protocolVersion: PROTOCOL_VERSION + 1 }));
+
+    expect(sent).toEqual([{ t: "error", code: "protocol_version" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Refuse un canvas absent ou pas prêt (§5.5)
+  it("refuses a missing or not ready canvas", async () => {
+    const { connection, sent, closed } = setup();
+
+    await connection.receive(hello({ canvasId: "unknown-canvas" }));
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_not_found" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Refuse la pose d'un invité sans jamais appeler le noyau, et le laisse regarder
+  it("refuses a placement from a guest without calling the core, and keeps it connected", async () => {
+    const { connection, sent, closed, placements } = setup({ session: null });
+    await connection.receive(hello());
+
+    await connection.receive(place());
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "unauthenticated" });
+    expect(placements).toEqual([]);
+    expect(closed).toEqual([]);
+  });
+
+  // Transmet la pose au noyau avec l'horloge injectée, et renvoie l'ack tel quel
+  it("forwards a placement with the injected clock and returns the ack as is", async () => {
+    const { connection, sent, placements } = setup();
+    await connection.receive(hello());
+
+    await connection.receive(place());
+
+    expect(placements).toEqual([
+      {
+        userId: session.userId,
+        requestId: ack.requestId,
+        nowMs: now,
+        pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+      },
+    ]);
+    expect(sent.at(-1)).toEqual(ack);
+  });
+
+  // Ferme sur un JSON cassé
+  it("closes on broken JSON", async () => {
+    const { connection, sent, closed } = setup();
+
+    await connection.receive("{ pas du json");
+
+    expect(sent).toEqual([{ t: "error", code: "invalid_frame" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Ferme sur une pose reçue avant le hello
+  it("closes on a placement received before hello", async () => {
+    const { connection, closed, placements } = setup();
+
+    await connection.receive(place());
+
+    expect(placements).toEqual([]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Ferme sur une frame que le protocole ne définit pas
+  it("closes on a frame the protocol does not define", async () => {
+    const { connection, closed } = setup();
+
+    await connection.receive(JSON.stringify({ t: "whatever" }));
+
+    expect(closed).toEqual([1008]);
+  });
+
+  // Répond pong à un ping
+  it("answers a ping with a pong", async () => {
+    const { connection, sent } = setup();
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "ping" }));
+
+    expect(sent.at(-1)).toEqual({ t: "pong" });
+  });
+
+  // Garde ce qui arrive pendant la lecture de l'état, et jette ce que le snapshot contient déjà
+  it("holds what arrives during the state read, and drops what the snapshot already holds", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ version: 1, duringSnapshot: () => during.run?.() });
+    during.run = () => {
+      context.publish(event(1, 1, 5));
+      context.publish(event(2, 2, 6));
+      context.broadcast.tick();
+    };
+
+    await context.connection.receive(hello());
+
+    expect(context.sent).toHaveLength(3);
+    expect(context.sent[2]).toEqual({
+      t: "cells",
+      toVersion: 2,
+      cells: [{ x: 2, y: 2, colorIndex: 6, previousColorIndex: 0, placedAt: now, version: 2, kind: "place" }],
+    });
+  });
+
+  // Traite les frames une par une : une pose envoyée juste après le hello attend le welcome
+  it("handles frames one at a time: a placement sent right after hello waits for the welcome", async () => {
+    const { connection, sent } = setup();
+
+    const greeted = connection.receive(hello());
+    const placed = connection.receive(place());
+    await Promise.all([greeted, placed]);
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "ack",
+    ]);
+  });
+
+  // Quitte la diffusion à la fermeture : plus aucune case n'arrive
+  it("leaves the broadcast on close: no cell arrives afterwards", async () => {
+    const context = setup();
+    await context.connection.receive(hello());
+
+    await context.connection.close();
+    context.publish(event(1, 1, 5));
+    context.broadcast.tick();
+
+    expect(context.sent).toHaveLength(2);
+  });
+});
