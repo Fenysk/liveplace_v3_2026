@@ -10,7 +10,7 @@ import {
   toCellKey,
   toStateOffset,
 } from "@liveplace/domain";
-import type { Placement } from "@liveplace/domain/ports";
+import type { LiveMessage, Placement } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -19,7 +19,9 @@ import { buildCanvasKeys, HIST_DEPTH } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
 const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-const core = createCanvasCore(redis);
+// Une connexion abonnée à part : en mode subscribe, Redis n'accepte plus les autres commandes (§6.3).
+const liveSubscriber = redis.duplicate();
+const core = createCanvasCore(redis, liveSubscriber);
 
 // Un préfixe par exécution : le nettoyage ne touche que les canvas de ce fichier.
 const runId = randomUUID();
@@ -46,6 +48,7 @@ afterAll(async () => {
   const found: string[] = [];
   for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
   if (found.length > 0) await redis.del(...found);
+  liveSubscriber.disconnect();
   await redis.quit();
 });
 
@@ -344,5 +347,100 @@ describe("place (§5.3)", () => {
     } finally {
       await subscriber.quit();
     }
+  });
+});
+
+describe("getCanvas (§6.1)", () => {
+  // Renvoie null pour un canvas absent
+  it("returns null for a missing canvas", async () => {
+    expect(await core.getCanvas(uniqueCanvasId())).toBeNull();
+  });
+
+  // Renvoie null tant que le canvas n'est pas prêt (§5.5)
+  it("returns null while the canvas is not ready", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    await redis.hset(buildCanvasKeys(canvasId).meta, "ready", "0");
+
+    expect(await core.getCanvas(canvasId)).toBeNull();
+  });
+
+  // Renvoie la meta d'un canvas prêt, nombres compris
+  it("returns the meta of a ready canvas, numbers included", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    expect(await core.getCanvas(canvasId)).toEqual(meta);
+  });
+});
+
+describe("isModerator (§6.1)", () => {
+  // Ne voit un modérateur qu'une fois ajouté à mods
+  it("sees a moderator only once added to mods", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(false);
+
+    await redis.sadd(buildCanvasKeys(canvasId).mods, "moderator-1");
+
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
+  });
+});
+
+describe("getSnapshot (§6.1)", () => {
+  const now = 1_700_000_000_000;
+
+  // Lit l'état entier et la version qui va avec
+  it("reads the whole state and the version that goes with it", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const pixel = { x: 3, y: 2, colorIndex: 5 };
+    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels: [pixel] });
+
+    const snapshot = await core.getSnapshot(canvasId);
+
+    expect(snapshot.state).toHaveLength(meta.width * meta.height);
+    expect(snapshot.state[toStateOffset(pixel.x, pixel.y, meta.width)]).toBe(pixel.colorIndex);
+    expect(snapshot.version).toBe(1);
+  });
+});
+
+describe("subscribe (§6.3)", () => {
+  const now = 1_700_000_000_000;
+
+  // Reçoit l'événement d'une pose, et plus rien après le désabonnement
+  it("receives the event of a placement, and nothing after unsubscribing", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const pixel = { x: 3, y: 2, colorIndex: 5 };
+    const received: LiveMessage[] = [];
+
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels: [pixel] });
+    await delay(100);
+
+    expect(received).toEqual([
+      {
+        e: {
+          version: 1,
+          kind: "place",
+          authorId: "user-1",
+          occurredAt: now,
+          cells: [{ ...pixel, previousColorIndex: TRANSPARENT_COLOR_INDEX, placedAt: now }],
+        },
+      },
+    ]);
+
+    await unsubscribe();
+    await core.place(canvasId, {
+      userId: "user-1",
+      requestId: randomUUID(),
+      nowMs: now,
+      pixels: [{ x: 4, y: 2, colorIndex: 5 }],
+    });
+    await delay(100);
+
+    expect(received).toHaveLength(1);
   });
 });
