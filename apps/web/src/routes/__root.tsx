@@ -1,7 +1,10 @@
 // La coquille HTML commune à toutes les pages.
 
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import type { CanvasOpener } from "../state/canvas-store";
+
+export type RouterContext = { openCanvas: CanvasOpener };
 
 const RootDocument = ({ children }: { children: ReactNode }) => (
   <html lang="fr">
@@ -15,7 +18,7 @@ const RootDocument = ({ children }: { children: ReactNode }) => (
   </html>
 );
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
