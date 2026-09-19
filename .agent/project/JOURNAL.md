@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-19 — `noCycles` désactivé provisoirement : l'arbre de routes de Start fait un cycle
+
+**Contexte.** Start génère `routeTree.gen.ts`, dont le pied importe le type de `getRouter` depuis le routeur, qui importe l'arbre : un cycle inhérent au framework (§9), dans du code généré. Essayé sans succès : routes écrites à la main (le build de Start exige l'arbre généré), `noImportCycles` de Biome (ne résout pas les alias `@liveplace/*`, prouvé par une sonde), fichier généré hors du scan (fuir la règle).
+**Décision.** `rules.noCycles: false` jusqu'à ce que le socle sache ignorer le code généré dans `architecture`, comme `lexique` le fait déjà pour `**/*.gen.ts` : à remonter en amont du socle, puis rétablir `true`. D'ici là, un audit des cycles hors `*.gen.ts` avant chaque commit (19/09 : lancé à chaque commit, aucun cycle).
+**Renoncement.** Pas de correctif dans `.agent/core/`, écrasé à la prochaine installation (`core-integrity`). Pas de fichier déplacé pour échapper au scan.
+
 ## 2026-09-19 — `SESSION_SECRET` de production provisoirement égal à celui de dev
 
 **Contexte.** Posé ainsi par l'humain pour le jalon J5 : un cookie signé avec le secret du `.env` est donc valide en production.

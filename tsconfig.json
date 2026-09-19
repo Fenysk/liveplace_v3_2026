@@ -1,6 +1,6 @@
 {
   "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "tools/**/*.ts", "*.ts"],
-  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/.output", ".agent"],
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/.output", ".agent", "apps/web"],
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],

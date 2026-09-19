@@ -57,12 +57,12 @@
   ],
 
   "rules": {
-    "noCycles": true,
+    "noCycles": false,
     "noOrphans": false,
     "entryPoints": ["apps/*/src/app/**", "tools/bench/**", "**/*.test.ts", "**/*.test.tsx"],
 
     "_unlayeredFilesAllowed": "Chemins EXACTS, pas des globs. Chaque fichier de configuration racine ajouté au dépôt devra y être inscrit nommément (apps/web/vite.config.ts, les tsup.config.ts…). C'est voulu : cette liste doit rester lisible d'un coup d'œil.",
-    "unlayeredFilesAllowed": ["vitest.config.ts"],
+    "unlayeredFilesAllowed": ["vitest.config.ts", "apps/web/vite.config.ts"],
 
     "maxDuplicationPercent": 3,
     "duplicationWindow": 8,
