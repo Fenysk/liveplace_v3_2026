@@ -1,0 +1,74 @@
+# La seule description du déploiement (D-10, §11.1) : Dokploy l'exécute, il ne l'écrit pas.
+#
+# Les variables viennent de l'onglet Environment du Compose dans Dokploy. Chaque service ne reçoit que
+# ce que son `config.ts` lit, et `${NOM:?}` fait échouer le déploiement s'il en manque une
+# (Écart §11.1, JOURNAL 2026-09-19). Aucun port n'est publié : Traefik est le seul point d'entrée.
+#
+# Ne jamais renommer le projet Compose : le volume de Redis porte son nom, et l'AOF avec.
+
+services:
+  redis:
+    image: redis:7-alpine
+    # AOF à la seconde, et jamais d'éviction : un canvas ne disparaît pas en silence (§11.3).
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        APP: gateway
+    environment:
+      REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET manquante}
+      BROADCAST_HZ: ${BROADCAST_HZ:-10}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [default, dokploy-network]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      # Règle plus longue que celle du web, donc prioritaire : `/ws` va au gateway, le reste au web.
+      traefik.http.routers.liveplace-ws.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`) && PathPrefix(`/ws`)
+      traefik.http.routers.liveplace-ws.entrypoints: websecure
+      traefik.http.routers.liveplace-ws.tls.certresolver: letsencrypt
+      traefik.http.routers.liveplace-ws.service: liveplace-ws
+      traefik.http.services.liveplace-ws.loadbalancer.server.port: "8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    networks: [default, dokploy-network]
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      traefik.http.routers.liveplace-web.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
+      traefik.http.routers.liveplace-web.entrypoints: websecure
+      traefik.http.routers.liveplace-web.tls.certresolver: letsencrypt
+      traefik.http.routers.liveplace-web.service: liveplace-web
+      traefik.http.services.liveplace-web.loadbalancer.server.port: "3000"
+      # HTTP → HTTPS, par le middleware que Dokploy déclare déjà côté Traefik.
+      traefik.http.routers.liveplace-http.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
+      traefik.http.routers.liveplace-http.entrypoints: web
+      traefik.http.routers.liveplace-http.middlewares: redirect-to-https@file
+      traefik.http.routers.liveplace-http.service: liveplace-web
+
+volumes:
+  redis-data:
+
+networks:
+  dokploy-network:
+    external: true
