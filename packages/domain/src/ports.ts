@@ -46,3 +46,16 @@ export interface ClientSocket {
   sendSnapshot(state: Uint8Array): void;
   close(code: number): void;
 }
+
+// Ce que le gateway renvoie au web : les frames JSON, et le snapshot en binaire (§4.3).
+export type TransportListeners = {
+  onFrame(frame: ServerFrame): void;
+  onSnapshot(state: Uint8Array): void;
+  onClose(code: number): void;
+};
+
+// Le lien du web vers le gateway, vu du store : `net/` l'implémente, `state/` le reçoit (§9.2).
+export interface Transport {
+  send(frame: ClientFrame): void; // mis en attente tant que la connexion s'ouvre
+  listen(listeners: TransportListeners): void;
+}
