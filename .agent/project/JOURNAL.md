@@ -13,6 +13,36 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-19 — `SESSION_SECRET` de production provisoirement égal à celui de dev
+
+**Contexte.** Posé ainsi par l'humain pour le jalon J5 : un cookie signé avec le secret du `.env` est donc valide en production.
+**Décision.** À remplacer par une valeur distincte **au J8**, avant la première vraie connexion Twitch. D'ici là, aucun cookie n'est signé avec le secret du `.env` : les essais locaux lancent le gateway avec un secret jetable.
+**Renoncement.** Pas de secret de prod tiré par l'agent : les secrets restent posés par l'humain dans Dokploy.
+
+## 2026-09-19 — Écart §11.1 : les variables sont listées par service, sans `env_file`
+
+**Contexte.** Le croquis du §11.1 donne le `.env` entier à chaque service. Dokploy n'injecte une variable du projet que si le Compose la référence (`${{project.NOM}}`), et sa doc ne garantit pas que l'onglet Environment devient un `.env`.
+**Décision.** `environment:` explicite par service, avec `${NOM:?}` pour les obligatoires : le déploiement échoue si une variable manque (règle 4). Chaque app ne reçoit que ce que son `config.ts` lit. Pas de service `worker` avant son jour.
+**Renoncement.** Pas d'`env_file: .env` : tous les secrets dans tous les conteneurs, y compris ceux qui ne les lisent pas.
+
+## 2026-09-19 — Écart §9.1 provisoire : `canvasId = login` jusqu'au J8
+
+**Contexte.** `/{login}` se résout par Convex (`users.getByLogin` puis `canvases.getActiveForOwner`), qui arrive au J8 avec Twitch.
+**Décision.** Le loader de `/$login` rend `canvasId = login`, marqué `Écart §9.1`. Le canvas de test du jalon J5 est créé à la main avec le pseudo pour identifiant, et supprimé au J8, quand Convex crée le vrai `canvasId` opaque (D-14).
+**Renoncement.** Pas de variable `DEMO_CANVAS_ID` : une variable de plus, qui pourrait partir en production.
+
+## 2026-09-19 — Le web a son propre `tsconfig`, et `typecheck` vérifie les deux
+
+**Contexte.** Le `tsconfig.json` racine vise Node (`lib: ES2023`, sans DOM ni JSX) et inclut pourtant `apps/**/*.tsx`. Le check `architecture` refuse tout fichier hors couche, fichiers de configuration compris.
+**Décision.** `apps/web/tsconfig.json` (DOM, `jsx: react-jsx`), exclu du `tsconfig` racine ; `pnpm typecheck` lance les deux. `apps/web/vite.config.ts` et `apps/gateway/tsup.config.ts` entrent nommément dans `unlayeredFilesAllowed`.
+**Renoncement.** Pas de DOM dans le `tsconfig` racine : les globales du navigateur deviendraient visibles dans le code serveur.
+
+## 2026-09-19 — Le web dépend de TanStack Start, React, Vite et Nitro ; le gateway se construit avec tsup
+
+**Contexte.** §9 nomme TanStack Start, §11.4 nomme tsup, `vite build` et Nitro. `redis-core` lit `place.lua` par `readFileSync` : une fois empaqueté, le fichier doit être à côté du bundle.
+**Décision.** Web : `@tanstack/react-start`, `@tanstack/react-router`, `react`, `react-dom`, `zod`, `vite`, `@vitejs/plugin-react`, `nitro` (bêta, version épinglée). Gateway : `tsup`, qui empaquette `@liveplace/*` et copie les `*.lua` dans `dist/`.
+**Renoncement.** Pas de `tsx` en production (sources et chargeur dans l'image). Pas d'import du Lua comme texte : trois outils à accorder pour un fichier.
+
 ## 2026-09-18 — `useNamingConvention` désactivé sur la seule lecture d'env
 
 **Contexte.** Le §11.5 fixe les noms des variables (`REDIS_URL`, `SESSION_SECRET`…) et veut que le boot nomme la variable manquante telle qu'elle est écrite dans Dokploy. Biome exige des propriétés en camelCase et refuse donc le schéma Zod de `config.ts`.
