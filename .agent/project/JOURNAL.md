@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-19 — L'exception Biome des fichiers de config couvre aussi ceux des apps
+
+**Contexte.** L'override de `biome.json` qui autorise `node:*` dans `*.config.ts` ne vise que la racine en Biome 2. `apps/gateway/tsup.config.ts` a besoin de `node:fs` pour copier les `*.lua` dans `dist/`, et `architecture.json` prévoyait déjà ces fichiers de config imbriqués.
+**Décision.** Le motif passe de `*.config.ts` à `**/*.config.ts` : les fichiers de configuration d'outils, où qu'ils soient, peuvent importer `node:*`. Le code des couches reste soumis à la règle.
+**Renoncement.** Pas de copie des `*.lua` en commande shell dans une chaîne : même effet, mais c'est contourner la règle sans le dire.
+
 ## 2026-09-19 — `noCycles` désactivé provisoirement : l'arbre de routes de Start fait un cycle
 
 **Contexte.** Start génère `routeTree.gen.ts`, dont le pied importe le type de `getRouter` depuis le routeur, qui importe l'arbre : un cycle inhérent au framework (§9), dans du code généré. Essayé sans succès : routes écrites à la main (le build de Start exige l'arbre généré), `noImportCycles` de Biome (ne résout pas les alias `@liveplace/*`, prouvé par une sonde), fichier généré hors du scan (fuir la règle).

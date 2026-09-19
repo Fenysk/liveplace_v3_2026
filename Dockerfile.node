@@ -1,0 +1,30 @@
+# L'image d'une app Node du dépôt (§11.4) : `APP` vaut `gateway`, puis `worker` à son jour.
+# docker build -f Dockerfile.node --build-arg APP=gateway .
+
+ARG NODE_IMAGE=node:22-alpine
+
+FROM ${NODE_IMAGE} AS build
+ARG APP
+# pnpm par npm plutôt que par corepack : pas de vérification de signature à suivre.
+RUN npm install --global pnpm@11.17.0
+WORKDIR /repo
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm fetch
+COPY . .
+# Tout l'espace de travail : les packages sont lus par leurs sources, avec leurs propres dépendances.
+RUN pnpm install --frozen-lockfile --offline
+RUN pnpm --filter "@liveplace/${APP}" build
+# Les seules dépendances de production de l'app, sans lien vers le reste du dépôt.
+RUN pnpm --filter "@liveplace/${APP}" deploy --prod --legacy /deployed
+
+FROM ${NODE_IMAGE}
+ARG APP
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /deployed/package.json ./package.json
+COPY --from=build /deployed/node_modules ./node_modules
+# `dist/` vient du build, pas de `deploy` : il est ignoré par git, donc absent des fichiers publiés.
+COPY --from=build /repo/apps/${APP}/dist ./dist
+USER node
+EXPOSE 8080
+CMD ["node", "dist/main.js"]

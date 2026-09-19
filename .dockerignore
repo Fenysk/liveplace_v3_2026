@@ -1,0 +1,15 @@
+# Le contexte de build des images (§11.4). Aucun secret n'y entre : le .env reste sur le poste.
+.env
+.env.*
+!.env.example
+
+.git
+.agent
+**/node_modules
+**/dist
+**/.output
+**/.nitro
+**/.tanstack
+**/.vite
+**/coverage
+*.log
