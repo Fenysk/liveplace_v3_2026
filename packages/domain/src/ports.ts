@@ -58,4 +58,5 @@ export type TransportListeners = {
 export interface Transport {
   send(frame: ClientFrame): void; // mis en attente tant que la connexion s'ouvre
   listen(listeners: TransportListeners): void;
+  close(): void;
 }
