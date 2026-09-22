@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-22 — Écart §8 : la production vise le déploiement Convex de dev
+
+**Contexte.** Le §8 prévoit deux déploiements, `dev` sur le poste et `prod` visé par le VPS. Le `CONVEX_URL` et le `CONVEX_SERVICE_KEY` de Dokploy portent les valeurs du dev, et le déploiement de prod (`valiant-panther-436`) n'a pas de `SERVICE_KEY`.
+**Décision.** On le garde ainsi tant qu'on développe : une seule base, celle de dev, pour le poste et le VPS. À rétablir avant toute ouverture publique, avec un `SERVICE_KEY` de prod posé par l'humain.
+**Renoncement.** Pas de bascule maintenant : elle demande un secret de production et un export/import pour garder les `canvasId` déjà écrits dans Redis.
+
 ## 2026-09-22 — Les routes serveur de Start nomment leurs handlers `GET`
 
 **Contexte.** Start déclare une route serveur par `server.handlers`, dont les clés sont les méthodes HTTP en capitales (`GET`). Biome exige des propriétés d'objet en camelCase et refuse `GET`.
