@@ -2,15 +2,9 @@
 
 import { SESSION_ALGORITHM, SESSION_COOKIE, toSession } from "@liveplace/domain";
 import type { SessionVerifier } from "@liveplace/domain/ports";
+import { cookieValue } from "@liveplace/shared";
 import { jwtVerify } from "jose";
 import { JOSEError } from "jose/errors";
-
-const cookieValue = (header: string | undefined, name: string): string | undefined =>
-  header
-    ?.split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
 
 export function createSessionVerifier(secret: string): SessionVerifier {
   const key = new TextEncoder().encode(secret);

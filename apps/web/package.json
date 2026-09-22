@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "node --env-file=../../.env ./node_modules/vite/bin/vite.js dev --port 3000 --strictPort",
     "build": "vite build",
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.170.38",
     "@tanstack/react-start": "^1.168.56",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.4"

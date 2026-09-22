@@ -10,6 +10,8 @@ export default defineConfig({
     alias: {
       "@liveplace/protocol": packageSource("protocol"),
       "@liveplace/domain": packageSource("domain"),
+      "@liveplace/redis-core": packageSource("redis-core"),
+      "@liveplace/durable": packageSource("durable"),
       "@liveplace/shared": packageSource("shared"),
     },
   },
@@ -17,7 +19,10 @@ export default defineConfig({
   server: { proxy: { "/ws": { target: "ws://127.0.0.1:8080", ws: true } } },
   plugins: [
     // Le routeur et l'arbre généré vivent dans `app/`, la seule couche qui voit `routes/` et le reste.
-    tanstackStart({ router: { entry: "app/router.tsx", generatedRouteTree: "app/routeTree.gen.ts" } }),
+    tanstackStart({
+      start: { entry: "app/start.ts" },
+      router: { entry: "app/router.tsx", generatedRouteTree: "app/routeTree.gen.ts" },
+    }),
     nitro(),
     viteReact(),
   ],

@@ -51,6 +51,17 @@ export interface SessionVerifier {
   verify(cookieHeader: string | undefined): Promise<Session | null>;
 }
 
+// Le pendant de `SessionVerifier`, côté web : le cookie signé au callback OAuth (§10.2).
+export interface SessionSigner {
+  sign(session: Session): Promise<string>;
+}
+
+// Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.
+export interface TwitchAuth {
+  authorizeUrl(state: string): string;
+  getUserFromCode(code: string): Promise<User>;
+}
+
 // Une connexion vue de la socket : le pendant de `ClientSocket`, pour que l'infra n'importe pas le usecase.
 export interface ClientConnection {
   receive(text: string): Promise<void>;

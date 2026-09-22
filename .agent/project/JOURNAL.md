@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-22 — Les routes serveur de Start nomment leurs handlers `GET`
+
+**Contexte.** Start déclare une route serveur par `server.handlers`, dont les clés sont les méthodes HTTP en capitales (`GET`). Biome exige des propriétés d'objet en camelCase et refuse `GET`.
+**Décision.** Dans `apps/web/src/routes/**` seulement, `useNamingConvention` accepte aussi CONSTANT_CASE pour les propriétés d'objet. Les autres conventions ne bougent pas.
+**Renoncement.** Pas de règle coupée dans les routes : variables et fonctions y restent contrôlées. Pas de clé calculée pour contourner la règle sans le dire.
+
 ## 2026-09-22 — Convex dans `durable`, `jose` et `ioredis` dans le web
 
 **Contexte.** §8 nomme Convex et `ConvexHttpClient`. Le callback OAuth signe le cookie de session (§10.2) et écrit `user:` et le canvas dans Redis (§2, §10.1).

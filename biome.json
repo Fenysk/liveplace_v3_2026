@@ -88,8 +88,36 @@
       "linter": { "rules": { "style": { "useNamingConvention": "off" } } }
     },
     {
+      "includes": ["apps/web/src/infra/twitch.ts"],
+      "linter": { "rules": { "style": { "useNamingConvention": "off" } } }
+    },
+    {
       "includes": ["apps/web/src/routes/**"],
-      "linter": { "rules": { "style": { "useFilenamingConvention": "off" } } }
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off",
+            "useNamingConvention": {
+              "level": "error",
+              "options": {
+                "strictCase": false,
+                "conventions": [
+                  { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] },
+                  { "selector": { "kind": "function" }, "formats": ["camelCase"] },
+                  {
+                    "selector": { "kind": "variable" },
+                    "formats": ["camelCase", "CONSTANT_CASE", "PascalCase"]
+                  },
+                  {
+                    "selector": { "kind": "objectLiteralProperty" },
+                    "formats": ["camelCase", "CONSTANT_CASE"]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     },
     {
       "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
