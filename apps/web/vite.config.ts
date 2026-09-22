@@ -23,7 +23,7 @@ export default defineConfig({
       start: { entry: "app/start.ts" },
       router: { entry: "app/router.tsx", generatedRouteTree: "app/routeTree.gen.ts" },
     }),
-    nitro(),
+    nitro({ plugins: ["./src/app/boot.ts"] }),
     viteReact(),
   ],
 });
