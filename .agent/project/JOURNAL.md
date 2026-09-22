@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-22 — `SESSION_SECRET` de production distinct de celui de dev
+
+**Contexte.** Égal à celui du `.env` depuis le 19/09, pour le jalon J5 : un cookie signé sur le poste de dev était valide en production.
+**Décision.** Nouvelle valeur posée par l'humain dans Dokploy, et une autre dans le `.env`, avant la première connexion Twitch. Preuve : un cookie signé avec le secret du `.env` au nom du propriétaire du canvas de test reçoit `guest` en production.
+**Renoncement.** Pas de secret commun pour faciliter les essais : un cookie de production se signe dans le conteneur du gateway, d'où le secret ne sort pas.
+
 ## 2026-09-22 — L'exception Biome des fichiers de config revient aux seuls fichiers d'outils
 
 **Contexte.** Depuis le 19/09, `**/*.config.ts` autorise `node:*` dans tout fichier ainsi nommé, couches comprises : une sonde `packages/domain/src/probe.config.ts` qui importe `node:fs` passait le lint.
