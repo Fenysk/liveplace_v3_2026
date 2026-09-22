@@ -50,6 +50,18 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL manquante}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET manquante}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:?TWITCH_CLIENT_ID manquante}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:?TWITCH_CLIENT_SECRET manquante}
+      CONVEX_URL: ${CONVEX_URL:?CONVEX_URL manquante}
+      CONVEX_SERVICE_KEY: ${CONVEX_SERVICE_KEY:?CONVEX_SERVICE_KEY manquante}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
+    # Le callback OAuth crée le canvas dans Redis (§10.1).
+    depends_on:
+      redis:
+        condition: service_healthy
     networks: [default, dokploy-network]
     restart: unless-stopped
     labels:
