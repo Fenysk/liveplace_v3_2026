@@ -78,7 +78,8 @@
         "apps/*/src/app/**",
         "apps/web/src/net/**",
         "tools/bench/**",
-        "**/*.config.ts"
+        "*.config.ts",
+        "apps/*/*.config.ts"
       ],
       "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
     },

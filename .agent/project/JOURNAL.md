@@ -13,6 +13,18 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-22 — L'exception Biome des fichiers de config revient aux seuls fichiers d'outils
+
+**Contexte.** Depuis le 19/09, `**/*.config.ts` autorise `node:*` dans tout fichier ainsi nommé, couches comprises : une sonde `packages/domain/src/probe.config.ts` qui importe `node:fs` passait le lint.
+**Décision.** Motif `*.config.ts` et `apps/*/*.config.ts` : la racine du dépôt et celle de chaque app, où vivent `vitest`, `vite` et `tsup`. Tout fichier couvert est hors couche, donc déjà inscrit nommément dans `unlayeredFilesAllowed`.
+**Renoncement.** Pas de liste de chemins exacts dans `biome.json` : elle doublerait `unlayeredFilesAllowed`, qui impose déjà une décision par fichier.
+
+## 2026-09-22 — `noCycles` rétabli : le socle 1.2.0 sait ignorer le code généré
+
+**Contexte.** Coupé le 19/09 à cause du cycle de `routeTree.gen.ts`, généré par Start. Le socle 1.2.0 lit une clé `ignore` dans `architecture.json`, comme `lexique` : les fichiers couverts sortent du scan (couche, dépendances, cycles), un import écrit à la main vers eux reste contrôlé.
+**Décision.** Socle réinstallé en 1.2.0, `ignore: ["**/*.gen.ts"]` et `noCycles: true`. Sonde : deux fichiers de `shared` qui s'importent passaient le gate, ils le font maintenant échouer. L'audit manuel des cycles avant chaque commit s'arrête.
+**Renoncement.** Pas de `convex/_generated` ajouté d'avance, bien que `lexique` l'ignore déjà : il entrera au J8, avec le code qu'il couvre.
+
 ## 2026-09-19 — L'exception Biome des fichiers de config couvre aussi ceux des apps
 
 **Contexte.** L'override de `biome.json` qui autorise `node:*` dans `*.config.ts` ne vise que la racine en Biome 2. `apps/gateway/tsup.config.ts` a besoin de `node:fs` pour copier les `*.lua` dans `dist/`, et `architecture.json` prévoyait déjà ces fichiers de config imbriqués.

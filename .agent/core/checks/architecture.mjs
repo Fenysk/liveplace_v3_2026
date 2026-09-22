@@ -47,7 +47,14 @@ const layers = expand(arch.layers).map((l) => {
 const allowlist = new Set((arch.rules?.unlayeredFilesAllowed ?? []).map(toPosix));
 const aliases = arch.aliases ?? {};
 const root = arch.root ?? "src";
-const files = walk(join(cwd, root)).map((f) => toPosix(f.slice(cwd.length + 1)));
+// Le code GÉNÉRÉ (arbre de routes d'un framework, client d'API) n'est écrit par personne :
+// ni couche ni cycle à lui reprocher, et un framework qui s'importe en boucle forçait à couper
+// `noCycles` pour tout le dépôt. Même clé `ignore` que lexique.json. Un import VERS un fichier
+// ignoré reste contrôlé : la couche de la cible se lit dans son chemin, pas dans le scan.
+const ignoreRes = (arch.ignore ?? []).map(globToRegExp);
+const files = walk(join(cwd, root))
+  .map((f) => toPosix(f.slice(cwd.length + 1)))
+  .filter((f) => !ignoreRes.some((re) => re.test(f)));
 if (files.length === 0) fail(`architecture — aucun fichier de code sous « ${root} ».\n  Soit \`root\` est faux dans architecture.json, soit le gate tourne au mauvais endroit. Dans les deux cas il ne prouve rien.`);
 
 const layerOf = (f) => layers.find((l) => l.re.test(f))?.name ?? null;
