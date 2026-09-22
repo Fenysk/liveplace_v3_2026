@@ -7,13 +7,21 @@ import type {
   CanvasCore,
   LiveMessage,
   Placement,
+  SignInWrites,
   Snapshot,
   Unsubscribe,
 } from "@liveplace/domain/ports";
 import { decodeServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
-import { buildCanvasKeys, EVENTS_MAXLEN, GAUGE_TTL_SECONDS, HIST_DEPTH, REQ_TTL_SECONDS } from "./keys";
+import {
+  buildCanvasKeys,
+  EVENTS_MAXLEN,
+  GAUGE_TTL_SECONDS,
+  HIST_DEPTH,
+  REQ_TTL_SECONDS,
+  userKey,
+} from "./keys";
 
 declare module "ioredis" {
   interface RedisCommander<Context> {
@@ -41,6 +49,27 @@ const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
   return value;
 };
 
+// Ce que le web écrit à la connexion (§2) : ni script ni connexion abonnée, il ne pose jamais un pixel.
+export function createSignInWrites(redis: Redis): SignInWrites {
+  return {
+    // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
+    async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
+      const keys = buildCanvasKeys(canvasId);
+      const transaction = redis.multi();
+      for (const [field, value] of Object.entries(meta)) transaction.hsetnx(keys.meta, field, value);
+      await transaction
+        .set(keys.state, Buffer.alloc(meta.width * meta.height), "NX")
+        .set(keys.version, 0, "NX")
+        .hsetnx(keys.meta, "ready", 1)
+        .exec();
+    },
+
+    async setUser({ userId, login, displayName }): Promise<void> {
+      await redis.hset(userKey(userId), { login, displayName });
+    },
+  };
+}
+
 export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCore {
   redis.defineCommand("place", {
     numberOfKeys: 7,
@@ -56,17 +85,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   });
 
   return {
-    // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
-    async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
-      const keys = buildCanvasKeys(canvasId);
-      const transaction = redis.multi();
-      for (const [field, value] of Object.entries(meta)) transaction.hsetnx(keys.meta, field, value);
-      await transaction
-        .set(keys.state, Buffer.alloc(meta.width * meta.height), "NX")
-        .set(keys.version, 0, "NX")
-        .hsetnx(keys.meta, "ready", 1)
-        .exec();
-    },
+    ...createSignInWrites(redis),
 
     // `null` tant que `ready` n'est pas à 1 : on ne sert jamais un canvas en cours de restore (§5.5).
     async getCanvas(canvasId: string): Promise<CanvasMeta | null> {

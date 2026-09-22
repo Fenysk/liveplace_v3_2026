@@ -14,8 +14,8 @@ import type { LiveMessage, Placement } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore } from "./client";
-import { buildCanvasKeys, HIST_DEPTH } from "./keys";
+import { createCanvasCore, createSignInWrites } from "./client";
+import { buildCanvasKeys, HIST_DEPTH, userKey } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
 const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
@@ -442,5 +442,34 @@ describe("subscribe (§6.3)", () => {
     await delay(100);
 
     expect(received).toHaveLength(1);
+  });
+});
+
+describe("createSignInWrites (§2, §5.1)", () => {
+  const writes = createSignInWrites(redis);
+
+  // Crée un canvas prêt sans charger de script, et ne réinitialise jamais un canvas existant
+  it("creates a ready canvas without any script, and never resets an existing one", async () => {
+    const canvasId = uniqueCanvasId();
+    const keys = buildCanvasKeys(canvasId);
+
+    await writes.createCanvas(canvasId, meta);
+    await redis.setrange(keys.state, 0, "\x05");
+    await writes.createCanvas(canvasId, meta);
+
+    expect(await redis.hget(keys.meta, "ready")).toBe("1");
+    expect((await redis.getBuffer(keys.state))?.[0]).toBe(5);
+  });
+
+  // Écrit le miroir user:<userId> sans expiration, et le remplace à la connexion suivante
+  it("writes the user mirror without expiry, and replaces it on the next sign-in", async () => {
+    const userId = `${runId}-user`;
+
+    await writes.setUser({ userId, login: "fenysk", displayName: "Fenysk" });
+    await writes.setUser({ userId, login: "fenysk_v2", displayName: "Fenysk V2" });
+
+    expect(await redis.hgetall(userKey(userId))).toEqual({ login: "fenysk_v2", displayName: "Fenysk V2" });
+    expect(await redis.ttl(userKey(userId))).toBe(-1);
+    await redis.del(userKey(userId));
   });
 });

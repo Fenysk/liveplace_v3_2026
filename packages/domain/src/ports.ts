@@ -22,12 +22,17 @@ export type Unsubscribe = () => Promise<void>;
 
 export interface CanvasCore {
   createCanvas(canvasId: string, meta: CanvasMeta): Promise<void>;
+  // Le miroir `user:<userId>` (§5.1), réécrit à chaque connexion : le gateway n'a pas le droit d'aller dans Convex.
+  setUser(user: Pick<User, "userId" | "login" | "displayName">): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
   isModerator(canvasId: string, userId: string): Promise<boolean>;
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
+
+// Ce que le web écrit dans Redis à la connexion (§2) : jamais un pixel, donc jamais de script.
+export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser">;
 
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
