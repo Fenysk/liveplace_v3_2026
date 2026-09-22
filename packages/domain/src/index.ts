@@ -11,6 +11,24 @@ export type Session = { userId: string; login: string; displayName: string };
 // Une personne, miroir de son compte Twitch (§8.1). `userId` = Twitch ID, immuable.
 export type User = { userId: string; login: string; displayName: string; avatarUrl: string };
 
+// Le cookie de session (§10.2) : signé par le web, vérifié par le gateway, défini ici une seule fois.
+export const SESSION_COOKIE = "lp_session";
+export const SESSION_TTL_SECONDS = 30 * 24 * 3600;
+export const SESSION_ALGORITHM = "HS256";
+
+export type SessionClaims = { sub: string; login: string; displayName: string };
+
+export function toSessionClaims(session: Session): SessionClaims {
+  return { sub: session.userId, login: session.login, displayName: session.displayName };
+}
+
+// Un claim absent ou illisible donne un invité, jamais une erreur (§10.2).
+export function toSession(claims: Record<string, unknown>): Session | null {
+  const { sub, login, displayName } = claims;
+  if (typeof sub !== "string" || typeof login !== "string" || typeof displayName !== "string") return null;
+  return { userId: sub, login, displayName };
+}
+
 // §10.3
 export function roleFor(
   session: Session | null,
@@ -61,6 +79,19 @@ export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: 
 }
 
 export const OBS_DELAY_MS = 5000;
+
+// Un canvas neuf aux valeurs par défaut du jeu (CDC §1) : aucune interface ne les change en bloc 1.
+export function defaultCanvasMeta(ownerId: string): CanvasMeta {
+  return {
+    ownerId,
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
+    gaugeMax: GAUGE_MAX,
+    refillMs: REFILL_MS,
+    refillCharges: REFILL_CHARGES,
+    obsDelayMs: OBS_DELAY_MS,
+  };
+}
 
 export type Palette = readonly string[];
 

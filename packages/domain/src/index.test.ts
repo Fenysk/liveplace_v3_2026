@@ -1,16 +1,24 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  CANVAS_HEIGHT,
   CANVAS_WIDTH,
   CELL_STRIDE,
   type CellKey,
+  defaultCanvasMeta,
+  GAUGE_MAX,
   type GaugeParams,
+  OBS_DELAY_MS,
   PALETTE,
+  REFILL_CHARGES,
+  REFILL_MS,
   refillGauge,
   roleFor,
   type Session,
   type StateOffset,
   TRANSPARENT_COLOR_INDEX,
   toCellKey,
+  toSession,
+  toSessionClaims,
   toStateOffset,
 } from "./index";
 
@@ -130,5 +138,40 @@ describe("palette", () => {
   it("holds only hex colors, at most 256 (one byte per colorIndex)", () => {
     for (const color of PALETTE) expect(color).toMatch(/^#[0-9a-f]{6}([0-9a-f]{2})?$/);
     expect(PALETTE.length).toBeLessThanOrEqual(256);
+  });
+});
+
+describe("session claims (§10.2)", () => {
+  const session: Session = { userId: "1234", login: "fenysk", displayName: "Fenysk" };
+
+  // Retrouve telle quelle la session que le web a signée
+  it("round-trips a session through its claims", () => {
+    expect(toSession(toSessionClaims(session))).toEqual(session);
+  });
+
+  // Met le Twitch ID dans sub, là où le gateway le lit
+  it("puts the Twitch ID in sub", () => {
+    expect(toSessionClaims(session).sub).toBe(session.userId);
+  });
+
+  // Rend null quand un claim manque ou n'est pas du texte : un invité, jamais une erreur
+  it("gives null when a claim is missing or not text", () => {
+    expect(toSession({ sub: "1234", login: "fenysk" })).toBeNull();
+    expect(toSession({ sub: 1234, login: "fenysk", displayName: "Fenysk" })).toBeNull();
+  });
+});
+
+describe("defaultCanvasMeta (CDC §1)", () => {
+  // Donne au canvas neuf de son propriétaire les valeurs par défaut du jeu
+  it("gives the owner's new canvas the game defaults", () => {
+    expect(defaultCanvasMeta("owner-1")).toEqual({
+      ownerId: "owner-1",
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+      gaugeMax: GAUGE_MAX,
+      refillMs: REFILL_MS,
+      refillCharges: REFILL_CHARGES,
+      obsDelayMs: OBS_DELAY_MS,
+    });
   });
 });
