@@ -13,6 +13,42 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-22 — Convex dans `durable`, `jose` et `ioredis` dans le web
+
+**Contexte.** §8 nomme Convex et `ConvexHttpClient`. Le callback OAuth signe le cookie de session (§10.2) et écrit `user:` et le canvas dans Redis (§2, §10.1).
+**Décision.** `convex` dans `packages/durable` seul. `jose` et `ioredis` dans `apps/web`, comme au gateway. Le web appelle Convex depuis son serveur, jamais depuis le navigateur (§8.3).
+**Renoncement.** Pas de `convex-test` : §12.3 ne demande pas de test des fonctions Convex, et la garde `serviceKey` est une fonction pure testée à part.
+
+## 2026-09-22 — `convex/_generated` sort du scan d'`architecture`
+
+**Contexte.** Code produit par la CLI Convex, déjà ignoré par `lexique` et par Biome. L'entrée `noCycles` du 22/09 le repoussait à l'arrivée du code qu'il couvre.
+**Décision.** `packages/durable/convex/_generated/**` rejoint `ignore` dans `architecture.json`. Un import écrit à la main vers lui reste contrôlé.
+**Renoncement.** Pas de code généré hors du dépôt : versionné, il laisse construire l'image du web sans la CLI Convex.
+
+## 2026-09-22 — `useNamingConvention` désactivé sur l'adaptateur Twitch
+
+**Contexte.** Twitch répond en snake_case (`access_token`, `display_name`, `profile_image_url`). Biome exige des propriétés en camelCase, comme pour `config.ts` le 18/09.
+**Décision.** Override Biome sur `apps/web/src/infra/twitch.ts` seul. Les champs de Twitch ne sortent pas de ce fichier : il rend un `User` en camelCase.
+**Renoncement.** Pas de `biome-ignore` en ligne, interdit. Pas de lecture sans schéma : la réponse d'un tiers se valide.
+
+## 2026-09-22 — Écart §9.2 : le web a aussi un `usecase/` et un `infra/`
+
+**Contexte.** Le §9.2 range le web en cinq dossiers. Son serveur appelle Twitch, Convex et Redis, et signe le cookie, alors que `routes/` (couche `ui`) n'a pas le droit d'importer l'infra.
+**Décision.** `usecase/` (callback, `returnTo`, résolution de `/{login}`) et `infra/` (Twitch, signature) s'ajoutent, déjà couverts par les globs `apps/*/src/…`. `app/start.ts` construit les dépendances et les pose dans le contexte des requêtes.
+**Renoncement.** Pas de `routes/auth/**` dans la couche `app` : ce serait élargir une couche pour passer le gate.
+
+## 2026-09-22 — Écart §10.1 : on revient là d'où l'on s'est connecté
+
+**Contexte.** Le §10.1 renvoie vers le `/{login}` de celui qui se connecte : un viewer qui clique « Se connecter » sur `/fenysk` atterrirait sur son propre canvas, vide.
+**Décision.** `/auth/twitch?returnTo=/<pseudo>` : le chemin voyage dans le cookie OAuth, et le callback y renvoie s'il a exactement cette forme. Sinon, vers son propre `/{login}`.
+**Renoncement.** Jamais d'URL complète dans `returnTo` : ce serait une redirection ouverte.
+
+## 2026-09-22 — Écart §8.1 : `lastSignInAt`, pas `lastLoginAt`
+
+**Contexte.** Le §8.1 nomme `lastLoginAt`, alors que le §10.2 et le lexique réservent `login` au pseudo, jamais à l'action.
+**Décision.** Le champ de `users` s'appelle `lastSignInAt`.
+**Renoncement.** Pas de fidélité au plan sur ce nom : le lexique ne voit pas un champ de schéma, mais le nom dirait le contraire de ce qu'il porte.
+
 ## 2026-09-22 — `SESSION_SECRET` de production distinct de celui de dev
 
 **Contexte.** Égal à celui du `.env` depuis le 19/09, pour le jalon J5 : un cookie signé sur le poste de dev était valide en production.
