@@ -1,4 +1,4 @@
-// L'état local d'un canvas : la copie de `state`, sa version, et le rôle donné par le gateway (§9.2).
+// L'état local d'un canvas : la copie de `state`, sa version, et le rôle et le nom donnés par le gateway (§9.2).
 
 import { type Role, toStateOffset } from "@liveplace/domain";
 import type { Transport } from "@liveplace/domain/ports";
@@ -13,6 +13,7 @@ export type CanvasView = {
   palette: readonly string[];
   version: number;
   role?: Role;
+  displayName?: string; // absent pour un invité
   lastError?: ErrorCode;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
 };
@@ -55,13 +56,15 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       case "welcome": {
         const { width, height } = frame.canvas;
         const { palette, version } = frame;
+        const { role, displayName } = frame.you;
         publish({
           status: "live",
           width,
           height,
           palette,
           version,
-          role: frame.you.role,
+          role,
+          ...(displayName ? { displayName } : {}),
           pixels: new Uint8Array(width * height),
         });
         break;
