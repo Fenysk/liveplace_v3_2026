@@ -39,8 +39,8 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: dokploy-network
-      # Règle plus longue que celle du web, donc prioritaire : `/ws` va au gateway, le reste au web.
-      traefik.http.routers.liveplace-ws.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`) && PathPrefix(`/ws`)
+      # Règle plus longue que celle du web, donc prioritaire. `Path` et non `PathPrefix` : `/ws_pseudo` est une page.
+      traefik.http.routers.liveplace-ws.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`) && Path(`/ws`)
       traefik.http.routers.liveplace-ws.entrypoints: websecure
       traefik.http.routers.liveplace-ws.tls.certresolver: letsencrypt
       traefik.http.routers.liveplace-ws.service: liveplace-ws

@@ -53,7 +53,8 @@ export function startGatewayServer(deps: GatewayServerDeps) {
 
   // La session est vérifiée avant l'upgrade : après, une frame pourrait arriver sans personne pour l'écouter.
   server.on("upgrade", async (request, socket, head) => {
-    if (!request.url?.startsWith("/ws")) {
+    // Le chemin exact : `/ws_pseudo` est la page d'un streamer, pas le socket.
+    if (request.url !== "/ws") {
       socket.destroy();
       return;
     }
