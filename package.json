@@ -13,7 +13,8 @@
     "format": "biome format --write .",
     "test": "vitest run --passWithNoTests",
     "gate": "node .agent/core/gate.mjs",
-    "calibrate": "node .agent/core/calibrate.mjs"
+    "calibrate": "node .agent/core/calibrate.mjs",
+    "convex:deploy": "pnpm --filter @liveplace/durable exec convex deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",

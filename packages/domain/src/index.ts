@@ -8,6 +8,9 @@ export type Role = (typeof ROLES)[number];
 // Cookie `lp_session` vérifié (§10.2).
 export type Session = { userId: string; login: string; displayName: string };
 
+// Une personne, miroir de son compte Twitch (§8.1). `userId` = Twitch ID, immuable.
+export type User = { userId: string; login: string; displayName: string; avatarUrl: string };
+
 // §10.3
 export function roleFor(
   session: Session | null,

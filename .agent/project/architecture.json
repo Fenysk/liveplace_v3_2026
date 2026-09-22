@@ -12,8 +12,8 @@
     "@liveplace/shared": "packages/shared/src"
   },
 
-  "_ignore": "Code généré par un outil (routeTree.gen.ts de Start) : hors couche et hors cycles, un import vers lui reste contrôlé (JOURNAL 2026-09-22).",
-  "ignore": ["**/*.gen.ts"],
+  "_ignore": "Code généré par un outil (routeTree.gen.ts de Start, convex/_generated de Convex) : hors couche et hors cycles, un import vers lui reste contrôlé (JOURNAL 2026-09-22).",
+  "ignore": ["**/*.gen.ts", "packages/durable/convex/_generated/**"],
 
   "layers": [
     {

@@ -2,7 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CanvasMeta, Session, Timestamp } from "./index";
+import type { CanvasMeta, Session, Timestamp, User } from "./index";
 
 export type Placement = {
   userId: string;
@@ -27,6 +27,18 @@ export interface CanvasCore {
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
+}
+
+// Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
+export type OwnedCanvas = { canvasId: string; width: number; height: number };
+
+// Le stockage durable (§8.2) : des fonctions Convex, toutes gardées par la clé du service.
+export interface DurableStore {
+  upsertUserFromTwitch(user: User): Promise<void>;
+  getUserByLogin(login: string): Promise<User | null>;
+  // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
+  ensureCanvasForOwner(ownerId: string, candidate: OwnedCanvas): Promise<string>;
+  getActiveCanvasForOwner(ownerId: string): Promise<OwnedCanvas | null>;
 }
 
 // `null` = invité (§10.2).
