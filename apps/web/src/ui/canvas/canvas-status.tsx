@@ -1,4 +1,4 @@
-// Une ligne d'état sous le canvas : connexion, version, rôle, et le dernier refus du gateway.
+// La ligne d'état de la pill Dessin, en attendant la jauge (J10) : connexion, version, rôle, dernier refus du gateway.
 
 import { useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";

@@ -7,10 +7,8 @@ import type { CanvasStore } from "../state/canvas-store";
 import { AccountLink } from "../ui/canvas/account-link";
 import { CanvasStatus } from "../ui/canvas/canvas-status";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { Pill } from "../ui/pill/pill";
 import { resolveCanvas } from "../usecase/resolve-canvas";
-
-// Une seule couleur au J7 (CDC §4, « une grille, un clic, une couleur ») ; la palette arrive au J10.
-const PLACED_COLOR_INDEX = 7;
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
 const getCanvasPage = createServerFn({ method: "GET" })
@@ -30,18 +28,15 @@ const CanvasPage = () => {
     return () => opened.close();
   }, [canvasId, openCanvas]);
 
+  // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   return (
-    <main style={{ padding: 16, display: "grid", gap: 12, justifyItems: "center" }}>
-      <h1 style={{ margin: 0, fontSize: 18 }}>{displayName}</h1>
-      {store ? (
-        <>
-          <PixelCanvas store={store} colorIndex={PLACED_COLOR_INDEX} />
-          <CanvasStatus store={store} />
-          <AccountLink store={store} login={login} />
-        </>
-      ) : (
-        <p>Connexion…</p>
-      )}
+    <main>
+      {store && <PixelCanvas store={store} />}
+      <Pill anchor="topLeft">
+        <h1 style={{ margin: 0, fontSize: 14 }}>{displayName}</h1>
+      </Pill>
+      {store && <AccountLink store={store} login={login} />}
+      <Pill anchor="bottomCenter">{store ? <CanvasStatus store={store} /> : "Connexion…"}</Pill>
     </main>
   );
 };

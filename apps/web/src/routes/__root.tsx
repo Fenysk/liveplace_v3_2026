@@ -3,6 +3,7 @@
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { CanvasOpener } from "../state/canvas-store";
+import { VOID_COLOR } from "../ui/canvas/render-scene";
 
 export type RouterContext = { openCanvas: CanvasOpener };
 
@@ -11,7 +12,9 @@ const RootDocument = ({ children }: { children: ReactNode }) => (
     <head>
       <HeadContent />
     </head>
-    <body style={{ margin: 0, background: "#1b1d27", color: "#e8e6ee", fontFamily: "system-ui, sans-serif" }}>
+    <body
+      style={{ margin: 0, background: VOID_COLOR, color: "#e8e6ee", fontFamily: "system-ui, sans-serif" }}
+    >
       {children}
       <Scripts />
     </body>
