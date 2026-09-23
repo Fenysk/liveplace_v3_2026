@@ -31,7 +31,7 @@ const CanvasPage = () => {
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   return (
     <main>
-      {store && <PixelCanvas store={store} />}
+      {store && <PixelCanvas store={store} canvasId={canvasId} />}
       <Pill anchor="topLeft">
         <h1 style={{ margin: 0, fontSize: 14 }}>{displayName}</h1>
       </Pill>

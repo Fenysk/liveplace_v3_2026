@@ -16,7 +16,10 @@ import {
   zoomLimits,
 } from "./viewport";
 
-export type CanvasScene = { dispose(): void };
+export type CanvasScene = { zoomBy(factor: number): void; recenter(): void; dispose(): void };
+
+// `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
+type SceneOptions = { initialViewport: Viewport | null; onViewportMove(viewport: Viewport): void };
 
 const MIDDLE_BUTTON = 1;
 
@@ -29,7 +32,11 @@ const toPointerInput = (event: PointerEvent): PointerInput => ({
 
 const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y === b?.y;
 
-export function createCanvasScene(surface: HTMLCanvasElement, store: CanvasStore): CanvasScene {
+export function createCanvasScene(
+  surface: HTMLCanvasElement,
+  store: CanvasStore,
+  options: SceneOptions,
+): CanvasScene {
   const context = surface.getContext("2d");
   if (!context) throw new Error("canvas-scene : contexte 2d indisponible");
   const image = createCanvasImage();
@@ -37,7 +44,7 @@ export function createCanvasScene(surface: HTMLCanvasElement, store: CanvasStore
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
   let checker: CanvasPattern | null = null;
-  let viewport: Viewport | null = null;
+  let viewport = options.initialViewport;
   let targetCell: Cell | null = null;
   let isImageStale = true;
   let frameRequest = 0;
@@ -67,6 +74,7 @@ export function createCanvasScene(surface: HTMLCanvasElement, store: CanvasStore
 
   const moveViewport = (next: Viewport) => {
     viewport = next;
+    options.onViewportMove(next);
     requestRender();
   };
 
@@ -77,7 +85,8 @@ export function createCanvasScene(surface: HTMLCanvasElement, store: CanvasStore
   };
 
   const apply = (gesture: Gesture) => {
-    if (!viewport) return;
+    // Avant le `welcome`, le canvas n'a pas de taille : rien à déplacer.
+    if (!viewport || store.getView().width === 0) return;
     switch (gesture.kind) {
       case "pan":
         moveViewport(panBy(viewport, gesture.dx, gesture.dy));
@@ -154,6 +163,13 @@ export function createCanvasScene(surface: HTMLCanvasElement, store: CanvasStore
   );
 
   return {
+    zoomBy(factor) {
+      apply({ kind: "zoom", point: { x: screen.width / 2, y: screen.height / 2 }, factor });
+    },
+    // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui.
+    recenter() {
+      if (viewport && store.getView().width > 0) moveViewport(fitViewport(screen, canvasSize()));
+    },
     dispose() {
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
