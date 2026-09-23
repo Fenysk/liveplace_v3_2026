@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-23 — Écart §9.3 : l'image hors écran se repeint en entier
+
+**Contexte.** Le §9.3 n'écrit dans le `<canvas>` hors écran que les lignes sales. Pour les connaître, le store devrait dire quelles lignes ont changé : son contrat grandirait, pour un canvas de 256 × 256.
+**Décision.** L'image entière est repeinte, au plus une fois par image affichée et seulement si le store a changé ; le zoom et le déplacement ne la touchent pas. Mesuré le 23/09 sur le PC : 0,05 ms pour 65 536 cases avec une table de couleurs en `Uint32Array`, contre 2 ms pour le `set()` par case du J7. Le téléphone se mesure à la preuve du J9.
+**Renoncement.** Pas de lignes sales tant que le canvas ne grandit pas : elles reviennent avec le redimensionnement, ou si le repeint dépasse quelques millisecondes au téléphone.
+
 ## 2026-09-22 — Écart §8 : la production vise le déploiement Convex de dev
 
 **Contexte.** Le §8 prévoit deux déploiements, `dev` sur le poste et `prod` visé par le VPS. Le `CONVEX_URL` et le `CONVEX_SERVICE_KEY` de Dokploy portent les valeurs du dev, et le déploiement de prod (`valiant-panther-436`) n'a pas de `SERVICE_KEY`.
