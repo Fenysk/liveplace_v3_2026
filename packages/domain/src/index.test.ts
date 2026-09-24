@@ -166,6 +166,24 @@ describe("session claims (§10.2)", () => {
     expect(toSession({ sub: "1234", login: "fenysk" })).toBeNull();
     expect(toSession({ sub: 1234, login: "fenysk", displayName: "Fenysk" })).toBeNull();
   });
+
+  // Porte la photo Twitch quand la session en a une, et la retrouve (écart §10.2, JOURNAL 2026-09-24)
+  it("carries the Twitch photo when the session has one, and reads it back", () => {
+    const withPhoto: Session = {
+      ...session,
+      avatarUrl: "https://static-cdn.jtvnw.net/jtv_user_pictures/fenysk-profile_image-300x300.png",
+    };
+    expect(toSessionClaims(withPhoto).avatarUrl).toBe(withPhoto.avatarUrl);
+    expect(toSession(toSessionClaims(withPhoto))).toEqual(withPhoto);
+  });
+
+  // Un cookie signé avant la photo reste valide, sans photo ; une photo illisible est ignorée
+  it("keeps a cookie signed before the photo valid, and ignores an unreadable photo", () => {
+    expect(toSessionClaims(session)).not.toHaveProperty("avatarUrl");
+    expect(toSession({ sub: "1234", login: "fenysk", displayName: "Fenysk", avatarUrl: 42 })).toEqual(
+      session,
+    );
+  });
 });
 
 describe("defaultCanvasMeta (CDC §1)", () => {

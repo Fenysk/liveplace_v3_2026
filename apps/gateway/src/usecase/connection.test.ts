@@ -150,6 +150,20 @@ describe("createConnection (§6.1)", () => {
     });
   });
 
+  // Recopie la photo Twitch de la session dans le welcome, et rien sans elle (écart §4.3, JOURNAL 2026-09-24)
+  it("copies the session's Twitch photo into the welcome, and nothing without one", async () => {
+    const avatarUrl = "https://static-cdn.jtvnw.net/jtv_user_pictures/fenysk-profile_image-300x300.png";
+    const withPhoto = setup({ session: { ...session, avatarUrl } });
+    const withoutPhoto = setup();
+
+    await withPhoto.connection.receive(hello());
+    await withoutPhoto.connection.receive(hello());
+
+    expect(withPhoto.sent[0]).toMatchObject({ t: "welcome", you: { userId: session.userId, avatarUrl } });
+    expect(withoutPhoto.sent[0]).toMatchObject({ t: "welcome", you: { userId: session.userId } });
+    expect(withoutPhoto.sent[0]).not.toHaveProperty("you.avatarUrl");
+  });
+
   // N'envoie aucune jauge à un invité
   it("sends no gauge to a guest", async () => {
     const { connection, sent } = setup({ session: null });

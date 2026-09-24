@@ -56,6 +56,14 @@ const isOtherProtocolVersion = (raw: unknown): boolean =>
   "protocolVersion" in raw &&
   raw.protocolVersion !== PROTOCOL_VERSION;
 
+// Écart §4.3 (JOURNAL 2026-09-24) : la photo Twitch de la session, quand le cookie la porte.
+const youOf = ({ userId, login, displayName, avatarUrl }: Session) => ({
+  userId,
+  login,
+  displayName,
+  ...(avatarUrl ? { avatarUrl } : {}),
+});
+
 const buildWelcome = (
   canvasId: string,
   meta: CanvasMeta,
@@ -74,9 +82,7 @@ const buildWelcome = (
   },
   palette: [...PALETTE],
   version,
-  you: session
-    ? { userId: session.userId, login: session.login, displayName: session.displayName, role }
-    : { role },
+  you: session ? { ...youOf(session), role } : { role },
   ...(gauge ? { gauge } : {}),
 });
 

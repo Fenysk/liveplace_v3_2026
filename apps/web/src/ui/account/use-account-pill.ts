@@ -6,10 +6,10 @@ import { pickTheme, useThemeChoice } from "../design/use-theme";
 import type { AccountIdentity, AccountPillProps } from "./account-pill";
 import { signInHref, signOutHref } from "./auth-links";
 
-const toIdentity = ({ role, userId, login, displayName }: CanvasView): AccountIdentity => {
+const toIdentity = ({ role, userId, login, displayName, avatarUrl }: CanvasView): AccountIdentity => {
   if (!role) return { kind: "unknown" };
   if (!userId || !login || !displayName) return { kind: "guest" };
-  return { kind: "signedIn", user: { displayName, login } };
+  return { kind: "signedIn", user: { displayName, login, avatarUrl } };
 };
 
 export function useAccountPillProps(
