@@ -136,12 +136,15 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
           isExpanded={isExpanded}
           onPress={toggle}
         />
-        <RecentSwatches
-          palette={state.palette}
-          recentColorIndexes={state.recentColorIndexes}
-          colorIndex={state.colorIndex}
-          onPick={actions.onPickRecentColor}
-        />
+        {/* La palette complète dépliée les contient déjà : les récentes reviennent quand elle se replie. */}
+        {!isExpanded && (
+          <RecentSwatches
+            palette={state.palette}
+            recentColorIndexes={state.recentColorIndexes}
+            colorIndex={state.colorIndex}
+            onPick={actions.onPickRecentColor}
+          />
+        )}
       </div>
       <div className="lp-row lp-sheet-tools">
         <Button
