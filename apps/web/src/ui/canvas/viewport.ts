@@ -7,6 +7,8 @@ export type Cell = { x: number; y: number };
 // `scale` : la taille d'une case à l'écran. `offsetX`, `offsetY` : le coin haut gauche du canvas.
 export type Viewport = { scale: number; offsetX: number; offsetY: number };
 export type ZoomLimits = { minScale: number; maxScale: number };
+// Ce que la pill Pratique montre du cadrage : le pourcentage, et si la vue a bougé depuis l'arrivée.
+export type Framing = { zoomPercent: number; isArrival: boolean };
 
 const ARRIVAL_RATIO = 0.9;
 const MAX_CELL_SIZE = 64;
@@ -49,4 +51,21 @@ export function zoomAt(viewport: Viewport, point: ScreenPoint, factor: number, l
 
 export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
   return { ...viewport, offsetX: viewport.offsetX + dx, offsetY: viewport.offsetY + dy };
+}
+
+// Le pourcentage de la pill Pratique : 100 % au cadrage de l'arrivée (CDC 2026).
+export function zoomPercent(viewport: Viewport, screen: Size, canvas: Size): number {
+  return Math.round((viewport.scale / fitViewport(screen, canvas).scale) * 100);
+}
+
+// Sur mobile, Recentrer n'apparaît que quand la vue a bougé (CDC 2026, Mobile).
+// À moins d'un pixel près : un arrondi n'est pas un déplacement.
+export function isArrivalView(viewport: Viewport, screen: Size, canvas: Size): boolean {
+  const arrival = fitViewport(screen, canvas);
+  const isNear = (a: number, b: number) => Math.abs(a - b) < 1;
+  return (
+    isNear(viewport.scale * canvas.width, arrival.scale * canvas.width) &&
+    isNear(viewport.offsetX, arrival.offsetX) &&
+    isNear(viewport.offsetY, arrival.offsetY)
+  );
 }

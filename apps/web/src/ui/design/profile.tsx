@@ -5,7 +5,7 @@ import { Radio } from "lucide-react";
 import { useState } from "react";
 import { Button, blurAfterClick } from "./button";
 
-export type ProfileUser = { displayName: string; login: string; avatarUrl?: string };
+export type ProfileUser = { displayName: string; login: string; avatarUrl?: string | undefined };
 
 // `avatar` : la photo seule. `name` : la photo et le nom. `full` : la photo, le nom et l'icône Twitch.
 export type ProfileVariant = "avatar" | "name" | "full";
@@ -45,7 +45,7 @@ export const Profile = ({ user, variant = "name" }: ProfileProps) => {
         title={canvasLabel}
         aria-label={canvasLabel}
       >
-        <Avatar displayName={user.displayName} {...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {})} />
+        <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
         {variant !== "avatar" && <span className="lp-profile-name lp-type-title">{user.displayName}</span>}
       </a>
       {/* `Radio` en attendant le glyphe officiel du kit de marque Twitch (design system, Profile). */}
@@ -73,6 +73,6 @@ export const AvatarButton = ({ user, title, onPress }: AvatarButtonProps) => (
     aria-label={title}
     onClick={blurAfterClick(onPress)}
   >
-    <Avatar displayName={user.displayName} {...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {})} />
+    <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
   </button>
 );

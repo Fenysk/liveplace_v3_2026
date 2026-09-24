@@ -10,7 +10,9 @@ import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } fr
 import { createChecker, renderScene } from "./render-scene";
 import {
   type Cell,
+  type Framing,
   fitViewport,
+  isArrivalView,
   panBy,
   type ScreenPoint,
   type Size,
@@ -18,12 +20,21 @@ import {
   viewportToCell,
   zoomAt,
   zoomLimits,
+  zoomPercent,
 } from "./viewport";
 
 export type CanvasScene = { zoomBy(factor: number): void; recenter(): void; dispose(): void };
 
 // `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
-type SceneOptions = { initialViewport: Viewport | null; onViewportMove(viewport: Viewport): void };
+// `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
+type SceneOptions = {
+  initialViewport: Viewport | null;
+  onViewportMove(viewport: Viewport): void;
+  onFraming(framing: Framing): void;
+};
+
+const isSameFraming = (a: Framing | null, b: Framing) =>
+  a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
 
 const MIDDLE_BUTTON = 1;
 
@@ -54,10 +65,21 @@ export function createCanvasScene(
   let lastTracedCell: Cell | null = null;
   let isImageStale = true;
   let frameRequest = 0;
+  let lastFraming: Framing | null = null;
 
   const canvasSize = (): Size => {
     const { width, height } = store.getView();
     return { width, height };
+  };
+
+  const reportFraming = (current: Viewport, canvas: Size) => {
+    const framing = {
+      zoomPercent: zoomPercent(current, screen, canvas),
+      isArrival: isArrivalView(current, screen, canvas),
+    };
+    if (isSameFraming(lastFraming, framing)) return;
+    lastFraming = framing;
+    options.onFraming(framing);
   };
 
   const render = () => {
@@ -66,6 +88,7 @@ export function createCanvasScene(
     if (!checker || view.width === 0 || screen.width === 0) return;
     const canvas = { width: view.width, height: view.height };
     viewport ??= fitViewport(screen, canvas);
+    reportFraming(viewport, canvas);
     if (isImageStale) {
       image.repaint(view);
       isImageStale = false;

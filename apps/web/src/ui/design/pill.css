@@ -56,6 +56,13 @@
   background: var(--chip-hover);
 }
 
+/* Une phrase dans une pill (une invitation, une confirmation) : courte, alignée sur les boutons */
+.lp-prompt {
+  max-width: 280px;
+  margin: 0;
+  padding: 0 6px;
+}
+
 /* Verticale : mêmes règles, l'axe tourne. Exactement la largeur d'un contrôle et de ses marges */
 .lp-pill--v .lp-pill-content {
   flex-direction: column;
@@ -179,4 +186,13 @@ html[data-panning] .lp-floating {
   .lp-reco-wait i {
     animation: none;
   }
+}
+
+/* Un message seul, au centre de l'écran */
+.lp-notice {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  display: grid;
+  place-items: center;
 }

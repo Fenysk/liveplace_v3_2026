@@ -48,4 +48,12 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("e", "KeyE", true), "draft")).toBeNull();
     expect(keyCommand(press("d", "KeyD", true), "view")).toBeNull();
   });
+
+  // Pendant l'invitation d'un invité, Échap la referme, et rien d'autre n'agit
+  it("while a guest is invited to sign in, Escape closes the invitation and nothing else acts", () => {
+    expect(keyCommand(press("Escape", "Escape"), "signInPrompt")).toBe("exitDraftMode");
+    expect(keyCommand(press(" ", "Space"), "signInPrompt")).toBeNull();
+    expect(keyCommand(press("Enter", "Enter"), "signInPrompt")).toBeNull();
+    expect(keyCommand(press("d", "KeyD"), "signInPrompt")).toBeNull();
+  });
 });

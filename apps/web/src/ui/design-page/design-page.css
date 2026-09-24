@@ -109,6 +109,12 @@
   width: 280px;
 }
 
+/* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */
+.design-notice-box .lp-notice {
+  min-height: 0;
+  padding: 0;
+}
+
 @media (max-width: 640px) {
   .design-type-row {
     grid-template-columns: 1fr;

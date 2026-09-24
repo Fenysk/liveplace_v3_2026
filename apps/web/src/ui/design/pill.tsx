@@ -13,9 +13,9 @@ export type PillLayout = "row" | "stack" | "rail";
 export type PillState = { kind: "locked" } | { kind: "reconnecting"; label: string };
 
 type PillProps = {
-  dock?: PillDock; // absente : posée sur place, comme sur /design
-  layout?: PillLayout;
-  state?: PillState;
+  dock?: PillDock | undefined; // absente : posée sur place, comme sur /design
+  layout?: PillLayout | undefined;
+  state?: PillState | undefined;
   isVisible?: boolean;
   children: ReactNode;
 };
@@ -64,3 +64,15 @@ export const Pill = ({ dock, layout = "row", state, isVisible = true, children }
 
 // Un trait fin entre deux groupes de contrôles, qui suit l'axe de la pill.
 export const PillSeparator = () => <span className="lp-sep" aria-hidden="true" />;
+
+// Un message seul au centre de l'écran, dans une pill : la page d'accueil, un canvas introuvable.
+type NoticePillProps = { title: string; children: ReactNode };
+
+export const NoticePill = ({ title, children }: NoticePillProps) => (
+  <div className="lp-notice">
+    <Pill layout="stack">
+      <h1 className="lp-type-title lp-prompt">{title}</h1>
+      {children}
+    </Pill>
+  </div>
+);

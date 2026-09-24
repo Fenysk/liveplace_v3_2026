@@ -8,6 +8,7 @@ import { ThemePicker } from "../design/theme-controls";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { ComponentsSection } from "./components-section";
 import { FoundationsSection } from "./foundations-section";
+import { GamePillsSection } from "./game-pills-section";
 
 type Pointer = "mouse" | "touch";
 
@@ -34,6 +35,7 @@ export const DesignPage = () => {
       </header>
       <FoundationsSection />
       <ComponentsSection />
+      <GamePillsSection />
     </main>
   );
 };

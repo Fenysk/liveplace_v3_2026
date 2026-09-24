@@ -66,6 +66,13 @@ describe("the gauge (§9.4)", () => {
     expect(store.getView()).toMatchObject({ gauge, userId: "user-1", params: welcome.params });
   });
 
+  // Garde le pseudo et le nom de la personne connectée : sa pill Compte mène à son canvas (CDC 2026, Profils)
+  it("keeps the signed-in login and display name for the account pill", () => {
+    const { store } = setup();
+
+    expect(store.getView()).toMatchObject({ login: "user1", displayName: "User 1" });
+  });
+
   // Prend la jauge de chaque ack et de chaque frame gauge
   it("takes the gauge from every ack and every gauge frame", () => {
     const { store, receive } = setup();

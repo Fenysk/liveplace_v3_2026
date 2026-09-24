@@ -26,6 +26,7 @@ export type DraftView = {
   isTracing: boolean;
   isTouchTracing: boolean; // le Toggle tracé : un doigt trace, deux doigts déplacent
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
+  isSignInPrompted: boolean; // un invité a voulu dessiner : la pill Dessin l'invite à se connecter (CDC 2026)
 };
 
 export type DraftStore = {
@@ -65,6 +66,7 @@ export function createDraftStore(
     isTracing: false,
     isTouchTracing: false,
     shakeCount: 0,
+    isSignInPrompted: false,
   };
   let lastColorIndex = FIRST_COLOR_INDEX;
   let loadedUserId: string | undefined;
@@ -142,10 +144,13 @@ export function createDraftStore(
     },
     getView: () => view,
     enterDraftMode() {
-      if (canvas.getView().userId && !view.isSending) publish({ mode: "draft" });
+      const { userId, status } = canvas.getView();
+      if (userId && !view.isSending) publish({ mode: "draft" });
+      else if (!userId && status === "live") publish({ isSignInPrompted: true });
     },
     exitDraftMode() {
-      if (!view.isSending) leaveDraftMode();
+      if (view.isSignInPrompted) publish({ isSignInPrompted: false });
+      else if (!view.isSending) leaveDraftMode();
     },
     discardDraft() {
       if (isEditable()) setDraft(EMPTY_DRAFT);

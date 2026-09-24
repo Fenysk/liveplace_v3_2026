@@ -230,10 +230,7 @@ export const ComponentsSection = () => {
       >
         {PROFILE_USERS.map(({ caption, user }) => (
           <Specimen key={caption} caption={caption}>
-            <Avatar
-              displayName={user.displayName}
-              {...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {})}
-            />
+            <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
           </Specimen>
         ))}
         {PROFILE_VARIANTS.map((variant) => (

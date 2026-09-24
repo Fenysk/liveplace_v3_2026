@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fitViewport, panBy, viewportToCell, zoomAt, zoomLimits } from "./viewport";
+import {
+  fitViewport,
+  isArrivalView,
+  panBy,
+  viewportToCell,
+  zoomAt,
+  zoomLimits,
+  zoomPercent,
+} from "./viewport";
 
 const CANVAS = { width: 256, height: 256 };
 const DESKTOP = { width: 1000, height: 800 };
@@ -94,5 +102,25 @@ describe("panBy", () => {
   it("moves the canvas by the dragged distance", () => {
     const viewport = { scale: 3, offsetX: 100, offsetY: 50 };
     expect(panBy(viewport, 30, -10)).toEqual({ scale: 3, offsetX: 130, offsetY: 40 });
+  });
+});
+
+describe("zoomPercent et isArrivalView (CDC 2026, pill Pratique)", () => {
+  // Le cadrage de l'arrivée vaut 100 %, et deux fois plus près, 200 %
+  it("gives 100% at the arrival framing, and 200% twice as close", () => {
+    const arrival = fitViewport(DESKTOP, CANVAS);
+    expect(zoomPercent(arrival, DESKTOP, CANVAS)).toBe(100);
+    expect(zoomPercent({ ...arrival, scale: arrival.scale * 2 }, DESKTOP, CANVAS)).toBe(200);
+    expect(zoomPercent({ ...arrival, scale: arrival.scale / 3 }, DESKTOP, CANVAS)).toBe(33);
+  });
+
+  // Sur mobile, Recentrer n'apparaît que quand la vue a bougé depuis l'arrivée
+  it("tells whether the view has moved from the arrival framing", () => {
+    const arrival = fitViewport(PHONE, CANVAS);
+    expect(isArrivalView(arrival, PHONE, CANVAS)).toBe(true);
+    // Moins d'un pixel : un arrondi, pas un déplacement
+    expect(isArrivalView(panBy(arrival, 0.4, -0.4), PHONE, CANVAS)).toBe(true);
+    expect(isArrivalView(panBy(arrival, 12, 0), PHONE, CANVAS)).toBe(false);
+    expect(isArrivalView({ ...arrival, scale: arrival.scale * 1.5 }, PHONE, CANVAS)).toBe(false);
   });
 });

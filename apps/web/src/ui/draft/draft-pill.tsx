@@ -1,159 +1,169 @@
-// La pill Dessin (CDC 2026), en bas au centre. Vue : la jauge et Dessiner. Dessin : la jauge, la palette, Valider, Annuler, Vider.
+// La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
+// Vue : la jauge et Dessiner. Dessin : la palette, puis la jauge, Vider, Annuler, Valider.
 
-import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { type CSSProperties, type MouseEvent, useEffect, useState, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
-import type { DraftStore } from "../../state/draft-store";
-import { Pill } from "../design/pill";
-import { GaugeMeter } from "../gauge/gauge-meter";
+import { Brush, LogIn, Trash } from "lucide-react";
+import type { ReactNode } from "react";
+import { Button } from "../design/button";
+import { Gauge, type GaugeProps } from "../design/gauge";
+import { Palette } from "../design/palette";
+import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
 
-const BUTTON_STYLE: CSSProperties = {
-  padding: "6px 12px",
-  border: "none",
-  borderRadius: 999,
-  background: "rgba(255, 255, 255, 0.12)",
-  color: "inherit",
-  font: "inherit",
-  cursor: "pointer",
-};
-const PRIMARY_STYLE: CSSProperties = { ...BUTTON_STYLE, background: "#3388de" };
-const SWATCH_SIZE = 22;
-// La gomme se distingue des couleurs : un damier barré (CDC 2026).
-const ERASER_BACKGROUND =
-  "linear-gradient(135deg, transparent 45%, #ec273f 45%, #ec273f 55%, transparent 55%), repeating-conic-gradient(#d6d6dc 0% 25%, #c2c2ca 0% 50%) 0 0 / 8px 8px";
-const LINK_STYLE = { color: "#c9b6ff" };
-const STATUS_LABELS = { connecting: "Connexion…", closed: "Déconnecté · recharge la page" } as const;
+export type DraftPillState =
+  | { kind: "connecting" }
+  | { kind: "closed" } // la reconnexion arrive au J12 : on recharge la page
+  | { kind: "guest"; isSignInPrompted: boolean; signInHref: string }
+  | { kind: "view"; gauge: GaugeProps; refusal?: string }
+  | {
+      kind: "draft";
+      gauge: GaugeProps;
+      palette: readonly string[];
+      colorIndex: number;
+      isSending: boolean;
+      canSubmit: boolean;
+      canDiscard: boolean;
+      isTouchScreen: boolean;
+      isTouchTracing: boolean;
+      refusal?: string;
+    };
 
-// Un bouton rend le focus après un clic : sinon Espace et Entrée le recliqueraient au lieu de tracer ou de valider.
-const pressed = (action: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
-  event.currentTarget.blur();
-  action();
-};
-
-export const submitDraft = (draftStore: DraftStore): void => {
-  draftStore
-    .submit()
-    .catch((error: unknown) => console.error("draft-pill : envoi du brouillon interrompu", error));
-};
-
-// Lu dans un `useEffect` : `matchMedia` n'existe pas sur le serveur.
-const useTouchScreen = (): boolean => {
-  const [isTouchScreen, setIsTouchScreen] = useState(false);
-  useEffect(() => setIsTouchScreen(window.matchMedia("(any-pointer: coarse)").matches), []);
-  return isTouchScreen;
+export type DraftPillActions = {
+  onEnter: () => void; // Dessiner, ou l'invitation d'un invité
+  onExit: () => void; // Annuler : sort du Dessin, ou referme l'invitation
+  onSubmit: () => void;
+  onDiscard: () => void;
+  onPickColor: (colorIndex: number) => void;
+  onToggleTouchTracing: () => void;
+  onReload: () => void;
 };
 
-type PaletteProps = { palette: readonly string[]; colorIndex: number; draftStore: DraftStore };
+type DraftPillProps = { state: DraftPillState; actions: DraftPillActions; isDocked?: boolean };
 
-// L'ordre de la palette est celui du CDC 2026, la gomme (index 0) en tête.
-const PaletteSwatches = ({ palette, colorIndex, draftStore }: PaletteProps) => (
-  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 4 }}>
-    {palette.map((color, index) => (
-      <button
-        key={color}
-        type="button"
-        aria-label={index === TRANSPARENT_COLOR_INDEX ? "Gomme (E)" : `Couleur ${color}`}
-        aria-pressed={index === colorIndex}
-        onClick={pressed(() => draftStore.selectColor(index))}
-        style={{
-          width: SWATCH_SIZE,
-          height: SWATCH_SIZE,
-          padding: 0,
-          borderRadius: 6,
-          border: `2px solid ${index === colorIndex ? "#ffffff" : "rgba(255, 255, 255, 0.15)"}`,
-          background: index === TRANSPARENT_COLOR_INDEX ? ERASER_BACKGROUND : color,
-          cursor: "pointer",
-        }}
-      />
-    ))}
-  </div>
+// Ce que la pill montre dans un état : son contenu, sa disposition, son voile.
+type DraftPillContent = {
+  content: ReactNode;
+  layout?: PillLayout | undefined;
+  pillState?: PillState | undefined;
+};
+
+const DOCK: PillDock = "bc";
+
+const Refusal = ({ code }: { code: string | undefined }) =>
+  code ? <span className="lp-type-caption lp-danger">Refusé : {code}</span> : null;
+
+const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => (
+  <Button label="Dessiner" kbd="D" variant="primary" title="Passer en mode Dessin" onPress={onEnter} />
 );
 
-type DraftPillProps = { store: CanvasStore; draftStore: DraftStore; login: string };
+const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => (
+  <Button
+    label="Annuler"
+    kbd="Échap"
+    title="Sortir du mode Dessin (le brouillon est gardé)"
+    onPress={onExit}
+  />
+);
 
-export const DraftPill = ({ store, draftStore, login }: DraftPillProps) => {
-  const canvasView = useSyncExternalStore(store.subscribe, store.getView, store.getView);
-  const draftView = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
-  const isTouchScreen = useTouchScreen();
-
-  if (canvasView.status !== "live") return <Pill dock="bc">{STATUS_LABELS[canvasView.status]}</Pill>;
-
-  // Écart §10.1 (JOURNAL 2026-09-22) : après Twitch, on revient sur ce canvas.
-  if (!canvasView.userId)
-    return (
-      <Pill dock="bc">
-        <a href={`/auth/twitch?returnTo=${encodeURIComponent(`/${login}`)}`} style={LINK_STYLE}>
-          Se connecter pour dessiner
-        </a>
-      </Pill>
-    );
-
-  const gauge = <GaugeMeter store={store} draftStore={draftStore} />;
-  const refusal = canvasView.lastError && (
-    <span style={{ fontSize: 12, color: "#fa6e79" }}>Refusé : {canvasView.lastError}</span>
-  );
-
-  if (draftView.mode === "view")
-    return (
-      <Pill dock="bc">
-        {gauge}
-        <button type="button" style={PRIMARY_STYLE} onClick={pressed(() => draftStore.enterDraftMode())}>
-          Dessiner
-        </button>
-        {refusal}
-      </Pill>
-    );
-
-  const canSubmit = draftView.draft.size > 0 && !draftView.isSending;
-  return (
-    <Pill dock="bc" layout="stack">
-      {/* Pendant l'envoi, le mode Dessin reste affiché mais verrouillé (CDC 2026). */}
-      <div
-        style={{
-          display: "grid",
-          gap: 8,
-          justifyItems: "center",
-          opacity: draftView.isSending ? 0.5 : 1,
-          pointerEvents: draftView.isSending ? "none" : "auto",
-        }}
-      >
-        {gauge}
-        <PaletteSwatches
-          palette={canvasView.palette}
-          colorIndex={draftView.colorIndex}
-          draftStore={draftStore}
-        />
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
-          <button
-            type="button"
-            style={{ ...PRIMARY_STYLE, opacity: canSubmit ? 1 : 0.4 }}
-            disabled={!canSubmit}
-            onClick={pressed(() => submitDraft(draftStore))}
-          >
-            Valider
-          </button>
-          <button type="button" style={BUTTON_STYLE} onClick={pressed(() => draftStore.exitDraftMode())}>
-            Annuler
-          </button>
-          <button type="button" style={BUTTON_STYLE} onClick={pressed(() => draftStore.discardDraft())}>
-            Vider
-          </button>
-          {isTouchScreen && (
-            <button
-              type="button"
-              aria-pressed={draftView.isTouchTracing}
-              style={{
-                ...BUTTON_STYLE,
-                ...(draftView.isTouchTracing ? { background: "#9de64e", color: "#10121c" } : {}),
-              }}
-              onClick={pressed(() => draftStore.toggleTouchTracing())}
-            >
-              Tracé
-            </button>
-          )}
+const guestContent = (
+  state: Extract<DraftPillState, { kind: "guest" }>,
+  actions: DraftPillActions,
+): DraftPillContent => {
+  if (!state.isSignInPrompted) return { content: <EnterButton onEnter={actions.onEnter} /> };
+  return {
+    layout: "stack",
+    content: (
+      <>
+        <p className="lp-type-body lp-prompt">Connecte-toi avec Twitch pour dessiner.</p>
+        <div className="lp-row">
+          <span className="lp-spacer" />
+          <CancelButton onExit={actions.onExit} />
+          <Button label="Se connecter" icon={LogIn} variant="primary" href={state.signInHref} />
         </div>
-        {refusal}
+      </>
+    ),
+  };
+};
+
+const draftContent = (
+  state: Extract<DraftPillState, { kind: "draft" }>,
+  actions: DraftPillActions,
+): DraftPillContent => ({
+  layout: "stack",
+  pillState: state.isSending ? { kind: "locked" } : undefined,
+  content: (
+    <>
+      <Palette palette={state.palette} colorIndex={state.colorIndex} onPick={actions.onPickColor} />
+      <div className="lp-row">
+        <Gauge {...state.gauge} />
+        <span className="lp-spacer" />
+        {state.isTouchScreen && (
+          <Button
+            icon={Brush}
+            variant="ghost"
+            title="Tracé : un doigt dessine, deux doigts déplacent"
+            isPressed={state.isTouchTracing}
+            onPress={actions.onToggleTouchTracing}
+          />
+        )}
+        <Button
+          icon={Trash}
+          variant="ghost"
+          title="Vider le brouillon"
+          isDisabled={!state.canDiscard}
+          onPress={actions.onDiscard}
+        />
+        <CancelButton onExit={actions.onExit} />
+        <Button
+          label="Valider"
+          kbd="⏎"
+          variant="primary"
+          title="Poser le brouillon"
+          isDisabled={!state.canSubmit}
+          onPress={actions.onSubmit}
+        />
       </div>
+      <Refusal code={state.refusal} />
+    </>
+  ),
+});
+
+const contentOf = (state: DraftPillState, actions: DraftPillActions): DraftPillContent => {
+  switch (state.kind) {
+    case "connecting":
+      return {
+        content: <EnterButton onEnter={actions.onEnter} />,
+        pillState: { kind: "reconnecting", label: "Connexion" },
+      };
+    case "closed":
+      return {
+        content: (
+          <>
+            <span className="lp-type-body lp-prompt">Connexion perdue</span>
+            <Button label="Recharger" onPress={actions.onReload} />
+          </>
+        ),
+      };
+    case "guest":
+      return guestContent(state, actions);
+    case "view":
+      return {
+        content: (
+          <>
+            <Gauge {...state.gauge} />
+            <EnterButton onEnter={actions.onEnter} />
+            <Refusal code={state.refusal} />
+          </>
+        ),
+      };
+    case "draft":
+      return draftContent(state, actions);
+  }
+};
+
+export const DraftPill = ({ state, actions, isDocked = true }: DraftPillProps) => {
+  const { content, layout, pillState } = contentOf(state, actions);
+  return (
+    <Pill dock={isDocked ? DOCK : undefined} layout={layout} state={pillState}>
+      {content}
     </Pill>
   );
 };

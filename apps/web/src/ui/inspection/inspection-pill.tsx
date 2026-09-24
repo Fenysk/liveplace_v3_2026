@@ -1,97 +1,87 @@
-// La pill Inspection (CDC 2026), au centre à droite : l'auteur du pixel inspecté, la date de pose, la couleur.
-// Visible seulement pendant une inspection, en mode Vue. Les boutons de modération arrivent au J11.
+// La pill Inspection (CDC 2026), au centre à droite : l'auteur du pixel inspecté, sa couleur, sa date de pose.
+// L'affichage seul, nourri par `useInspectionPillProps`. La modération arrive au J11.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import type { InspectEntry } from "@liveplace/domain/ports";
-import { type CSSProperties, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
-import type { DraftStore } from "../../state/draft-store";
-import { Pill } from "../design/pill";
+import { X } from "lucide-react";
+import type { Inspection } from "../../state/canvas-store";
+import { Button } from "../design/button";
+import { ColorChip } from "../design/palette";
+import { Pill, type PillDock } from "../design/pill";
+import { Profile } from "../design/profile";
+import { formatPlacedAgo } from "./placed-ago";
 
-const AVATAR_SIZE = 40;
-const AVATAR_STYLE: CSSProperties = {
-  width: AVATAR_SIZE,
-  height: AVATAR_SIZE,
-  borderRadius: "50%",
-  flexShrink: 0,
-  display: "grid",
-  placeItems: "center",
-  background: "#5e5b8c",
-  fontWeight: 700,
-  objectFit: "cover",
+const DOCK: PillDock = "cr";
+const PLACED_AT_FORMAT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
+
+export type InspectionPillProps = {
+  inspection: Inspection | null;
+  palette: readonly string[];
+  nowMs: number; // pour la date relative
+  onClose: () => void;
+  isDocked?: boolean;
 };
-const CLOSE_STYLE: CSSProperties = {
-  position: "absolute",
-  top: 4,
-  right: 8,
-  border: "none",
-  background: "transparent",
-  color: "inherit",
-  fontSize: 18,
-  cursor: "pointer",
+
+const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
+  <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
+);
+
+type InspectedCellProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose"> & {
+  inspection: Exclude<Inspection, { status: "loading" }>;
 };
-const PLACED_AT_FORMAT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 
-// Sans avatar (auteur pas reconnecté depuis l'écart du JOURNAL 2026-09-24) : son initiale.
-const Avatar = ({ entry }: { entry: InspectEntry }) =>
-  entry.avatarUrl ? (
-    <img src={entry.avatarUrl} alt="" style={AVATAR_STYLE} />
-  ) : (
-    <span style={AVATAR_STYLE} aria-hidden="true">
-      {entry.displayName.slice(0, 1).toUpperCase()}
-    </span>
-  );
-
-const Author = ({ entry, palette }: { entry: InspectEntry; palette: readonly string[] }) => {
-  const color = palette[entry.colorIndex];
-  const isTransparent = entry.colorIndex === TRANSPARENT_COLOR_INDEX;
+const InspectedCell = ({ inspection, palette, nowMs, onClose }: InspectedCellProps) => {
+  const coordinates = `(${inspection.x}, ${inspection.y})`;
+  if (inspection.status === "empty")
+    return (
+      <>
+        <div className="lp-row">
+          <span className="lp-type-body lp-prompt">Personne n'a encore posé ici</span>
+          <span className="lp-spacer" />
+          <CloseButton onClose={onClose} />
+        </div>
+        <span className="lp-type-caption lp-muted lp-prompt">{coordinates}</span>
+      </>
+    );
+  const { entry } = inspection;
+  const color = entry.colorIndex === TRANSPARENT_COLOR_INDEX ? undefined : palette[entry.colorIndex];
   return (
-    <div style={{ display: "grid", gap: 6, paddingRight: 16 }}>
-      {/* L'avatar et le nom ouvrent sa chaîne Twitch dans un nouvel onglet (CDC 2026). */}
-      <a
-        href={`https://www.twitch.tv/${encodeURIComponent(entry.login)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ display: "flex", alignItems: "center", gap: 10, color: "#c9b6ff" }}
-      >
-        <Avatar entry={entry} />
-        <strong>{entry.displayName}</strong>
-      </a>
-      <span style={{ fontSize: 13, opacity: 0.8 }}>Posé le {PLACED_AT_FORMAT.format(entry.placedAt)}</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-        <span
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 3,
-            background: isTransparent ? "transparent" : color,
-          }}
-        />
-        {isTransparent ? "Transparent (gomme)" : color}
-      </span>
-    </div>
-  );
-};
-
-type InspectionPillProps = { store: CanvasStore; draftStore: DraftStore };
-
-export const InspectionPill = ({ store, draftStore }: InspectionPillProps) => {
-  const { inspection, palette } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
-  const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
-  if (!inspection || mode !== "view") return null;
-  return (
-    <Pill dock="cr" layout="stack">
-      <div style={{ position: "relative", minWidth: 180, whiteSpace: "normal" }}>
-        <button type="button" aria-label="Fermer" style={CLOSE_STYLE} onClick={() => store.closeInspection()}>
-          ×
-        </button>
-        <span style={{ display: "block", fontSize: 12, opacity: 0.6, marginBottom: 6 }}>
-          Case {inspection.x}, {inspection.y}
-        </span>
-        {inspection.status === "loading" && <span>…</span>}
-        {inspection.status === "empty" && <span>Personne n'a encore posé ici</span>}
-        {inspection.status === "found" && <Author entry={inspection.entry} palette={palette} />}
+    <>
+      <div className="lp-row">
+        <Profile user={entry} variant="full" />
+        <span className="lp-spacer" />
+        <CloseButton onClose={onClose} />
       </div>
+      <div className="lp-row lp-prompt">
+        <ColorChip {...(color ? { color } : {})}>
+          <span className="lp-type-caption" title={color ?? "Transparent (gomme)"}>
+            {coordinates}
+          </span>
+        </ColorChip>
+        <span
+          className="lp-type-caption lp-muted"
+          title={`Posé le ${PLACED_AT_FORMAT.format(entry.placedAt)}`}
+        >
+          {formatPlacedAgo(entry.placedAt, nowMs)}
+        </span>
+      </div>
+    </>
+  );
+};
+
+// Pendant la requête, la pill reste masquée : elle apparaît avec sa réponse, sans « … » qui clignote.
+export const InspectionPill = ({
+  inspection,
+  palette,
+  nowMs,
+  onClose,
+  isDocked = true,
+}: InspectionPillProps) => {
+  if (!inspection) return null;
+  return (
+    <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={inspection.status !== "loading"}>
+      {inspection.status !== "loading" && (
+        <InspectedCell inspection={inspection} palette={palette} nowMs={nowMs} onClose={onClose} />
+      )}
     </Pill>
   );
 };

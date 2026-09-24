@@ -27,6 +27,7 @@ export type CanvasView = {
   version: number;
   role?: Role;
   userId?: string; // absent pour un invité
+  login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
@@ -127,7 +128,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
 
   const welcomeView = (frame: WelcomeFrame): Partial<CanvasView> => {
     const { width, height } = frame.canvas;
-    const { userId, displayName, role } = frame.you;
+    const { userId, login, displayName, role } = frame.you;
     return {
       status: "live",
       width,
@@ -138,6 +139,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       params: frame.params,
       gauge: frame.gauge ?? null,
       ...(userId ? { userId } : {}),
+      ...(login ? { login } : {}),
       ...(displayName ? { displayName } : {}),
       pixels: new Uint8Array(width * height),
     };

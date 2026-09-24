@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand } from "./draft-keys";
-import { submitDraft } from "./draft-pill";
+import { submitDraft } from "./use-draft-pill";
 
 type KeyStores = { canvas: CanvasStore; draft: DraftStore };
 
@@ -16,6 +16,9 @@ const isTyping = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
+// La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
+const isWindowOpen = (): boolean => document.querySelector("dialog[open]") !== null;
+
 const toKeyPress = (event: KeyboardEvent): KeyPress => ({
   key: event.key,
   code: event.code,
@@ -23,7 +26,8 @@ const toKeyPress = (event: KeyboardEvent): KeyPress => ({
 });
 
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
-  const { mode } = draft.getView();
+  const { mode, isSignInPrompted } = draft.getView();
+  if (isSignInPrompted) return "signInPrompt";
   return mode === "view" && canvas.getView().inspection ? "inspecting" : mode;
 };
 
@@ -40,7 +44,7 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores): voi
 };
 
 const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState): void => {
-  if (isTyping(event.target)) return;
+  if (isTyping(event.target) || isWindowOpen()) return;
   const command = keyCommand(toKeyPress(event), keyModeOf(stores));
   // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
   if (command || event.code === "Space") event.preventDefault();
