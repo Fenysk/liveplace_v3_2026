@@ -1,0 +1,30 @@
+/* La poignée d'une feuille : glisser vers le haut ou le bas, ou toucher */
+
+.lp-grabber {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: grab;
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin: -4px 0 0;
+  padding: 0;
+  touch-action: none;
+}
+
+.lp-grabber::after {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--chip-hover);
+}
+
+.lp-grabber:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-pill);
+}

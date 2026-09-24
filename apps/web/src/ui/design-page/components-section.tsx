@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button, type ButtonProps } from "../design/button";
-import { ColorChip, Palette } from "../design/palette";
+import { Grabber } from "../design/grabber";
+import { ColorChip, CurrentColorButton, Palette } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
@@ -127,6 +128,7 @@ const PillSpecimens = () => {
 
 const PaletteSpecimens = () => {
   const [colorIndex, setColorIndex] = useState(5);
+  const [isExpanded, setIsExpanded] = useState(false);
   return (
     <>
       <Specimen caption="À la souris : la gomme en tête">
@@ -153,6 +155,23 @@ const PaletteSpecimens = () => {
           <ColorChip>
             <span className="lp-type-caption">transparent</span>
           </ColorChip>
+        </div>
+      </Specimen>
+      <Specimen caption="Mobile : la couleur actuelle ouvre la palette complète">
+        <CurrentColorButton
+          color={PALETTE[colorIndex]}
+          isExpanded={isExpanded}
+          onPress={() => setIsExpanded((expanded) => !expanded)}
+        />
+      </Specimen>
+      <Specimen caption="Mobile : la poignée d'une feuille (glisser ou toucher)">
+        <div className="design-phone-box">
+          <Grabber
+            label="Déplier la palette"
+            onUp={() => setIsExpanded(true)}
+            onDown={() => setIsExpanded(false)}
+            onTap={() => setIsExpanded((expanded) => !expanded)}
+          />
         </div>
       </Specimen>
       <Specimen caption="Gomme armée">

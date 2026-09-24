@@ -42,6 +42,7 @@ const CONNECTING_ACTIONS: DraftPillActions = {
   onSubmit: doNothing,
   onDiscard: doNothing,
   onPickColor: doNothing,
+  onToggleEraser: doNothing,
   onToggleTouchTracing: doNothing,
   onReload: doNothing,
 };
@@ -57,7 +58,7 @@ const LivePills = ({ stores, login, isCompact }: LivePillsProps) => {
     <>
       <AccountPill {...account} isCompact={isCompact} />
       <InspectionPill {...inspection} />
-      <DraftPill {...draft} />
+      <DraftPill {...draft} isCompact={isCompact} />
     </>
   );
 };

@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
+import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
@@ -42,6 +43,8 @@ const useWindowMotion = (isOpen: boolean) => {
   return { dialog, isShown };
 };
 
+const doNothing = (): void => undefined;
+
 export const Window = <Id extends string>({
   isOpen,
   sections,
@@ -64,6 +67,10 @@ export const Window = <Id extends string>({
       }}
       onClose={onClose}
     >
+      {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
+      <div className="lp-window-grabber">
+        <Grabber label="Fermer" onUp={doNothing} onDown={onClose} onTap={doNothing} />
+      </div>
       <nav className="lp-window-nav" aria-label="Sections">
         <ul>
           {sections.map(({ id, label, icon: Icon }) => (

@@ -109,6 +109,17 @@
   width: 280px;
 }
 
+/* La largeur d'un téléphone, moins ses marges : la barre du bas y prend toute la place, comme dans le jeu */
+.design-phone-box {
+  width: 359px;
+  max-width: 100%;
+}
+
+.design-phone-box .lp-pill,
+.design-phone-box .lp-pill-content {
+  width: 100%;
+}
+
 /* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */
 .design-notice-box .lp-notice {
   min-height: 0;

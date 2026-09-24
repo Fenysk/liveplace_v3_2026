@@ -1,6 +1,6 @@
 // Le canvas en plein écran, sous les pills (CDC 2026) : React le monte, la scène le fait vivre sans re-rendu.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
@@ -21,6 +21,8 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
   const [scene, setScene] = useState<CanvasScene>();
   const [framing, setFraming] = useState<Framing | null>(null);
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
+  const { inspection } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
+  const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
 
   // Le viewport sauvegardé se lit ici, jamais pendant le rendu : `localStorage` n'existe pas sur le serveur.
   useEffect(() => {
@@ -45,6 +47,7 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
         <ViewportPill
           framing={framing}
           isCompact={isCompact}
+          isSheetOpen={mode === "draft" || inspection !== null}
           onZoomIn={() => scene.zoomBy(ZOOM_STEP)}
           onZoomOut={() => scene.zoomBy(1 / ZOOM_STEP)}
           onRecenter={() => scene.recenter()}

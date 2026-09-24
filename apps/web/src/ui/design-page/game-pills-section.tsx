@@ -26,6 +26,7 @@ const DRAFT_ACTIONS: DraftPillActions = {
   onSubmit: noop,
   onDiscard: noop,
   onPickColor: noop,
+  onToggleEraser: noop,
   onToggleTouchTracing: noop,
   onReload: noop,
 };
@@ -52,7 +53,9 @@ const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { 
     ...overrides,
   }) satisfies DraftPillState;
 
-const draftStates = (nowMs: number): readonly { caption: string; state: DraftPillState }[] => [
+type DraftSpecimen = { caption: string; state: DraftPillState; isCompact?: boolean };
+
+const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
   { caption: "Connexion : floue, Valider bloqué", state: { kind: "connecting" } },
   { caption: "Connexion perdue", state: { kind: "closed" } },
   { caption: "Invité : Dessiner seul", state: { kind: "guest", isSignInPrompted: false, signInHref: "#" } },
@@ -72,6 +75,12 @@ const draftStates = (nowMs: number): readonly { caption: string; state: DraftPil
     caption: "Dessin, écran tactile : Tracé armé",
     state: draftState(nowMs, { isTouchScreen: true, isTouchTracing: true }),
   },
+  {
+    caption: "Mobile, Vue : la barre du bas",
+    state: { kind: "view", gauge: gaugeAt(nowMs, 6) },
+    isCompact: true,
+  },
+  { caption: "Mobile, Dessin : la feuille, palette repliée", state: draftState(nowMs), isCompact: true },
 ];
 
 const inspections = (nowMs: number): readonly { caption: string; inspection: Inspection }[] => [
@@ -126,9 +135,12 @@ export const GamePillsSection = () => {
         title="Dessin"
         note="En bas au centre. La même pill que dans le jeu, avec des props d'exemple."
       >
-        {draftStates(nowMs).map(({ caption, state }) => (
+        {draftStates(nowMs).map(({ caption, state, isCompact = false }) => (
           <Specimen key={caption} caption={caption}>
-            <DraftPill state={state} actions={DRAFT_ACTIONS} isDocked={false} />
+            {/* Sur mobile, la barre du bas prend toute la largeur : ici, celle d'un téléphone. */}
+            <div className={isCompact ? "design-phone-box" : undefined}>
+              <DraftPill state={state} actions={DRAFT_ACTIONS} isCompact={isCompact} isDocked={false} />
+            </div>
           </Specimen>
         ))}
       </SpecimenSection>
