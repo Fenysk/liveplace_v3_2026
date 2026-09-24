@@ -29,7 +29,7 @@ const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g
 
 const COLOR_USAGES: Usages = {
   void: "Le vide, derrière le canvas. Jamais de texte dessus.",
-  voidDot: "Les points du vide, qui suivent le viewport.",
+  voidDot: "Les points du vide, fixes à l'écran et centrés.",
   canvasBorder: "La bordure du canvas.",
   canvasGrid: "La grille, dès qu'une case dépasse 8 px.",
   checkerA: "Le damier du pixel transparent, case claire.",

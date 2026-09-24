@@ -1,3 +1,14 @@
+/* Le vide, première couche (CDC 2026) : gris neutre, parsemé de points fixes à l'écran, un pile au centre.
+   Il ne suit ni le zoom ni le déplacement. */
+.lp-void {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, var(--void-dot) 0 1px, transparent 1.5px) 50% 50% / 24px 24px,
+    var(--void);
+}
+
 /* Le canvas, deuxième couche (CDC 2026) : plein écran, sous les pills. La scène le peint avec les teintes des tokens. */
 
 .lp-canvas {
