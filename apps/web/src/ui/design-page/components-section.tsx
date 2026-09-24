@@ -17,7 +17,7 @@ import {
 import { useState } from "react";
 import { Button, type ButtonProps } from "../design/button";
 import { Grabber } from "../design/grabber";
-import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
+import { ColorChip, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
@@ -128,7 +128,6 @@ const PillSpecimens = () => {
 
 const PaletteSpecimens = () => {
   const [colorIndex, setColorIndex] = useState(5);
-  const [isExpanded, setIsExpanded] = useState(false);
   return (
     <>
       <Specimen caption="À la souris : la gomme en tête">
@@ -157,18 +156,11 @@ const PaletteSpecimens = () => {
           </ColorChip>
         </div>
       </Specimen>
-      <Specimen caption="Mobile : la couleur actuelle ouvre la palette complète">
-        <CurrentColorButton
-          color={PALETTE[colorIndex]}
-          isExpanded={isExpanded}
-          onPress={() => setIsExpanded((expanded) => !expanded)}
-        />
-      </Specimen>
-      <Specimen caption="Mobile : les couleurs récentes, dans un ordre stable">
+      <Specimen caption="Mobile : cinq couleurs récentes, la couleur active entourée">
         <div className="lp-row">
           <RecentSwatches
             palette={PALETTE}
-            recentColorIndexes={[5, 28, 19, 9]}
+            recentColorIndexes={[1, 5, 28, 19, 9]}
             colorIndex={colorIndex}
             onPick={setColorIndex}
           />
@@ -176,12 +168,7 @@ const PaletteSpecimens = () => {
       </Specimen>
       <Specimen caption="Mobile : la poignée d'une feuille (glisser ou toucher)">
         <div className="design-phone-box">
-          <Grabber
-            label="Déplier la palette"
-            onUp={() => setIsExpanded(true)}
-            onDown={() => setIsExpanded(false)}
-            onTap={() => setIsExpanded((expanded) => !expanded)}
-          />
+          <Grabber label="Déplier la palette" onUp={noop} onDown={noop} onTap={noop} />
         </div>
       </Specimen>
       <Specimen caption="Gomme armée">
