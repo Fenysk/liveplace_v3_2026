@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — La palette suit l'ordre du CDC 2026, et cet ordre ne bouge plus
+
+**Contexte.** La palette provisoire du J4 prenait 16 couleurs du CDC 2026 dans un autre ordre. Un canvas stocke des index (`state`, `hist:`) : réordonner change la teinte de chaque case déjà posée.
+**Décision.** `PALETTE` = le transparent, puis les 42 couleurs dans l'ordre du CDC 2026. Choix de l'humain : les 154 pixels de la prod, tous à l'index 7 (rouge), passent à l'orange. Dès maintenant, l'ordre est figé : une couleur nouvelle s'ajoute à la fin.
+**Renoncement.** Pas de garder les index 0 à 16 avec une liste d'affichage dans l'UI : une table de plus à tenir pour quelques pixels. Pas de migration des données.
+
 ## 2026-09-23 — Écart §9.3 : l'image hors écran se repeint en entier
 
 **Contexte.** Le §9.3 n'écrit dans le `<canvas>` hors écran que les lignes sales. Pour les connaître, le store devrait dire quelles lignes ont changé : son contrat grandirait, pour un canvas de 256 × 256.
