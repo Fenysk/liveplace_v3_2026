@@ -51,6 +51,11 @@
   flex: 1;
 }
 
+/* La rangée d'outils de la feuille Dessin, sur mobile : répartie sur toute la largeur */
+.lp-sheet-tools {
+  justify-content: space-between;
+}
+
 .lp-sep {
   width: 1px;
   align-self: stretch;

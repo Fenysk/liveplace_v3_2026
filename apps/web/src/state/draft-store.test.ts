@@ -172,6 +172,21 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
     store.toggleEraser();
     expect(store.getView().colorIndex).toBe(12);
   });
+
+  // Sur mobile, une couleur prise dans la palette entre dans les récentes ; en prendre une parmi elles garde leur ordre
+  it("remembers a color picked from the palette, and keeps the order when one is picked among the recent", () => {
+    const { store } = setup();
+    const before = store.getView().recentColorIndexes;
+
+    store.selectColor(12);
+    expect(store.getView().recentColorIndexes).toEqual([12, ...before.slice(0, 3)]);
+
+    store.pickRecentColor(before[1] ?? 0);
+    expect(store.getView()).toMatchObject({
+      colorIndex: before[1],
+      recentColorIndexes: [12, ...before.slice(0, 3)],
+    });
+  });
 });
 
 describe("createDraftStore — the cap (CDC 2026)", () => {

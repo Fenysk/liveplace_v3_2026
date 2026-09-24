@@ -8,7 +8,7 @@ import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
-import { CurrentColorButton, Palette } from "../design/palette";
+import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
 
 export type DraftPillState =
@@ -21,6 +21,7 @@ export type DraftPillState =
       gauge: GaugeProps;
       palette: readonly string[];
       colorIndex: number;
+      recentColorIndexes: readonly number[]; // sur mobile
       isSending: boolean;
       canSubmit: boolean;
       canDiscard: boolean;
@@ -34,7 +35,8 @@ export type DraftPillActions = {
   onExit: () => void; // Annuler : sort du Dessin, ou referme l'invitation
   onSubmit: () => void;
   onDiscard: () => void;
-  onPickColor: (colorIndex: number) => void;
+  onPickColor: (colorIndex: number) => void; // dans la palette
+  onPickRecentColor: (colorIndex: number) => void; // parmi les récentes, sur mobile
   onToggleEraser: () => void;
   onToggleTouchTracing: () => void;
   onReload: () => void;
@@ -134,7 +136,14 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
           isExpanded={isExpanded}
           onPress={toggle}
         />
-        <span className="lp-spacer" />
+        <RecentSwatches
+          palette={state.palette}
+          recentColorIndexes={state.recentColorIndexes}
+          colorIndex={state.colorIndex}
+          onPick={actions.onPickRecentColor}
+        />
+      </div>
+      <div className="lp-row lp-sheet-tools">
         <Button
           icon={Eraser}
           variant="ghost"

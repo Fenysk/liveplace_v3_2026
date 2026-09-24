@@ -17,7 +17,7 @@ import {
 import { useState } from "react";
 import { Button, type ButtonProps } from "../design/button";
 import { Grabber } from "../design/grabber";
-import { ColorChip, CurrentColorButton, Palette } from "../design/palette";
+import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
@@ -163,6 +163,16 @@ const PaletteSpecimens = () => {
           isExpanded={isExpanded}
           onPress={() => setIsExpanded((expanded) => !expanded)}
         />
+      </Specimen>
+      <Specimen caption="Mobile : les couleurs récentes, dans un ordre stable">
+        <div className="lp-row">
+          <RecentSwatches
+            palette={PALETTE}
+            recentColorIndexes={[5, 28, 19, 9]}
+            colorIndex={colorIndex}
+            onPick={setColorIndex}
+          />
+        </div>
       </Specimen>
       <Specimen caption="Mobile : la poignée d'une feuille (glisser ou toucher)">
         <div className="design-phone-box">
