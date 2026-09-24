@@ -5,7 +5,7 @@
 [data-theme="light"] {
   --void: #c9c7cc;
   --void-dot: #b6b3ba;
-  --canvas-border: #3e3b65;
+  --canvas-border: var(--ink); /* presque noir en clair, presque blanc en sombre */
   --canvas-grid: rgba(16, 18, 28, 0.14);
   --checker-a: #ffffff;
   --checker-b: #e4e2e7;
@@ -33,7 +33,7 @@
 [data-theme="dark"] {
   --void: #10121c;
   --void-dot: #1c1e2a;
-  --canvas-border: #8c78a5;
+  --canvas-border: var(--ink); /* presque noir en clair, presque blanc en sombre */
   --canvas-grid: rgba(0, 0, 0, 0.28);
   --checker-a: #262836;
   --checker-b: #1f212d;
