@@ -60,6 +60,15 @@
   filter: brightness(1.08);
 }
 
+.lp-btn--twitch {
+  background: var(--twitch);
+  color: var(--on-twitch);
+}
+
+.lp-btn--twitch:hover {
+  background: var(--twitch-hover);
+}
+
 .lp-btn--ghost {
   background: transparent;
 }

@@ -1,19 +1,7 @@
 // Les composants du design system, chacun dans chacun de ses états.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import {
-  Brush,
-  Eraser,
-  LocateFixed,
-  LogIn,
-  Minus,
-  Plus,
-  Radio,
-  Settings,
-  Trash,
-  User,
-  X,
-} from "lucide-react";
+import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Settings, Trash, User, X } from "lucide-react";
 import { useState } from "react";
 import { Button, type ButtonProps } from "../design/button";
 import { Grabber } from "../design/grabber";
@@ -21,6 +9,7 @@ import { ColorChip, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
+import { SignInButton, TwitchGlyph } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { Window, WindowRow } from "../design/window";
 import { noop, SAMPLE_BROKEN_PHOTO, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
@@ -40,7 +29,7 @@ const BUTTONS: readonly { caption: string; props: ButtonProps }[] = [
   { caption: "Secondaire", props: { label: "Annuler", kbd: "Échap", onPress: noop } },
   {
     caption: "Avec une icône",
-    props: { label: "Se connecter", icon: LogIn, variant: "primary", onPress: noop },
+    props: { label: "Se déconnecter", icon: LogOut, onPress: noop },
   },
   { caption: "Modération", props: { label: "Retirer ses pixels", onPress: noop } },
   { caption: "Modération, danger", props: { label: "Bannir", variant: "danger", onPress: noop } },
@@ -59,7 +48,7 @@ const BUTTONS: readonly { caption: string; props: ButtonProps }[] = [
   {
     caption: "Lien, nouvel onglet",
     props: {
-      icon: Radio,
+      icon: TwitchGlyph,
       variant: "ghost",
       title: "Chaîne Twitch",
       href: "https://www.twitch.tv",
@@ -238,6 +227,23 @@ export const ComponentsSection = () => {
         note="La seule bulle d'interface. Rayon = contrôle / 2 + marge : ronde à toute taille."
       >
         <PillSpecimens />
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Twitch"
+        note="Son logo officiel, et Se connecter à ses couleurs : texte blanc sur violet Twitch."
+      >
+        <Specimen caption="Se connecter">
+          <SignInButton href="#" label="Se connecter" />
+        </Specimen>
+        <Specimen caption="Se connecter, logo seul (mobile)">
+          <SignInButton href="#" />
+        </Specimen>
+        <Specimen caption="Le logo, à la couleur du texte">
+          <span className="design-icon">
+            <TwitchGlyph />
+          </span>
+        </Specimen>
       </SpecimenSection>
 
       <SpecimenSection

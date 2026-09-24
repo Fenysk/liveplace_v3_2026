@@ -5,13 +5,10 @@ import {
   Brush,
   Eraser,
   LocateFixed,
-  LogIn,
   LogOut,
-  type LucideIcon,
   Minus,
   Moon,
   Plus,
-  Radio,
   Settings,
   Sun,
   SunMoon,
@@ -19,7 +16,9 @@ import {
   User,
   X,
 } from "lucide-react";
+import type { ButtonIcon } from "../design/button";
 import { ColorChip } from "../design/palette";
+import { TwitchGlyph } from "../design/twitch";
 import { type SpecimenKind, VariableSpecimen } from "../design/variable-specimen";
 import { SpecimenSection } from "./specimen-section";
 
@@ -53,6 +52,9 @@ const COLOR_USAGES: Usages = {
   draftOutlineOut: "Le contour du brouillon et le viseur, dehors.",
   scrim: "Le voile derrière la fenêtre.",
   focusRing: "L'anneau du focus clavier.",
+  twitch: "Le violet de Twitch : Se connecter, seulement.",
+  twitchHover: "Le survol de Se connecter.",
+  onTwitch: "Le texte sur le violet de Twitch.",
 };
 
 const MEASURE_SETS: readonly { title: string; kind: SpecimenKind; usages: Usages }[] = [
@@ -108,7 +110,7 @@ const TYPE_STYLES = [
   { className: "lp-type-kbd", sample: "Échap", usage: "Un raccourci écrit dans un bouton." },
 ] as const;
 
-const ICONS: readonly { icon: LucideIcon; name: string }[] = [
+const ICONS: readonly { icon: ButtonIcon; name: string }[] = [
   { icon: Plus, name: "plus" },
   { icon: Minus, name: "minus" },
   { icon: LocateFixed, name: "locate-fixed" },
@@ -116,14 +118,13 @@ const ICONS: readonly { icon: LucideIcon; name: string }[] = [
   { icon: Brush, name: "brush" },
   { icon: Trash, name: "trash" },
   { icon: X, name: "x" },
-  { icon: LogIn, name: "log-in" },
   { icon: LogOut, name: "log-out" },
   { icon: User, name: "user" },
   { icon: Settings, name: "settings" },
   { icon: SunMoon, name: "sun-moon" },
   { icon: Sun, name: "sun" },
   { icon: Moon, name: "moon" },
-  { icon: Radio, name: "radio (Twitch)" },
+  { icon: TwitchGlyph, name: "twitch (logo officiel)" },
 ];
 
 const THEMES = [
