@@ -182,6 +182,21 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
     expect(store.getView().shakeCount).toBe(2);
   });
 
+  // N'allume le Toggle tracé qu'en Dessin, et l'éteint en sortant du Dessin
+  it("turns touch tracing on only in draft mode, and off when leaving draft mode", () => {
+    const { store } = setup();
+
+    store.toggleTouchTracing();
+    expect(store.getView().isTouchTracing).toBe(false);
+
+    store.enterDraftMode();
+    store.toggleTouchTracing();
+    expect(store.getView().isTouchTracing).toBe(true);
+
+    store.exitDraftMode();
+    expect(store.getView().isTouchTracing).toBe(false);
+  });
+
   // Ne trace rien hors d'un tracé
   it("traces nothing outside a trace", () => {
     const { store, cells } = setup();

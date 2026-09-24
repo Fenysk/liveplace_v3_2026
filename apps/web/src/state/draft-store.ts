@@ -24,6 +24,7 @@ export type DraftView = {
   colorIndex: number; // la couleur active, TRANSPARENT_COLOR_INDEX pour la gomme
   isSending: boolean; // la pill est verrouillée jusqu'au dernier ack ou à la coupure
   isTracing: boolean;
+  isTouchTracing: boolean; // le Toggle tracé : un doigt trace, deux doigts déplacent
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
 };
 
@@ -39,6 +40,7 @@ export type DraftStore = {
   startTrace(): void;
   traceCells(cells: readonly { x: number; y: number }[]): void;
   endTrace(): void;
+  toggleTouchTracing(): void;
   submit(): Promise<void>;
   dispose(): void;
 };
@@ -61,6 +63,7 @@ export function createDraftStore(
     colorIndex: FIRST_COLOR_INDEX,
     isSending: false,
     isTracing: false,
+    isTouchTracing: false,
     shakeCount: 0,
   };
   let lastColorIndex = FIRST_COLOR_INDEX;
@@ -107,17 +110,20 @@ export function createDraftStore(
   const submit = async (): Promise<void> => {
     if (view.isSending || view.draft.size === 0 || canvas.getView().status !== "live") return;
     publish({ isSending: true });
-    let lastSentAt = Number.NEGATIVE_INFINITY;
-    for (const batch of toBatches(view.draft)) {
-      const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
-      if (delay > 0) await clock.wait(delay);
-      lastSentAt = clock.now();
-      const result = await canvas.placeBatch(batch);
-      // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
-      if (!result.ok) break;
-      setDraft(settleBatch(view.draft, batch, result.value));
+    try {
+      let lastSentAt = Number.NEGATIVE_INFINITY;
+      for (const batch of toBatches(view.draft)) {
+        const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
+        if (delay > 0) await clock.wait(delay);
+        lastSentAt = clock.now();
+        const result = await canvas.placeBatch(batch);
+        // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
+        if (!result.ok) break;
+        setDraft(settleBatch(view.draft, batch, result.value));
+      }
+    } finally {
+      publish({ isSending: false });
     }
-    publish({ isSending: false });
   };
 
   return {
@@ -130,7 +136,7 @@ export function createDraftStore(
       if (canvas.getView().userId && !view.isSending) publish({ mode: "draft" });
     },
     exitDraftMode() {
-      if (!view.isSending) publish({ mode: "view", isTracing: false });
+      if (!view.isSending) publish({ mode: "view", isTracing: false, isTouchTracing: false });
     },
     discardDraft() {
       if (isEditable()) setDraft(EMPTY_DRAFT);
@@ -162,6 +168,9 @@ export function createDraftStore(
     },
     endTrace() {
       if (view.isTracing) publish({ isTracing: false });
+    },
+    toggleTouchTracing() {
+      if (view.mode === "draft") publish({ isTouchTracing: !view.isTouchTracing });
     },
     submit,
     dispose: unsubscribe,

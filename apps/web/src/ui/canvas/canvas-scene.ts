@@ -1,14 +1,18 @@
-// Le canvas vivant (§9.3) : sa taille, son viewport, la case visée, les gestes, et un dessin seulement quand quelque chose a changé.
+// Le canvas vivant (§9.3) : sa taille, son viewport, la case visée, les gestes, le brouillon, et un dessin seulement quand quelque chose a changé.
 // Créé dans un `useEffect` : la taille de l'écran, `window` et `ResizeObserver` n'existent que dans le navigateur.
 
+import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
 import type { CanvasStore } from "../../state/canvas-store";
+import type { DraftStore } from "../../state/draft-store";
 import { createCanvasImage } from "./canvas-image";
+import { cellLine } from "./cell-line";
 import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
 import { createChecker, renderScene } from "./render-scene";
 import {
   type Cell,
   fitViewport,
   panBy,
+  type ScreenPoint,
   type Size,
   type Viewport,
   viewportToCell,
@@ -35,17 +39,19 @@ const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y ===
 export function createCanvasScene(
   surface: HTMLCanvasElement,
   store: CanvasStore,
+  draftStore: DraftStore,
   options: SceneOptions,
 ): CanvasScene {
   const context = surface.getContext("2d");
   if (!context) throw new Error("canvas-scene : contexte 2d indisponible");
   const image = createCanvasImage();
-  const tracker = createGestureTracker();
+  const tracker = createGestureTracker({ isTouchTracing: () => draftStore.getView().isTouchTracing });
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
   let checker: CanvasPattern | null = null;
   let viewport = options.initialViewport;
   let targetCell: Cell | null = null;
+  let lastTracedCell: Cell | null = null;
   let isImageStale = true;
   let frameRequest = 0;
 
@@ -64,7 +70,18 @@ export function createCanvasScene(
       image.repaint(view);
       isImageStale = false;
     }
-    renderScene(context, { screen, pixelRatio, viewport, canvas, image: image.source, checker, targetCell });
+    renderScene(context, {
+      screen,
+      pixelRatio,
+      viewport,
+      canvas,
+      image: image.source,
+      checker,
+      targetCell,
+      draft: [...draftStore.getView().draft.values()],
+      palette: view.palette,
+      colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
+    });
   };
 
   // Au plus un dessin par rafraîchissement de l'écran, et aucun si rien n'a bougé.
@@ -84,6 +101,32 @@ export function createCanvasScene(
     requestRender();
   };
 
+  // Les cases entre la dernière case tracée et celle-ci : un geste rapide ne laisse aucun trou (CDC 2026).
+  const traceTo = (cell: Cell | null) => {
+    if (!cell) return;
+    draftStore.traceCells(cellLine(lastTracedCell ?? cell, cell));
+    lastTracedCell = cell;
+  };
+
+  const cellAt = (current: Viewport, point: ScreenPoint) => viewportToCell(current, point, canvasSize());
+
+  // Un clic immobile ou un tap : en Dessin, la case entre dans le brouillon ou en sort (A5 du plan du J10).
+  const tap = (current: Viewport, point: ScreenPoint) => {
+    const cell = cellAt(current, point);
+    setTargetCell(cell);
+    if (cell && draftStore.getView().mode === "draft") draftStore.toggleCell(cell.x, cell.y);
+  };
+
+  const applyTrace = (current: Viewport, gesture: Gesture) => {
+    if (gesture.kind === "traceEnd") return draftStore.endTrace();
+    if (gesture.kind !== "trace" && gesture.kind !== "target") return;
+    const cell = cellAt(current, gesture.point);
+    setTargetCell(cell);
+    // Le début d'un tracé part de la case visée : l'abonnement au brouillon la trace.
+    if (gesture.kind === "trace" && !draftStore.getView().isTracing) draftStore.startTrace();
+    else if (draftStore.getView().isTracing) traceTo(cell);
+  };
+
   const apply = (gesture: Gesture) => {
     // Avant le `welcome`, le canvas n'a pas de taille : rien à déplacer.
     if (!viewport || store.getView().width === 0) return;
@@ -99,11 +142,15 @@ export function createCanvasScene(
         moveViewport(zoomAt(panned, gesture.point, gesture.factor, zoomLimits(screen, canvasSize())));
         break;
       }
-      case "target":
-        setTargetCell(viewportToCell(viewport, gesture.point, canvasSize()));
-        break;
       default:
+        applyTrace(viewport, gesture);
     }
+  };
+
+  // Le relâcher qui vise une case est un clic ou un tap, pas un survol.
+  const release = (gesture: Gesture) => {
+    if (gesture.kind === "target" && viewport && store.getView().width > 0) tap(viewport, gesture.point);
+    else apply(gesture);
   };
 
   const resizeObserver = new ResizeObserver(([entry]) => {
@@ -122,6 +169,18 @@ export function createCanvasScene(
     requestRender();
   });
 
+  let wasTracing = false;
+  const unsubscribeDraft = draftStore.subscribe(() => {
+    const { isTracing, mode } = draftStore.getView();
+    if (isTracing !== wasTracing) {
+      lastTracedCell = null;
+      if (isTracing) traceTo(targetCell);
+      wasTracing = isTracing;
+    }
+    surface.style.cursor = mode === "draft" ? "crosshair" : "";
+    requestRender();
+  });
+
   const listening = new AbortController();
   const { signal } = listening;
   surface.addEventListener(
@@ -134,8 +193,10 @@ export function createCanvasScene(
     { signal },
   );
   surface.addEventListener("pointermove", (event) => apply(tracker.move(toPointerInput(event))), { signal });
-  surface.addEventListener("pointerup", (event) => apply(tracker.release(toPointerInput(event))), { signal });
-  surface.addEventListener("pointercancel", (event) => tracker.cancel(event.pointerId), { signal });
+  surface.addEventListener("pointerup", (event) => release(tracker.release(toPointerInput(event))), {
+    signal,
+  });
+  surface.addEventListener("pointercancel", (event) => apply(tracker.cancel(event.pointerId)), { signal });
   surface.addEventListener(
     "pointerleave",
     (event) => {
@@ -174,6 +235,7 @@ export function createCanvasScene(
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
       unsubscribe();
+      unsubscribeDraft();
       listening.abort();
     },
   };

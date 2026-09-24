@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
+import type { DraftStore } from "../../state/draft-store";
 import { type CanvasScene, createCanvasScene } from "./canvas-scene";
 import { createViewportSaver, getSavedViewport } from "./saved-viewport";
 import { ViewportPill } from "./viewport-pill";
@@ -9,7 +10,9 @@ import { ViewportPill } from "./viewport-pill";
 // Lu à chaque accès, dans un `try` : dans une fenêtre qui refuse le stockage, l'accès lui-même lève.
 const getBrowserStorage = () => window.localStorage;
 
-export const PixelCanvas = ({ store, canvasId }: { store: CanvasStore; canvasId: string }) => {
+type PixelCanvasProps = { store: CanvasStore; draftStore: DraftStore; canvasId: string };
+
+export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
   const [scene, setScene] = useState<CanvasScene>();
 
@@ -17,7 +20,7 @@ export const PixelCanvas = ({ store, canvasId }: { store: CanvasStore; canvasId:
   useEffect(() => {
     if (!surface.current) return;
     const saver = createViewportSaver(getBrowserStorage, canvasId);
-    const created = createCanvasScene(surface.current, store, {
+    const created = createCanvasScene(surface.current, store, draftStore, {
       initialViewport: getSavedViewport(getBrowserStorage, canvasId),
       onViewportMove: saver.save,
     });
@@ -26,7 +29,7 @@ export const PixelCanvas = ({ store, canvasId }: { store: CanvasStore; canvasId:
       created.dispose();
       saver.cancel();
     };
-  }, [store, canvasId]);
+  }, [store, draftStore, canvasId]);
 
   return (
     <>

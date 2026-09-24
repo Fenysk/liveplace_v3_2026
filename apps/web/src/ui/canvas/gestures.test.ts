@@ -114,6 +114,45 @@ describe("touch (CDC 2026, tolérance ~8 px)", () => {
   });
 });
 
+describe("Toggle tracé (CDC 2026, un doigt trace, deux doigts déplacent)", () => {
+  const tracing = () => createGestureTracker({ isTouchTracing: () => true });
+
+  // Un doigt trace dès qu'il se pose, à chaque mouvement, même sous la tolérance, et finit le tracé en se levant
+  it("traces with one finger from the touch, on every move even under the tolerance, and ends on lift", () => {
+    const tracker = tracing();
+
+    expect(tracker.press(finger(1, 100, 100))).toEqual({ kind: "trace", point: { x: 100, y: 100 } });
+    expect(tracker.move(finger(1, 102, 100))).toEqual({ kind: "trace", point: { x: 102, y: 100 } });
+    expect(tracker.release(finger(1, 102, 100))).toEqual({ kind: "traceEnd" });
+  });
+
+  // Un deuxième doigt arrête le tracé, et les deux pincent
+  it("ends the trace when a second finger lands, and both pinch", () => {
+    const tracker = tracing();
+    tracker.press(finger(1, 100, 100));
+
+    expect(tracker.press(finger(2, 200, 100))).toEqual({ kind: "traceEnd" });
+    expect(tracker.move(finger(2, 300, 100)).kind).toBe("pinch");
+    expect(tracker.release(finger(1, 100, 100))).toEqual({ kind: "none" });
+  });
+
+  // Un tracé annulé par le navigateur se termine
+  it("ends a trace the browser cancels", () => {
+    const tracker = tracing();
+    tracker.press(finger(1, 100, 100));
+
+    expect(tracker.cancel(1)).toEqual({ kind: "traceEnd" });
+  });
+
+  // Laisse la souris cliquer et glisser comme avant
+  it("leaves the mouse clicking and panning as before", () => {
+    const tracker = tracing();
+
+    expect(tracker.press(mouse(100, 100))).toEqual({ kind: "none" });
+    expect(tracker.move(mouse(110, 100))).toEqual({ kind: "pan", dx: 10, dy: 0 });
+  });
+});
+
 describe("wheelFactor (CDC 2026, molette vers le curseur)", () => {
   // Molette vers soi, on dézoome ; vers l'avant, on zoome ; un aller-retour s'annule
   it("zooms out rolling toward you, in rolling away, and a round trip cancels out", () => {

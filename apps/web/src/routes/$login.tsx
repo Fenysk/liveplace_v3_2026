@@ -4,9 +4,11 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import type { CanvasStore } from "../state/canvas-store";
+import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
 import { AccountLink } from "../ui/canvas/account-link";
-import { CanvasStatus } from "../ui/canvas/canvas-status";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { DraftPill } from "../ui/draft/draft-pill";
+import { useDraftKeys } from "../ui/draft/use-draft-keys";
 import { Pill } from "../ui/pill/pill";
 import { resolveCanvas } from "../usecase/resolve-canvas";
 
@@ -15,28 +17,47 @@ const getCanvasPage = createServerFn({ method: "GET" })
   .validator((login: string) => login)
   .handler(({ data: login, context }) => resolveCanvas(context.deps.durable, login));
 
+// Lu à chaque accès : dans une fenêtre qui refuse le stockage, l'accès lui-même lève (le brouillon l'attrape).
+const getBrowserStorage = () => window.localStorage;
+const browserClock: DraftClock = {
+  now: () => Date.now(),
+  wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+type Stores = { canvas: CanvasStore; draft: DraftStore };
+
 const CanvasPage = () => {
   const { canvasId, displayName } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
-  const [store, setStore] = useState<CanvasStore>();
+  const [stores, setStores] = useState<Stores>();
 
-  // Le WebSocket n'existe que dans le navigateur : la connexion s'ouvre après le rendu serveur.
+  // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
-    const opened = openCanvas(canvasId);
-    setStore(opened);
-    return () => opened.close();
+    const canvas = openCanvas(canvasId);
+    const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock);
+    setStores({ canvas, draft });
+    return () => {
+      draft.dispose();
+      canvas.close();
+    };
   }, [canvasId, openCanvas]);
+
+  useDraftKeys(stores?.draft);
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   return (
     <main>
-      {store && <PixelCanvas store={store} canvasId={canvasId} />}
+      {stores && <PixelCanvas store={stores.canvas} draftStore={stores.draft} canvasId={canvasId} />}
       <Pill anchor="topLeft">
         <h1 style={{ margin: 0, fontSize: 14 }}>{displayName}</h1>
       </Pill>
-      {store && <AccountLink store={store} login={login} />}
-      <Pill anchor="bottomCenter">{store ? <CanvasStatus store={store} /> : "Connexion…"}</Pill>
+      {stores && <AccountLink store={stores.canvas} login={login} />}
+      {stores ? (
+        <DraftPill store={stores.canvas} draftStore={stores.draft} login={login} />
+      ) : (
+        <Pill anchor="bottomCenter">Connexion…</Pill>
+      )}
     </main>
   );
 };
