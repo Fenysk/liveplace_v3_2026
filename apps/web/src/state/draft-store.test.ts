@@ -179,13 +179,20 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
     const before = store.getView().recentColorIndexes;
 
     store.selectColor(12);
-    expect(store.getView().recentColorIndexes).toEqual([12, ...before.slice(0, 3)]);
+    expect(store.getView().recentColorIndexes).toEqual([12, ...before.slice(0, 4)]);
 
     store.pickRecentColor(before[1] ?? 0);
     expect(store.getView()).toMatchObject({
       colorIndex: before[1],
-      recentColorIndexes: [12, ...before.slice(0, 3)],
+      recentColorIndexes: [12, ...before.slice(0, 4)],
     });
+  });
+
+  // La couleur active est l'une des récentes dès l'arrivée : la rangée mobile la montre, sans doublon à côté
+  it("starts with the active color among the recent ones", () => {
+    const { store } = setup();
+
+    expect(store.getView().recentColorIndexes).toContain(store.getView().colorIndex);
   });
 });
 

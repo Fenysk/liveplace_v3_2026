@@ -46,7 +46,7 @@ const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { 
     gauge: gaugeAt(nowMs, 8, 3),
     palette: PALETTE,
     colorIndex: 5,
-    recentColorIndexes: [5, 28, 19, 9],
+    recentColorIndexes: [1, 5, 28, 19, 9],
     isSending: false,
     canSubmit: true,
     canDiscard: true,

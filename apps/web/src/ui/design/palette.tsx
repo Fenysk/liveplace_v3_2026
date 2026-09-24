@@ -2,7 +2,7 @@
 // Les couleurs arrivent par props (la palette de `domain`) : aucune n'est écrite dans le CSS.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { ChevronUp, Eraser } from "lucide-react";
+import { Eraser } from "lucide-react";
 import type { ReactNode } from "react";
 import { blurAfterClick } from "./button";
 import { classNames } from "./class-names";
@@ -56,30 +56,7 @@ export const ColorChip = ({ color, children }: ColorChipProps) => (
   </span>
 );
 
-// Sur mobile, la couleur actuelle ouvre la palette complète, repliée dans la feuille Dessin. Sans couleur : la gomme.
-type CurrentColorButtonProps = { color?: string | undefined; isExpanded: boolean; onPress: () => void };
-
-export const CurrentColorButton = ({ color, isExpanded, onPress }: CurrentColorButtonProps) => {
-  const label = isExpanded ? "Masquer les couleurs" : "Toutes les couleurs";
-  return (
-    <button
-      type="button"
-      className="lp-btn lp-current-color"
-      aria-expanded={isExpanded}
-      aria-label={label}
-      title={label}
-      onClick={blurAfterClick(onPress)}
-    >
-      <i
-        className={classNames(!color && "is-transparent")}
-        style={color ? { background: color } : undefined}
-      />
-      <ChevronUp aria-hidden="true" />
-    </button>
-  );
-};
-
-// Sur mobile, les couleurs récentes, à côté de la couleur actuelle : à portée de pouce, dans un ordre stable.
+// Sur mobile, les couleurs récentes : à portée de pouce, dans un ordre stable, la couleur active entourée.
 type RecentSwatchesProps = {
   palette: readonly string[];
   recentColorIndexes: readonly number[];

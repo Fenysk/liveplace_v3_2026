@@ -3,12 +3,12 @@
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, LogIn, Trash } from "lucide-react";
+import { Brush, Eraser, LogIn, Palette as PaletteIcon, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
-import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
+import { Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
 
 export type DraftPillState =
@@ -133,17 +133,14 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
       {/* La palette complète dépliée remplace toute la rangée : elle revient quand la palette se replie. */}
       {!isExpanded && (
         <div className="lp-row">
-          <CurrentColorButton
-            color={isEraser ? undefined : state.palette[state.colorIndex]}
-            isExpanded={isExpanded}
-            onPress={toggle}
-          />
+          {/* La couleur active est l'une des récentes, entourée : pas de bouton de couleur actuelle en doublon. */}
           <RecentSwatches
             palette={state.palette}
             recentColorIndexes={state.recentColorIndexes}
             colorIndex={state.colorIndex}
             onPick={actions.onPickRecentColor}
           />
+          <Button icon={PaletteIcon} variant="ghost" title="Toutes les couleurs" onPress={toggle} />
         </div>
       )}
       <div className="lp-row lp-sheet-tools">
