@@ -130,22 +130,22 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
         <CancelButton onExit={actions.onExit} />
         <SubmitButton canSubmit={state.canSubmit} onSubmit={actions.onSubmit} />
       </div>
-      <div className="lp-row">
-        <CurrentColorButton
-          color={isEraser ? undefined : state.palette[state.colorIndex]}
-          isExpanded={isExpanded}
-          onPress={toggle}
-        />
-        {/* La palette complète dépliée les contient déjà : les récentes reviennent quand elle se replie. */}
-        {!isExpanded && (
+      {/* La palette complète dépliée remplace toute la rangée : elle revient quand la palette se replie. */}
+      {!isExpanded && (
+        <div className="lp-row">
+          <CurrentColorButton
+            color={isEraser ? undefined : state.palette[state.colorIndex]}
+            isExpanded={isExpanded}
+            onPress={toggle}
+          />
           <RecentSwatches
             palette={state.palette}
             recentColorIndexes={state.recentColorIndexes}
             colorIndex={state.colorIndex}
             onPick={actions.onPickRecentColor}
           />
-        )}
-      </div>
+        </div>
+      )}
       <div className="lp-row lp-sheet-tools">
         <Button
           icon={Eraser}
