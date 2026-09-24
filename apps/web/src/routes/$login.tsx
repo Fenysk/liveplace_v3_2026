@@ -2,7 +2,6 @@
 
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
@@ -10,8 +9,8 @@ import { AccountPill } from "../ui/account/account-pill";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
-import { Button } from "../ui/design/button";
 import { NoticePill } from "../ui/design/pill";
+import { SignInButton } from "../ui/design/twitch";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftKeys } from "../ui/draft/use-draft-keys";
@@ -102,7 +101,7 @@ const CanvasPage = () => {
 const CanvasNotFound = () => (
   <main>
     <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
-      <Button label="Se connecter avec Twitch" icon={LogIn} variant="primary" href="/auth/twitch" />
+      <SignInButton href="/auth/twitch" label="Se connecter avec Twitch" />
     </NoticePill>
   </main>
 );

@@ -1,16 +1,15 @@
 // Les pills du jeu, les vraies, avec des props d'exemple : chacune dans chacun de ses états.
 
 import { PALETTE } from "@liveplace/domain";
-import { LogIn } from "lucide-react";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { CanvasPill } from "../canvas/canvas-pill";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
-import { Button } from "../design/button";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
+import { SignInButton } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill } from "../inspection/inspection-pill";
@@ -208,7 +207,7 @@ export const GamePillsSection = () => {
         <Specimen caption="NoticePill">
           <div className="design-notice-box">
             <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
-              <Button label="Se connecter avec Twitch" icon={LogIn} variant="primary" onPress={noop} />
+              <SignInButton href="#" label="Se connecter avec Twitch" />
             </NoticePill>
           </div>
         </Specimen>

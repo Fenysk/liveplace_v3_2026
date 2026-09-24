@@ -1,12 +1,11 @@
 // La pill Compte (CDC 2026), en haut à droite : le thème, puis sa photo (Mon compte) ou Se connecter.
 
-import { LogIn } from "lucide-react";
 import { useState } from "react";
-import { Button } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
 import { ThemeButton } from "../design/theme-controls";
+import { SignInButton } from "../design/twitch";
 import { type AccountSection, AccountWindow } from "./account-window";
 
 const DOCK: PillDock = "tr";
@@ -48,9 +47,9 @@ export const AccountPill = ({
       {identity.kind === "guest" &&
         // Sur mobile, l'icône seule : la place manque en haut de l'écran.
         (isCompact ? (
-          <Button icon={LogIn} variant="primary" title="Se connecter avec Twitch" href={signInHref} />
+          <SignInButton href={signInHref} />
         ) : (
-          <Button label="Se connecter" icon={LogIn} variant="primary" href={signInHref} />
+          <SignInButton href={signInHref} label="Se connecter" />
         ))}
       {identity.kind === "signedIn" && (
         <>

@@ -69,6 +69,11 @@
   --control-size-touch: 44px;
   --font-sans: "Nunito Variable", system-ui, sans-serif;
 
+  /* Les couleurs de marque de Twitch, les mêmes dans les deux thèmes : Se connecter seulement */
+  --twitch: #9146ff;
+  --twitch-hover: #772ce8;
+  --on-twitch: #ffffff;
+
   /* Mouvement : une courbe douce, sans rebond, partout */
   --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --lp-dur: 0.34s; /* morphing, feuilles, fenêtre, niveau de la jauge */

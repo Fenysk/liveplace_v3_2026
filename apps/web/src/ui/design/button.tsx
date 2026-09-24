@@ -1,10 +1,13 @@
 // Le bouton : un texte pour une décision, une icône seule pour une action secondaire (CDC 2026, Pill).
 
-import type { LucideIcon } from "lucide-react";
-import type { MouseEvent } from "react";
+import type { ComponentType, MouseEvent } from "react";
 import { classNames } from "./class-names";
 
-export type ButtonVariant = "primary" | "danger" | "ghost";
+// `twitch` : aux couleurs de Twitch, pour Se connecter seulement (SignInButton).
+export type ButtonVariant = "primary" | "danger" | "ghost" | "twitch";
+
+// Une icône Lucide, ou le logo Twitch : le bouton la rend muette, son texte ou son titre la nomme.
+export type ButtonIcon = ComponentType<{ "aria-hidden"?: "true" }>;
 
 // Sans libellé, le bouton n'a que son icône : `title` devient son nom accessible, il est donc obligatoire.
 type ButtonText = { label: string; title?: string } | { label?: never; title: string };
@@ -16,7 +19,7 @@ type ButtonAction =
 
 export type ButtonProps = ButtonText &
   ButtonAction & {
-    icon?: LucideIcon;
+    icon?: ButtonIcon;
     kbd?: string; // le raccourci, écrit dans le bouton, masqué au doigt
     variant?: ButtonVariant;
     isPressed?: boolean; // un outil armé : gomme, tracé

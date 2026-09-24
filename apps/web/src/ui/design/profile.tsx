@@ -1,9 +1,9 @@
 // L'identité d'un utilisateur (CDC 2026, Profils) : sa photo Twitch, ou son initiale si elle manque ou ne charge pas.
 // L'avatar et le nom mènent à son canvas ; seule l'icône Twitch mène à sa chaîne.
 
-import { Radio } from "lucide-react";
 import { useState } from "react";
 import { Button, blurAfterClick } from "./button";
+import { TwitchGlyph } from "./twitch";
 
 export type ProfileUser = { displayName: string; login: string; avatarUrl?: string | undefined };
 
@@ -48,10 +48,9 @@ export const Profile = ({ user, variant = "name" }: ProfileProps) => {
         <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
         {variant !== "avatar" && <span className="lp-profile-name lp-type-title">{user.displayName}</span>}
       </a>
-      {/* `Radio` en attendant le glyphe officiel du kit de marque Twitch (design system, Profile). */}
       {variant === "full" && (
         <Button
-          icon={Radio}
+          icon={TwitchGlyph}
           variant="ghost"
           title={`Chaîne Twitch de ${user.displayName}`}
           href={`https://www.twitch.tv/${encodeURIComponent(user.login)}`}

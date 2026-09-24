@@ -3,13 +3,14 @@
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, LogIn, Palette as PaletteIcon, Trash } from "lucide-react";
+import { Brush, Eraser, Palette as PaletteIcon, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
+import { SignInButton } from "../design/twitch";
 
 export type DraftPillState =
   | { kind: "connecting" }
@@ -181,7 +182,7 @@ const guestContent = (
         <div className="lp-row">
           <span className="lp-spacer" />
           <CancelButton onExit={actions.onExit} />
-          <Button label="Se connecter" icon={LogIn} variant="primary" href={state.signInHref} />
+          <SignInButton href={state.signInHref} label="Se connecter" />
         </div>
       </>
     ),
