@@ -49,7 +49,7 @@
 .lp-swatch--eraser {
   display: grid;
   place-items: center;
-  color: var(--danger);
+  color: var(--ink);
 }
 
 .lp-swatch--eraser svg {
