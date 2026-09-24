@@ -17,6 +17,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   params: { gaugeMax: 200, refillMs, refillCharges: 1, obsDelayMs: 5000 },
   gauge: null,
   lastError: null,
+  inspection: null,
   pixels: new Uint8Array(256 * 4).fill(9),
   ...overrides,
 });
@@ -47,6 +48,8 @@ const setup = ({ view = liveView(), results = [], saved }: Setup = {}) => {
       const accepted = { ok: true as const, value: acceptAll(pixels) };
       return results.shift() ?? accepted;
     },
+    inspect: () => undefined,
+    closeInspection: () => undefined,
     close: () => undefined,
   };
   const entries = new Map<string, string>();

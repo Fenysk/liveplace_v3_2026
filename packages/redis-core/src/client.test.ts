@@ -507,4 +507,71 @@ describe("createSignInWrites (§2, §5.1)", () => {
     expect(await redis.ttl(userKey(userId))).toBe(-1);
     await redis.del(userKey(userId));
   });
+
+  // Écrit l'avatar dans le miroir quand Twitch en donne un (JOURNAL 2026-09-24)
+  it("writes the avatar in the user mirror when Twitch gives one", async () => {
+    const userId = `${runId}-avatar`;
+    const avatarUrl = "https://static-cdn.jtvnw.net/fenysk.png";
+
+    await writes.setUser({ userId, login: "fenysk", displayName: "Fenysk", avatarUrl });
+
+    expect(await redis.hget(userKey(userId), "avatarUrl")).toBe(avatarUrl);
+    await redis.del(userKey(userId));
+  });
+});
+
+describe("inspect (§5.6, JOURNAL 2026-09-24)", () => {
+  const now = 1_700_000_000_000;
+  const writes = createSignInWrites(redis);
+
+  // Ne rend aucune entrée pour une case où personne n'a posé
+  it("gives no entry for a cell nobody placed on", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    expect(await core.inspect(canvasId, 3, 2)).toBeNull();
+  });
+
+  // Rend l'auteur du pixel visible, lu en tête de sa pile, avec son miroir et son avatar
+  it("gives the author of the visible pixel, read at the head of its history, with its mirror and avatar", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const [first, second] = [`${runId}-first`, `${runId}-second`];
+    const avatarUrl = "https://static-cdn.jtvnw.net/second.png";
+    await writes.setUser({ userId: second, login: "second", displayName: "Second", avatarUrl });
+    const placeAs = (userId: string, colorIndex: number, nowMs: number) =>
+      core.place(canvasId, { userId, requestId: randomUUID(), nowMs, pixels: [{ x: 3, y: 2, colorIndex }] });
+    await placeAs(first, 5, now);
+    await placeAs(second, 7, now + 1000);
+
+    expect(await core.inspect(canvasId, 3, 2)).toEqual({
+      userId: second,
+      login: "second",
+      displayName: "Second",
+      avatarUrl,
+      colorIndex: 7,
+      placedAt: now + 1000,
+    });
+    await redis.del(userKey(second));
+  });
+
+  // Laisse avatarUrl de côté pour un auteur qui n'en a pas
+  it("leaves avatarUrl out for an author who has none", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const userId = `${runId}-plain`;
+    await writes.setUser({ userId, login: "plain", displayName: "Plain" });
+    await core.place(canvasId, {
+      userId,
+      requestId: randomUUID(),
+      nowMs: now,
+      pixels: [{ x: 1, y: 1, colorIndex: 4 }],
+    });
+
+    const entry = await core.inspect(canvasId, 1, 1);
+
+    expect(entry).toMatchObject({ userId, login: "plain", displayName: "Plain", colorIndex: 4 });
+    expect(entry).not.toHaveProperty("avatarUrl");
+    await redis.del(userKey(userId));
+  });
 });

@@ -1,8 +1,9 @@
-// Un seul écouteur du clavier, sur `window`, pour les raccourcis du CDC 2026.
+// Un seul écouteur du clavier, sur `window`, pour les raccourcis du CDC 2026, inspection comprise.
 
 import { useEffect } from "react";
+import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
-import { type DraftKeyCommand, type KeyPress, keyCommand } from "./draft-keys";
+import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand } from "./draft-keys";
 import { submitDraft } from "./draft-pill";
 
 // Les raccourcis se taisent quand un champ de saisie a le focus (CDC 2026).
@@ -16,22 +17,30 @@ const toKeyPress = (event: KeyboardEvent): KeyPress => ({
   hasModifier: event.ctrlKey || event.metaKey || event.altKey,
 });
 
-export function useDraftKeys(draftStore: DraftStore | undefined): void {
+type KeyStores = { canvas: CanvasStore; draft: DraftStore };
+
+export function useDraftKeys(stores: KeyStores | undefined): void {
   useEffect(() => {
-    if (!draftStore) return;
+    if (!stores) return;
+    const { canvas, draft: draftStore } = stores;
+    const keyMode = (): KeyMode => {
+      const { mode } = draftStore.getView();
+      return mode === "view" && canvas.getView().inspection ? "inspecting" : mode;
+    };
     const commands: Record<DraftKeyCommand, () => void> = {
       enterDraftMode: () => draftStore.enterDraftMode(),
       submit: () => submitDraft(draftStore),
       exitDraftMode: () => draftStore.exitDraftMode(),
       toggleEraser: () => draftStore.toggleEraser(),
       startTrace: () => draftStore.startTrace(),
+      closeInspection: () => canvas.closeInspection(),
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
       // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
       if (event.code === "Space") event.preventDefault();
-      const command = keyCommand(toKeyPress(event), draftStore.getView().mode);
+      const command = keyCommand(toKeyPress(event), keyMode());
       if (!command) return;
       event.preventDefault();
       if (!event.repeat) commands[command]();
@@ -50,5 +59,5 @@ export function useDraftKeys(draftStore: DraftStore | undefined): void {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [draftStore]);
+  }, [stores]);
 }

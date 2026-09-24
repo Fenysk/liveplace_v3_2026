@@ -9,6 +9,7 @@ import { AccountLink } from "../ui/canvas/account-link";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { DraftPill } from "../ui/draft/draft-pill";
 import { useDraftKeys } from "../ui/draft/use-draft-keys";
+import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { Pill } from "../ui/pill/pill";
 import { resolveCanvas } from "../usecase/resolve-canvas";
 
@@ -43,7 +44,7 @@ const CanvasPage = () => {
     };
   }, [canvasId, openCanvas]);
 
-  useDraftKeys(stores?.draft);
+  useDraftKeys(stores);
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   return (
@@ -53,6 +54,7 @@ const CanvasPage = () => {
         <h1 style={{ margin: 0, fontSize: 14 }}>{displayName}</h1>
       </Pill>
       {stores && <AccountLink store={stores.canvas} login={login} />}
+      {stores && <InspectionPill store={stores.canvas} draftStore={stores.draft} />}
       {stores ? (
         <DraftPill store={stores.canvas} draftStore={stores.draft} login={login} />
       ) : (

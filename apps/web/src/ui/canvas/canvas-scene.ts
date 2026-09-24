@@ -78,6 +78,7 @@ export function createCanvasScene(
       image: image.source,
       checker,
       targetCell,
+      inspectedCell: draftStore.getView().mode === "view" ? view.inspection : null,
       draft: [...draftStore.getView().draft.values()],
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
@@ -110,11 +111,15 @@ export function createCanvasScene(
 
   const cellAt = (current: Viewport, point: ScreenPoint) => viewportToCell(current, point, canvasSize());
 
-  // Un clic immobile ou un tap : en Dessin, la case entre dans le brouillon ou en sort (A5 du plan du J10).
+  // Un clic immobile ou un tap (A5 du plan du J10) : en Dessin, la case entre dans le brouillon ou en sort ;
+  // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026).
   const tap = (current: Viewport, point: ScreenPoint) => {
     const cell = cellAt(current, point);
     setTargetCell(cell);
-    if (cell && draftStore.getView().mode === "draft") draftStore.toggleCell(cell.x, cell.y);
+    if (draftStore.getView().mode === "draft") {
+      if (cell) draftStore.toggleCell(cell.x, cell.y);
+    } else if (cell) store.inspect(cell.x, cell.y);
+    else store.closeInspection();
   };
 
   const applyTrace = (current: Viewport, gesture: Gesture) => {
@@ -178,6 +183,8 @@ export function createCanvasScene(
       wasTracing = isTracing;
     }
     surface.style.cursor = mode === "draft" ? "crosshair" : "";
+    // En Dessin, un clic ne vise plus l'auteur d'une case : l'inspection se ferme.
+    if (mode === "draft" && store.getView().inspection) store.closeInspection();
     requestRender();
   });
 

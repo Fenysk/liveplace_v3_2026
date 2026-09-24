@@ -1,5 +1,5 @@
 import type { CanvasMeta, Session } from "@liveplace/domain";
-import type { AckFrame, ClientSocket, LiveMessage, Placement } from "@liveplace/domain/ports";
+import type { AckFrame, ClientSocket, InspectEntry, LiveMessage, Placement } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
 import { createBroadcast } from "./broadcast";
@@ -29,6 +29,16 @@ const ack: AckFrame = {
   gauge: { charges: 2, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs },
 };
 
+const entry: InspectEntry = {
+  userId: "user-2",
+  login: "user2",
+  displayName: "User 2",
+  colorIndex: 3,
+  placedAt: now,
+};
+
+const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", requestId: "inspect-1", x, y });
+
 const hello = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui", ...overrides });
 
@@ -47,6 +57,7 @@ type SetupOptions = { session?: Session | null; version?: number; duringSnapshot
 
 const setup = (options: SetupOptions = {}) => {
   const placements: Placement[] = [];
+  const inspected: { x: number; y: number }[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const core = {
     async getCanvas(asked: string) {
@@ -61,6 +72,10 @@ const setup = (options: SetupOptions = {}) => {
     },
     async getGauge(_asked: string, _userId: string, nowMs: number) {
       return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs };
+    },
+    async inspect(_asked: string, x: number, y: number) {
+      inspected.push({ x, y });
+      return x === 1 && y === 2 ? entry : null;
     },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
@@ -100,6 +115,7 @@ const setup = (options: SetupOptions = {}) => {
     sent,
     closed,
     placements,
+    inspected,
     publish: (published: Event) => publishTo?.({ e: published }),
   };
 };
@@ -221,6 +237,37 @@ describe("createConnection (§6.1)", () => {
     await connection.receive(JSON.stringify({ t: "whatever" }));
 
     expect(closed).toEqual([1008]);
+  });
+
+  // Répond à une inspection par l'auteur du pixel, invité compris (JOURNAL 2026-09-24)
+  it("answers an inspection with the pixel's author, for a guest too", async () => {
+    const { connection, sent } = setup({ session: null });
+    await connection.receive(hello());
+
+    await connection.receive(inspect(1, 2));
+
+    expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 1, y: 2, entry });
+  });
+
+  // Répond sans entrée pour une case où personne n'a posé
+  it("answers without an entry for a cell nobody placed on", async () => {
+    const { connection, sent } = setup();
+    await connection.receive(hello());
+
+    await connection.receive(inspect(0, 0));
+
+    expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 0, y: 0 });
+  });
+
+  // Répond sans entrée hors du canvas, sans interroger le noyau : une cellKey hors bornes nommerait une autre case
+  it("answers without an entry outside the canvas, without asking the core", async () => {
+    const { connection, sent, inspected } = setup();
+    await connection.receive(hello());
+
+    await connection.receive(inspect(meta.width, 0));
+
+    expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: meta.width, y: 0 });
+    expect(inspected).toEqual([]);
   });
 
   // Répond pong à un ping

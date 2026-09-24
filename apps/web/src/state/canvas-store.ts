@@ -1,7 +1,7 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
 import { type Role, toStateOffset } from "@liveplace/domain";
-import type { AckFrame, Placement, Transport } from "@liveplace/domain/ports";
+import type { AckFrame, InspectEntry, Placement, Transport } from "@liveplace/domain/ports";
 import { type CellsFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 
@@ -12,6 +12,12 @@ export type Pixel = Placement["pixels"][number];
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
+
+// La case inspectée (CDC 2026) : en attente de la réponse, avec son auteur, ou jamais posée.
+export type Inspection =
+  | { status: "loading"; x: number; y: number }
+  | { status: "found"; x: number; y: number; entry: InspectEntry }
+  | { status: "empty"; x: number; y: number };
 
 export type CanvasView = {
   status: "connecting" | "live" | "closed";
@@ -25,6 +31,7 @@ export type CanvasView = {
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   lastError: ErrorCode | null;
+  inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
 };
 
@@ -33,6 +40,8 @@ export type CanvasStore = {
   getView(): CanvasView;
   // Pose optimiste (§9.3) : les pixels changent tout de suite, et la promesse se résout sur l'ack du même `requestId`.
   placeBatch(pixels: readonly Pixel[]): Promise<PlaceResult>;
+  inspect(x: number, y: number): void;
+  closeInspection(): void;
   close(): void;
 };
 
@@ -47,6 +56,9 @@ type PendingBatch = {
   resolve(result: PlaceResult): void;
 };
 
+const toInspection = ({ x, y, entry }: Extract<ServerFrame, { t: "inspected" }>): Inspection =>
+  entry ? { status: "found", x, y, entry } : { status: "empty", x, y };
+
 export function createCanvasStore(canvasId: string, transport: Transport): CanvasStore {
   let view: CanvasView = {
     status: "connecting",
@@ -56,10 +68,12 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
     version: 0,
     gauge: null,
     lastError: null,
+    inspection: null,
     pixels: new Uint8Array(0),
   };
   const listeners = new Set<() => void>();
   const pending = new Map<string, PendingBatch>();
+  let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
 
   // Un nouvel objet à chaque changement : `useSyncExternalStore` compare les références.
   const publish = (next: Partial<CanvasView>): void => {
@@ -143,6 +157,11 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       case "gauge":
         publish({ gauge: { charges: frame.charges, max: frame.max, nextRefillAt: frame.nextRefillAt } });
         break;
+      case "inspected":
+        if (frame.requestId !== inspectRequestId) break;
+        inspectRequestId = null;
+        publish({ inspection: toInspection(frame) });
+        break;
       case "error":
         settleAllPending({ ok: false, error: frame.code });
         publish({ lastError: frame.code });
@@ -182,6 +201,15 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       publish({});
       transport.send({ t: "place", requestId, pixels: [...pixels] });
       return placed;
+    },
+    inspect(x, y) {
+      inspectRequestId = crypto.randomUUID();
+      publish({ inspection: { status: "loading", x, y } });
+      transport.send({ t: "inspect", requestId: inspectRequestId, x, y });
+    },
+    closeInspection() {
+      inspectRequestId = null;
+      publish({ inspection: null });
     },
     close: () => transport.close(),
   };

@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Écart §5.1 et §4.3 : `avatarUrl` dans le miroir `user:` et dans l'inspection
+
+**Contexte.** Le CDC 2026 montre l'avatar de l'auteur d'un pixel inspecté. Le miroir `user:` du §5.1 ne garde que `login` et `displayName`, et `InspectEntry` (§4.3) pas davantage.
+**Décision.** `setUser` écrit aussi `avatarUrl` quand Twitch en donne un, à chaque connexion. `InspectEntry` gagne un `avatarUrl` **optionnel** : un ancien client l'ignore, `PROTOCOL_VERSION` ne bouge pas. Sans avatar (auteur pas reconnecté depuis), la pill affiche son initiale.
+**Renoncement.** Pas de lecture de l'avatar dans Convex au moment d'inspecter : le gateway n'a pas le droit d'y aller (§5.1).
+
 ## 2026-09-24 — Écart §9.3 : le brouillon remplace le rectangle de la multi-sélection
 
 **Contexte.** Le §9.3 choisit plusieurs cases par un rectangle glissé. Le CDC 2026 le remplace par le brouillon : un clic ou un tap par case, et le tracé à l'Espace ou au Toggle tracé, jusqu'à Valider.

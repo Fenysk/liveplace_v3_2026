@@ -13,6 +13,9 @@ export type Placement = {
 
 export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
 
+// L'auteur du pixel visible d'une case (§4.3).
+export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>["entry"]>;
+
 export type Snapshot = { state: Uint8Array; version: number };
 
 // Canal `cv:<id>:live`. La variante `ctl` arrive avec moderate.lua (§5.4).
@@ -23,13 +26,17 @@ export type Unsubscribe = () => Promise<void>;
 export interface CanvasCore {
   createCanvas(canvasId: string, meta: CanvasMeta): Promise<void>;
   // Le miroir `user:<userId>` (§5.1), réécrit à chaque connexion : le gateway n'a pas le droit d'aller dans Convex.
-  setUser(user: Pick<User, "userId" | "login" | "displayName">): Promise<void>;
+  // Écart §5.1 (JOURNAL 2026-09-24) : `avatarUrl` aussi, quand Twitch en donne un.
+  setUser(
+    user: Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>,
+  ): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
   isModerator(canvasId: string, userId: string): Promise<boolean>;
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   // Écart §5.6 (JOURNAL 2026-09-24) : lue sans être écrite, pour le `welcome`.
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
+  inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null>; // `null` : personne n'a posé ici
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

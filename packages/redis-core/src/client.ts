@@ -1,10 +1,18 @@
 // Client typé du noyau Redis (§5.6).
 
 import { readFileSync } from "node:fs";
-import { type CanvasMeta, CELL_STRIDE, PALETTE, refillGauge, type Timestamp } from "@liveplace/domain";
+import {
+  type CanvasMeta,
+  CELL_STRIDE,
+  PALETTE,
+  refillGauge,
+  type Timestamp,
+  toCellKey,
+} from "@liveplace/domain";
 import type {
   AckFrame,
   CanvasCore,
+  InspectEntry,
   LiveMessage,
   Placement,
   SignInWrites,
@@ -64,8 +72,8 @@ export function createSignInWrites(redis: Redis): SignInWrites {
         .exec();
     },
 
-    async setUser({ userId, login, displayName }): Promise<void> {
-      await redis.hset(userKey(userId), { login, displayName });
+    async setUser({ userId, login, displayName, avatarUrl }): Promise<void> {
+      await redis.hset(userKey(userId), { login, displayName, ...(avatarUrl ? { avatarUrl } : {}) });
     },
   };
 }
@@ -165,6 +173,25 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const frame = decodeServerFrame(JSON.parse(ack ?? "null"));
       if (frame.ok && frame.value.t === "ack") return { ok: true, value: frame.value };
       throw new Error(`place.lua a renvoyé un ack invalide : ${ack}`);
+    },
+
+    // La tête de `hist:` est le pixel visible (§5.1). L'entrée se lit par la fin, comme dans place.lua.
+    async inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null> {
+      const head = await redis.lindex(buildCanvasKeys(canvasId).hist(toCellKey(x, y)), 0);
+      if (head === null) return null;
+      const [, userId, colorIndex, placedAt] = /^(.*):(\d+):(\d+):\d+$/.exec(head) ?? [];
+      if (userId === undefined || colorIndex === undefined || placedAt === undefined)
+        throw new Error(`inspect ${canvasId} : entrée d'historique illisible (${head})`);
+      // Sans miroir, l'auteur garde au moins son identifiant : le miroir n'expire jamais, c'est un filet.
+      const user = await redis.hgetall(userKey(userId));
+      return {
+        userId,
+        login: user.login ?? userId,
+        displayName: user.displayName ?? userId,
+        ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+        colorIndex: Number(colorIndex),
+        placedAt: Number(placedAt),
+      };
     },
 
     // Le comptage des abonnés appartient au gateway : premier client → abonnement, dernier → départ (§6.3).

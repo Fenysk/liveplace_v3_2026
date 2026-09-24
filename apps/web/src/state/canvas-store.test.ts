@@ -186,3 +186,57 @@ describe("placeBatch (§9.2, §9.3)", () => {
     expect(store.getView().status).toBe("closed");
   });
 });
+
+describe("inspect (CDC 2026, la pill Inspection)", () => {
+  const entry = { userId: "user-2", login: "user2", displayName: "User 2", colorIndex: 5, placedAt: now };
+
+  const lastInspect = (sent: ClientFrame[]) => {
+    const frame = sent.at(-1);
+    if (frame?.t !== "inspect") throw new Error("aucune frame inspect envoyée");
+    return frame;
+  };
+
+  // Montre la case inspectée tout de suite, puis son auteur quand la réponse arrive
+  it("shows the inspected cell at once, then its author when the answer comes", () => {
+    const { store, sent, receive } = setup();
+
+    store.inspect(1, 2);
+    expect(store.getView().inspection).toEqual({ status: "loading", x: 1, y: 2 });
+
+    receive({ t: "inspected", requestId: lastInspect(sent).requestId, x: 1, y: 2, entry });
+    expect(store.getView().inspection).toEqual({ status: "found", x: 1, y: 2, entry });
+  });
+
+  // Dit que personne n'a posé ici quand la réponse n'a pas d'entrée
+  it("says nobody placed here when the answer has no entry", () => {
+    const { store, sent, receive } = setup();
+
+    store.inspect(0, 0);
+    receive({ t: "inspected", requestId: lastInspect(sent).requestId, x: 0, y: 0 });
+
+    expect(store.getView().inspection).toEqual({ status: "empty", x: 0, y: 0 });
+  });
+
+  // Ignore la réponse à une inspection plus ancienne
+  it("ignores the answer to an older inspection", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+    const older = lastInspect(sent).requestId;
+
+    store.inspect(3, 3);
+    receive({ t: "inspected", requestId: older, x: 1, y: 2, entry });
+
+    expect(store.getView().inspection).toEqual({ status: "loading", x: 3, y: 3 });
+  });
+
+  // Ferme l'inspection, et ignore la réponse qui arrive ensuite
+  it("closes the inspection, and ignores the answer that comes afterwards", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+
+    store.closeInspection();
+    receive({ t: "inspected", requestId: lastInspect(sent).requestId, x: 1, y: 2, entry });
+
+    expect(store.getView().inspection).toBeNull();
+  });
+});

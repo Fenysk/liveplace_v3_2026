@@ -24,15 +24,18 @@ const CLOSE_POLICY = 1008;
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
+type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 
+// `ready` garde la taille du canvas : une case hors bornes n'a pas de cellKey à elle.
+type ReadyState = { status: "ready"; canvasId: string; width: number; height: number };
 type State =
   | { status: "awaitingHello" }
   | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[] }
-  | { status: "ready"; canvasId: string };
+  | ReadyState;
 
 export type ConnectionDeps = {
-  core: Pick<CanvasCore, "getCanvas" | "isModerator" | "getSnapshot" | "getGauge" | "place">;
+  core: Pick<CanvasCore, "getCanvas" | "isModerator" | "getSnapshot" | "getGauge" | "place" | "inspect">;
   broadcast: Broadcast;
   now: () => Timestamp;
 };
@@ -128,7 +131,7 @@ export function createConnection(
     socket.sendSnapshot(snapshot.state);
 
     const held = state.status === "joining" ? state.pendingFrames : [];
-    state = { status: "ready", canvasId: frame.canvasId };
+    state = { status: "ready", canvasId: frame.canvasId, width: meta.width, height: meta.height };
     sendHeld(held, snapshot.version);
   };
 
@@ -145,10 +148,18 @@ export function createConnection(
     socket.sendFrame(result.value);
   };
 
-  const route = async (frame: Exclude<ClientFrame, HelloFrame>, canvasId: string): Promise<void> => {
-    if (frame.t === "place") return placePixels(frame, canvasId);
+  // Ouverte à tous, invités compris : l'auteur d'un pixel est public (CDC 2026).
+  const inspectCell = async ({ requestId, x, y }: InspectFrame, ready: ReadyState): Promise<void> => {
+    const isInside = x < ready.width && y < ready.height;
+    const entry = isInside ? await deps.core.inspect(ready.canvasId, x, y) : null;
+    socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
+  };
+
+  const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
+    if (frame.t === "place") return placePixels(frame, ready.canvasId);
+    if (frame.t === "inspect") return inspectCell(frame, ready);
     if (frame.t === "ping") return socket.sendFrame({ t: "pong" });
-    // `inspect` (J7+) et `moderate` (J15) : la frame est valide, le service n'existe pas encore.
+    // `moderate` (J11) : la frame est valide, le service n'existe pas encore.
     socket.sendFrame({ t: "error", code: "invalid_frame", message: "pas encore pris en charge" });
   };
 
@@ -159,7 +170,7 @@ export function createConnection(
     const frame = decoded.value;
     if (frame.t === "hello") return state.status === "awaitingHello" ? greet(frame) : refuse("invalid_frame");
     if (state.status !== "ready") return refuse("invalid_frame");
-    return route(frame, state.canvasId);
+    return route(frame, state);
   };
 
   return {

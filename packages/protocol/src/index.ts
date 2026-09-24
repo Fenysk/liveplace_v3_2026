@@ -97,6 +97,7 @@ const InspectEntrySchema = z.object({
   userId: UserIdSchema,
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
 });

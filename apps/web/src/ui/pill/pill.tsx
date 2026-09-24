@@ -19,6 +19,7 @@ const PILL_ANCHORS = {
     textAlign: "center",
   },
   bottomRight: { bottom: EDGE_GAP, right: EDGE_GAP },
+  centerRight: { top: "50%", right: EDGE_GAP, transform: "translateY(-50%)" },
 } satisfies Record<string, CSSProperties>;
 
 const PILL_STYLE: CSSProperties = {

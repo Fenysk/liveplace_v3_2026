@@ -1,5 +1,5 @@
 // Une image à l'écran (§9.3), dans l'ordre : le vide, le damier, les pixels, le brouillon, la grille, la bordure,
-// le contour du brouillon, la case visée. Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
+// le contour du brouillon, la case visée, le viseur de la case inspectée. Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "../../state/canvas-store";
@@ -13,6 +13,7 @@ export type Scene = {
   image: CanvasImageSource;
   checker: CanvasPattern;
   targetCell: Cell | null;
+  inspectedCell: Cell | null;
   draft: readonly Pixel[];
   palette: readonly string[];
   colorIndexAt(x: number, y: number): number; // la couleur posée, sous le brouillon
@@ -31,6 +32,13 @@ const BORDER_COLOR = "rgba(255, 255, 255, 0.55)";
 const DRAFT_ALPHA = 0.6;
 const ERASED_ALPHA = 0.35;
 const ERASER_CROSS_INSET = 0.2; // la croix de la gomme laisse un peu de marge dans la case
+const RETICLE_MIN_SIZE = 16; // pixels CSS : le viseur reste visible au plus petit zoom
+const RETICLE_CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;
 
 // Le damier du pixel transparent, accroché à l'écran : il ne suit ni le zoom ni le déplacement (CDC 2026).
 export function createChecker(
@@ -176,6 +184,37 @@ const strokeDraftOutline = (
   }
 };
 
+// Le viseur (CDC 2026) : quatre coins en équerre autour de la case, noir sous blanc, d'une taille minimale fixe à l'écran.
+const strokeReticle = (
+  context: CanvasRenderingContext2D,
+  rect: Rect,
+  pixelRatio: number,
+  lineWidth: number,
+) => {
+  const half = Math.max(rect.width, RETICLE_MIN_SIZE * pixelRatio) / 2 + lineWidth * 2;
+  const arm = half * 0.6;
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  context.beginPath();
+  for (const [signX, signY] of RETICLE_CORNERS) {
+    const cornerX = centerX + signX * half;
+    const cornerY = centerY + signY * half;
+    context.moveTo(cornerX - signX * arm, cornerY);
+    context.lineTo(cornerX, cornerY);
+    context.lineTo(cornerX, cornerY - signY * arm);
+  }
+  context.lineCap = "square";
+  for (const [color, width] of [
+    ["#000000", lineWidth * 3],
+    ["#ffffff", lineWidth],
+  ] as const) {
+    context.lineWidth = width;
+    context.strokeStyle = color;
+    context.stroke();
+  }
+  context.lineCap = "butt";
+};
+
 export function renderScene(context: CanvasRenderingContext2D, scene: Scene): void {
   const { screen, pixelRatio, viewport, canvas } = scene;
   const cellSize = viewport.scale * pixelRatio;
@@ -205,8 +244,8 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   // Remis à chaque image : redimensionner un <canvas> remet son contexte à zéro.
   context.imageSmoothingEnabled = false;
   context.drawImage(scene.image, originX, originY, canvas.width * cellSize, canvas.height * cellSize);
-  const draftRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
-  fillDraft(context, scene, draftRect, lineWidth);
+  const oneCellRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
+  fillDraft(context, scene, oneCellRect, lineWidth);
 
   if (viewport.scale >= GRID_MIN_SCALE) {
     const top = Math.max(0, canvasRect.top);
@@ -229,7 +268,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
 
   context.strokeStyle = BORDER_COLOR;
   strokeOutside(context, canvasRect, lineWidth, 0);
-  strokeDraftOutline(context, scene.draft, draftRect, lineWidth);
+  strokeDraftOutline(context, scene.draft, oneCellRect, lineWidth);
 
   if (scene.targetCell) {
     // Blanc contre la case, noir autour : visible sur toutes les couleurs, à tous les zooms.
@@ -239,4 +278,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
     context.strokeStyle = "#000000";
     strokeOutside(context, target, lineWidth, 1);
   }
+
+  if (scene.inspectedCell)
+    strokeReticle(context, oneCellRect(scene.inspectedCell.x, scene.inspectedCell.y), pixelRatio, lineWidth);
 }

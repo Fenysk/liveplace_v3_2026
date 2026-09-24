@@ -33,6 +33,14 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("d", "KeyD"), "draft")).toBeNull();
   });
 
+  // Pendant une inspection, Échap la ferme, et D ou Entrée entrent toujours en Dessin
+  it("while inspecting, Escape closes the inspection, and D or Enter still enter draft mode", () => {
+    expect(keyCommand(press("Escape", "Escape"), "inspecting")).toBe("closeInspection");
+    expect(keyCommand(press("d", "KeyD"), "inspecting")).toBe("enterDraftMode");
+    expect(keyCommand(press("Enter", "Enter"), "inspecting")).toBe("enterDraftMode");
+    expect(keyCommand(press(" ", "Space"), "inspecting")).toBeNull();
+  });
+
   // Laisse au navigateur les touches tenues avec Ctrl, Alt ou Cmd
   it("leaves keys held with Ctrl, Alt or Cmd to the browser", () => {
     expect(keyCommand(press("e", "KeyE", true), "draft")).toBeNull();
