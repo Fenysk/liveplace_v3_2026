@@ -1,13 +1,22 @@
+/* À la souris, des pastilles assez grandes pour être visées vite : deux rangées de 22 */
 .lp-palette {
+  --lp-swatch-size: 28px;
   display: grid;
-  grid-template-columns: repeat(22, 20px);
+  grid-template-columns: repeat(22, var(--lp-swatch-size));
   gap: var(--space-1);
   padding: var(--space-1);
 }
 
+/* Une fenêtre étroite, sans être un téléphone : trois rangées plutôt qu'une pill qui déborde */
+@media (max-width: 800px) {
+  .lp-palette {
+    grid-template-columns: repeat(15, var(--lp-swatch-size));
+  }
+}
+
 .lp-swatch {
-  width: 20px;
-  height: 20px;
+  width: var(--lp-swatch-size, 28px);
+  height: var(--lp-swatch-size, 28px);
   padding: 0;
   border: 0;
   flex: none;
@@ -51,8 +60,8 @@
 }
 
 .lp-swatch--eraser svg {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 
 /* Au doigt : des cibles de la taille d'un contrôle, rondes, six par rangée */
