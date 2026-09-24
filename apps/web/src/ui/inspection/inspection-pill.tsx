@@ -54,7 +54,7 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose }: InspectedCellPro
       </div>
       <div className="lp-row lp-prompt">
         <ColorChip {...(color ? { color } : {})}>
-          <span className="lp-type-caption" title={color ?? "Transparent (gomme)"}>
+          <span className="lp-type-numeric" title={color ?? "Transparent (gomme)"}>
             {coordinates}
           </span>
         </ColorChip>
