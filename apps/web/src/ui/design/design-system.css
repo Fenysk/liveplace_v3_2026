@@ -1,0 +1,12 @@
+/* L'entrée du design system, liée une seule fois dans le `<head>` : la police, les tokens, puis chaque composant. */
+
+@import "@fontsource-variable/nunito";
+@import "./tokens.css";
+
+html,
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}

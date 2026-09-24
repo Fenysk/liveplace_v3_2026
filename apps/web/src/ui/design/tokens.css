@@ -1,0 +1,141 @@
+/* Les tokens du design system : la seule source des valeurs de l'interface (JOURNAL 2026-09-24).
+   La palette du canvas n'est pas ici : elle vit dans `domain` et arrive par le `welcome`. */
+
+:root,
+[data-theme="light"] {
+  --void: #c9c7cc;
+  --void-dot: #b6b3ba;
+  --canvas-border: #3e3b65;
+  --canvas-grid: rgba(16, 18, 28, 0.14);
+  --checker-a: #ffffff;
+  --checker-b: #e4e2e7;
+  --pill-surface: #ffffff;
+  --pill-border: var(--pill-surface); /* invisible en clair : l'ombre suffit */
+  --chip: #efeef1;
+  --chip-hover: #e4e2e7;
+  --ink: #2c1e31;
+  --muted: #5c5a63;
+  --accent: var(--ink);
+  --accent-hover: #10121c;
+  --on-accent: #ffffff;
+  --danger: #ac2847;
+  --on-danger: #ffffff;
+  --gauge-charge: #26854c;
+  --gauge-draft: #f3a833;
+  --gauge-empty: #e4e2e7;
+  --draft-outline-in: #ffffff;
+  --draft-outline-out: #10121c;
+  --scrim: rgba(16, 18, 28, 0.4);
+  --focus-ring: var(--accent);
+  --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
+}
+
+[data-theme="dark"] {
+  --void: #10121c;
+  --void-dot: #1c1e2a;
+  --canvas-border: #8c78a5;
+  --canvas-grid: rgba(0, 0, 0, 0.28);
+  --checker-a: #262836;
+  --checker-b: #1f212d;
+  --pill-surface: #181a24;
+  --pill-border: #2e3040; /* visible en sombre : l'ombre ne se voit pas */
+  --chip: #242633;
+  --chip-hover: #2e3040;
+  --ink: #f6e8e0;
+  --muted: #a3a5b3;
+  --accent: var(--ink);
+  --accent-hover: #ffffff;
+  --on-accent: #10121c;
+  --danger: #fa6e79;
+  --on-danger: #10121c;
+  --gauge-charge: #5ab552;
+  --gauge-draft: #f7f3b7;
+  --gauge-empty: #2e3040;
+  --draft-outline-in: #ffffff;
+  --draft-outline-out: #10121c;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --focus-ring: var(--accent);
+  --pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+  --control-size: 36px;
+  --control-size-touch: 44px;
+  --font-sans: "Nunito Variable", system-ui, sans-serif;
+
+  /* Mouvement : une courbe douce, sans rebond, partout */
+  --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --lp-dur: 0.34s; /* morphing, feuilles, fenêtre, niveau de la jauge */
+  --lp-dur-fade: 0.2s; /* apparitions, fondu des pills */
+  --lp-dur-fast: 0.14s; /* survols, fondu du contenu */
+}
+
+/* Écran étroit ou tactile : cible tactile minimale (Apple 44 pt, WCAG 2.2 AAA) */
+@media (max-width: 640px), (pointer: coarse) {
+  :root {
+    --control-size: var(--control-size-touch);
+  }
+}
+
+/* Les transitions passent toutes par ces durées : les couper ici les coupe partout */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lp-dur: 0s;
+    --lp-dur-fade: 0s;
+    --lp-dur-fast: 0s;
+  }
+}
+
+/* Les composants portent ces classes, ils n'écrivent jamais de taille de police */
+.lp-type-heading {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 900;
+}
+
+.lp-type-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 800;
+}
+
+.lp-type-body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.lp-type-numeric {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-type-caption {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.lp-type-kbd {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 12px;
+  font-weight: 800;
+}
+
+.lp-muted {
+  color: var(--muted);
+}

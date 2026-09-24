@@ -13,6 +13,18 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Le thème est retenu dans le navigateur et posé avant la première peinture
+
+**Contexte.** Le CDC 2026 veut un thème clair, sombre ou auto : auto au premier chargement, puis le choix retenu. Le rendu serveur ne voit pas le stockage du navigateur : la page s'afficherait au thème du système, puis basculerait après l'hydratation, à chaque F5.
+**Décision.** Le choix vit dans `localStorage` (`liveplace:theme`). Un script émis par `ScriptOnce` en tête du `<head>` pose `data-theme` sur `<html>` avant la première peinture ; `useTheme` prend le relais ensuite.
+**Renoncement.** Pas de cookie lu par le serveur : chaque route devrait lire la requête, pour ce que trois lignes de script font.
+
+## 2026-09-24 — `lucide-react` et Nunito servie par le web
+
+**Contexte.** Le design system LivePlace (fait avec Claude Design) dessine ses icônes avec Lucide et écrit en Nunito, graisses 700 à 900.
+**Décision.** `lucide-react` et `@fontsource-variable/nunito` en dépendances d'`apps/web` seul. Les icônes s'importent une par une ; la police est servie par notre domaine, importée par `design-system.css`.
+**Renoncement.** Pas de Google Fonts : une requête vers Google à chaque visite. Pas de SVG recopiés à la main depuis la référence du design system : un fichier de plus à tenir à jour.
+
 ## 2026-09-24 — Écart §5.1 et §4.3 : `avatarUrl` dans le miroir `user:` et dans l'inspection
 
 **Contexte.** Le CDC 2026 montre l'avatar de l'auteur d'un pixel inspecté. Le miroir `user:` du §5.1 ne garde que `login` et `displayName`, et `InspectEntry` (§4.3) pas davantage.
