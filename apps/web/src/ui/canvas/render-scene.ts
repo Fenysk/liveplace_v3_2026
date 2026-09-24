@@ -1,5 +1,7 @@
-// Une image à l'écran (§9.3), dans l'ordre : le vide et ses points, le damier, les pixels, le brouillon, la grille, la bordure,
-// le contour du brouillon, la case visée, le viseur de la case inspectée. Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
+// Une image à l'écran (§9.3), dans l'ordre : le damier, les pixels, le brouillon, la grille, la bordure,
+// le contour du brouillon, la case visée, le viseur de la case inspectée. Le vide n'est pas ici : c'est une couche CSS
+// fixe sous le canvas (`.lp-void`), qui ne suit pas le viewport ; le canvas reste transparent autour de l'image.
+// Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "../../state/canvas-store";
@@ -7,8 +9,7 @@ import type { Cell, Size, Viewport } from "./viewport";
 
 // Les teintes du canvas, lues dans les tokens du thème (tokens.css) : aucune n'est écrite ici.
 export type SceneShades = {
-  void: string;
-  voidDot: string;
+  void: string; // le fond sous une case gommée du brouillon : pas de damier (CDC 2026)
   border: string;
   grid: string;
   checkerA: string;
@@ -37,10 +38,6 @@ type CellRect = (x: number, y: number) => Rect;
 
 const CHECKER_DIVISOR = 48;
 const GRID_MIN_SCALE = 8;
-// Les points du vide suivent le viewport : un point toutes les 4 cases, pas doublé tant qu'ils sont trop serrés.
-const VOID_DOT_STEP = 4;
-const VOID_DOT_MIN_GAP = 22; // pixels CSS
-const VOID_DOT_SIZE = 2; // pixels CSS
 const DRAFT_ALPHA = 0.6;
 const ERASED_ALPHA = 0.35;
 const ERASER_CROSS_INSET = 0.2; // la croix de la gomme laisse un peu de marge dans la case
@@ -233,25 +230,6 @@ const strokeReticle = (
   context.lineCap = "butt";
 };
 
-// Les points du vide (CDC 2026, Rendu) : ils suivent le viewport, et rendent visibles le déplacement et le zoom.
-const fillVoidDots = (context: CanvasRenderingContext2D, { viewport, screen, pixelRatio, shades }: Scene) => {
-  let step = VOID_DOT_STEP;
-  while (step * viewport.scale < VOID_DOT_MIN_GAP) step *= 2;
-  const gap = step * viewport.scale;
-  const size = VOID_DOT_SIZE * pixelRatio;
-  const firstX = viewport.offsetX - Math.ceil(viewport.offsetX / gap) * gap;
-  const firstY = viewport.offsetY - Math.ceil(viewport.offsetY / gap) * gap;
-  context.fillStyle = shades.voidDot;
-  for (let y = firstY; y < screen.height; y += gap)
-    for (let x = firstX; x < screen.width; x += gap)
-      context.fillRect(
-        Math.round(x * pixelRatio - size / 2),
-        Math.round(y * pixelRatio - size / 2),
-        size,
-        size,
-      );
-};
-
 export function renderScene(context: CanvasRenderingContext2D, scene: Scene): void {
   const { screen, pixelRatio, viewport, canvas } = scene;
   const cellSize = viewport.scale * pixelRatio;
@@ -273,9 +251,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   const lineWidth = Math.max(1, Math.round(pixelRatio));
 
   context.setTransform(1, 0, 0, 1, 0, 0);
-  context.fillStyle = scene.shades.void;
-  context.fillRect(0, 0, screenWidth, screenHeight);
-  fillVoidDots(context, scene);
+  context.clearRect(0, 0, screenWidth, screenHeight);
   context.fillStyle = scene.checker;
   context.fillRect(canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height);
 

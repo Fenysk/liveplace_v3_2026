@@ -42,6 +42,8 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
 
   return (
     <>
+      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, puis le canvas. */}
+      <div className="lp-void" aria-hidden="true" />
       <canvas ref={surface} className="lp-canvas" />
       {scene && (
         <ViewportPill

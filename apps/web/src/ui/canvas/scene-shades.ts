@@ -8,7 +8,6 @@ export function getSceneShades(root: Element): SceneShades {
   const variable = (name: string) => style.getPropertyValue(name).trim();
   return {
     void: variable("--void"),
-    voidDot: variable("--void-dot"),
     border: variable("--canvas-border"),
     grid: variable("--canvas-grid"),
     checkerA: variable("--checker-a"),
