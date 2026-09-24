@@ -198,3 +198,47 @@ html[data-panning] .lp-floating {
   display: grid;
   place-items: center;
 }
+
+/* Écran étroit : pills du haut sous l'encoche, barre du bas pleine largeur au-dessus de l'indicateur d'accueil.
+   L'inspection et Recentrer se posent juste au-dessus de la barre du bas : une seule feuille à la fois. */
+@media (max-width: 640px) {
+  .lp-floating[data-dock="tl"] {
+    top: max(var(--space-2), env(safe-area-inset-top));
+    left: var(--space-2);
+  }
+
+  .lp-floating[data-dock="tr"] {
+    top: max(var(--space-2), env(safe-area-inset-top));
+    right: var(--space-2);
+  }
+
+  .lp-floating[data-dock="bc"],
+  .lp-floating[data-dock="cr"] {
+    left: var(--space-2);
+    right: var(--space-2);
+    transform: none;
+    top: auto;
+    bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  }
+
+  .lp-floating[data-dock="bc"] .lp-pill,
+  .lp-floating[data-dock="cr"] .lp-pill,
+  .lp-floating[data-dock="bc"] .lp-pill-content,
+  .lp-floating[data-dock="cr"] .lp-pill-content {
+    width: 100%;
+    max-width: none;
+  }
+
+  .lp-floating[data-dock="cr"],
+  .lp-floating[data-dock="br"] {
+    bottom: calc(max(var(--space-2), env(safe-area-inset-bottom)) + var(--control-size) + 3 * var(--space-2));
+  }
+
+  .lp-floating[data-dock="br"] {
+    right: var(--space-2);
+  }
+
+  .lp-pill.is-hidden {
+    transform: translateY(12px);
+  }
+}

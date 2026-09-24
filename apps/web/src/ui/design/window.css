@@ -72,6 +72,10 @@
   box-shadow: var(--pill-shadow);
 }
 
+.lp-window-grabber {
+  display: none;
+}
+
 .lp-window-main {
   flex: 1;
   min-width: 0;
@@ -113,10 +117,12 @@
 /* Écran étroit : une feuille modale qui monte du bas, la barre latérale devient une rangée d'onglets */
 @media (max-width: 640px) {
   .lp-window {
+    /* Ancrée en bas : sa hauteur est celle de son contenu */
+    inset: auto 0 0;
     width: 100%;
     height: auto;
     max-height: calc(100dvh - 48px);
-    margin: auto 0 0;
+    margin: 0;
     border-radius: var(--lp-radius-box) var(--lp-radius-box) 0 0;
     padding-bottom: env(safe-area-inset-bottom);
     transform: translateY(100%);
@@ -124,6 +130,12 @@
 
   .lp-window[open] {
     flex-direction: column;
+  }
+
+  .lp-window-grabber {
+    display: block;
+    order: -1;
+    margin-top: var(--space-1);
   }
 
   .lp-window-nav {
@@ -143,6 +155,11 @@
 
   .lp-window-main {
     display: contents;
+  }
+
+  /* iOS : Fermer au bord de tête de la barre */
+  .lp-window-head .lp-btn {
+    order: -1;
   }
 
   .lp-window-head {

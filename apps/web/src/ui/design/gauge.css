@@ -97,3 +97,9 @@
   height: var(--lp-level);
   transition: height var(--lp-dur) var(--lp-ease);
 }
+
+@media (max-width: 640px) {
+  .lp-fluid {
+    height: 12px;
+  }
+}

@@ -14,6 +14,7 @@ type ViewportPillProps = {
   onZoomOut: () => void;
   onRecenter: () => void;
   isCompact?: boolean;
+  isSheetOpen?: boolean; // sur mobile, une seule feuille à la fois : la feuille Dessin ou l'inspection
   isDocked?: boolean;
 };
 
@@ -23,6 +24,7 @@ export const ViewportPill = ({
   onZoomOut,
   onRecenter,
   isCompact = false,
+  isSheetOpen = false,
   isDocked = true,
 }: ViewportPillProps) => {
   const dock = isDocked ? DOCK : undefined;
@@ -31,7 +33,7 @@ export const ViewportPill = ({
   );
   if (isCompact)
     return (
-      <Pill dock={dock} isVisible={framing !== null && !framing.isArrival}>
+      <Pill dock={dock} isVisible={framing !== null && !framing.isArrival && !isSheetOpen}>
         {recenter}
       </Pill>
     );
