@@ -100,6 +100,12 @@
   position: fixed;
   z-index: 2;
   transition: opacity var(--lp-dur-fade) ease;
+  /* Le conteneur laisse passer les pointeurs : une pill masquée ne couvre ni un bouton, ni le canvas */
+  pointer-events: none;
+}
+
+.lp-floating > .lp-pill {
+  pointer-events: auto;
 }
 
 .lp-floating[data-dock="tl"] {
@@ -132,12 +138,16 @@
 /* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
 html[data-panning] .lp-floating {
   opacity: 0;
-  pointer-events: none;
 }
 
 .lp-pill.is-hidden {
   opacity: 0;
   transform: translateX(16px) scale(0.96);
+  pointer-events: none;
+}
+
+html[data-panning] .lp-floating > .lp-pill,
+.lp-floating > .lp-pill.is-hidden {
   pointer-events: none;
 }
 
