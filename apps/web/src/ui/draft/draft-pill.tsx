@@ -4,8 +4,8 @@ import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { type CSSProperties, type MouseEvent, useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
+import { Pill } from "../design/pill";
 import { GaugeMeter } from "../gauge/gauge-meter";
-import { Pill } from "../pill/pill";
 
 const BUTTON_STYLE: CSSProperties = {
   padding: "6px 12px",
@@ -76,13 +76,12 @@ export const DraftPill = ({ store, draftStore, login }: DraftPillProps) => {
   const draftView = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
   const isTouchScreen = useTouchScreen();
 
-  if (canvasView.status !== "live")
-    return <Pill anchor="bottomCenter">{STATUS_LABELS[canvasView.status]}</Pill>;
+  if (canvasView.status !== "live") return <Pill dock="bc">{STATUS_LABELS[canvasView.status]}</Pill>;
 
   // Écart §10.1 (JOURNAL 2026-09-22) : après Twitch, on revient sur ce canvas.
   if (!canvasView.userId)
     return (
-      <Pill anchor="bottomCenter">
+      <Pill dock="bc">
         <a href={`/auth/twitch?returnTo=${encodeURIComponent(`/${login}`)}`} style={LINK_STYLE}>
           Se connecter pour dessiner
         </a>
@@ -96,7 +95,7 @@ export const DraftPill = ({ store, draftStore, login }: DraftPillProps) => {
 
   if (draftView.mode === "view")
     return (
-      <Pill anchor="bottomCenter">
+      <Pill dock="bc">
         {gauge}
         <button type="button" style={PRIMARY_STYLE} onClick={pressed(() => draftStore.enterDraftMode())}>
           Dessiner
@@ -107,7 +106,7 @@ export const DraftPill = ({ store, draftStore, login }: DraftPillProps) => {
 
   const canSubmit = draftView.draft.size > 0 && !draftView.isSending;
   return (
-    <Pill anchor="bottomCenter" direction="panel">
+    <Pill dock="bc" layout="stack">
       {/* Pendant l'envoi, le mode Dessin reste affiché mais verrouillé (CDC 2026). */}
       <div
         style={{

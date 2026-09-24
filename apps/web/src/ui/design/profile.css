@@ -1,0 +1,64 @@
+.lp-avatar {
+  position: relative;
+  overflow: hidden;
+  width: var(--control-size);
+  height: var(--control-size);
+  flex: none;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  /* L'initiale, sous la photo : elle prend le relais si la photo manque */
+  background: var(--chip);
+  color: var(--ink);
+}
+
+.lp-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lp-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lp-profile-main {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+}
+
+.lp-profile-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-profile-main:has(.lp-profile-name) {
+  padding-right: 6px;
+}
+
+.lp-profile-main:hover .lp-profile-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lp-profile-main:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.lp-avatar-btn {
+  padding: 0;
+  width: var(--control-size);
+  background: none;
+}

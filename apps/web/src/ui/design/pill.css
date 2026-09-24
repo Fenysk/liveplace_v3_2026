@@ -1,0 +1,182 @@
+/* Géométrie : un contrôle mesure --control-size, la marge intérieure vaut --space-2, le rayon
+   control-size / 2 + space-2. Une pill d'une ligne (ou d'une colonne) est donc parfaitement ronde,
+   et son contenu concentrique à l'arrondi, à 36 px comme à 44 px. */
+
+.lp-pill {
+  /* Calculé ici et non sur :root : il suit --control-size là où il change */
+  --lp-radius-box: calc(var(--control-size) / 2 + var(--space-2));
+  position: relative;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--space-4));
+  overflow: hidden;
+  background: var(--pill-surface);
+  color: var(--ink);
+  border-radius: var(--lp-radius-box);
+  /* Le contour hors du flux : la hauteur reste contrôle + 2 × marge */
+  box-shadow:
+    0 0 0 1px var(--pill-border),
+    var(--pill-shadow);
+  font-family: var(--font-sans);
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    transform var(--lp-dur) var(--lp-ease);
+}
+
+.lp-pill-content {
+  box-sizing: border-box;
+  padding: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition:
+    opacity var(--lp-dur-fast) ease,
+    filter var(--lp-dur-fade) ease;
+}
+
+.lp-col {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.lp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lp-spacer {
+  flex: 1;
+}
+
+.lp-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 2px;
+  background: var(--chip-hover);
+}
+
+/* Verticale : mêmes règles, l'axe tourne. Exactement la largeur d'un contrôle et de ses marges */
+.lp-pill--v .lp-pill-content {
+  flex-direction: column;
+  width: calc(var(--control-size) + 2 * var(--space-2));
+}
+
+.lp-pill--v .lp-pill-content > * {
+  max-width: var(--control-size);
+}
+
+.lp-pill--v .lp-sep {
+  width: auto;
+  height: 1px;
+  margin: 2px 4px;
+}
+
+/* Le pourcentage de zoom tient dans la largeur d'un contrôle, même à quatre chiffres */
+.lp-zoom {
+  width: var(--control-size);
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+/* Flottante : fixée à un bord de l'écran, avec un espace */
+.lp-floating {
+  position: fixed;
+  z-index: 2;
+  transition: opacity var(--lp-dur-fade) ease;
+}
+
+.lp-floating[data-dock="tl"] {
+  top: var(--space-4);
+  left: var(--space-4);
+}
+
+.lp-floating[data-dock="tr"] {
+  top: var(--space-4);
+  right: var(--space-4);
+}
+
+.lp-floating[data-dock="br"] {
+  bottom: var(--space-4);
+  right: var(--space-4);
+}
+
+.lp-floating[data-dock="bc"] {
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lp-floating[data-dock="cr"] {
+  top: 50%;
+  right: var(--space-4);
+  transform: translateY(-50%);
+}
+
+/* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
+html[data-panning] .lp-floating {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lp-pill.is-hidden {
+  opacity: 0;
+  transform: translateX(16px) scale(0.96);
+  pointer-events: none;
+}
+
+/* Envoi en cours : le contenu grisé, non cliquable */
+.lp-pill.is-locked .lp-pill-content {
+  filter: grayscale(1);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Connexion en cours ou perdue : le contenu flou et en noir et blanc, sans déborder de la pill */
+.lp-pill.is-reconnecting .lp-pill-content {
+  filter: blur(3px) grayscale(1);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.lp-reco {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.lp-reco-wait i {
+  font-style: normal;
+  animation: lp-wait 1.2s steps(1) infinite;
+}
+
+.lp-reco-wait i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.lp-reco-wait i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes lp-wait {
+  0% {
+    opacity: 0;
+  }
+
+  30%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reco-wait i {
+    animation: none;
+  }
+}

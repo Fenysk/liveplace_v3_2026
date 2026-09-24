@@ -6,7 +6,7 @@ import type { InspectEntry } from "@liveplace/domain/ports";
 import { type CSSProperties, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
-import { Pill } from "../pill/pill";
+import { Pill } from "../design/pill";
 
 const AVATAR_SIZE = 40;
 const AVATAR_STYLE: CSSProperties = {
@@ -80,7 +80,7 @@ export const InspectionPill = ({ store, draftStore }: InspectionPillProps) => {
   const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
   if (!inspection || mode !== "view") return null;
   return (
-    <Pill anchor="centerRight" direction="panel">
+    <Pill dock="cr" layout="stack">
       <div style={{ position: "relative", minWidth: 180, whiteSpace: "normal" }}>
         <button type="button" aria-label="Fermer" style={CLOSE_STYLE} onClick={() => store.closeInspection()}>
           ×

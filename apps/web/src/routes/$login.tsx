@@ -7,10 +7,10 @@ import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
 import { AccountLink } from "../ui/canvas/account-link";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { Pill } from "../ui/design/pill";
 import { DraftPill } from "../ui/draft/draft-pill";
 import { useDraftKeys } from "../ui/draft/use-draft-keys";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
-import { Pill } from "../ui/pill/pill";
 import { resolveCanvas } from "../usecase/resolve-canvas";
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
@@ -50,7 +50,7 @@ const CanvasPage = () => {
   return (
     <main>
       {stores && <PixelCanvas store={stores.canvas} draftStore={stores.draft} canvasId={canvasId} />}
-      <Pill anchor="topLeft">
+      <Pill dock="tl">
         <h1 style={{ margin: 0, fontSize: 14 }}>{displayName}</h1>
       </Pill>
       {stores && <AccountLink store={stores.canvas} login={login} />}
@@ -58,7 +58,7 @@ const CanvasPage = () => {
       {stores ? (
         <DraftPill store={stores.canvas} draftStore={stores.draft} login={login} />
       ) : (
-        <Pill anchor="bottomCenter">Connexion…</Pill>
+        <Pill dock="bc">Connexion…</Pill>
       )}
     </main>
   );

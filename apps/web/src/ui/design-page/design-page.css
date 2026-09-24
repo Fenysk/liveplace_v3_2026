@@ -1,0 +1,117 @@
+/* La mise en page de /design, et elle seule. Les composants gardent leur propre CSS. */
+
+@import "../design/variable-specimen.css";
+
+.design-page {
+  box-sizing: border-box;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) 96px;
+  display: grid;
+  gap: 48px;
+}
+
+/* Le pointeur « Doigt » : les contrôles à la taille tactile, comme sur un téléphone */
+.design-page.is-touch-preview {
+  --control-size: var(--control-size-touch);
+}
+
+.design-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.design-head h1,
+.design-head p,
+.design-section h2,
+.design-group h3,
+.design-group p {
+  margin: 0;
+}
+
+.design-controls {
+  flex-wrap: wrap;
+}
+
+.design-section {
+  display: grid;
+  gap: 32px;
+}
+
+.design-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.design-specimens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4) 32px;
+  margin-top: var(--space-2);
+}
+
+.design-specimen {
+  margin: 0;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+/* Les couleurs, un thème par colonne : chaque colonne porte son propre `data-theme` */
+.design-theme-column {
+  flex: 1 1 320px;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--void);
+  color: var(--ink);
+}
+
+.design-theme-column p {
+  margin: 0;
+}
+
+.design-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  width: 100%;
+}
+
+.design-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.design-type-row {
+  display: grid;
+  grid-template-columns: 160px 140px 1fr;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.design-type-row code,
+.design-icon code {
+  font-family: ui-monospace, monospace;
+}
+
+.design-icon {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  width: 88px;
+}
+
+.design-fill-box {
+  display: flex;
+  width: 280px;
+}
+
+@media (max-width: 640px) {
+  .design-type-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

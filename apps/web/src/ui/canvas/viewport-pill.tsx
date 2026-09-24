@@ -1,7 +1,7 @@
 // La pill Pratique (CDC 2026) : zoomer et dézoomer vers le centre de l'écran, recentrer comme à l'arrivée.
 
 import type { CSSProperties } from "react";
-import { Pill } from "../pill/pill";
+import { Pill } from "../design/pill";
 import type { CanvasScene } from "./canvas-scene";
 
 const ZOOM_STEP = 1.5;
@@ -22,7 +22,7 @@ const BUTTON_STYLE: CSSProperties = {
 };
 
 export const ViewportPill = ({ scene }: { scene: CanvasScene }) => (
-  <Pill anchor="bottomRight" direction="column">
+  <Pill dock="br" layout="rail">
     <button
       type="button"
       aria-label="Dézoomer"

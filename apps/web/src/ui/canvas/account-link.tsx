@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
-import { Pill } from "../pill/pill";
+import { Pill } from "../design/pill";
 
 const LINK_STYLE = { color: "#c9b6ff" };
 
@@ -13,7 +13,7 @@ export const AccountLink = ({ store, login }: { store: CanvasStore; login: strin
   // La pill Compte attend le rôle : jamais de bulle vide.
   if (!view.role) return null;
   return (
-    <Pill anchor="topRight">
+    <Pill dock="tr">
       {view.role === "guest" ? (
         <a href={`/auth/twitch?returnTo=${returnTo}`} style={LINK_STYLE}>
           Se connecter avec Twitch

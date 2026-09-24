@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Le design system vit dans `ui/design/`, et `/design` passe avant le jeu
+
+**Contexte.** Le design system LivePlace arrive en maquette et en JavaScript de référence (`innerHTML`, `window.LivePlace`). Le web n'avait que des `style={{}}` et des couleurs en dur, et des pills qui lisent les stores : impossibles à montrer hors du jeu.
+**Décision.** Un `.tsx` et son `.css` par composant dans `ui/design/`, qui ne reçoivent que des props. `tokens.css` est la seule source des valeurs (la palette reste dans `domain`). Chaque pill du jeu = un composant d'affichage + un hook qui lit les stores. `/design`, en développement seulement, rend ces mêmes composants : on y change un composant avant de s'en servir. Un test du gate refuse `style=` hors de `ui/design/`, toute couleur en dur, et tout composant absent de `/design`.
+**Renoncement.** Pas de package `packages/ui` (un seul consommateur), ni Tailwind, ni modules CSS, ni `tokens.json` et son générateur. Pas de recopie de la référence ni de la maquette.
+
 ## 2026-09-24 — Le thème est retenu dans le navigateur et posé avant la première peinture
 
 **Contexte.** Le CDC 2026 veut un thème clair, sombre ou auto : auto au premier chargement, puis le choix retenu. Le rendu serveur ne voit pas le stockage du navigateur : la page s'afficherait au thème du système, puis basculerait après l'hydratation, à chaque F5.

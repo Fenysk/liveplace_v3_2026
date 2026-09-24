@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './../routes/__root'
 import { Route as IndexRouteImport } from './../routes/index'
 import { Route as LoginRouteImport } from './../routes/$login'
+import { Route as DesignRouteImport } from './../routes/design'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
 import { Route as AuthTwitchCallbackRouteImport } from './../routes/auth/twitch.callback'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/$login',
   path: '/$login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignRoute = DesignRouteImport.update({
+  id: '/design',
+  path: '/design',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignoutRoute = AuthSignoutRouteImport.update({
@@ -44,6 +50,7 @@ const AuthTwitchCallbackRoute = AuthTwitchCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/design': typeof DesignRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/design': typeof DesignRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/design': typeof DesignRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -66,14 +75,25 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/$login' | '/auth/signout' | '/auth/twitch' | '/auth/twitch/callback'
+    | '/'
+    | '/$login'
+    | '/design'
+    | '/auth/signout'
+    | '/auth/twitch'
+    | '/auth/twitch/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/$login' | '/auth/signout' | '/auth/twitch' | '/auth/twitch/callback'
+    | '/'
+    | '/$login'
+    | '/design'
+    | '/auth/signout'
+    | '/auth/twitch'
+    | '/auth/twitch/callback'
   id:
     | '__root__'
     | '/'
     | '/$login'
+    | '/design'
     | '/auth/signout'
     | '/auth/twitch'
     | '/auth/twitch/callback'
@@ -82,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  DesignRoute: typeof DesignRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
 }
@@ -100,6 +121,13 @@ declare module '@tanstack/react-router' {
       path: '/$login'
       fullPath: '/$login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design': {
+      id: '/design'
+      path: '/design'
+      fullPath: '/design'
+      preLoaderRoute: typeof DesignRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/signout': {
@@ -141,6 +169,7 @@ const AuthTwitchRouteWithChildren = AuthTwitchRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  DesignRoute: DesignRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
 }

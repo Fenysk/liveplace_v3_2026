@@ -1,0 +1,47 @@
+.lp-segmented {
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+}
+
+.lp-segmented-option {
+  position: relative;
+  height: calc(var(--control-size) - 6px);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--lp-dur-fast);
+}
+
+.lp-segmented-option svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Le bouton radio reste là pour le clavier et les lecteurs d'écran, invisible */
+.lp-segmented-option input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.lp-segmented-option:has(input:checked) {
+  background: var(--pill-surface);
+  box-shadow: var(--pill-shadow);
+}
+
+.lp-segmented-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

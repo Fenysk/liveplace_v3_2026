@@ -1,0 +1,174 @@
+/* La fenêtre est une pill : un `<dialog>`, dont on retire les styles du navigateur. */
+
+.lp-window {
+  /* `.lp-pill` est en `relative` : la fenêtre reprend la position fixe d'une modale, centrée */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(760px, calc(100% - 2 * var(--space-4)));
+  height: min(520px, calc(100% - 2 * var(--space-4)));
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  flex-direction: row;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    transform var(--lp-dur) var(--lp-ease),
+    overlay var(--lp-dur) allow-discrete,
+    display var(--lp-dur) allow-discrete;
+}
+
+.lp-window[open] {
+  display: flex;
+  opacity: 1;
+  transform: none;
+}
+
+/* Le voile : l'interface reste visible derrière, assombrie */
+.lp-window::backdrop {
+  background: var(--scrim, rgba(16, 18, 28, 0.4));
+  opacity: 0;
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    overlay var(--lp-dur-fade) allow-discrete,
+    display var(--lp-dur-fade) allow-discrete;
+}
+
+.lp-window[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .lp-window[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  .lp-window[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+.lp-window-nav {
+  flex: none;
+  width: 208px;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  background: var(--chip);
+}
+
+.lp-window-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lp-window-nav .lp-btn {
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+}
+
+.lp-window-nav .lp-btn:hover {
+  background: var(--chip-hover);
+}
+
+.lp-window-nav .lp-btn[aria-current="page"] {
+  background: var(--pill-surface);
+  box-shadow: var(--pill-shadow);
+}
+
+.lp-window-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-window-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0 var(--space-4);
+  min-height: calc(var(--control-size) + var(--space-2));
+}
+
+.lp-window-head h2 {
+  margin: 0;
+  flex: 1;
+}
+
+.lp-window-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+.lp-window-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-size);
+}
+
+/* Écran étroit : une feuille modale qui monte du bas, la barre latérale devient une rangée d'onglets */
+@media (max-width: 640px) {
+  .lp-window {
+    width: 100%;
+    height: auto;
+    max-height: calc(100dvh - 48px);
+    margin: auto 0 0;
+    border-radius: var(--lp-radius-box) var(--lp-radius-box) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateY(100%);
+  }
+
+  .lp-window[open] {
+    flex-direction: column;
+  }
+
+  @starting-style {
+    .lp-window[open] {
+      transform: translateY(100%);
+    }
+  }
+
+  .lp-window-nav {
+    width: auto;
+    order: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .lp-window-nav ul {
+    flex-direction: row;
+  }
+
+  .lp-window-nav .lp-btn {
+    width: auto;
+  }
+
+  .lp-window-main {
+    display: contents;
+  }
+
+  .lp-window-head {
+    order: 0;
+    padding-left: var(--space-4);
+  }
+
+  .lp-window-body {
+    order: 2;
+  }
+}

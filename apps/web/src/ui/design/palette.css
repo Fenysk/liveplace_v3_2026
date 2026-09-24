@@ -1,0 +1,83 @@
+.lp-palette {
+  display: grid;
+  grid-template-columns: repeat(22, 20px);
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+
+.lp-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  flex: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  /* Distingue une couleur proche du fond de la pill */
+  box-shadow: inset 0 0 0 1px var(--chip-hover);
+  transition: box-shadow var(--lp-dur-fast) ease;
+}
+
+/* Le survol se montre par un anneau : rien ne bouge */
+.lp-swatch:hover {
+  box-shadow:
+    0 0 0 2px var(--pill-surface),
+    0 0 0 3px var(--muted);
+}
+
+.lp-swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.lp-swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--pill-surface),
+    0 0 0 4px var(--ink);
+}
+
+/* Le damier du pixel transparent, fait des deux teintes du canvas */
+.lp-swatch--eraser,
+.lp-color-chip i.is-transparent {
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 10px 10px;
+}
+
+.lp-swatch--eraser {
+  display: grid;
+  place-items: center;
+  color: var(--danger);
+}
+
+.lp-swatch--eraser svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Au doigt : des cibles de la taille d'un contrôle, rondes, six par rangée */
+.lp-palette--touch {
+  grid-template-columns: repeat(6, var(--control-size));
+  gap: var(--space-2);
+  justify-content: space-between;
+  padding: var(--space-1) 0;
+}
+
+.lp-palette--touch .lp-swatch {
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+}
+
+.lp-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lp-color-chip i {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px var(--chip-hover);
+}

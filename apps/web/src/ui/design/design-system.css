@@ -2,6 +2,13 @@
 
 @import "@fontsource-variable/nunito";
 @import "./tokens.css";
+@import "./pill.css";
+@import "./button.css";
+@import "./profile.css";
+@import "./gauge.css";
+@import "./palette.css";
+@import "./segmented.css";
+@import "./window.css";
 
 html,
 body {
