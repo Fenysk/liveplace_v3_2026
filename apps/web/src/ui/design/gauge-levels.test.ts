@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gaugeLevels, refillProgress } from "./gauge-levels";
+import { gaugeLevels, refillProgress, tiltDirection } from "./gauge-levels";
 
 describe("gaugeLevels", () => {
   // Sans brouillon, l'anneau montre les charges, et les deux fluides sont au même niveau
@@ -35,5 +35,14 @@ describe("refillProgress", () => {
   it("reste entre 0 et 1", () => {
     expect(refillProgress(refill, 25_000)).toBe(1);
     expect(refillProgress(refill, 5_000)).toBe(0);
+  });
+});
+
+describe("tiltDirection", () => {
+  // Le fluide s'incline dans le sens où son niveau bouge, et reste droit quand il ne bouge pas
+  it("leans the way the level moves, and stays straight otherwise", () => {
+    expect(tiltDirection(0.3, 0.8)).toBe(1);
+    expect(tiltDirection(0.8, 0.3)).toBe(-1);
+    expect(tiltDirection(0.5, 0.5)).toBe(0);
   });
 });

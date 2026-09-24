@@ -1,15 +1,21 @@
 // La jauge (CDC 2026) : un nombre dans un anneau-minuteur, puis un tube où les charges sont un fluide.
 // Aucune boucle à nous : l'anneau est une animation du navigateur, le niveau une transition CSS (JOURNAL 2026-09-24).
+// Pas d'ondulation au repos : la seule boucle de l'interface est celle de « Reconnexion… » (design system).
 
 import { useEffect, useRef } from "react";
 import { type CssVariables, classNames } from "./class-names";
-import { type GaugeRefill, gaugeLevels, refillProgress } from "./gauge-levels";
+import { type GaugeRefill, gaugeLevels, refillProgress, tiltDirection } from "./gauge-levels";
+import { motionEasing, motionMs } from "./motion";
 
 const RING_RADIUS = 16;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 const SHAKE_MS = 360;
 const SHAKE_KEYFRAMES = [0, -4, 4, -3, 2, 0].map((x) => ({ transform: `translateX(${x}px)` }));
 const VIBRATION_MS = 12;
+// La surface penche d'environ 1,2 px dans un tube de 14 px pendant un changement, puis se redresse (maquette).
+const TILT_DEGREES = 10;
+const SLOSH_DEGREES = [0, 12, -9, 6, -3, 0];
+const SLOSH_STRETCH = 1.5; // l'agitation dure un peu plus qu'un changement de niveau
 
 export type GaugeProps = {
   charges: number;
@@ -41,6 +47,48 @@ const useRingAnimation = (refill: GaugeRefill | null) => {
   return ring;
 };
 
+type Orientation = NonNullable<GaugeProps["orientation"]>;
+
+const skew = (orientation: Orientation, degrees: number) =>
+  orientation === "vertical" ? `skewY(${degrees}deg)` : `skewX(${degrees}deg)`;
+
+// Le fluide penche pendant que son niveau glisse vers sa cible, et s'agite quand la jauge vibre (design system, Gauge).
+const useFluidMotion = (level: number, orientation: Orientation, shakeCount: number) => {
+  const fluid = useRef<HTMLSpanElement>(null);
+  const previousLevel = useRef(level);
+
+  useEffect(() => {
+    const element = fluid.current;
+    const direction = tiltDirection(previousLevel.current, level);
+    previousLevel.current = level;
+    if (!element || direction === 0) return;
+    const duration = motionMs(element, "--lp-dur");
+    if (duration === 0) return;
+    const leaning = skew(orientation, -direction * TILT_DEGREES);
+    element.animate(
+      [
+        { transform: skew(orientation, 0) },
+        { transform: leaning, offset: 0.35 },
+        { transform: skew(orientation, 0) },
+      ],
+      { duration, easing: motionEasing(element) },
+    );
+  }, [level, orientation]);
+
+  useEffect(() => {
+    const element = fluid.current;
+    if (!element || shakeCount === 0) return;
+    const duration = motionMs(element, "--lp-dur");
+    if (duration === 0) return;
+    element.animate(
+      SLOSH_DEGREES.map((degrees) => ({ transform: skew(orientation, degrees) })),
+      { duration: duration * SLOSH_STRETCH, easing: "ease-out" },
+    );
+  }, [shakeCount, orientation]);
+
+  return fluid;
+};
+
 const useShake = (shakeCount: number) => {
   const meter = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -64,6 +112,8 @@ export const Gauge = ({
   const ring = useRingAnimation(refill);
   const meter = useShake(shakeCount);
   const { count, remainingLevel, chargesLevel } = gaugeLevels(charges, max, draft);
+  const draftFluid = useFluidMotion(chargesLevel, orientation, shakeCount);
+  const chargeFluid = useFluidMotion(remainingLevel, orientation, shakeCount);
   const percent = (level: number): CssVariables => ({ "--lp-level": `${level * 100}%` });
   return (
     <span
@@ -102,8 +152,8 @@ export const Gauge = ({
         <b className="lp-type-numeric">{count}</b>
       </span>
       <span className="lp-fluid" aria-hidden="true">
-        <span className="lp-fluid-draft" style={percent(chargesLevel)} />
-        <span className="lp-fluid-charge" style={percent(remainingLevel)} />
+        <span ref={draftFluid} className="lp-fluid-draft" style={percent(chargesLevel)} />
+        <span ref={chargeFluid} className="lp-fluid-charge" style={percent(remainingLevel)} />
       </span>
     </span>
   );

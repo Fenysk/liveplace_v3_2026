@@ -20,3 +20,8 @@ export function gaugeLevels(charges: number, max: number, draft: number): GaugeL
 export function refillProgress(refill: GaugeRefill, nowMs: Timestamp): number {
   return clampShare(1 - (refill.endsAt - nowMs) / refill.durationMs);
 }
+
+// Le fluide s'incline pendant un changement de niveau (design system, Gauge) : dans le sens du mouvement.
+export function tiltDirection(previousLevel: number, nextLevel: number): -1 | 0 | 1 {
+  return Math.sign(nextLevel - previousLevel) as -1 | 0 | 1;
+}
