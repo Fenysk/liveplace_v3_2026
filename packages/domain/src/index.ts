@@ -5,8 +5,8 @@ export type Timestamp = number; // ms depuis epoch
 export const ROLES = ["owner", "moderator", "viewer", "guest"] as const;
 export type Role = (typeof ROLES)[number];
 
-// Cookie `lp_session` vérifié (§10.2).
-export type Session = { userId: string; login: string; displayName: string };
+// Cookie `lp_session` vérifié (§10.2). Écart §10.2 (JOURNAL 2026-09-24) : la photo Twitch, quand il y en a une.
+export type Session = { userId: string; login: string; displayName: string; avatarUrl?: string };
 
 // Une personne, miroir de son compte Twitch (§8.1). `userId` = Twitch ID, immuable.
 export type User = { userId: string; login: string; displayName: string; avatarUrl: string };
@@ -16,17 +16,19 @@ export const SESSION_COOKIE = "lp_session";
 export const SESSION_TTL_SECONDS = 30 * 24 * 3600;
 export const SESSION_ALGORITHM = "HS256";
 
-export type SessionClaims = { sub: string; login: string; displayName: string };
+export type SessionClaims = { sub: string; login: string; displayName: string; avatarUrl?: string };
 
 export function toSessionClaims(session: Session): SessionClaims {
-  return { sub: session.userId, login: session.login, displayName: session.displayName };
+  const { userId, login, displayName, avatarUrl } = session;
+  return { sub: userId, login, displayName, ...(avatarUrl ? { avatarUrl } : {}) };
 }
 
 // Un claim absent ou illisible donne un invité, jamais une erreur (§10.2).
+// Un cookie signé avant la photo n'en a pas : la session reste valide, sans elle.
 export function toSession(claims: Record<string, unknown>): Session | null {
-  const { sub, login, displayName } = claims;
+  const { sub, login, displayName, avatarUrl } = claims;
   if (typeof sub !== "string" || typeof login !== "string" || typeof displayName !== "string") return null;
-  return { userId: sub, login, displayName };
+  return { userId: sub, login, displayName, ...(typeof avatarUrl === "string" ? { avatarUrl } : {}) };
 }
 
 // §10.3

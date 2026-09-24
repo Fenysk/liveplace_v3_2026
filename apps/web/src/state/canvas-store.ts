@@ -29,6 +29,7 @@ export type CanvasView = {
   userId?: string; // absent pour un invité
   login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
+  avatarUrl?: string; // absente pour un invité, ou d'une session d'avant la photo (JOURNAL 2026-09-24)
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   lastError: ErrorCode | null;
@@ -128,7 +129,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
 
   const welcomeView = (frame: WelcomeFrame): Partial<CanvasView> => {
     const { width, height } = frame.canvas;
-    const { userId, login, displayName, role } = frame.you;
+    const { userId, login, displayName, avatarUrl, role } = frame.you;
     return {
       status: "live",
       width,
@@ -141,6 +142,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       ...(userId ? { userId } : {}),
       ...(login ? { login } : {}),
       ...(displayName ? { displayName } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
       pixels: new Uint8Array(width * height),
     };
   };

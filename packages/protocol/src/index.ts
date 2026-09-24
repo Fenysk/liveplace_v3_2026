@@ -195,6 +195,7 @@ const WelcomeFrameSchema = z.object({
     userId: UserIdSchema.optional(),
     login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
+    avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
     role: RoleSchema,
   }),
   gauge: GaugeSchema.optional(),

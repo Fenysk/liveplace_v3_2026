@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Écart §10.2 et §4.3 : la photo Twitch dans le cookie de session et dans `you`
+
+**Contexte.** Le design system montre sa propre photo dans la pill Compte. Le `you` du `welcome` vient du cookie de session (§10.2), qui ne porte que `sub`, `login` et `displayName`, figés à la connexion.
+**Décision.** `avatarUrl` devient un claim **optionnel** du cookie, signé au callback Twitch comme le nom, puis recopié par le gateway dans `you.avatarUrl`, champ optionnel du protocole : `PROTOCOL_VERSION` ne bouge pas. Un cookie signé avant reste valide, sans photo : elle apparaît à la prochaine connexion.
+**Renoncement.** Pas de lecture du miroir `user:` à chaque `hello` : une lecture Redis de plus par connexion, et deux sources pour une même identité (le nom dans le cookie, la photo dans Redis).
+
 ## 2026-09-24 — Le design system vit dans `ui/design/`, et `/design` passe avant le jeu
 
 **Contexte.** Le design system LivePlace arrive en maquette et en JavaScript de référence (`innerHTML`, `window.LivePlace`). Le web n'avait que des `style={{}}` et des couleurs en dur, et des pills qui lisent les stores : impossibles à montrer hors du jeu.

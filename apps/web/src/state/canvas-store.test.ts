@@ -73,6 +73,16 @@ describe("the gauge (§9.4)", () => {
     expect(store.getView()).toMatchObject({ login: "user1", displayName: "User 1" });
   });
 
+  // Garde la photo Twitch de la personne connectée, quand le gateway l'envoie (écart §4.3, JOURNAL 2026-09-24)
+  it("keeps the signed-in Twitch photo when the gateway sends it", () => {
+    const { store, receive } = setup();
+    const avatarUrl = "https://static-cdn.jtvnw.net/jtv_user_pictures/fenysk-profile_image-300x300.png";
+
+    receive({ ...welcome, you: { ...welcome.you, avatarUrl } } as ServerFrame);
+
+    expect(store.getView().avatarUrl).toBe(avatarUrl);
+  });
+
   // Prend la jauge de chaque ack et de chaque frame gauge
   it("takes the gauge from every ack and every gauge frame", () => {
     const { store, receive } = setup();
