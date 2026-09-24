@@ -70,6 +70,9 @@ export function createCanvasScene(
       image.repaint(view);
       isImageStale = false;
     }
+    // Le brouillon ne se voit qu'en Dessin, le viseur qu'en Vue (CDC 2026).
+    const draftView = draftStore.getView();
+    const isDrafting = draftView.mode === "draft";
     renderScene(context, {
       screen,
       pixelRatio,
@@ -78,8 +81,8 @@ export function createCanvasScene(
       image: image.source,
       checker,
       targetCell,
-      inspectedCell: draftStore.getView().mode === "view" ? view.inspection : null,
-      draft: [...draftStore.getView().draft.values()],
+      inspectedCell: isDrafting ? null : view.inspection,
+      draft: isDrafting ? [...draftView.draft.values()] : [],
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
     });
