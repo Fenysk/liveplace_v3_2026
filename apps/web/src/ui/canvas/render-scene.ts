@@ -1,6 +1,7 @@
-// Une image à l'écran (§9.3), dans l'ordre : le damier, les pixels, le brouillon, la grille, la bordure,
-// le contour du brouillon, la case visée, le viseur de la case inspectée. Le vide n'est pas ici : c'est une couche CSS
-// fixe sous le canvas (`.lp-void`), qui ne suit pas le viewport ; le canvas reste transparent autour de l'image.
+// Une image à l'écran (§9.3), dans l'ordre : les pixels, le brouillon, la grille, la bordure,
+// le contour du brouillon, la case visée, le viseur de la case inspectée. Le vide et le damier ne sont pas ici : ce sont
+// deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent pas le viewport. Le canvas reste
+// transparent autour de l'image, et sous ses pixels transparents.
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
@@ -12,8 +13,6 @@ export type SceneShades = {
   void: string; // le fond sous une case gommée du brouillon : pas de damier (CDC 2026)
   border: string;
   grid: string;
-  checkerA: string;
-  checkerB: string;
   outlineIn: string; // contour du brouillon, case visée, viseur : dedans
   outlineOut: string; // … et dehors
 };
@@ -24,7 +23,6 @@ export type Scene = {
   viewport: Viewport;
   canvas: Size;
   image: CanvasImageSource;
-  checker: CanvasPattern;
   shades: SceneShades;
   targetCell: Cell | null;
   inspectedCell: Cell | null;
@@ -36,7 +34,6 @@ export type Scene = {
 type Rect = { left: number; top: number; width: number; height: number };
 type CellRect = (x: number, y: number) => Rect;
 
-const CHECKER_DIVISOR = 48;
 const GRID_MIN_SCALE = 8;
 const DRAFT_ALPHA = 0.6;
 const ERASED_ALPHA = 0.35;
@@ -48,32 +45,6 @@ const RETICLE_CORNERS = [
   [1, 1],
   [-1, 1],
 ] as const;
-
-// Le damier du pixel transparent, accroché à l'écran : il ne suit ni le zoom ni le déplacement (CDC 2026).
-export function createChecker(
-  context: CanvasRenderingContext2D,
-  screen: Size,
-  pixelRatio: number,
-  shades: Pick<SceneShades, "checkerA" | "checkerB">,
-): CanvasPattern {
-  const square = Math.max(
-    2,
-    Math.round((Math.min(screen.width, screen.height) * pixelRatio) / CHECKER_DIVISOR),
-  );
-  const patternSource = document.createElement("canvas");
-  patternSource.width = square * 2;
-  patternSource.height = square * 2;
-  const patternContext = patternSource.getContext("2d");
-  if (!patternContext) throw new Error("render-scene : contexte 2d indisponible");
-  patternContext.fillStyle = shades.checkerA;
-  patternContext.fillRect(0, 0, square * 2, square * 2);
-  patternContext.fillStyle = shades.checkerB;
-  patternContext.fillRect(0, 0, square, square);
-  patternContext.fillRect(square, square, square, square);
-  const pattern = context.createPattern(patternSource, "repeat");
-  if (!pattern) throw new Error("render-scene : motif du damier indisponible");
-  return pattern;
-}
 
 // Les bords intérieurs des cases visibles, centrés sur un pixel physique pour un trait net.
 const innerEdges = (origin: number, cellSize: number, count: number, screenLength: number): number[] => {
@@ -252,8 +223,6 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
 
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, screenWidth, screenHeight);
-  context.fillStyle = scene.checker;
-  context.fillRect(canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height);
 
   // Remis à chaque image : redimensionner un <canvas> remet son contexte à zéro.
   context.imageSmoothingEnabled = false;
