@@ -31,6 +31,9 @@ const useWindowMotion = (isOpen: boolean) => {
     if (!element) return;
     if (isOpen) {
       if (!element.open) element.showModal();
+      // `showModal()` donne le focus au premier contrôle, la poignée sur mobile : Safari y dessine l'anneau après un
+      // toucher. La fenêtre le prend elle-même ; au clavier, Tab mène ensuite aux contrôles.
+      element.focus({ preventScroll: true });
       element.getBoundingClientRect();
       setIsShown(true);
       return;
@@ -60,6 +63,7 @@ export const Window = <Id extends string>({
     <dialog
       ref={dialog}
       className={classNames("lp-pill lp-window", isShown && "is-open")}
+      tabIndex={-1}
       aria-labelledby="lp-window-title"
       onCancel={(event) => {
         event.preventDefault();
