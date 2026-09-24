@@ -18,6 +18,7 @@ type PixelCanvasProps = { store: CanvasStore; draftStore: DraftStore; canvasId: 
 
 export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
+  const checker = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<CanvasScene>();
   const [framing, setFraming] = useState<Framing | null>(null);
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
@@ -26,12 +27,13 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
 
   // Le viewport sauvegardé se lit ici, jamais pendant le rendu : `localStorage` n'existe pas sur le serveur.
   useEffect(() => {
-    if (!surface.current) return;
+    if (!surface.current || !checker.current) return;
     const saver = createViewportSaver(getBrowserStorage, canvasId);
     const created = createCanvasScene(surface.current, store, draftStore, {
       initialViewport: getSavedViewport(getBrowserStorage, canvasId),
       onViewportMove: saver.save,
       onFraming: setFraming,
+      checker: checker.current,
     });
     setScene(created);
     return () => {
@@ -42,8 +44,9 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
 
   return (
     <>
-      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, puis le canvas. */}
+      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, le damier, découpé au canvas, puis le canvas. */}
       <div className="lp-void" aria-hidden="true" />
+      <div ref={checker} className="lp-checker" aria-hidden="true" />
       <canvas ref={surface} className="lp-canvas" />
       {scene && (
         <ViewportPill

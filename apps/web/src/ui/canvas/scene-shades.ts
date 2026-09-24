@@ -10,8 +10,6 @@ export function getSceneShades(root: Element): SceneShades {
     void: variable("--void"),
     border: variable("--canvas-border"),
     grid: variable("--canvas-grid"),
-    checkerA: variable("--checker-a"),
-    checkerB: variable("--checker-b"),
     outlineIn: variable("--draft-outline-in"),
     outlineOut: variable("--draft-outline-out"),
   };

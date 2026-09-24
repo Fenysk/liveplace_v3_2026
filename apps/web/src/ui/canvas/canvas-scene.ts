@@ -7,7 +7,7 @@ import type { DraftStore } from "../../state/draft-store";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
-import { createChecker, renderScene } from "./render-scene";
+import { renderScene } from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
@@ -28,11 +28,19 @@ export type CanvasScene = { zoomBy(factor: number): void; recenter(): void; disp
 
 // `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
 // `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
+// `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases.
 type SceneOptions = {
   initialViewport: Viewport | null;
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
+  checker: HTMLElement;
 };
+
+// Les cases du damier, en pixels CSS : leur taille suit l'écran, jamais le zoom (CDC 2026).
+const CHECKER_DIVISOR = 48;
+const CHECKER_MIN_TILE = 6;
+const checkerTile = (screen: Size): number =>
+  Math.max(CHECKER_MIN_TILE, Math.round(Math.min(screen.width, screen.height) / CHECKER_DIVISOR));
 
 const isSameFraming = (a: Framing | null, b: Framing) =>
   a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
@@ -64,7 +72,6 @@ export function createCanvasScene(
   let pixelRatio = 1;
   const root = document.documentElement;
   let shades = getSceneShades(root);
-  let checker: CanvasPattern | null = null;
   let viewport = options.initialViewport;
   let targetCell: Cell | null = null;
   let lastTracedCell: Cell | null = null;
@@ -87,13 +94,22 @@ export function createCanvasScene(
     options.onFraming(framing);
   };
 
+  // Le damier défile en CSS, accroché à l'écran : seul son cadre suit le canvas, sans jamais en dépasser.
+  const clipChecker = (current: Viewport, canvas: Size) => {
+    const right = screen.width - (current.offsetX + canvas.width * current.scale);
+    const bottom = screen.height - (current.offsetY + canvas.height * current.scale);
+    const inset = [current.offsetY, right, bottom, current.offsetX].map((side) => `${Math.max(0, side)}px`);
+    options.checker.style.setProperty("--lp-checker-clip", `inset(${inset.join(" ")})`);
+  };
+
   const render = () => {
     frameRequest = 0;
     const view = store.getView();
-    if (!checker || view.width === 0 || screen.width === 0) return;
+    if (view.width === 0 || screen.width === 0) return;
     const canvas = { width: view.width, height: view.height };
     viewport ??= fitViewport(screen, canvas);
     reportFraming(viewport, canvas);
+    clipChecker(viewport, canvas);
     if (isImageStale) {
       image.repaint(view);
       isImageStale = false;
@@ -107,7 +123,6 @@ export function createCanvasScene(
       viewport,
       canvas,
       image: image.source,
-      checker,
       shades,
       targetCell,
       inspectedCell: isDrafting ? null : view.inspection,
@@ -209,15 +224,14 @@ export function createCanvasScene(
     pixelRatio = window.devicePixelRatio;
     surface.width = Math.round(screen.width * pixelRatio);
     surface.height = Math.round(screen.height * pixelRatio);
-    checker = createChecker(context, screen, pixelRatio, shades);
+    options.checker.style.setProperty("--lp-checker-tile", `${checkerTile(screen)}px`);
     requestRender();
   });
   resizeObserver.observe(surface);
 
-  // Le thème change (bouton, Préférences, ou le système en auto) : nouvelles teintes, nouveau damier.
+  // Le thème change (bouton, Préférences, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
   const themeObserver = new MutationObserver(() => {
     shades = getSceneShades(root);
-    checker = createChecker(context, screen, pixelRatio, shades);
     requestRender();
   });
   themeObserver.observe(root, { attributes: true, attributeFilter: ["data-theme"] });

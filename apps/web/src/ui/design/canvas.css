@@ -9,6 +9,41 @@
     var(--void);
 }
 
+/* Le damier des pixels transparents (CDC 2026) : accroché à l'écran, il défile lentement en diagonale.
+   La scène le découpe au rectangle du canvas (--lp-checker-clip) et règle ses cases sur l'écran (--lp-checker-tile). */
+.lp-checker {
+  --lp-checker-tile: 16px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  clip-path: var(--lp-checker-clip, inset(100%));
+}
+
+/* Deux cases de marge en haut à gauche : le motif avance de deux cases par cycle, et boucle sans à-coup */
+.lp-checker::before {
+  content: "";
+  position: absolute;
+  inset: calc(-2 * var(--lp-checker-tile)) 0 0 calc(-2 * var(--lp-checker-tile));
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / calc(2 * var(--lp-checker-tile)) calc(2 * var(--lp-checker-tile));
+  animation: lp-checker-drift 20s linear infinite;
+  will-change: transform;
+}
+
+@keyframes lp-checker-drift {
+  to {
+    transform: translate(calc(2 * var(--lp-checker-tile)), calc(2 * var(--lp-checker-tile)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-checker::before {
+    animation: none;
+  }
+}
+
 /* Le canvas, deuxième couche (CDC 2026) : plein écran, sous les pills. La scène le peint avec les teintes des tokens. */
 
 .lp-canvas {
