@@ -388,6 +388,41 @@ describe("isModerator (§6.1)", () => {
   });
 });
 
+describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
+  const now = 1_700_000_000_000;
+
+  // Donne une jauge pleine à qui n'a jamais posé, sans l'écrire
+  it("gives a full gauge to someone who never placed, without writing it", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    const gauge = await core.getGauge(canvasId, "user-1", now);
+
+    expect(gauge).toEqual({ charges: meta.gaugeMax, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs });
+    expect(await redis.exists(buildCanvasKeys(canvasId).gauge("user-1"))).toBe(0);
+  });
+
+  // Applique la recharge de place.lua à la jauge stockée, sans jamais la réécrire
+  it("applies the place.lua refill to the stored gauge, without ever writing it back", async () => {
+    const canvasId = uniqueCanvasId();
+    const keys = buildCanvasKeys(canvasId);
+    await core.createCanvas(canvasId, meta);
+    const pixels = Array.from({ length: meta.gaugeMax }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
+    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels });
+    const later = now + meta.refillMs * 1.5;
+    const expected = refillGauge({ charges: 0, at: now }, later, meta);
+
+    const gauge = await core.getGauge(canvasId, "user-1", later);
+
+    expect(gauge).toEqual({
+      charges: expected.charges,
+      max: meta.gaugeMax,
+      nextRefillAt: expected.at + meta.refillMs,
+    });
+    expect(await redis.hgetall(keys.gauge("user-1"))).toEqual({ charges: "0", at: String(now) });
+  });
+});
+
 describe("getSnapshot (§6.1)", () => {
   const now = 1_700_000_000_000;
 

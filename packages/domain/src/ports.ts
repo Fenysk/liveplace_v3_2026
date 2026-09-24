@@ -27,6 +27,8 @@ export interface CanvasCore {
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
   isModerator(canvasId: string, userId: string): Promise<boolean>;
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
+  // Écart §5.6 (JOURNAL 2026-09-24) : lue sans être écrite, pour le `welcome`.
+  getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }

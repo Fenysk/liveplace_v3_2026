@@ -8,7 +8,7 @@ import {
   type Session,
   type Timestamp,
 } from "@liveplace/domain";
-import type { CanvasCore, ClientConnection, ClientSocket } from "@liveplace/domain/ports";
+import type { AckFrame, CanvasCore, ClientConnection, ClientSocket } from "@liveplace/domain/ports";
 import {
   type CellsFrame,
   type ClientFrame,
@@ -32,7 +32,7 @@ type State =
   | { status: "ready"; canvasId: string };
 
 export type ConnectionDeps = {
-  core: Pick<CanvasCore, "getCanvas" | "isModerator" | "getSnapshot" | "place">;
+  core: Pick<CanvasCore, "getCanvas" | "isModerator" | "getSnapshot" | "getGauge" | "place">;
   broadcast: Broadcast;
   now: () => Timestamp;
 };
@@ -59,6 +59,7 @@ const buildWelcome = (
   version: number,
   role: Role,
   session: Session | null,
+  gauge: AckFrame["gauge"] | null,
 ): WelcomeFrame => ({
   t: "welcome",
   canvas: { canvasId, width: meta.width, height: meta.height, ownerId: meta.ownerId },
@@ -73,6 +74,7 @@ const buildWelcome = (
   you: session
     ? { userId: session.userId, login: session.login, displayName: session.displayName, role }
     : { role },
+  ...(gauge ? { gauge } : {}),
 });
 
 export function createConnection(
@@ -105,6 +107,8 @@ export function createConnection(
     const meta = await deps.core.getCanvas(frame.canvasId);
     if (!meta) return refuse("canvas_not_found");
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
+    // Écart §5.6 (JOURNAL 2026-09-24) : la jauge dès l'arrivée. Un invité n'en a pas.
+    const gauge = session ? await deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null;
 
     // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1).
     state = { status: "joining", canvasId: frame.canvasId, pendingFrames: [] };
@@ -112,7 +116,14 @@ export function createConnection(
     const snapshot = await deps.core.getSnapshot(frame.canvasId);
 
     socket.sendFrame(
-      buildWelcome(frame.canvasId, meta, snapshot.version, roleFor(session, meta, isModerator), session),
+      buildWelcome(
+        frame.canvasId,
+        meta,
+        snapshot.version,
+        roleFor(session, meta, isModerator),
+        session,
+        gauge,
+      ),
     );
     socket.sendSnapshot(snapshot.state);
 

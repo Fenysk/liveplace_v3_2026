@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Écart §5.6 : `getGauge` sur le port `CanvasCore`, en lecture seule
+
+**Contexte.** Le `welcome` a un champ `gauge` (§4.3), mais le port du §5.6 n'a aucun moyen de lire une jauge : sans lui, la jauge reste inconnue jusqu'à la première pose.
+**Décision.** `getGauge(canvasId, userId, nowMs)` lit `meta` et `gauge:<userId>`, applique `refillGauge` de `domain` (la formule de `place.lua`) et n'écrit rien. Le gateway la joint au `welcome` d'un connecté ; un invité n'en reçoit pas.
+**Renoncement.** Pas d'écriture de la jauge recalculée : seul `place.lua` modifie une jauge, et le Lua ne bouge pas.
+
 ## 2026-09-24 — La palette suit l'ordre du CDC 2026, et cet ordre ne bouge plus
 
 **Contexte.** La palette provisoire du J4 prenait 16 couleurs du CDC 2026 dans un autre ordre. Un canvas stocke des index (`state`, `hist:`) : réordonner change la teinte de chaque case déjà posée.

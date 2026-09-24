@@ -1,7 +1,7 @@
 // Client typé du noyau Redis (§5.6).
 
 import { readFileSync } from "node:fs";
-import { type CanvasMeta, CELL_STRIDE, PALETTE } from "@liveplace/domain";
+import { type CanvasMeta, CELL_STRIDE, PALETTE, refillGauge, type Timestamp } from "@liveplace/domain";
 import type {
   AckFrame,
   CanvasCore,
@@ -116,6 +116,23 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       if (!Buffer.isBuffer(state) || typeof version !== "string")
         throw new Error(`getSnapshot ${canvasId} : état ou version illisible`);
       return { state, version: Number(version) };
+    },
+
+    // La formule de place.lua, sans jamais écrire : seul le script modifie une jauge.
+    async getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]> {
+      const keys = buildCanvasKeys(canvasId);
+      const [fields, [charges, at]] = await Promise.all([
+        redis.hgetall(keys.meta),
+        redis.hmget(keys.gauge(userId), "charges", "at"),
+      ]);
+      const params = {
+        gaugeMax: metaNumber(fields, "gaugeMax"),
+        refillMs: metaNumber(fields, "refillMs"),
+        refillCharges: metaNumber(fields, "refillCharges"),
+      };
+      const stored = charges && at ? { charges: Number(charges), at: Number(at) } : undefined;
+      const gauge = refillGauge(stored, nowMs, params);
+      return { charges: gauge.charges, max: params.gaugeMax, nextRefillAt: gauge.at + params.refillMs };
     },
 
     // L'ordre des arguments est celui que lit place.lua.

@@ -59,6 +59,9 @@ const setup = (options: SetupOptions = {}) => {
       options.duringSnapshot?.();
       return { state: new Uint8Array(meta.width * meta.height), version: options.version ?? 0 };
     },
+    async getGauge(_asked: string, _userId: string, nowMs: number) {
+      return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs };
+    },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
       return { ok: true as const, value: ack };
@@ -117,6 +120,28 @@ describe("createConnection (§6.1)", () => {
       you: { userId: session.userId, login: session.login, role: "viewer" },
     });
     expect(sent[1]).toEqual({ snapshot: new Uint8Array(meta.width * meta.height) });
+  });
+
+  // Joint au welcome d'un connecté sa jauge, lue à l'heure injectée (JOURNAL 2026-09-24)
+  it("joins the gauge, read at the injected clock, to a signed-in welcome", async () => {
+    const { connection, sent } = setup();
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({
+      t: "welcome",
+      gauge: { ...ack.gauge, nextRefillAt: now + meta.refillMs },
+    });
+  });
+
+  // N'envoie aucune jauge à un invité
+  it("sends no gauge to a guest", async () => {
+    const { connection, sent } = setup({ session: null });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({ t: "welcome", you: { role: "guest" } });
+    expect(sent[0]).not.toHaveProperty("gauge");
   });
 
   // Refuse une autre version de protocole, avec le bon code (§4.1)
