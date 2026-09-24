@@ -7,13 +7,6 @@
   height: 100%;
   display: block;
   touch-action: none;
-  cursor: grab;
-}
-
-.lp-canvas.is-drafting {
+  /* Toujours la croix, en Vue comme en Dessin, même pendant un déplacement : jamais la main */
   cursor: crosshair;
-}
-
-.lp-canvas.is-panning {
-  cursor: grabbing;
 }

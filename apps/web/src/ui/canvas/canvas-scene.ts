@@ -124,7 +124,6 @@ export function createCanvasScene(
 
   const setPanning = (isPanning: boolean) => {
     root.toggleAttribute(PANNING_ATTRIBUTE, isPanning);
-    surface.classList.toggle("is-panning", isPanning);
   };
 
   // Les pills reviennent quand le dernier doigt se lève : lever un doigt d'un pincement ne les montre pas encore.
@@ -236,7 +235,6 @@ export function createCanvasScene(
       if (isTracing) traceTo(targetCell);
       wasTracing = isTracing;
     }
-    surface.classList.toggle("is-drafting", mode === "draft");
     // En Dessin, un clic ne vise plus l'auteur d'une case : l'inspection se ferme.
     if (mode === "draft" && store.getView().inspection) store.closeInspection();
     requestRender();
