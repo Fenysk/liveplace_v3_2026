@@ -23,6 +23,11 @@
   display: flex;
 }
 
+/* La fenêtre reçoit le focus à l'ouverture : ce n'est pas un contrôle, aucun anneau (ses contrôles gardent le leur) */
+.lp-window:focus {
+  outline: none;
+}
+
 /* Posée juste après l'ouverture, retirée avant la fermeture : c'est elle qui anime (window.tsx) */
 .lp-window.is-open {
   opacity: 1;
