@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { classNames } from "./class-names";
+import { useMorph } from "./use-morph";
 
 // Le bord où la pill flotte : haut gauche, haut droite, centre droite, bas droite, bas centre.
 export type PillDock = "tl" | "tr" | "cr" | "br" | "bc";
@@ -27,8 +28,10 @@ const LAYOUT_CLASSES: Record<PillLayout, { pill?: string; content?: string }> = 
 };
 
 export const Pill = ({ dock, layout = "row", state, isVisible = true, children }: PillProps) => {
+  const morph = useMorph<HTMLDivElement, HTMLDivElement>();
   const pill = (
     <div
+      ref={morph.pill}
       className={classNames(
         "lp-pill",
         LAYOUT_CLASSES[layout].pill,
@@ -37,7 +40,11 @@ export const Pill = ({ dock, layout = "row", state, isVisible = true, children }
       )}
       inert={!isVisible}
     >
-      <div className={classNames("lp-pill-content", LAYOUT_CLASSES[layout].content)} inert={Boolean(state)}>
+      <div
+        ref={morph.content}
+        className={classNames("lp-pill-content", LAYOUT_CLASSES[layout].content)}
+        inert={Boolean(state)}
+      >
         {children}
       </div>
       {state?.kind === "reconnecting" && (

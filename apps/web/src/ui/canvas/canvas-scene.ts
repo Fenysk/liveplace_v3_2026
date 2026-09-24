@@ -127,6 +127,13 @@ export function createCanvasScene(
     surface.classList.toggle("is-panning", isPanning);
   };
 
+  // Les pills reviennent quand le dernier doigt se lève : lever un doigt d'un pincement ne les montre pas encore.
+  const pressedPointers = new Set<number>();
+  const liftPointer = (pointerId: number) => {
+    pressedPointers.delete(pointerId);
+    if (pressedPointers.size === 0) setPanning(false);
+  };
+
   const moveViewport = (next: Viewport) => {
     viewport = next;
     options.onViewportMove(next);
@@ -193,7 +200,6 @@ export function createCanvasScene(
 
   // Le relâcher qui vise une case est un clic ou un tap, pas un survol.
   const release = (gesture: Gesture) => {
-    setPanning(false);
     if (gesture.kind === "target" && viewport && store.getView().width > 0) tap(viewport, gesture.point);
     else apply(gesture);
   };
@@ -243,18 +249,24 @@ export function createCanvasScene(
     (event) => {
       // Le glissement continue même quand la souris sort de la fenêtre.
       surface.setPointerCapture(event.pointerId);
+      pressedPointers.add(event.pointerId);
       apply(tracker.press(toPointerInput(event)));
     },
     { signal },
   );
   surface.addEventListener("pointermove", (event) => apply(tracker.move(toPointerInput(event))), { signal });
-  surface.addEventListener("pointerup", (event) => release(tracker.release(toPointerInput(event))), {
-    signal,
-  });
+  surface.addEventListener(
+    "pointerup",
+    (event) => {
+      liftPointer(event.pointerId);
+      release(tracker.release(toPointerInput(event)));
+    },
+    { signal },
+  );
   surface.addEventListener(
     "pointercancel",
     (event) => {
-      setPanning(false);
+      liftPointer(event.pointerId);
       apply(tracker.cancel(event.pointerId));
     },
     { signal },

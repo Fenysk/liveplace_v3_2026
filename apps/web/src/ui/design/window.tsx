@@ -1,10 +1,12 @@
 // La fenêtre (CDC 2026) : un seul menu flottant, une barre latérale et un contenu, par-dessus toute l'interface.
-// Sur un `<dialog>` natif : l'arrière devient inerte, Échap ferme, le focus revient au bouton d'origine, `::backdrop` est le voile.
+// Sur un `<dialog>` natif : l'arrière devient inerte, le focus revient au bouton d'origine, `::backdrop` est le voile.
 
 import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button, blurAfterClick } from "./button";
+import { classNames } from "./class-names";
+import { motionMs } from "./motion";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
 
@@ -17,6 +19,29 @@ type WindowProps<Id extends string> = {
   children: ReactNode; // le contenu de la section ouverte
 };
 
+// Ouvrir : `showModal()`, l'état fermé calculé une fois, puis `is-open`, pour que la transition parte de lui.
+// Fermer : retirer `is-open`, laisser la transition finir, puis `close()`. Sans CSS `display` ni `overlay` animés :
+// tous les navigateurs ne les ont pas encore (la maquette fait de même).
+const useWindowMotion = (isOpen: boolean) => {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [isShown, setIsShown] = useState(false);
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (isOpen) {
+      if (!element.open) element.showModal();
+      element.getBoundingClientRect();
+      setIsShown(true);
+      return;
+    }
+    setIsShown(false);
+    if (!element.open) return;
+    const timer = setTimeout(() => element.close(), motionMs(element, "--lp-dur"));
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+  return { dialog, isShown };
+};
+
 export const Window = <Id extends string>({
   isOpen,
   sections,
@@ -25,19 +50,20 @@ export const Window = <Id extends string>({
   onClose,
   children,
 }: WindowProps<Id>) => {
-  const dialog = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const element = dialog.current;
-    if (!element) return;
-    if (isOpen && !element.open) element.showModal();
-    if (!isOpen && element.open) element.close();
-  }, [isOpen]);
-
+  const { dialog, isShown } = useWindowMotion(isOpen);
   const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
-  // Le voile ne ferme pas la fenêtre : seuls Échap et le bouton Fermer le font (le `<dialog>` émet alors `close`).
+  // Le voile ne ferme pas la fenêtre : seuls Échap et le bouton Fermer le font, en passant par l'animation.
   return (
-    <dialog ref={dialog} className="lp-pill lp-window" aria-labelledby="lp-window-title" onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className={classNames("lp-pill lp-window", isShown && "is-open")}
+      aria-labelledby="lp-window-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClose={onClose}
+    >
       <nav className="lp-window-nav" aria-label="Sections">
         <ul>
           {sections.map(({ id, label, icon: Icon }) => (

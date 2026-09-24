@@ -3,6 +3,7 @@
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Button } from "../design/button";
 import { ColorChip } from "../design/palette";
@@ -68,7 +69,25 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose }: InspectedCellPro
   );
 };
 
-// Pendant la requête, la pill reste masquée : elle apparaît avec sa réponse, sans « … » qui clignote.
+type ShownInspection = Exclude<Inspection, { status: "loading" }>;
+
+const toShown = (inspection: Inspection | null): ShownInspection | null =>
+  inspection && inspection.status !== "loading" ? inspection : null;
+
+// La pill garde la dernière case montrée : elle s'efface avec elle à la fermeture, et une autre case la remplace
+// par un morphing sans qu'elle disparaisse (maquette). À la première ouverture, elle attend la réponse, masquée.
+const useShownInspection = (inspection: Inspection | null) => {
+  const current = toShown(inspection);
+  const [lastShown, setLastShown] = useState<ShownInspection | null>(current);
+  const wasVisible = useRef(false);
+  const isVisible = inspection !== null && (current !== null || wasVisible.current);
+  useEffect(() => {
+    wasVisible.current = isVisible;
+    if (current) setLastShown(current);
+  }, [isVisible, current]);
+  return { shown: current ?? lastShown, isVisible };
+};
+
 export const InspectionPill = ({
   inspection,
   palette,
@@ -76,12 +95,11 @@ export const InspectionPill = ({
   onClose,
   isDocked = true,
 }: InspectionPillProps) => {
-  if (!inspection) return null;
+  const { shown, isVisible } = useShownInspection(inspection);
+  if (!inspection && !shown) return null;
   return (
-    <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={inspection.status !== "loading"}>
-      {inspection.status !== "loading" && (
-        <InspectedCell inspection={inspection} palette={palette} nowMs={nowMs} onClose={onClose} />
-      )}
+    <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={isVisible}>
+      {shown && <InspectedCell inspection={shown} palette={palette} nowMs={nowMs} onClose={onClose} />}
     </Pill>
   );
 };

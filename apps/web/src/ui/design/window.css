@@ -16,13 +16,15 @@
   transform: translateY(8px) scale(0.98);
   transition:
     opacity var(--lp-dur-fade) ease,
-    transform var(--lp-dur) var(--lp-ease),
-    overlay var(--lp-dur) allow-discrete,
-    display var(--lp-dur) allow-discrete;
+    transform var(--lp-dur) var(--lp-ease);
 }
 
 .lp-window[open] {
   display: flex;
+}
+
+/* Posée juste après l'ouverture, retirée avant la fermeture : c'est elle qui anime (window.tsx) */
+.lp-window.is-open {
   opacity: 1;
   transform: none;
 }
@@ -31,25 +33,11 @@
 .lp-window::backdrop {
   background: var(--scrim, rgba(16, 18, 28, 0.4));
   opacity: 0;
-  transition:
-    opacity var(--lp-dur-fade) ease,
-    overlay var(--lp-dur-fade) allow-discrete,
-    display var(--lp-dur-fade) allow-discrete;
+  transition: opacity var(--lp-dur-fade) ease;
 }
 
-.lp-window[open]::backdrop {
+.lp-window.is-open::backdrop {
   opacity: 1;
-}
-
-@starting-style {
-  .lp-window[open] {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-
-  .lp-window[open]::backdrop {
-    opacity: 0;
-  }
 }
 
 .lp-window-nav {
@@ -136,12 +124,6 @@
 
   .lp-window[open] {
     flex-direction: column;
-  }
-
-  @starting-style {
-    .lp-window[open] {
-      transform: translateY(100%);
-    }
   }
 
   .lp-window-nav {

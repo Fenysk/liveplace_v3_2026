@@ -23,7 +23,9 @@
     transform var(--lp-dur) var(--lp-ease);
 }
 
+/* Le contenu garde sa propre taille : c'est elle que la pill suit, et qu'elle anime (use-morph.ts) */
 .lp-pill-content {
+  width: max-content;
   box-sizing: border-box;
   padding: var(--space-2);
   display: flex;
