@@ -2,6 +2,7 @@
 
 @import "@fontsource-variable/nunito";
 @import "./tokens.css";
+@import "./canvas.css";
 @import "./pill.css";
 @import "./button.css";
 @import "./profile.css";

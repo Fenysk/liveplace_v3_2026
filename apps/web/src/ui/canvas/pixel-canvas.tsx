@@ -40,17 +40,7 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
 
   return (
     <>
-      <canvas
-        ref={surface}
-        style={{
-          position: "fixed",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          display: "block",
-          touchAction: "none",
-        }}
-      />
+      <canvas ref={surface} className="lp-canvas" />
       {scene && (
         <ViewportPill
           framing={framing}

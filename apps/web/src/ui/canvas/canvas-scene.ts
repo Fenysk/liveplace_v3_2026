@@ -8,6 +8,7 @@ import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
 import { createChecker, renderScene } from "./render-scene";
+import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
   type Framing,
@@ -37,6 +38,8 @@ const isSameFraming = (a: Framing | null, b: Framing) =>
   a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
 
 const MIDDLE_BUTTON = 1;
+// Pendant un glissement ou un pincement, les pills s'effacent en fondu (CDC 2026) : le CSS lit cet attribut.
+const PANNING_ATTRIBUTE = "data-panning";
 
 const toPointerInput = (event: PointerEvent): PointerInput => ({
   pointerId: event.pointerId,
@@ -59,6 +62,8 @@ export function createCanvasScene(
   const tracker = createGestureTracker({ isTouchTracing: () => draftStore.getView().isTouchTracing });
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
+  const root = document.documentElement;
+  let shades = getSceneShades(root);
   let checker: CanvasPattern | null = null;
   let viewport = options.initialViewport;
   let targetCell: Cell | null = null;
@@ -103,6 +108,7 @@ export function createCanvasScene(
       canvas,
       image: image.source,
       checker,
+      shades,
       targetCell,
       inspectedCell: isDrafting ? null : view.inspection,
       draft: isDrafting ? [...draftView.draft.values()] : [],
@@ -114,6 +120,11 @@ export function createCanvasScene(
   // Au plus un dessin par rafraîchissement de l'écran, et aucun si rien n'a bougé.
   const requestRender = () => {
     if (frameRequest === 0) frameRequest = requestAnimationFrame(render);
+  };
+
+  const setPanning = (isPanning: boolean) => {
+    root.toggleAttribute(PANNING_ATTRIBUTE, isPanning);
+    surface.classList.toggle("is-panning", isPanning);
   };
 
   const moveViewport = (next: Viewport) => {
@@ -163,12 +174,14 @@ export function createCanvasScene(
     if (!viewport || store.getView().width === 0) return;
     switch (gesture.kind) {
       case "pan":
+        setPanning(true);
         moveViewport(panBy(viewport, gesture.dx, gesture.dy));
         break;
       case "zoom":
         moveViewport(zoomAt(viewport, gesture.point, gesture.factor, zoomLimits(screen, canvasSize())));
         break;
       case "pinch": {
+        setPanning(true);
         const panned = panBy(viewport, gesture.dx, gesture.dy);
         moveViewport(zoomAt(panned, gesture.point, gesture.factor, zoomLimits(screen, canvasSize())));
         break;
@@ -180,6 +193,7 @@ export function createCanvasScene(
 
   // Le relâcher qui vise une case est un clic ou un tap, pas un survol.
   const release = (gesture: Gesture) => {
+    setPanning(false);
     if (gesture.kind === "target" && viewport && store.getView().width > 0) tap(viewport, gesture.point);
     else apply(gesture);
   };
@@ -190,10 +204,18 @@ export function createCanvasScene(
     pixelRatio = window.devicePixelRatio;
     surface.width = Math.round(screen.width * pixelRatio);
     surface.height = Math.round(screen.height * pixelRatio);
-    checker = createChecker(context, screen, pixelRatio);
+    checker = createChecker(context, screen, pixelRatio, shades);
     requestRender();
   });
   resizeObserver.observe(surface);
+
+  // Le thème change (bouton, Préférences, ou le système en auto) : nouvelles teintes, nouveau damier.
+  const themeObserver = new MutationObserver(() => {
+    shades = getSceneShades(root);
+    checker = createChecker(context, screen, pixelRatio, shades);
+    requestRender();
+  });
+  themeObserver.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
 
   const unsubscribe = store.subscribe(() => {
     isImageStale = true;
@@ -208,7 +230,7 @@ export function createCanvasScene(
       if (isTracing) traceTo(targetCell);
       wasTracing = isTracing;
     }
-    surface.style.cursor = mode === "draft" ? "crosshair" : "";
+    surface.classList.toggle("is-drafting", mode === "draft");
     // En Dessin, un clic ne vise plus l'auteur d'une case : l'inspection se ferme.
     if (mode === "draft" && store.getView().inspection) store.closeInspection();
     requestRender();
@@ -229,7 +251,14 @@ export function createCanvasScene(
   surface.addEventListener("pointerup", (event) => release(tracker.release(toPointerInput(event))), {
     signal,
   });
-  surface.addEventListener("pointercancel", (event) => apply(tracker.cancel(event.pointerId)), { signal });
+  surface.addEventListener(
+    "pointercancel",
+    (event) => {
+      setPanning(false);
+      apply(tracker.cancel(event.pointerId));
+    },
+    { signal },
+  );
   surface.addEventListener(
     "pointerleave",
     (event) => {
@@ -267,6 +296,8 @@ export function createCanvasScene(
     dispose() {
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
+      themeObserver.disconnect();
+      setPanning(false);
       unsubscribe();
       unsubscribeDraft();
       listening.abort();

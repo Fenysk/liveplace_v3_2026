@@ -1,9 +1,21 @@
-// Une image à l'écran (§9.3), dans l'ordre : le vide, le damier, les pixels, le brouillon, la grille, la bordure,
+// Une image à l'écran (§9.3), dans l'ordre : le vide et ses points, le damier, les pixels, le brouillon, la grille, la bordure,
 // le contour du brouillon, la case visée, le viseur de la case inspectée. Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "../../state/canvas-store";
 import type { Cell, Size, Viewport } from "./viewport";
+
+// Les teintes du canvas, lues dans les tokens du thème (tokens.css) : aucune n'est écrite ici.
+export type SceneShades = {
+  void: string;
+  voidDot: string;
+  border: string;
+  grid: string;
+  checkerA: string;
+  checkerB: string;
+  outlineIn: string; // contour du brouillon, case visée, viseur : dedans
+  outlineOut: string; // … et dehors
+};
 
 export type Scene = {
   screen: Size; // pixels CSS
@@ -12,6 +24,7 @@ export type Scene = {
   canvas: Size;
   image: CanvasImageSource;
   checker: CanvasPattern;
+  shades: SceneShades;
   targetCell: Cell | null;
   inspectedCell: Cell | null;
   draft: readonly Pixel[];
@@ -22,13 +35,12 @@ export type Scene = {
 type Rect = { left: number; top: number; width: number; height: number };
 type CellRect = (x: number, y: number) => Rect;
 
-// Aussi le fond de la page : avant la connexion, le vide est déjà là.
-export const VOID_COLOR = "#1b1d27";
-const CHECKER_SHADES = ["#d6d6dc", "#c2c2ca"] as const;
 const CHECKER_DIVISOR = 48;
 const GRID_MIN_SCALE = 8;
-const GRID_COLOR = "rgba(0, 0, 0, 0.18)";
-const BORDER_COLOR = "rgba(255, 255, 255, 0.55)";
+// Les points du vide suivent le viewport : un point toutes les 4 cases, pas doublé tant qu'ils sont trop serrés.
+const VOID_DOT_STEP = 4;
+const VOID_DOT_MIN_GAP = 22; // pixels CSS
+const VOID_DOT_SIZE = 2; // pixels CSS
 const DRAFT_ALPHA = 0.6;
 const ERASED_ALPHA = 0.35;
 const ERASER_CROSS_INSET = 0.2; // la croix de la gomme laisse un peu de marge dans la case
@@ -45,6 +57,7 @@ export function createChecker(
   context: CanvasRenderingContext2D,
   screen: Size,
   pixelRatio: number,
+  shades: Pick<SceneShades, "checkerA" | "checkerB">,
 ): CanvasPattern {
   const square = Math.max(
     2,
@@ -55,9 +68,9 @@ export function createChecker(
   patternSource.height = square * 2;
   const patternContext = patternSource.getContext("2d");
   if (!patternContext) throw new Error("render-scene : contexte 2d indisponible");
-  patternContext.fillStyle = CHECKER_SHADES[0];
+  patternContext.fillStyle = shades.checkerA;
   patternContext.fillRect(0, 0, square * 2, square * 2);
-  patternContext.fillStyle = CHECKER_SHADES[1];
+  patternContext.fillStyle = shades.checkerB;
   patternContext.fillRect(0, 0, square, square);
   patternContext.fillRect(square, square, square, square);
   const pattern = context.createPattern(patternSource, "repeat");
@@ -82,9 +95,14 @@ const strokeOutside = (context: CanvasRenderingContext2D, rect: Rect, lineWidth:
 };
 
 // La gomme : la couleur posée, pâlie, et une croix fine. Pas de damier (CDC 2026).
-const fillErased = (context: CanvasRenderingContext2D, rect: Rect, color: string | undefined) => {
+const fillErased = (
+  context: CanvasRenderingContext2D,
+  rect: Rect,
+  color: string | undefined,
+  shades: SceneShades,
+) => {
   context.globalAlpha = 1;
-  context.fillStyle = VOID_COLOR;
+  context.fillStyle = shades.void;
   context.fillRect(rect.left, rect.top, rect.width, rect.height);
   if (color) {
     context.globalAlpha = ERASED_ALPHA;
@@ -109,15 +127,15 @@ const fillDraft = (
   lineWidth: number,
 ) => {
   context.lineWidth = lineWidth;
-  context.strokeStyle = "#ffffff";
+  context.strokeStyle = scene.shades.outlineIn;
   for (const { x, y, colorIndex } of scene.draft) {
     const rect = cellRect(x, y);
     if (colorIndex === TRANSPARENT_COLOR_INDEX) {
-      fillErased(context, rect, scene.palette[scene.colorIndexAt(x, y)]);
+      fillErased(context, rect, scene.palette[scene.colorIndexAt(x, y)], scene.shades);
       continue;
     }
     context.globalAlpha = DRAFT_ALPHA;
-    context.fillStyle = scene.palette[colorIndex] ?? VOID_COLOR;
+    context.fillStyle = scene.palette[colorIndex] ?? scene.shades.void;
     context.fillRect(rect.left, rect.top, rect.width, rect.height);
   }
   context.globalAlpha = 1;
@@ -155,7 +173,7 @@ const edgeLine = (
 // Un trait sur chaque arête qui borde une case hors du brouillon : noir dehors, puis blanc dedans (CDC 2026).
 const strokeDraftOutline = (
   context: CanvasRenderingContext2D,
-  draft: readonly Pixel[],
+  { draft, shades }: Pick<Scene, "draft" | "shades">,
   cellRect: CellRect,
   lineWidth: number,
 ) => {
@@ -167,8 +185,8 @@ const strokeDraftOutline = (
     })),
   );
   for (const [color, direction] of [
-    ["#000000", -1],
-    ["#ffffff", 1],
+    [shades.outlineOut, -1],
+    [shades.outlineIn, 1],
   ] as const) {
     const offset = (direction * lineWidth) / 2;
     const reach = direction < 0 ? lineWidth : 0; // le trait du dehors déborde pour fermer les coins
@@ -188,7 +206,7 @@ const strokeDraftOutline = (
 const strokeReticle = (
   context: CanvasRenderingContext2D,
   rect: Rect,
-  pixelRatio: number,
+  { pixelRatio, shades }: Pick<Scene, "pixelRatio" | "shades">,
   lineWidth: number,
 ) => {
   const half = Math.max(rect.width, RETICLE_MIN_SIZE * pixelRatio) / 2 + lineWidth * 2;
@@ -205,14 +223,33 @@ const strokeReticle = (
   }
   context.lineCap = "square";
   for (const [color, width] of [
-    ["#000000", lineWidth * 3],
-    ["#ffffff", lineWidth],
+    [shades.outlineOut, lineWidth * 3],
+    [shades.outlineIn, lineWidth],
   ] as const) {
     context.lineWidth = width;
     context.strokeStyle = color;
     context.stroke();
   }
   context.lineCap = "butt";
+};
+
+// Les points du vide (CDC 2026, Rendu) : ils suivent le viewport, et rendent visibles le déplacement et le zoom.
+const fillVoidDots = (context: CanvasRenderingContext2D, { viewport, screen, pixelRatio, shades }: Scene) => {
+  let step = VOID_DOT_STEP;
+  while (step * viewport.scale < VOID_DOT_MIN_GAP) step *= 2;
+  const gap = step * viewport.scale;
+  const size = VOID_DOT_SIZE * pixelRatio;
+  const firstX = viewport.offsetX - Math.ceil(viewport.offsetX / gap) * gap;
+  const firstY = viewport.offsetY - Math.ceil(viewport.offsetY / gap) * gap;
+  context.fillStyle = shades.voidDot;
+  for (let y = firstY; y < screen.height; y += gap)
+    for (let x = firstX; x < screen.width; x += gap)
+      context.fillRect(
+        Math.round(x * pixelRatio - size / 2),
+        Math.round(y * pixelRatio - size / 2),
+        size,
+        size,
+      );
 };
 
 export function renderScene(context: CanvasRenderingContext2D, scene: Scene): void {
@@ -236,8 +273,9 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   const lineWidth = Math.max(1, Math.round(pixelRatio));
 
   context.setTransform(1, 0, 0, 1, 0, 0);
-  context.fillStyle = VOID_COLOR;
+  context.fillStyle = scene.shades.void;
   context.fillRect(0, 0, screenWidth, screenHeight);
+  fillVoidDots(context, scene);
   context.fillStyle = scene.checker;
   context.fillRect(canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height);
 
@@ -262,23 +300,23 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
       context.lineTo(right, y);
     }
     context.lineWidth = 1;
-    context.strokeStyle = GRID_COLOR;
+    context.strokeStyle = scene.shades.grid;
     context.stroke();
   }
 
-  context.strokeStyle = BORDER_COLOR;
+  context.strokeStyle = scene.shades.border;
   strokeOutside(context, canvasRect, lineWidth, 0);
-  strokeDraftOutline(context, scene.draft, oneCellRect, lineWidth);
+  strokeDraftOutline(context, scene, oneCellRect, lineWidth);
 
   if (scene.targetCell) {
     // Blanc contre la case, noir autour : visible sur toutes les couleurs, à tous les zooms.
     const target = cellRect(scene.targetCell.x, scene.targetCell.y, 1, 1);
-    context.strokeStyle = "#ffffff";
+    context.strokeStyle = scene.shades.outlineIn;
     strokeOutside(context, target, lineWidth, 0);
-    context.strokeStyle = "#000000";
+    context.strokeStyle = scene.shades.outlineOut;
     strokeOutside(context, target, lineWidth, 1);
   }
 
   if (scene.inspectedCell)
-    strokeReticle(context, oneCellRect(scene.inspectedCell.x, scene.inspectedCell.y), pixelRatio, lineWidth);
+    strokeReticle(context, oneCellRect(scene.inspectedCell.x, scene.inspectedCell.y), scene, lineWidth);
 }

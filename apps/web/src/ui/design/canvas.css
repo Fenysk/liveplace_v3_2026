@@ -1,0 +1,19 @@
+/* Le canvas, deuxième couche (CDC 2026) : plein écran, sous les pills. La scène le peint avec les teintes des tokens. */
+
+.lp-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.lp-canvas.is-drafting {
+  cursor: crosshair;
+}
+
+.lp-canvas.is-panning {
+  cursor: grabbing;
+}
