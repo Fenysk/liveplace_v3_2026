@@ -10,7 +10,9 @@
   width: max-content;
   max-width: calc(100vw - 2 * var(--space-4));
   overflow: hidden;
-  background: var(--pill-surface);
+  background: color-mix(in srgb, var(--pill-surface) var(--pill-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--pill-blur));
+  backdrop-filter: blur(var(--pill-blur));
   color: var(--ink);
   border-radius: var(--lp-radius-box);
   /* Le contour hors du flux : la hauteur reste contrôle + 2 × marge */

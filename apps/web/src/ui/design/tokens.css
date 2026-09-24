@@ -69,6 +69,10 @@
   --control-size-touch: 44px;
   --font-sans: "Nunito Variable", system-ui, sans-serif;
 
+  /* Les pills laissent deviner ce qui passe derrière elles : très légèrement transparentes, et floutées */
+  --pill-opacity: 92%;
+  --pill-blur: 16px;
+
   /* Les couleurs de marque de Twitch, les mêmes dans les deux thèmes : Se connecter seulement */
   --twitch: #9146ff;
   --twitch-hover: #772ce8;
