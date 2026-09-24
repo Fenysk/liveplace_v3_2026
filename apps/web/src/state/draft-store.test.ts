@@ -247,6 +247,18 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
     await store.submit();
 
     expect(cells()).toEqual([{ x: 1, y: 0, colorIndex: store.getView().colorIndex }]);
+    expect(store.getView().mode).toBe("draft");
+  });
+
+  // Revient en Vue tout seul quand tout le brouillon est posé
+  it("goes back to view mode on its own once the whole draft is placed", async () => {
+    const { store, cells } = setup();
+    fill(store, 3);
+
+    await store.submit();
+
+    expect(cells()).toEqual([]);
+    expect(store.getView().mode).toBe("view");
   });
 
   // S'arrête quand la connexion tombe, et garde tout ce qui n'est pas confirmé
@@ -283,9 +295,10 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
     expect(store.getView().isSending).toBe(true);
     store.toggleCell(9, 3);
     store.exitDraftMode();
+    expect(store.getView().mode).toBe("draft");
     await sending;
 
-    expect(store.getView().mode).toBe("draft");
+    expect(store.getView().isSending).toBe(false);
     expect(cells()).toEqual([]);
   });
 });

@@ -102,28 +102,37 @@ export function createDraftStore(
   // Le brouillon ne bouge qu'en Dessin, et jamais pendant l'envoi.
   const isEditable = () => view.mode === "draft" && !view.isSending;
 
+  const leaveDraftMode = (): void => publish({ mode: "view", isTracing: false, isTouchTracing: false });
+
   const applyEdit = (edit: DraftEdit, canShake: boolean): void => {
     setDraft(edit.draft);
     if (edit.isCapped && canShake) publish({ shakeCount: view.shakeCount + 1 });
+  };
+
+  // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde.
+  const sendBatches = async (): Promise<void> => {
+    let lastSentAt = Number.NEGATIVE_INFINITY;
+    for (const batch of toBatches(view.draft)) {
+      const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
+      if (delay > 0) await clock.wait(delay);
+      lastSentAt = clock.now();
+      const result = await canvas.placeBatch(batch);
+      // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
+      if (!result.ok) return;
+      setDraft(settleBatch(view.draft, batch, result.value));
+    }
   };
 
   const submit = async (): Promise<void> => {
     if (view.isSending || view.draft.size === 0 || canvas.getView().status !== "live") return;
     publish({ isSending: true });
     try {
-      let lastSentAt = Number.NEGATIVE_INFINITY;
-      for (const batch of toBatches(view.draft)) {
-        const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
-        if (delay > 0) await clock.wait(delay);
-        lastSentAt = clock.now();
-        const result = await canvas.placeBatch(batch);
-        // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
-        if (!result.ok) break;
-        setDraft(settleBatch(view.draft, batch, result.value));
-      }
+      await sendBatches();
     } finally {
       publish({ isSending: false });
     }
+    // Tout est posé : retour en Vue (CDC 2026). Des refus restent, ils restent visibles en Dessin.
+    if (view.draft.size === 0) leaveDraftMode();
   };
 
   return {
@@ -136,7 +145,7 @@ export function createDraftStore(
       if (canvas.getView().userId && !view.isSending) publish({ mode: "draft" });
     },
     exitDraftMode() {
-      if (!view.isSending) publish({ mode: "view", isTracing: false, isTouchTracing: false });
+      if (!view.isSending) leaveDraftMode();
     },
     discardDraft() {
       if (isEditable()) setDraft(EMPTY_DRAFT);

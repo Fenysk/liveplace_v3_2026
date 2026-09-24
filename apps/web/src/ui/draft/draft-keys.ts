@@ -26,6 +26,7 @@ const KEYS_BY_MODE = { view: VIEW_KEYS, draft: DRAFT_KEYS, inspecting: INSPECTIN
 // Ctrl, Alt ou Cmd : la touche appartient au navigateur (Ctrl+E, Ctrl+D…).
 export function keyCommand(press: KeyPress, mode: KeyMode): DraftKeyCommand | null {
   if (press.hasModifier) return null;
-  if (press.code === "Space") return mode === "draft" ? "startTrace" : null;
+  // Espace entre en Dessin comme Entrée, puis trace : elle ne valide jamais.
+  if (press.code === "Space") return mode === "draft" ? "startTrace" : "enterDraftMode";
   return KEYS_BY_MODE[mode][press.key.toLowerCase()] ?? null;
 }

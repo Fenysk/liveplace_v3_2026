@@ -4,11 +4,13 @@ import { type KeyPress, keyCommand } from "./draft-keys";
 const press = (key: string, code: string, hasModifier = false): KeyPress => ({ key, code, hasModifier });
 
 describe("keyCommand (CDC 2026, raccourcis)", () => {
-  // Entre en Dessin par D ou Entrée, en minuscule comme en majuscule
-  it("enters draft mode with D or Enter, lowercase or uppercase", () => {
+  // Entre en Dessin par D, Entrée ou Espace, en minuscule comme en majuscule
+  it("enters draft mode with D, Enter or Space, lowercase or uppercase", () => {
     expect(keyCommand(press("d", "KeyD"), "view")).toBe("enterDraftMode");
     expect(keyCommand(press("D", "KeyD"), "view")).toBe("enterDraftMode");
     expect(keyCommand(press("Enter", "Enter"), "view")).toBe("enterDraftMode");
+    expect(keyCommand(press(" ", "Space"), "view")).toBe("enterDraftMode");
+    expect(keyCommand(press(" ", "Space"), "inspecting")).toBe("enterDraftMode");
   });
 
   // En Dessin, Entrée valide, Échap sort, E bascule la gomme, Espace trace
@@ -25,10 +27,10 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("q", "KeyD"), "view")).toBeNull();
   });
 
-  // Ne fait rien des touches du Dessin en Vue, ni de D en Dessin
-  it("does nothing with draft keys in view mode, nor with D in draft mode", () => {
+  // Ne fait rien des touches du Dessin en Vue, ni de D en Dessin, et Espace ne valide jamais
+  it("does nothing with draft keys in view mode, nor with D in draft mode, and Space never submits", () => {
     expect(keyCommand(press("e", "KeyE"), "view")).toBeNull();
-    expect(keyCommand(press(" ", "Space"), "view")).toBeNull();
+    expect(keyCommand(press(" ", "Space"), "draft")).not.toBe("submit");
     expect(keyCommand(press("Escape", "Escape"), "view")).toBeNull();
     expect(keyCommand(press("d", "KeyD"), "draft")).toBeNull();
   });
@@ -38,7 +40,7 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("Escape", "Escape"), "inspecting")).toBe("closeInspection");
     expect(keyCommand(press("d", "KeyD"), "inspecting")).toBe("enterDraftMode");
     expect(keyCommand(press("Enter", "Enter"), "inspecting")).toBe("enterDraftMode");
-    expect(keyCommand(press(" ", "Space"), "inspecting")).toBeNull();
+    expect(keyCommand(press("e", "KeyE"), "inspecting")).toBeNull();
   });
 
   // Laisse au navigateur les touches tenues avec Ctrl, Alt ou Cmd
