@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-24 — Écart §9.3 : le brouillon remplace le rectangle de la multi-sélection
+
+**Contexte.** Le §9.3 choisit plusieurs cases par un rectangle glissé. Le CDC 2026 le remplace par le brouillon : un clic ou un tap par case, et le tracé à l'Espace ou au Toggle tracé, jusqu'à Valider.
+**Décision.** Le brouillon vit dans `state/draft.ts` (règles pures) et `state/draft-store.ts`, séparé du store du canvas, que la vue OBS partagera. Valider découpe en lots de 64, un lot à la fois après l'ack du précédent, et jamais plus de 8 par seconde (§6.3). Il est sauvegardé par canvas et par utilisateur.
+**Renoncement.** Aucun rectangle, même en raccourci : le glisser déplace toujours le viewport, en Dessin comme en Vue (CDC 2026).
+
 ## 2026-09-24 — Écart §5.6 : `getGauge` sur le port `CanvasCore`, en lecture seule
 
 **Contexte.** Le `welcome` a un champ `gauge` (§4.3), mais le port du §5.6 n'a aucun moyen de lire une jauge : sans lui, la jauge reste inconnue jusqu'à la première pose.
