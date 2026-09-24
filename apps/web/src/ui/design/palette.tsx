@@ -78,3 +78,28 @@ export const CurrentColorButton = ({ color, isExpanded, onPress }: CurrentColorB
     </button>
   );
 };
+
+// Sur mobile, les couleurs récentes, à côté de la couleur actuelle : à portée de pouce, dans un ordre stable.
+type RecentSwatchesProps = {
+  palette: readonly string[];
+  recentColorIndexes: readonly number[];
+  colorIndex: number;
+  onPick: (colorIndex: number) => void;
+};
+
+export const RecentSwatches = ({ palette, recentColorIndexes, colorIndex, onPick }: RecentSwatchesProps) => (
+  <>
+    {recentColorIndexes.map((index) => (
+      <button
+        key={index}
+        type="button"
+        className="lp-swatch lp-swatch--touch"
+        style={{ background: palette[index] }}
+        title={palette[index]}
+        aria-label={`Couleur ${palette[index]}`}
+        aria-pressed={colorIndex === index}
+        onClick={blurAfterClick(() => onPick(index))}
+      />
+    ))}
+  </>
+);

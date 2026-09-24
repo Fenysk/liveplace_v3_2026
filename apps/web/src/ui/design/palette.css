@@ -64,7 +64,8 @@
   padding: var(--space-1) 0;
 }
 
-.lp-palette--touch .lp-swatch {
+.lp-palette--touch .lp-swatch,
+.lp-swatch--touch {
   width: var(--control-size);
   height: var(--control-size);
   border-radius: var(--radius-pill);
