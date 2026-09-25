@@ -13,6 +13,18 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-25 — Une pose non confirmée attend la reprise : un test du J10 change d'attente
+
+**Contexte.** Sans reconnexion, une coupure échouait les lots en attente (« closed ») et rendait leurs couleurs : c'est ce que vérifie le test du J10 « resolves as closed when the connection drops ». Le CDC 2026 (Envoi) veut que le `requestId` empêche toute double pose au renvoi, et le plan du J10 remettait ce renvoi à la reconnexion.
+**Décision.** Une coupure laisse les lots en attente, couleurs comprises. Au `welcome` suivant, ceux partis il y a moins de 100 s repartent avec leur `requestId` (l'`ack` reste gardé 120 s par `place.lua`), les autres échouent en « closed ». Le test du J10 attend désormais le renvoi, avec une assertion de plus.
+**Renoncement.** Pas de « closed » à la coupure suivi d'une nouvelle validation : un lot posé dont l'`ack` s'est perdu serait posé deux fois, et coûterait deux charges.
+
+## 2026-09-25 — Écart §4.5 : une reprise refusée pour `protocol_version` recharge la page
+
+**Contexte.** Avec la reconnexion, une page survit aux redéploiements. Si l'un d'eux change `PROTOCOL_VERSION`, la page reprend avec l'ancien code et le gateway la refuse : une source OBS resterait figée jusqu'à ce que quelqu'un la rafraîchisse, en plein stream.
+**Décision.** Une page qui a déjà reçu un `welcome` et qui se voit refuser une reprise pour `protocol_version` se recharge une fois, pour prendre le nouveau code. Au tout premier `hello`, pas de rechargement : la page est déjà la dernière, recharger bouclerait.
+**Renoncement.** Pas de négociation de version (§4.1) ni de vieux protocole gardé côté gateway.
+
 ## 2026-09-25 — Écart CDC v3 §1, plan §9.5 et §15 : le délai OBS se règle, à chaud
 
 **Contexte.** Le CDC v3 §1 fixe le délai tampon « sans aucune interface pour le modifier », et le plan remet le changement à chaud à plus tard (§15). L'humain veut le régler dans la section Vue OBS, de 0 à 10 min, 10 s par défaut, et que les sources ouvertes le prennent aussitôt.

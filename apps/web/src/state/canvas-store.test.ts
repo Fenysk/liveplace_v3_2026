@@ -1,8 +1,8 @@
 import { PALETTE, toStateOffset } from "@liveplace/domain";
 import type { AckFrame, Transport, TransportListeners } from "@liveplace/domain/ports";
-import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
+import { type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
-import { createCanvasStore } from "./canvas-store";
+import { type Arrival, type CanvasStoreOptions, createCanvasStore } from "./canvas-store";
 
 const width = 4;
 const now = 1_700_000_000_000;
@@ -20,9 +20,13 @@ const welcome: ServerFrame = {
 
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 
-const setup = () => {
+// `isWelcomed` à faux : la page vient de s'ouvrir, le gateway n'a pas encore répondu.
+type SetupOptions = { storeOptions?: Partial<CanvasStoreOptions>; isWelcomed?: boolean };
+
+const setup = ({ storeOptions = {}, isWelcomed = true }: SetupOptions = {}) => {
   const sent: ClientFrame[] = [];
   const listening: { listeners?: TransportListeners } = {};
+  const transportState = { isClosed: false };
   const transport: Transport = {
     send: (frame) => {
       sent.push(frame);
@@ -30,11 +34,23 @@ const setup = () => {
     listen: (listeners) => {
       listening.listeners = listeners;
     },
-    close: () => undefined,
+    close: () => {
+      transportState.isClosed = true;
+    },
   };
-  const store = createCanvasStore("canvas-1", transport);
+  const clock = { nowMs: now };
+  const reloads: string[] = [];
+  const store = createCanvasStore("canvas-1", transport, {
+    mode: "ui",
+    now: () => clock.nowMs,
+    reload: () => reloads.push("reload"),
+    ...storeOptions,
+  });
   const receive = (frame: ServerFrame) => listening.listeners?.onFrame(frame);
-  receive(welcome);
+  const open = () => listening.listeners?.onOpen();
+  const snapshot = (state: Uint8Array) => listening.listeners?.onSnapshot(state);
+  open();
+  if (isWelcomed) receive(welcome);
   const lastPlace = (): PlaceFrame => {
     const frame = sent.at(-1);
     if (frame?.t !== "place") throw new Error("aucune frame place envoyée");
@@ -49,7 +65,20 @@ const setup = () => {
   });
   const pixelAt = (x: number, y: number) => store.getView().pixels[toStateOffset(x, y, width)];
   const close = () => listening.listeners?.onClose(1006);
-  return { store, sent, receive, lastPlace, ackOf, pixelAt, close };
+  return {
+    store,
+    sent,
+    receive,
+    lastPlace,
+    ackOf,
+    pixelAt,
+    close,
+    open,
+    snapshot,
+    clock,
+    reloads,
+    transportState,
+  };
 };
 
 const cellsFrame = (x: number, y: number, colorIndex: number): ServerFrame => ({
@@ -191,16 +220,23 @@ describe("placeBatch (§9.2, §9.3)", () => {
     expect(pixelAt(1, 2)).toBe(0);
   });
 
-  // Se résout en « fermé » quand la connexion tombe pendant l'envoi, et rend les couleurs d'avant
-  it("resolves as closed when the connection drops while sending, and restores the colors", async () => {
-    const { store, close, pixelAt } = setup();
+  // Garde un lot parti avant une coupure, couleurs comprises, et le renvoie avec son requestId au welcome suivant
+  // (CDC 2026, Envoi ; ce test attendait « closed » avant la reconnexion, JOURNAL 2026-09-25)
+  it("keeps a batch sent before a drop, colors included, and sends it again with its requestId after the welcome", async () => {
+    const { store, close, open, receive, lastPlace, ackOf, pixelAt } = setup();
 
     const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const first = lastPlace();
     close();
 
-    expect(await placing).toEqual({ ok: false, error: "closed" });
-    expect(pixelAt(1, 2)).toBe(0);
-    expect(store.getView().status).toBe("closed");
+    expect(pixelAt(1, 2)).toBe(5);
+    expect(store.getView().status).toBe("reconnecting");
+    open();
+    receive(welcome);
+    expect(lastPlace()).toEqual(first);
+    const ack = ackOf(first);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
   });
 });
 
@@ -333,5 +369,109 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
     expect(store.getView().isBanned).toBe(true);
     receive({ t: "unbanned" });
     expect(store.getView().isBanned).toBe(false);
+  });
+});
+
+describe("the reconnection (§4.5, JOURNAL 2026-09-25)", () => {
+  // Dit bonjour à chaque ouverture, avec son mode, et avec sa dernière version une fois accueilli
+  it("says hello on every opening, with its mode, and with its last version once welcomed", () => {
+    const { sent, receive, close, open } = setup({ storeOptions: { mode: "obs" } });
+    const hello = { t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId: "canvas-1", mode: "obs" };
+
+    expect(sent[0]).toEqual(hello);
+    receive(cellsFrame(1, 1, 3));
+    close();
+    open();
+    expect(sent.at(-1)).toEqual({ ...hello, lastVersion: 8 });
+  });
+
+  // Montre la reprise, garde ses pixels à travers un resync, et revient en direct au welcome
+  it("shows the reconnection, keeps its pixels through a resync, and is live again at the welcome", () => {
+    const { store, receive, close, open, pixelAt } = setup();
+    receive(cellsFrame(1, 2, 4));
+
+    close();
+    expect(store.getView().status).toBe("reconnecting");
+    open();
+    receive({ ...welcome, version: 8 });
+
+    expect(pixelAt(1, 2)).toBe(4);
+    expect(store.getView()).toMatchObject({ status: "live", version: 8 });
+  });
+
+  // Échoue un lot parti plus de 100 s avant le welcome, sans le renvoyer : son ack n'est plus gardé
+  it("fails a batch sent more than 100 s before the welcome, without sending it again", async () => {
+    const { store, sent, close, open, receive, clock, pixelAt } = setup();
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    close();
+    clock.nowMs += 101_000;
+    open();
+    receive(welcome);
+
+    expect(await placing).toEqual({ ok: false, error: "closed" });
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(sent.filter((frame) => frame.t === "place")).toHaveLength(1);
+  });
+
+  // Recharge la page quand une reprise est refusée pour la version du protocole
+  it("reloads the page when a reconnection is refused for the protocol version", () => {
+    const { receive, close, open, reloads } = setup();
+
+    close();
+    open();
+    receive({ t: "error", code: "protocol_version" });
+
+    expect(reloads).toEqual(["reload"]);
+  });
+
+  // Abandonne sans recharger sur un refus de version au tout premier hello : la page est déjà la dernière
+  it("gives up without reloading on a protocol version refusal at the very first hello", () => {
+    const { store, receive, reloads, transportState } = setup({ isWelcomed: false });
+
+    receive({ t: "error", code: "protocol_version" });
+
+    expect(reloads).toEqual([]);
+    expect(store.getView().status).toBe("closed");
+    expect(transportState.isClosed).toBe(true);
+  });
+});
+
+describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
+  // Prend un nouveau délai OBS, et envoie celui que le streamer choisit
+  it("takes a new OBS delay, and sends the one the owner picks", () => {
+    const { store, sent, receive } = setup();
+
+    receive({ t: "obsDelay", obsDelayMs: 60_000 });
+    store.setObsDelay(300_000);
+
+    expect(store.getView().params?.obsDelayMs).toBe(60_000);
+    expect(sent.at(-1)).toEqual({ t: "setObsDelay", requestId: expect.any(String), obsDelayMs: 300_000 });
+  });
+
+  // Transmet chaque arrivée à ses écouteurs : le snapshot avec son recent, puis les cases
+  it("hands every arrival to its listeners: the snapshot with its recent, then the cells", () => {
+    const { store, receive, snapshot } = setup({ isWelcomed: false });
+    const arrivals: Arrival[] = [];
+    store.listenArrivals((arrival) => arrivals.push(arrival));
+    const recent = { toVersion: 7, cells: [] };
+    const state = new Uint8Array(width * 4).fill(2);
+
+    receive({ ...welcome, recent });
+    snapshot(state);
+    receive(cellsFrame(1, 2, 4));
+
+    expect(arrivals).toEqual([
+      { kind: "snapshot", pixels: state, recent },
+      {
+        kind: "cells",
+        frame: {
+          toVersion: 8,
+          cells: [
+            { x: 1, y: 2, colorIndex: 4, previousColorIndex: 0, placedAt: now, version: 8, kind: "place" },
+          ],
+        },
+      },
+    ]);
   });
 });

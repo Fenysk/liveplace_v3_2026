@@ -14,7 +14,8 @@ import { SignInButton } from "../design/twitch";
 
 export type DraftPillState =
   | { kind: "connecting" }
-  | { kind: "closed" } // la reconnexion arrive au J12 : on recharge la page
+  | { kind: "closed" } // pour de bon : on recharge la page
+  | { kind: "reconnecting"; shown: Exclude<DraftPillState, { kind: "reconnecting" }> } // son contenu, flouté (§4.5)
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; isSignInPrompted: boolean; signInHref: string }
   | { kind: "view"; gauge: GaugeProps; refusal?: string }
@@ -226,6 +227,11 @@ const contentOf = (
       return {
         content: <EnterButton onEnter={actions.onEnter} />,
         pillState: { kind: "reconnecting", label: "Connexion" },
+      };
+    case "reconnecting":
+      return {
+        ...contentOf(state.shown, actions, isCompact),
+        pillState: { kind: "reconnecting", label: "Reconnexion" },
       };
     case "closed":
       return {
