@@ -58,7 +58,7 @@ const draftModeState = (
   draft: DraftView,
   gauge: GaugeProps,
   isTouchScreen: boolean,
-): DraftPillState => {
+): Extract<DraftPillState, { kind: "draft" }> => {
   const isEditable = draft.draft.size > 0 && !draft.isSending;
   return {
     kind: "draft",
@@ -75,14 +75,17 @@ const draftModeState = (
   };
 };
 
-const toDraftPillState = (
+type ShownDraftPillState = Exclude<DraftPillState, { kind: "reconnecting" }>;
+
+// Ce que la pill montre quand la connexion est là, ou qu'on attend encore la première réponse.
+const toShownState = (
   canvas: CanvasView,
   draft: DraftView,
   gauge: GaugeProps | null,
   login: string,
   isTouchScreen: boolean,
-): DraftPillState => {
-  if (canvas.status !== "live") return { kind: canvas.status };
+): ShownDraftPillState => {
+  if (canvas.status === "connecting" || canvas.status === "closed") return { kind: canvas.status };
   if (!canvas.userId)
     return { kind: "guest", isSignInPrompted: draft.isSignInPrompted, signInHref: signInHref(login) };
   if (canvas.isBanned) return { kind: "banned" };
@@ -91,6 +94,12 @@ const toDraftPillState = (
   if (draft.mode === "view")
     return { kind: "view", gauge, ...(canvas.lastError ? { refusal: canvas.lastError } : {}) };
   return draftModeState(canvas, draft, gauge, isTouchScreen);
+};
+
+// Pendant une reprise, la pill garde son contenu, flouté, et rien n'y répond (CDC 2026, Connexion et reconnexion).
+const toDraftPillState = (...shown: Parameters<typeof toShownState>): DraftPillState => {
+  const state = toShownState(...shown);
+  return shown[0].status === "reconnecting" ? { kind: "reconnecting", shown: state } : state;
 };
 
 type DraftPillStores = { canvas: CanvasStore; draft: DraftStore };

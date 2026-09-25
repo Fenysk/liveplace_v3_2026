@@ -1,7 +1,12 @@
-// Le Transport du web : une WebSocket sur `/ws`, à l'origine de la page (D-09, §9.2).
+// Le Transport du web : une WebSocket sur `/ws`, à l'origine de la page (D-09, §9.2), qui se rouvre seule (§4.5).
 
 import type { Transport, TransportListeners } from "@liveplace/domain/ports";
 import { decodeServerFrame } from "@liveplace/protocol";
+import { MISSED_PONGS_LIMIT, PING_INTERVAL_MS, reconnectDelayMs } from "./reconnect";
+
+const CLOSE_NORMAL = 1000;
+// Fermée de notre côté faute de `pong` : le navigateur peut mettre longtemps à le voir sur un réseau coupé.
+const CLOSE_NO_PONG = 4000;
 
 // Même origine en dev (proxy Vite) et en production (Traefik) : le cookie de session suit.
 const socketUrl = (): string => {
@@ -18,35 +23,71 @@ const decodeText = (text: string) => {
 };
 
 export function createWsClient(): Transport {
-  const socket = new WebSocket(socketUrl());
-  socket.binaryType = "arraybuffer"; // le snapshot arrive en binaire (§4.3)
-  const waiting: string[] = [];
+  let socket: WebSocket | null = null;
   let listeners: TransportListeners | undefined;
+  let attempt = 0;
+  let missedPongs = 0;
+  let isClosedForGood = false;
+  let pingTimer: ReturnType<typeof setInterval> | undefined;
+  let reopenTimer: ReturnType<typeof setTimeout> | undefined;
 
-  socket.addEventListener("open", () => {
-    for (const text of waiting.splice(0)) socket.send(text);
-  });
+  // Une seule fois par socket : sa fin prévient le store, puis la reprise se programme.
+  const drop = (dropped: WebSocket, code: number): void => {
+    if (dropped !== socket) return;
+    socket = null;
+    clearInterval(pingTimer);
+    listeners?.onClose(code);
+    if (isClosedForGood) return;
+    reopenTimer = setTimeout(connect, reconnectDelayMs(attempt, Math.random));
+    attempt += 1;
+  };
 
-  socket.addEventListener("message", (message) => {
-    if (message.data instanceof ArrayBuffer) return listeners?.onSnapshot(new Uint8Array(message.data));
-    const decoded = decodeText(String(message.data));
-    if (decoded.ok) listeners?.onFrame(decoded.value);
-    else console.error("ws: frame serveur illisible", decoded.error);
-  });
+  const ping = (opened: WebSocket): void => {
+    if (missedPongs >= MISSED_PONGS_LIMIT) {
+      opened.close(CLOSE_NO_PONG);
+      drop(opened, CLOSE_NO_PONG);
+      return;
+    }
+    missedPongs += 1;
+    opened.send(JSON.stringify({ t: "ping" }));
+  };
 
-  socket.addEventListener("close", (closed) => listeners?.onClose(closed.code));
+  function connect(): void {
+    const opened = new WebSocket(socketUrl());
+    opened.binaryType = "arraybuffer"; // le snapshot arrive en binaire (§4.3)
+    socket = opened;
+
+    opened.addEventListener("open", () => {
+      attempt = 0;
+      missedPongs = 0;
+      pingTimer = setInterval(() => ping(opened), PING_INTERVAL_MS);
+      listeners?.onOpen();
+    });
+
+    opened.addEventListener("message", (message) => {
+      if (message.data instanceof ArrayBuffer) return listeners?.onSnapshot(new Uint8Array(message.data));
+      const decoded = decodeText(String(message.data));
+      if (!decoded.ok) return console.error("ws: frame serveur illisible", decoded.error);
+      if (decoded.value.t === "pong") missedPongs = 0;
+      listeners?.onFrame(decoded.value);
+    });
+
+    opened.addEventListener("close", (closed) => drop(opened, closed.code));
+  }
 
   return {
     send(frame) {
-      const text = JSON.stringify(frame);
-      if (socket.readyState === WebSocket.OPEN) socket.send(text);
-      else waiting.push(text);
+      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(frame));
     },
     listen(next) {
       listeners = next;
+      connect();
     },
     close() {
-      socket.close(1000);
+      isClosedForGood = true;
+      clearTimeout(reopenTimer);
+      clearInterval(pingTimer);
+      socket?.close(CLOSE_NORMAL);
     },
   };
 }

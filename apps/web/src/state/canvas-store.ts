@@ -1,6 +1,6 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
-import { type Role, toStateOffset } from "@liveplace/domain";
+import { type Role, type Timestamp, toStateOffset } from "@liveplace/domain";
 import type {
   AckFrame,
   BannedUser,
@@ -14,6 +14,24 @@ import type { Result } from "@liveplace/shared";
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
+type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
+
+// L'ack d'un lot reste gardé 120 s par place.lua : au-delà, le renvoyer le poserait deux fois (JOURNAL 2026-09-25).
+const RESEND_MAX_AGE_MS = 100_000;
+
+// `obs` : la page ouverte dans OBS (§9.1). Le gateway y joint le `recent` au snapshot (§9.5).
+export type CanvasMode = "ui" | "obs";
+
+export type CanvasStoreOptions = {
+  mode: CanvasMode;
+  now: () => Timestamp; // l'âge d'un lot au moment de le renvoyer
+  reload: () => void; // Écart §4.5 (JOURNAL 2026-09-25) : une reprise refusée pour la version du protocole
+};
+
+// Ce qui arrive du serveur, dans l'ordre : la vue OBS en tient son propre affichage (§9.5).
+export type Arrival =
+  | { kind: "snapshot"; pixels: Uint8Array; recent: CellsFrame | null }
+  | { kind: "cells"; frame: CellsFrame };
 
 export type Pixel = Placement["pixels"][number];
 export type ServerGauge = AckFrame["gauge"];
@@ -30,7 +48,7 @@ export type Inspection =
   | { status: "empty"; x: number; y: number };
 
 export type CanvasView = {
-  status: "connecting" | "live" | "closed";
+  status: "connecting" | "live" | "reconnecting" | "closed"; // `closed` : pour de bon
   width: number;
   height: number;
   palette: readonly string[];
@@ -60,14 +78,18 @@ export type CanvasStore = {
   moderate(action: ModerationAction): Promise<RequestResult<{ cells: number }>>;
   listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
   listBans(): Promise<RequestResult<BannedUser[]>>;
+  setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
+  listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
 };
 
 // Fourni aux routes par le contexte du routeur : `ui/` ouvre un canvas sans connaître `net/`.
-export type CanvasOpener = (canvasId: string) => CanvasStore;
+export type CanvasOpener = (canvasId: string, mode: CanvasMode) => CanvasStore;
 
 // Un lot envoyé, pas encore confirmé : de quoi rendre à chaque pixel sa couleur d'avant.
 type PendingBatch = {
+  frame: PlaceFrame; // renvoyée telle quelle après une reprise : même `requestId`, jamais de double pose
+  sentAt: Timestamp;
   offsets: number[];
   previousColorIndexes: number[];
   touched: Set<number>; // cases qu'une frame `cells` a écrites depuis : elle fait foi
@@ -82,7 +104,11 @@ type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCo
 const toInspection = ({ x, y, entry }: Extract<ServerFrame, { t: "inspected" }>): Inspection =>
   entry ? { status: "found", x, y, entry } : { status: "empty", x, y };
 
-export function createCanvasStore(canvasId: string, transport: Transport): CanvasStore {
+export function createCanvasStore(
+  canvasId: string,
+  transport: Transport,
+  options: CanvasStoreOptions,
+): CanvasStore {
   let view: CanvasView = {
     status: "connecting",
     width: 0,
@@ -99,6 +125,13 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
   const pending = new Map<string, PendingBatch>();
   const requests = new Map<string, PendingRequest>();
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
+  const arrivalListeners = new Set<(arrival: Arrival) => void>();
+  let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
+  let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
+
+  const emit = (arrival: Arrival): void => {
+    for (const listener of arrivalListeners) listener(arrival);
+  };
 
   // Un nouvel objet à chaque changement : `useSyncExternalStore` compare les références.
   const publish = (next: Partial<CanvasView>): void => {
@@ -114,6 +147,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
     }
     publish({ version: frame.toVersion });
+    emit({ kind: "cells", frame: { toVersion: frame.toVersion, cells: frame.cells } });
   };
 
   const restore = (batch: PendingBatch, indexes: readonly number[]): void => {
@@ -151,16 +185,27 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       transport.send(frame);
     });
 
-  // Sans ack (erreur ou coupure), aucun pixel n'est confirmé : tous reprennent leur couleur.
+  // Sans ack, aucun pixel du lot n'est confirmé : tous reprennent leur couleur.
+  const settle = (requestId: string, batch: PendingBatch, result: PlaceResult): void => {
+    restore(
+      batch,
+      batch.offsets.map((_, index) => index),
+    );
+    batch.resolve(result);
+    pending.delete(requestId);
+  };
+
   const settleAllPending = (result: PlaceResult): void => {
-    for (const batch of pending.values()) {
-      restore(
-        batch,
-        batch.offsets.map((_, index) => index),
-      );
-      batch.resolve(result);
+    for (const [requestId, batch] of pending) settle(requestId, batch, result);
+  };
+
+  // Après une reprise : les lots récents repartent avec leur `requestId`, les autres échouent (JOURNAL 2026-09-25).
+  const resendPending = (): void => {
+    for (const [requestId, batch] of pending) {
+      if (options.now() - batch.sentAt > RESEND_MAX_AGE_MS)
+        settle(requestId, batch, { ok: false, error: "closed" });
+      else transport.send(batch.frame);
     }
-    pending.clear();
   };
 
   const acknowledge = (ack: AckFrame): void => {
@@ -193,14 +238,38 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       ...(login ? { login } : {}),
       ...(displayName ? { displayName } : {}),
       ...(avatarUrl ? { avatarUrl } : {}),
-      pixels: new Uint8Array(width * height),
+      // Un resync n'a pas de snapshot : la copie reste, et les cases manquées arrivent par `cells` (§4.5).
+      pixels: view.pixels.length === width * height ? view.pixels : new Uint8Array(width * height),
     };
+  };
+
+  const welcome = (frame: WelcomeFrame): void => {
+    heldRecent = frame.recent ?? null;
+    publish(welcomeView(frame));
+    if (hasWelcomed) resendPending();
+    hasWelcomed = true;
+  };
+
+  // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
+  const refuse = (code: ErrorCode): void => {
+    // Écart §4.5 (JOURNAL 2026-09-25) : le code a changé pendant la coupure, la page va le chercher.
+    if (code === "protocol_version" && hasWelcomed) {
+      options.reload();
+      return;
+    }
+    settleAllPending({ ok: false, error: code });
+    failAllRequests(code);
+    publish({ lastError: code });
+    // Au tout premier `hello`, la page est déjà la dernière : reprendre ne ferait que reboucler.
+    if (code !== "protocol_version") return;
+    transport.close();
+    publish({ status: "closed" });
   };
 
   const onFrame = (frame: ServerFrame): void => {
     switch (frame.t) {
       case "welcome":
-        publish(welcomeView(frame));
+        welcome(frame);
         break;
       case "cells":
         apply(frame);
@@ -225,27 +294,39 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       case "unbanned":
         publish({ isBanned: frame.t === "banned" });
         break;
+      case "obsDelay":
+        if (view.params) publish({ params: { ...view.params, obsDelayMs: frame.obsDelayMs } });
+        break;
       case "error":
-        // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
-        settleAllPending({ ok: false, error: frame.code });
-        failAllRequests(frame.code);
-        publish({ lastError: frame.code });
+        refuse(frame.code);
         break;
       default:
     }
   };
 
   transport.listen({
+    // À chaque ouverture ; après une première réponse, avec la dernière version reçue (§4.5).
+    onOpen: () =>
+      transport.send({
+        t: "hello",
+        protocolVersion: PROTOCOL_VERSION,
+        canvasId,
+        mode: options.mode,
+        ...(hasWelcomed ? { lastVersion: view.version } : {}),
+      }),
     onFrame,
     // Le snapshot suit le `welcome` : il remplace la copie entière (§6.1).
-    onSnapshot: (state) => publish({ pixels: state.slice() }),
+    onSnapshot: (state) => {
+      publish({ pixels: state.slice() });
+      emit({ kind: "snapshot", pixels: state.slice(), recent: heldRecent });
+      heldRecent = null;
+    },
+    // Les lots attendent la reprise (JOURNAL 2026-09-25) ; les modérations et les lectures échouent.
     onClose: () => {
-      settleAllPending({ ok: false, error: "closed" });
       failAllRequests("closed");
-      publish({ status: "closed" });
+      if (view.status !== "closed") publish({ status: "reconnecting" });
     },
   });
-  transport.send({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui" });
 
   return {
     subscribe(listener) {
@@ -261,11 +342,13 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
         const offset = offsets[index];
         if (offset !== undefined) view.pixels[offset] = colorIndex;
       });
+      const frame: PlaceFrame = { t: "place", requestId, pixels: [...pixels] };
       const placed = new Promise<PlaceResult>((resolve) => {
-        pending.set(requestId, { offsets, previousColorIndexes, touched: new Set(), resolve });
+        const sentAt = options.now();
+        pending.set(requestId, { frame, sentAt, offsets, previousColorIndexes, touched: new Set(), resolve });
       });
       publish({});
-      transport.send({ t: "place", requestId, pixels: [...pixels] });
+      transport.send(frame);
       return placed;
     },
     inspect(x, y) {
@@ -293,6 +376,12 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       request({ t: "listBans", requestId: crypto.randomUUID() }, (reply) =>
         reply.t === "bans" ? reply.users : undefined,
       ),
+    setObsDelay: (obsDelayMs) =>
+      transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
+    listenArrivals(listener) {
+      arrivalListeners.add(listener);
+      return () => arrivalListeners.delete(listener);
+    },
     close: () => transport.close(),
   };
 }

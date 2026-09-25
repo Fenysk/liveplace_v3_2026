@@ -119,14 +119,15 @@ export interface ClientSocket {
 
 // Ce que le gateway renvoie au web : les frames JSON, et le snapshot en binaire (§4.3).
 export type TransportListeners = {
+  onOpen(): void; // à chaque ouverture : la première, puis chaque reprise (§4.5)
   onFrame(frame: ServerFrame): void;
   onSnapshot(state: Uint8Array): void;
-  onClose(code: number): void;
+  onClose(code: number): void; // à chaque coupure : la reprise suit d'elle-même, sauf après `close()`
 };
 
 // Le lien du web vers le gateway, vu du store : `net/` l'implémente, `state/` le reçoit (§9.2).
 export interface Transport {
-  send(frame: ClientFrame): void; // mis en attente tant que la connexion s'ouvre
-  listen(listeners: TransportListeners): void;
-  close(): void;
+  send(frame: ClientFrame): void; // perdue si la connexion n'est pas ouverte : le store renvoie ce qui compte
+  listen(listeners: TransportListeners): void; // ouvre la connexion
+  close(): void; // pour de bon : plus de reprise
 }

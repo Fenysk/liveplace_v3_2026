@@ -84,7 +84,7 @@ const CanvasPage = () => {
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
-    const canvas = openCanvas(canvasId);
+    const canvas = openCanvas(canvasId, "ui");
     const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock);
     setStores({ canvas, draft });
     return () => {
