@@ -28,12 +28,14 @@ export type CanvasScene = { zoomBy(factor: number): void; recenter(): void; disp
 
 // `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
 // `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
-// `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases.
+// `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
+// et fait dériver son motif (`checkerTiles`).
 type SceneOptions = {
   initialViewport: Viewport | null;
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
   checker: HTMLElement;
+  checkerTiles: HTMLElement;
 };
 
 // Les cases du damier, en pixels CSS : leur taille suit l'écran, jamais le zoom (CDC 2026).
@@ -41,6 +43,9 @@ const CHECKER_DIVISOR = 48;
 const CHECKER_MIN_TILE = 6;
 const checkerTile = (screen: Size): number =>
   Math.max(CHECKER_MIN_TILE, Math.round(Math.min(screen.width, screen.height) / CHECKER_DIVISOR));
+// Deux cases par cycle, en diagonale : lent. Des valeurs concrètes, jamais `var()` dans des keyframes CSS, que Chrome
+// ne sait pas confier à la carte graphique : l'animation tournerait sur le fil principal, et saccaderait.
+const CHECKER_DRIFT_MS = 20_000;
 
 const isSameFraming = (a: Framing | null, b: Framing) =>
   a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
@@ -95,6 +100,20 @@ export function createCanvasScene(
   };
 
   // Le damier défile en CSS, accroché à l'écran : seul son cadre suit le canvas, sans jamais en dépasser.
+  let checkerDrift: Animation | null = null;
+  let driftTile = 0;
+  const driftChecker = (tile: number) => {
+    if (tile === driftTile) return;
+    driftTile = tile;
+    checkerDrift?.cancel();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const shift = `${2 * tile}px`;
+    checkerDrift = options.checkerTiles.animate(
+      [{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${shift}, ${shift}, 0)` }],
+      { duration: CHECKER_DRIFT_MS, iterations: Number.POSITIVE_INFINITY, easing: "linear" },
+    );
+  };
+
   const clipChecker = (current: Viewport, canvas: Size) => {
     const right = screen.width - (current.offsetX + canvas.width * current.scale);
     const bottom = screen.height - (current.offsetY + canvas.height * current.scale);
@@ -224,7 +243,9 @@ export function createCanvasScene(
     pixelRatio = window.devicePixelRatio;
     surface.width = Math.round(screen.width * pixelRatio);
     surface.height = Math.round(screen.height * pixelRatio);
-    options.checker.style.setProperty("--lp-checker-tile", `${checkerTile(screen)}px`);
+    const tile = checkerTile(screen);
+    options.checker.style.setProperty("--lp-checker-tile", `${tile}px`);
+    driftChecker(tile);
     requestRender();
   });
   resizeObserver.observe(surface);
@@ -320,6 +341,7 @@ export function createCanvasScene(
     dispose() {
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
+      checkerDrift?.cancel();
       themeObserver.disconnect();
       setPanning(false);
       unsubscribe();
