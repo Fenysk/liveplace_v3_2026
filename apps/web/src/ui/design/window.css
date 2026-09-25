@@ -68,8 +68,11 @@
   background: transparent;
 }
 
-.lp-window-nav .lp-btn:hover {
-  background: var(--chip-hover);
+/* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
+@media (hover: hover) {
+  .lp-window-nav .lp-btn:hover {
+    background: var(--chip-hover);
+  }
 }
 
 .lp-window-nav .lp-btn[aria-current="page"] {

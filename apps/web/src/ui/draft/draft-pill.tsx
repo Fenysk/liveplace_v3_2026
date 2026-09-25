@@ -3,12 +3,12 @@
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, Palette as PaletteIcon, Trash } from "lucide-react";
+import { Brush, Eraser, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
-import { Palette, RecentSwatches } from "../design/palette";
+import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
 import { SignInButton } from "../design/twitch";
 
@@ -22,7 +22,7 @@ export type DraftPillState =
       gauge: GaugeProps;
       palette: readonly string[];
       colorIndex: number;
-      recentColorIndexes: readonly number[]; // sur mobile
+      recentColorIndexes: readonly number[]; // sur mobile, la rangée : jamais la couleur du bouton
       isSending: boolean;
       canSubmit: boolean;
       canDiscard: boolean;
@@ -36,8 +36,7 @@ export type DraftPillActions = {
   onExit: () => void; // Annuler : sort du Dessin, ou referme l'invitation
   onSubmit: () => void;
   onDiscard: () => void;
-  onPickColor: (colorIndex: number) => void; // dans la palette
-  onPickRecentColor: (colorIndex: number) => void; // parmi les récentes, sur mobile
+  onPickColor: (colorIndex: number) => void; // dans la palette, ou dans la rangée des récentes sur mobile
   onToggleEraser: () => void;
   onToggleTouchTracing: () => void;
   onReload: () => void;
@@ -134,14 +133,16 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
       {/* La palette complète dépliée remplace toute la rangée : elle revient quand la palette se replie. */}
       {!isExpanded && (
         <div className="lp-row">
-          {/* La couleur active est l'une des récentes, entourée : pas de bouton de couleur actuelle en doublon. */}
+          {/* La couleur active ouvre la palette. Toucher une récente l'échange avec elle, sur place. */}
+          <CurrentColorButton
+            color={isEraser ? undefined : state.palette[state.colorIndex]}
+            onPress={toggle}
+          />
           <RecentSwatches
             palette={state.palette}
             recentColorIndexes={state.recentColorIndexes}
-            colorIndex={state.colorIndex}
-            onPick={actions.onPickRecentColor}
+            onPick={actions.onPickColor}
           />
-          <Button icon={PaletteIcon} variant="ghost" title="Toutes les couleurs" onPress={toggle} />
         </div>
       )}
       <div className="lp-row lp-sheet-tools">

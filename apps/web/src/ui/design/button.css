@@ -22,8 +22,11 @@
     transform 0.1s;
 }
 
-.lp-btn:hover {
-  background: var(--chip-hover);
+/* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
+@media (hover: hover) {
+  .lp-btn:hover {
+    background: var(--chip-hover);
+  }
 }
 
 .lp-btn:active {
@@ -46,8 +49,10 @@
   color: var(--on-accent);
 }
 
-.lp-btn--primary:hover {
-  background: var(--accent-hover);
+@media (hover: hover) {
+  .lp-btn--primary:hover {
+    background: var(--accent-hover);
+  }
 }
 
 .lp-btn--danger {
@@ -55,9 +60,11 @@
   color: var(--on-danger);
 }
 
-.lp-btn--danger:hover {
-  background: var(--danger);
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .lp-btn--danger:hover {
+    background: var(--danger);
+    filter: brightness(1.08);
+  }
 }
 
 .lp-btn--twitch {
@@ -65,8 +72,10 @@
   color: var(--on-twitch);
 }
 
-.lp-btn--twitch:hover {
-  background: var(--twitch-hover);
+@media (hover: hover) {
+  .lp-btn--twitch:hover {
+    background: var(--twitch-hover);
+  }
 }
 
 .lp-btn--ghost {

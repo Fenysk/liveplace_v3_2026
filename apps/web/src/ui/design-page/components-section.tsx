@@ -3,9 +3,10 @@
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Settings, Trash, User, X } from "lucide-react";
 import { useState } from "react";
+import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { Button, type ButtonProps } from "../design/button";
 import { Grabber } from "../design/grabber";
-import { ColorChip, Palette, RecentSwatches } from "../design/palette";
+import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
@@ -115,6 +116,24 @@ const PillSpecimens = () => {
   );
 };
 
+// La vraie règle de la rangée : toucher une récente l'échange avec la couleur actuelle, sur place.
+const RecentRowSpecimen = () => {
+  const [row, setRow] = useState({ colorIndex: 1, recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES });
+  const pick = (colorIndex: number) =>
+    setRow({
+      colorIndex,
+      recentColorIndexes: rememberColorIndex(row.recentColorIndexes, row.colorIndex, colorIndex),
+    });
+  return (
+    <Specimen caption="Mobile : toucher une récente l'échange avec la couleur actuelle, sur place">
+      <div className="lp-row">
+        <CurrentColorButton color={PALETTE[row.colorIndex]} onPress={noop} />
+        <RecentSwatches palette={PALETTE} recentColorIndexes={row.recentColorIndexes} onPick={pick} />
+      </div>
+    </Specimen>
+  );
+};
+
 const PaletteSpecimens = () => {
   const [colorIndex, setColorIndex] = useState(5);
   return (
@@ -145,16 +164,13 @@ const PaletteSpecimens = () => {
           </ColorChip>
         </div>
       </Specimen>
-      <Specimen caption="Mobile : cinq couleurs récentes, la couleur active entourée">
+      <Specimen caption="Mobile : la couleur actuelle ouvre la palette complète">
         <div className="lp-row">
-          <RecentSwatches
-            palette={PALETTE}
-            recentColorIndexes={[1, 5, 28, 19, 9]}
-            colorIndex={colorIndex}
-            onPick={setColorIndex}
-          />
+          <CurrentColorButton color={PALETTE[colorIndex]} onPress={noop} />
+          <CurrentColorButton onPress={noop} />
         </div>
       </Specimen>
+      <RecentRowSpecimen />
       <Specimen caption="Mobile : la poignée d'une feuille (glisser ou toucher)">
         <div className="design-phone-box">
           <Grabber label="Déplier la palette" onUp={noop} onDown={noop} onTap={noop} />

@@ -111,7 +111,6 @@ export function useDraftPillProps(
       onSubmit: () => submitDraft(draft),
       onDiscard: () => draft.discardDraft(),
       onPickColor: (colorIndex) => draft.selectColor(colorIndex),
-      onPickRecentColor: (colorIndex) => draft.pickRecentColor(colorIndex),
       onToggleEraser: () => draft.toggleEraser(),
       onToggleTouchTracing: () => draft.toggleTouchTracing(),
       onReload: () => window.location.reload(),

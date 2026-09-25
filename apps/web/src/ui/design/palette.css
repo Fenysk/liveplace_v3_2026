@@ -20,11 +20,14 @@
   transition: box-shadow var(--lp-dur-fast) ease;
 }
 
-/* Le survol se montre par un anneau : rien ne bouge */
-.lp-swatch:hover {
-  box-shadow:
-    0 0 0 2px var(--pill-surface),
-    0 0 0 3px var(--muted);
+/* Le survol se montre par un anneau, rien ne bouge. Seulement avec une souris : au doigt, l'anneau resterait collé
+   à la case qui passe sous le dernier toucher, comme un focus */
+@media (hover: hover) {
+  .lp-swatch:hover {
+    box-shadow:
+      0 0 0 2px var(--pill-surface),
+      0 0 0 3px var(--muted);
+  }
 }
 
 .lp-swatch:focus-visible {
@@ -40,7 +43,8 @@
 
 /* Le damier du pixel transparent, fait des deux teintes du canvas */
 .lp-swatch--eraser,
-.lp-color-chip i.is-transparent {
+.lp-color-chip i.is-transparent,
+.lp-current-color i.is-transparent {
   background:
     conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
     0 / 10px 10px;
@@ -65,10 +69,16 @@
   padding: var(--space-1) 0;
 }
 
-.lp-palette--touch .lp-swatch,
-.lp-swatch--touch {
+.lp-palette--touch .lp-swatch {
   width: var(--control-size);
   height: var(--control-size);
+  border-radius: var(--radius-pill);
+}
+
+/* Les couleurs récentes, plus discrètes que les contrôles : de la taille de la pastille de la couleur actuelle */
+.lp-swatch--recent {
+  width: calc(var(--control-size) - 12px);
+  height: calc(var(--control-size) - 12px);
   border-radius: var(--radius-pill);
 }
 
@@ -82,5 +92,18 @@
   width: 16px;
   height: 16px;
   border-radius: 5px;
+  box-shadow: inset 0 0 0 1px var(--chip-hover);
+}
+
+/* La couleur actuelle, dans la feuille Dessin sur mobile : elle ouvre la palette complète */
+.lp-current-color {
+  gap: 4px;
+  padding: 0 8px 0 4px;
+}
+
+.lp-current-color i {
+  width: calc(var(--control-size) - 12px);
+  height: calc(var(--control-size) - 12px);
+  border-radius: 50%;
   box-shadow: inset 0 0 0 1px var(--chip-hover);
 }
