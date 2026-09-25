@@ -6,6 +6,7 @@ export const HIST_DEPTH = 8; // D-06
 export const EVENTS_MAXLEN = 20_000; // `MAXLEN ~` à chaque XADD, rien d'autre ne trimme
 export const GAUGE_TTL_SECONDS = 30 * 24 * 3600; // glissant, jauge expirée = pleine
 export const REQ_TTL_SECONDS = 120;
+export const CLEAR_SLICE_CELLS = 4096; // §5.4 : la latence Redis pire cas d'une tranche, connue d'avance
 
 export function buildCanvasKeys(canvasId: string) {
   const prefix = `cv:${canvasId}:`;
@@ -25,6 +26,10 @@ export function buildCanvasKeys(canvasId: string) {
     cellsPrefix,
     hist: (cellKey: CellKey) => `${histPrefix}${cellKey}`,
     cells: (userId: string) => `${cellsPrefix}${userId}`, // vidé par clearUser
+    // Écart §5.4 (JOURNAL 2026-09-25) : vidé par la dernière tranche ; une coupure le garde jusqu'au clearUser suivant.
+    clearing: (userId: string) => `${prefix}clearing:${userId}`,
+    // Écart §5.1 (JOURNAL 2026-09-25) : la preuve d'un ban, `cellKey` → `colorIndex`. Écrite par ban, supprimée par unban.
+    ban: (userId: string) => `${prefix}ban:${userId}`,
     gauge: (userId: string) => `${prefix}gauge:${userId}`,
     req: (userId: string, requestId: string) => `${prefix}req:${userId}:${requestId}`,
   };

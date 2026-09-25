@@ -1,9 +1,11 @@
-import type { CanvasCore, LiveMessage } from "@liveplace/domain/ports";
+import type { CanvasCore, LiveControl, LiveMessage } from "@liveplace/domain/ports";
 import type { CellsFrame, Event } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
-import { type CellsListener, createBroadcast } from "./broadcast";
+import { type CellsListener, type ControlListener, createBroadcast } from "./broadcast";
 
 const occurredAt = 1_700_000_000_000;
+
+const ignoreControl: ControlListener = () => undefined;
 
 const event = (version: number, x: number, colorIndex: number): Event => ({
   version,
@@ -28,7 +30,8 @@ const fakeCore = () => {
     },
   };
   const publish = (canvasId: string, published: Event) => callbacks.get(canvasId)?.({ e: published });
-  return { core, counts, publish };
+  const control = (canvasId: string, published: LiveControl) => callbacks.get(canvasId)?.({ ctl: published });
+  return { core, counts, publish, control };
 };
 
 describe("createBroadcast (§6.2, §6.3)", () => {
@@ -44,8 +47,8 @@ describe("createBroadcast (§6.2, §6.3)", () => {
       seen.push(frame);
     };
 
-    await broadcast.join("canvas-1", first);
-    await broadcast.join("canvas-1", second);
+    await broadcast.join("canvas-1", first, ignoreControl);
+    await broadcast.join("canvas-1", second, ignoreControl);
 
     expect(counts.subscribe).toBe(1);
 
@@ -64,8 +67,8 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     const broadcast = createBroadcast(core);
     const first: CellsFrame[] = [];
     const second: CellsFrame[] = [];
-    await broadcast.join("canvas-1", (frame) => first.push(frame));
-    await broadcast.join("canvas-1", (frame) => second.push(frame));
+    await broadcast.join("canvas-1", (frame) => first.push(frame), ignoreControl);
+    await broadcast.join("canvas-1", (frame) => second.push(frame), ignoreControl);
 
     publish("canvas-1", event(1, 3, 5));
     publish("canvas-1", event(2, 3, 6));
@@ -82,7 +85,7 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     const { core, publish } = fakeCore();
     const broadcast = createBroadcast(core);
     const received: CellsFrame[] = [];
-    await broadcast.join("canvas-1", (frame) => received.push(frame));
+    await broadcast.join("canvas-1", (frame) => received.push(frame), ignoreControl);
 
     broadcast.tick();
 
@@ -101,13 +104,42 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     const broadcast = createBroadcast(core);
     const firstCanvas: CellsFrame[] = [];
     const secondCanvas: CellsFrame[] = [];
-    await broadcast.join("canvas-1", (frame) => firstCanvas.push(frame));
-    await broadcast.join("canvas-2", (frame) => secondCanvas.push(frame));
+    await broadcast.join("canvas-1", (frame) => firstCanvas.push(frame), ignoreControl);
+    await broadcast.join("canvas-2", (frame) => secondCanvas.push(frame), ignoreControl);
 
     publish("canvas-1", event(1, 3, 5));
     broadcast.tick();
 
     expect(firstCanvas).toHaveLength(1);
     expect(secondCanvas).toHaveLength(0);
+  });
+
+  // Remet un ctl tout de suite à chaque client du canvas, sans attendre le tick ni passer par la conflation
+  it("hands a ctl at once to every client of the canvas, without the tick or the conflation", async () => {
+    const { core, publish, control } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const cells: CellsFrame[] = [];
+    const controls: LiveControl[] = [];
+    await broadcast.join(
+      "canvas-1",
+      (frame) => cells.push(frame),
+      (published) => controls.push(published),
+    );
+    await broadcast.join(
+      "canvas-2",
+      () => undefined,
+      (published) => controls.push(published),
+    );
+
+    publish("canvas-1", event(1, 3, 5));
+    control("canvas-1", { t: "banned", userId: "user-9" });
+
+    expect(controls).toEqual([{ t: "banned", userId: "user-9" }]);
+    expect(cells).toHaveLength(0);
+
+    broadcast.tick();
+
+    expect(cells).toHaveLength(1);
+    expect(cells[0]?.toVersion).toBe(1);
   });
 });

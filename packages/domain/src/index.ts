@@ -43,6 +43,11 @@ export function roleFor(
   return "viewer";
 }
 
+// Le gateway décide, le web affiche (§10.3) : la même règle des deux côtés.
+export function canModerate(role: Role): boolean {
+  return role === "owner" || role === "moderator";
+}
+
 // D-15 : deux index d'une même case, jamais interchangeables.
 export type CellKey = number & { readonly __brand: "CellKey" };
 export type StateOffset = number & { readonly __brand: "StateOffset" };
@@ -57,6 +62,11 @@ export function toStateOffset(x: number, y: number, width: number): StateOffset 
 
 export function toCellKey(x: number, y: number): CellKey {
   return (y * CELL_STRIDE + x) as CellKey;
+}
+
+// L'inverse de `toCellKey` : une cellKey lue dans Redis redevient une case.
+export function toCell(cellKey: number): { x: number; y: number } {
+  return { x: cellKey % CELL_STRIDE, y: Math.floor(cellKey / CELL_STRIDE) };
 }
 
 // Jauge stockée (§5.1), pas la frame `gauge`.

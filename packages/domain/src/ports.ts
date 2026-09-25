@@ -13,13 +13,29 @@ export type Placement = {
 
 export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
 
+export type Pixel = Placement["pixels"][number];
+
+// Une action de modération (§5.4), et la tranche demandée : `first` pose la pierre tombale, `next` continue.
+export type Moderation = {
+  by: string;
+  nowMs: Timestamp;
+  action: Extract<ClientFrame, { t: "moderate" }>["action"];
+  slice: "first" | "next";
+};
+
+// Une tranche faite : sa version, les cases dont le pixel visible a changé, et s'il en reste.
+export type ModerationSlice = { version: number; cells: number; isDone: boolean };
+
+export type BannedUser = Extract<ServerFrame, { t: "bans" }>["users"][number];
+
 // L'auteur du pixel visible d'une case (§4.3).
 export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>["entry"]>;
 
 export type Snapshot = { state: Uint8Array; version: number };
 
-// Canal `cv:<id>:live`. La variante `ctl` arrive avec moderate.lua (§5.4).
-export type LiveMessage = { e: Event };
+// Canal `cv:<id>:live` : les événements, et les messages de contrôle de moderate.lua (§5.4).
+export type LiveControl = { t: "banned" | "unbanned"; userId: string };
+export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
 
@@ -37,6 +53,14 @@ export interface CanvasCore {
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
   inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null>; // `null` : personne n'a posé ici
+  moderate(
+    canvasId: string,
+    moderation: Moderation,
+  ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">>;
+  // Écart §5.6 (JOURNAL 2026-09-25) : l'état banni au `hello`, les pixels d'un auteur, et les bannis.
+  isBanned(canvasId: string, userId: string): Promise<boolean>;
+  listPixels(canvasId: string, userId: string): Promise<Pixel[]>; // un banni : sa preuve (§5.1)
+  listBans(canvasId: string): Promise<BannedUser[]>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

@@ -1,5 +1,16 @@
 import type { CanvasMeta, Session } from "@liveplace/domain";
-import type { AckFrame, ClientSocket, InspectEntry, LiveMessage, Placement } from "@liveplace/domain/ports";
+import type {
+  AckFrame,
+  BannedUser,
+  ClientSocket,
+  InspectEntry,
+  LiveControl,
+  LiveMessage,
+  Moderation,
+  ModerationSlice,
+  Pixel,
+  Placement,
+} from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
 import { createBroadcast } from "./broadcast";
@@ -19,6 +30,12 @@ const meta: CanvasMeta = {
 };
 
 const session: Session = { userId: "user-1", login: "user1", displayName: "User 1" };
+const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
+
+const proof: Pixel[] = [{ x: 1, y: 2, colorIndex: 3 }];
+const bannedUsers: BannedUser[] = [
+  { userId: "user-2", login: "user2", displayName: "User 2", pixelCount: 1 },
+];
 
 const ack: AckFrame = {
   t: "ack",
@@ -53,11 +70,22 @@ const event = (version: number, x: number, colorIndex: number): Event => ({
   cells: [{ x, y: 2, colorIndex, previousColorIndex: 0, placedAt: now }],
 });
 
-type SetupOptions = { session?: Session | null; version?: number; duringSnapshot?: () => void };
+const moderate = (action: string, target = "user-2") =>
+  JSON.stringify({ t: "moderate", requestId: "moderate-1", action: { action, target } });
+
+type SetupOptions = {
+  session?: Session | null;
+  version?: number;
+  duringSnapshot?: () => void;
+  isBanned?: boolean;
+  slices?: ModerationSlice[];
+};
 
 const setup = (options: SetupOptions = {}) => {
   const placements: Placement[] = [];
   const inspected: { x: number; y: number }[] = [];
+  const moderations: Moderation[] = [];
+  const listedPixels: string[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const core = {
     async getCanvas(asked: string) {
@@ -81,6 +109,21 @@ const setup = (options: SetupOptions = {}) => {
       placements.push(placement);
       return { ok: true as const, value: ack };
     },
+    async moderate(_asked: string, moderation: Moderation) {
+      moderations.push(moderation);
+      const slice = options.slices?.[moderations.length - 1] ?? { version: 9, cells: 0, isDone: true };
+      return { ok: true as const, value: slice };
+    },
+    async isBanned() {
+      return options.isBanned ?? false;
+    },
+    async listPixels(_asked: string, userId: string) {
+      listedPixels.push(userId);
+      return proof;
+    },
+    async listBans() {
+      return bannedUsers;
+    },
     async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
       publishTo = onMessage;
       return async () => {
@@ -89,26 +132,30 @@ const setup = (options: SetupOptions = {}) => {
     },
   };
 
-  const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
-  const closed: number[] = [];
-  const socket: ClientSocket = {
-    sendFrame: (frame) => {
-      sent.push(frame);
-    },
-    sendSnapshot: (state) => {
-      sent.push({ snapshot: state });
-    },
-    close: (code) => {
-      closed.push(code);
-    },
+  const broadcast = createBroadcast(core);
+  // Une connexion de plus sur le même noyau : un autre onglet, ou un autre joueur.
+  const open = (opened: Session | null) => {
+    const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
+    const closed: number[] = [];
+    const socket: ClientSocket = {
+      sendFrame: (frame) => {
+        sent.push(frame);
+      },
+      sendSnapshot: (state) => {
+        sent.push({ snapshot: state });
+      },
+      close: (code) => {
+        closed.push(code);
+      },
+    };
+    return {
+      connection: createConnection({ core, broadcast, now: () => now }, socket, opened),
+      sent,
+      closed,
+    };
   };
 
-  const broadcast = createBroadcast(core);
-  const connection = createConnection(
-    { core, broadcast, now: () => now },
-    socket,
-    options.session === undefined ? session : options.session,
-  );
+  const { connection, sent, closed } = open(options.session === undefined ? session : options.session);
   return {
     connection,
     broadcast,
@@ -116,7 +163,11 @@ const setup = (options: SetupOptions = {}) => {
     closed,
     placements,
     inspected,
+    moderations,
+    listedPixels,
+    open,
     publish: (published: Event) => publishTo?.({ e: published }),
+    control: (published: LiveControl) => publishTo?.({ ctl: published }),
   };
 };
 
@@ -339,5 +390,118 @@ describe("createConnection (§6.1)", () => {
     context.broadcast.tick();
 
     expect(context.sent).toHaveLength(2);
+  });
+});
+
+describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
+  // Refuse la modération d'un viewer par forbidden, sans appeler le noyau, et le laisse connecté
+  it("refuses a viewer's moderation with forbidden, without calling the core, and keeps it connected", async () => {
+    const { connection, sent, closed, moderations } = setup();
+    await connection.receive(hello());
+
+    await connection.receive(moderate("clearUser"));
+    await connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
+
+    expect(sent.slice(-2)).toEqual([
+      { t: "error", code: "forbidden" },
+      { t: "error", code: "forbidden" },
+    ]);
+    expect(moderations).toEqual([]);
+    expect(closed).toEqual([]);
+  });
+
+  // Enchaîne toutes les tranches d'un clearUser du propriétaire, une frame moderated chacune, à l'heure injectée
+  it("runs every slice of the owner's clearUser, one moderated frame each, at the injected clock", async () => {
+    const slices = [
+      { version: 4, cells: 4096, isDone: false },
+      { version: 5, cells: 4096, isDone: false },
+      { version: 6, cells: 7, isDone: true },
+    ];
+    const { connection, sent, moderations } = setup({ session: owner, slices });
+    await connection.receive(hello());
+
+    await connection.receive(moderate("clearUser"));
+
+    const action = { action: "clearUser", target: "user-2" };
+    expect(moderations).toEqual([
+      { by: owner.userId, nowMs: now, action, slice: "first" },
+      { by: owner.userId, nowMs: now, action, slice: "next" },
+      { by: owner.userId, nowMs: now, action, slice: "next" },
+    ]);
+    expect(sent.slice(-3)).toEqual([
+      { t: "moderated", requestId: "moderate-1", version: 4, cells: 4096, done: false },
+      { t: "moderated", requestId: "moderate-1", version: 5, cells: 4096, done: false },
+      { t: "moderated", requestId: "moderate-1", version: 6, cells: 7, done: true },
+    ]);
+  });
+
+  // Rend les pixels d'un auteur au propriétaire et à l'auteur lui-même, jamais à un autre viewer
+  it("gives an author's pixels to the owner and to the author, never to another viewer", async () => {
+    const context = setup({ session: owner });
+    const self = context.open(session);
+    const other = context.open({ ...session, userId: "user-3" });
+    for (const opened of [context, self, other]) await opened.connection.receive(hello());
+    const listPixels = JSON.stringify({ t: "listPixels", requestId: "pixels-1", userId: session.userId });
+
+    for (const opened of [context, self, other]) await opened.connection.receive(listPixels);
+
+    const answer = { t: "pixels", requestId: "pixels-1", userId: session.userId, pixels: proof };
+    expect(context.sent.at(-1)).toEqual(answer);
+    expect(self.sent.at(-1)).toEqual(answer);
+    expect(other.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+    expect(context.listedPixels).toEqual([session.userId, session.userId]);
+  });
+
+  // Rend la liste des bannis au propriétaire
+  it("gives the list of banned users to the owner", async () => {
+    const { connection, sent } = setup({ session: owner });
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
+
+    expect(sent.at(-1)).toEqual({ t: "bans", requestId: "bans-1", users: bannedUsers });
+  });
+
+  // Envoie banned juste après le welcome et le snapshot d'un banni
+  it("sends banned right after the welcome and the snapshot of a banned user", async () => {
+    const { connection, sent } = setup({ isBanned: true });
+
+    await connection.receive(hello());
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "banned",
+    ]);
+  });
+
+  // Prévient en direct les seules sockets de la cible, de son ban puis de son débannissement
+  it("tells only the target's sockets, live, about its ban and then its unban", async () => {
+    const context = setup();
+    const secondTab = context.open(session);
+    const other = context.open({ ...session, userId: "user-3" });
+    for (const opened of [context, secondTab, other]) await opened.connection.receive(hello());
+
+    context.control({ t: "banned", userId: session.userId });
+    context.control({ t: "unbanned", userId: session.userId });
+
+    expect(context.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "unbanned" }]);
+    expect(secondTab.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "unbanned" }]);
+    expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Garde un ban tombé pendant l'arrivée, et l'envoie après le welcome
+  it("holds a ban that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "banned", userId: session.userId });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "banned",
+    ]);
   });
 });

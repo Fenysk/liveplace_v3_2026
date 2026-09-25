@@ -2,13 +2,21 @@
 
 import {
   type CanvasMeta,
+  canModerate,
   PALETTE,
   type Role,
   roleFor,
   type Session,
   type Timestamp,
 } from "@liveplace/domain";
-import type { AckFrame, CanvasCore, ClientConnection, ClientSocket } from "@liveplace/domain/ports";
+import type {
+  AckFrame,
+  CanvasCore,
+  ClientConnection,
+  ClientSocket,
+  LiveControl,
+  Moderation,
+} from "@liveplace/domain/ports";
 import {
   type CellsFrame,
   type ClientFrame,
@@ -16,7 +24,7 @@ import {
   PROTOCOL_VERSION,
   type ServerFrame,
 } from "@liveplace/protocol";
-import type { Broadcast, CellsListener } from "./broadcast";
+import type { Broadcast, CellsListener, ControlListener } from "./broadcast";
 
 // « policy violation » : la frame est refusée et la connexion fermée.
 const CLOSE_POLICY = 1008;
@@ -25,17 +33,31 @@ type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
+type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
+type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 
-// `ready` garde la taille du canvas : une case hors bornes n'a pas de cellKey à elle.
-type ReadyState = { status: "ready"; canvasId: string; width: number; height: number };
+// `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
+type ReadyState = { status: "ready"; canvasId: string; width: number; height: number; role: Role };
 type State =
   | { status: "awaitingHello" }
-  | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[] }
+  | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[]; pendingControls: LiveControl["t"][] }
   | ReadyState;
 
 export type ConnectionDeps = {
-  core: Pick<CanvasCore, "getCanvas" | "isModerator" | "getSnapshot" | "getGauge" | "place" | "inspect">;
+  core: Pick<
+    CanvasCore,
+    | "getCanvas"
+    | "isModerator"
+    | "isBanned"
+    | "getSnapshot"
+    | "getGauge"
+    | "place"
+    | "inspect"
+    | "moderate"
+    | "listPixels"
+    | "listBans"
+  >;
   broadcast: Broadcast;
   now: () => Timestamp;
 };
@@ -99,6 +121,13 @@ export function createConnection(
     else if (state.status === "ready") socket.sendFrame({ t: "cells", ...frame });
   };
 
+  // Écart §10.2 (JOURNAL 2026-09-25) : seules les sockets de la cible apprennent son ban, en direct.
+  const onControl: ControlListener = ({ t, userId }) => {
+    if (userId !== session?.userId) return;
+    if (state.status === "joining") state.pendingControls.push(t);
+    else if (state.status === "ready") socket.sendFrame({ t });
+  };
+
   const refuse = (code: ErrorCode): void => {
     socket.sendFrame({ t: "error", code });
     socket.close(CLOSE_POLICY);
@@ -112,33 +141,38 @@ export function createConnection(
     }
   };
 
+  // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban aussi.
+  const joinCanvas = async (
+    canvasId: string,
+    meta: CanvasMeta,
+    role: Role,
+    gauge: AckFrame["gauge"] | null,
+  ) => {
+    state = { status: "joining", canvasId, pendingFrames: [], pendingControls: [] };
+    await deps.broadcast.join(canvasId, listener, onControl);
+    const [snapshot, wasBanned] = await Promise.all([
+      deps.core.getSnapshot(canvasId),
+      session ? deps.core.isBanned(canvasId, session.userId) : false,
+    ]);
+
+    socket.sendFrame(buildWelcome(canvasId, meta, snapshot.version, role, session, gauge));
+    socket.sendSnapshot(snapshot.state);
+
+    const held = state.status === "joining" ? state : { pendingFrames: [], pendingControls: [] };
+    state = { status: "ready", canvasId, width: meta.width, height: meta.height, role };
+    sendHeld(held.pendingFrames, snapshot.version);
+    // Écart §10.2 (JOURNAL 2026-09-25) : un ban tombé pendant l'arrivée l'emporte sur celui qu'on a lu.
+    const lastControl = held.pendingControls.at(-1);
+    if (lastControl ? lastControl === "banned" : wasBanned) socket.sendFrame({ t: "banned" });
+  };
+
   const greet = async (frame: HelloFrame): Promise<void> => {
     const meta = await deps.core.getCanvas(frame.canvasId);
     if (!meta) return refuse("canvas_not_found");
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
     // Écart §5.6 (JOURNAL 2026-09-24) : la jauge dès l'arrivée. Un invité n'en a pas.
     const gauge = session ? await deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null;
-
-    // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1).
-    state = { status: "joining", canvasId: frame.canvasId, pendingFrames: [] };
-    await deps.broadcast.join(frame.canvasId, listener);
-    const snapshot = await deps.core.getSnapshot(frame.canvasId);
-
-    socket.sendFrame(
-      buildWelcome(
-        frame.canvasId,
-        meta,
-        snapshot.version,
-        roleFor(session, meta, isModerator),
-        session,
-        gauge,
-      ),
-    );
-    socket.sendSnapshot(snapshot.state);
-
-    const held = state.status === "joining" ? state.pendingFrames : [];
-    state = { status: "ready", canvasId: frame.canvasId, width: meta.width, height: meta.height };
-    sendHeld(held, snapshot.version);
+    await joinCanvas(frame.canvasId, meta, roleFor(session, meta, isModerator), gauge);
   };
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
@@ -161,12 +195,45 @@ export function createConnection(
     socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
   };
 
+  const forbid = (): void => socket.sendFrame({ t: "error", code: "forbidden" });
+
+  // Le gateway enchaîne les tranches jusqu'à la fin (§4.3), même si la socket se ferme : l'action était confirmée.
+  const moderateSlices = async (
+    canvasId: string,
+    requestId: string,
+    moderation: Omit<Moderation, "nowMs">,
+  ) => {
+    const result = await deps.core.moderate(canvasId, { ...moderation, nowMs: deps.now() });
+    if (!result.ok) return result.error === "forbidden" ? forbid() : refuse(result.error);
+    const { version, cells, isDone } = result.value;
+    socket.sendFrame({ t: "moderated", requestId, version, cells, done: isDone });
+    if (!isDone) await moderateSlices(canvasId, requestId, { ...moderation, slice: "next" });
+  };
+
+  const moderateCanvas = async ({ requestId, action }: ModerateFrame, ready: ReadyState): Promise<void> => {
+    if (!session || !canModerate(ready.role)) return forbid();
+    await moderateSlices(ready.canvasId, requestId, { by: session.userId, action, slice: "first" });
+  };
+
+  // Écart §4.2 (JOURNAL 2026-09-25) : les pixels d'un auteur, pour qui modère ou pour l'auteur lui-même.
+  const listPixels = async ({ requestId, userId }: ListPixelsFrame, ready: ReadyState): Promise<void> => {
+    if (!canModerate(ready.role) && userId !== session?.userId) return forbid();
+    const pixels = await deps.core.listPixels(ready.canvasId, userId);
+    socket.sendFrame({ t: "pixels", requestId, userId, pixels });
+  };
+
+  const listBans = async (requestId: string, ready: ReadyState): Promise<void> => {
+    if (!canModerate(ready.role)) return forbid();
+    socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
+  };
+
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     if (frame.t === "place") return placePixels(frame, ready.canvasId);
     if (frame.t === "inspect") return inspectCell(frame, ready);
-    if (frame.t === "ping") return socket.sendFrame({ t: "pong" });
-    // `moderate` (J11) : la frame est valide, le service n'existe pas encore.
-    socket.sendFrame({ t: "error", code: "invalid_frame", message: "pas encore pris en charge" });
+    if (frame.t === "moderate") return moderateCanvas(frame, ready);
+    if (frame.t === "listPixels") return listPixels(frame, ready);
+    if (frame.t === "listBans") return listBans(frame.requestId, ready);
+    socket.sendFrame({ t: "pong" });
   };
 
   const onFrame = async (text: string): Promise<void> => {

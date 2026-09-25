@@ -6,7 +6,8 @@ import { z } from "zod";
 
 // --- Constantes et types de base --------------------------------------
 
-export const PROTOCOL_VERSION = 1;
+// 2 : cinq frames de modération, `cursor` et `clearArea` retirés (JOURNAL 2026-09-25).
+export const PROTOCOL_VERSION = 2;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -19,10 +20,10 @@ export type Event = {
   authorId: string | null; // null = système
   occurredAt: Timestamp;
   cells: EventCell[];
+  // Écart §4.4 (JOURNAL 2026-09-25) : plus de `clearArea`, donc plus d'`area`.
   moderation?: {
-    action: "clearUser" | "clearArea" | "ban" | "unban";
-    target?: string;
-    area?: [number, number, number, number];
+    action: "clearUser" | "ban" | "unban";
+    target: string;
   };
 };
 
@@ -54,7 +55,6 @@ const CanvasIdSchema = z.string();
 const UserIdSchema = z.string();
 const TwitchLoginSchema = z.string();
 const DisplayNameSchema = z.string();
-const CursorSchema = z.string();
 const TimestampSchema = z.number();
 const VersionSchema = z.number().int().nonnegative();
 const CoordinateSchema = z.number().int().nonnegative();
@@ -135,29 +135,26 @@ const InspectFrameSchema = z.object({
   y: CoordinateSchema,
 });
 
-const ModerateActionSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("clearUser"),
-    target: UserIdSchema,
-    cursor: CursorSchema.optional(),
-  }),
-  z.object({
-    action: z.literal("clearArea"),
-    x0: CoordinateSchema,
-    y0: CoordinateSchema,
-    x1: CoordinateSchema,
-    y1: CoordinateSchema,
-    cursor: CursorSchema.optional(),
-  }),
-  z.object({ action: z.literal("ban"), target: UserIdSchema }),
-  z.object({ action: z.literal("unban"), target: UserIdSchema }),
-]);
+// Écart §5.4 et §4.2 (JOURNAL 2026-09-25) : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
+const ModerateActionSchema = z.object({
+  action: z.enum(["clearUser", "ban", "unban"]),
+  target: UserIdSchema,
+});
 
 const ModerateFrameSchema = z.object({
   t: z.literal("moderate"),
   requestId: RequestIdSchema,
   action: ModerateActionSchema,
 });
+
+// Écart §4.2 (JOURNAL 2026-09-25) : les pixels d'un auteur (sa preuve s'il est banni), et la liste des bannis.
+const ListPixelsFrameSchema = z.object({
+  t: z.literal("listPixels"),
+  requestId: RequestIdSchema,
+  userId: UserIdSchema,
+});
+
+const ListBansFrameSchema = z.object({ t: z.literal("listBans"), requestId: RequestIdSchema });
 
 const PingFrameSchema = z.object({ t: z.literal("ping") });
 
@@ -166,6 +163,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   PlaceFrameSchema,
   InspectFrameSchema,
   ModerateFrameSchema,
+  ListPixelsFrameSchema,
+  ListBansFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -233,6 +232,30 @@ const ModeratedFrameSchema = z.object({
 
 const BannedFrameSchema = z.object({ t: z.literal("banned") });
 
+// Écart §4.3 (JOURNAL 2026-09-25) : la réponse à `listPixels` et à `listBans`, et le débannissement en direct.
+const PixelsFrameSchema = z.object({
+  t: z.literal("pixels"),
+  requestId: RequestIdSchema,
+  userId: UserIdSchema,
+  pixels: z.array(PixelSchema),
+});
+
+const BannedUserSchema = z.object({
+  userId: UserIdSchema,
+  login: TwitchLoginSchema,
+  displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(),
+  pixelCount: z.number().int().nonnegative(),
+});
+
+const BansFrameSchema = z.object({
+  t: z.literal("bans"),
+  requestId: RequestIdSchema,
+  users: z.array(BannedUserSchema),
+});
+
+const UnbannedFrameSchema = z.object({ t: z.literal("unbanned") });
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -249,6 +272,9 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   GaugeFrameSchema,
   ModeratedFrameSchema,
   BannedFrameSchema,
+  PixelsFrameSchema,
+  BansFrameSchema,
+  UnbannedFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);
