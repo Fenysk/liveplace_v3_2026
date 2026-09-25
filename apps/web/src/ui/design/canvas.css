@@ -20,28 +20,15 @@
   clip-path: var(--lp-checker-clip, inset(100%));
 }
 
-/* Deux cases de marge en haut à gauche : le motif avance de deux cases par cycle, et boucle sans à-coup */
-.lp-checker::before {
-  content: "";
+/* Le motif, deux cases plus grand en haut à gauche : il avance de deux cases par cycle, et boucle sans à-coup.
+   Sa dérive est lancée par la scène, en pixels concrets : ainsi le navigateur l'anime seul, au sous-pixel près. */
+.lp-checker-tiles {
   position: absolute;
   inset: calc(-2 * var(--lp-checker-tile)) 0 0 calc(-2 * var(--lp-checker-tile));
   background:
     conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
     0 / calc(2 * var(--lp-checker-tile)) calc(2 * var(--lp-checker-tile));
-  animation: lp-checker-drift 20s linear infinite;
   will-change: transform;
-}
-
-@keyframes lp-checker-drift {
-  to {
-    transform: translate(calc(2 * var(--lp-checker-tile)), calc(2 * var(--lp-checker-tile)));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-checker::before {
-    animation: none;
-  }
 }
 
 /* Le canvas, deuxième couche (CDC 2026) : plein écran, sous les pills. La scène le peint avec les teintes des tokens. */
