@@ -5,15 +5,18 @@ import type { ReactNode } from "react";
 import type { CanvasOpener } from "../state/canvas-store";
 import designSystemCss from "../ui/design/design-system.css?url";
 import { THEME_SCRIPT } from "../ui/design/theme";
+import { OBS_VIEW_SCRIPT } from "../ui/obs/obs-view";
 
 export type RouterContext = { openCanvas: CanvasOpener };
 
 const RootDocument = ({ children }: { children: ReactNode }) => (
-  // `data-theme` est posé par le script du thème avant que React hydrate : un écart voulu, sur `<html>` seul.
+  // `data-theme` et `data-view` sont posés par script avant que React hydrate : un écart voulu, sur `<html>` seul.
   <html lang="fr" suppressHydrationWarning>
     <head>
       {/* Avant tout le reste : le thème est posé avant la première peinture (JOURNAL 2026-09-24). */}
       <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
+      {/* Et la vue OBS : l'interface ne passe jamais sur le stream (JOURNAL 2026-09-25). */}
+      <ScriptOnce>{OBS_VIEW_SCRIPT}</ScriptOnce>
       <HeadContent />
     </head>
     <body>
