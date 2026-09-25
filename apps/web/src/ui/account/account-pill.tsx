@@ -1,6 +1,6 @@
 // La pill Compte (CDC 2026), en haut à droite : le thème, puis sa photo (Mon compte) ou Se connecter.
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
@@ -22,6 +22,7 @@ export type AccountPillProps = {
   signOutHref: string;
   themeChoice: ThemeChoice;
   onPickTheme: (choice: ThemeChoice) => void;
+  moderationTab?: ReactNode | undefined; // l'onglet Modération de la fenêtre, pour qui modère
   isCompact?: boolean;
   isDocked?: boolean;
 };
@@ -32,6 +33,7 @@ export const AccountPill = ({
   signOutHref,
   themeChoice,
   onPickTheme,
+  moderationTab,
   isCompact = false,
   isDocked = true,
 }: AccountPillProps) => {
@@ -63,6 +65,7 @@ export const AccountPill = ({
             signOutHref={signOutHref}
             themeChoice={themeChoice}
             onPickTheme={onPickTheme}
+            moderationTab={moderationTab}
           />
         </>
       )}

@@ -81,6 +81,8 @@ export function createDraftStore(
     for (const listener of listeners) listener();
   };
 
+  const leaveDraftMode = (): void => publish({ mode: "view", isTracing: false, isTouchTracing: false });
+
   // Le brouillon d'un utilisateur ne se lit qu'après le `welcome` : c'est lui qui donne le `userId`.
   const applySavedDraft = (): void => {
     const { userId, status, width, height, palette } = canvas.getView();
@@ -89,7 +91,14 @@ export function createDraftStore(
     const bounds = { width, height, paletteSize: palette.length };
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
   };
-  const unsubscribe = canvas.subscribe(applySavedDraft);
+  // Écart §10.2 (JOURNAL 2026-09-25) : un banni sort du Dessin, son brouillon reste sauvegardé.
+  const leaveIfBanned = (): void => {
+    if (canvas.getView().isBanned && view.mode === "draft") leaveDraftMode();
+  };
+  const unsubscribe = canvas.subscribe(() => {
+    applySavedDraft();
+    leaveIfBanned();
+  });
   applySavedDraft();
 
   const setDraft = (draft: Draft): void => {
@@ -107,8 +116,6 @@ export function createDraftStore(
   // Le brouillon ne bouge qu'en Dessin, et jamais pendant l'envoi.
   const isEditable = () => view.mode === "draft" && !view.isSending;
 
-  const leaveDraftMode = (): void => publish({ mode: "view", isTracing: false, isTouchTracing: false });
-
   const applyEdit = (edit: DraftEdit, canShake: boolean): void => {
     setDraft(edit.draft);
     if (edit.isCapped && canShake) publish({ shakeCount: view.shakeCount + 1 });
@@ -125,11 +132,13 @@ export function createDraftStore(
       // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
       if (!result.ok) return;
       setDraft(settleBatch(view.draft, batch, result.value));
+      if (canvas.getView().isBanned) return;
     }
   };
 
   const submit = async (): Promise<void> => {
-    if (view.isSending || view.draft.size === 0 || canvas.getView().status !== "live") return;
+    const { status, isBanned } = canvas.getView();
+    if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned) return;
     publish({ isSending: true });
     try {
       await sendBatches();
@@ -147,7 +156,8 @@ export function createDraftStore(
     },
     getView: () => view,
     enterDraftMode() {
-      const { userId, status } = canvas.getView();
+      const { userId, status, isBanned } = canvas.getView();
+      if (isBanned) return;
       if (userId && !view.isSending) publish({ mode: "draft" });
       else if (!userId && status === "live") publish({ isSignInPrompted: true });
     },

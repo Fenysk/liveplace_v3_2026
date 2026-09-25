@@ -62,8 +62,8 @@ const strokeOutside = (context: CanvasRenderingContext2D, rect: Rect, lineWidth:
   context.strokeRect(rect.left - gap, rect.top - gap, rect.width + gap * 2, rect.height + gap * 2);
 };
 
-// La gomme : la couleur posée, pâlie, et une croix fine. Pas de damier (CDC 2026).
-const fillErased = (
+// La gomme : la couleur posée, pâlie, et une croix fine. Pas de damier (CDC 2026). L'aperçu de pixels la reprend.
+export const fillErased = (
   context: CanvasRenderingContext2D,
   rect: Rect,
   color: string | undefined,

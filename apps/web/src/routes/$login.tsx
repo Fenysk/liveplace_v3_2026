@@ -17,6 +17,11 @@ import { useDraftKeys } from "../ui/draft/use-draft-keys";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
+import { BannedWindow } from "../ui/moderation/banned-window";
+import { ModerationTab } from "../ui/moderation/moderation-tab";
+import { ModerationWindow } from "../ui/moderation/moderation-window";
+import { useBannedWindowProps } from "../ui/moderation/use-banned-window";
+import { useModeration } from "../ui/moderation/use-moderation";
 import { resolveCanvas } from "../usecase/resolve-canvas";
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
@@ -52,12 +57,20 @@ type LivePillsProps = { stores: Stores; login: string; isCompact: boolean };
 const LivePills = ({ stores, login, isCompact }: LivePillsProps) => {
   const account = useAccountPillProps(stores.canvas, login);
   const draft = useDraftPillProps(stores, login);
-  const inspection = useInspectionPillProps(stores);
+  const moderation = useModeration(stores.canvas);
+  const inspection = useInspectionPillProps(stores, moderation.controls);
+  const banned = useBannedWindowProps(stores.canvas);
   return (
     <>
-      <AccountPill {...account} isCompact={isCompact} />
+      <AccountPill
+        {...account}
+        isCompact={isCompact}
+        moderationTab={moderation.controls && <ModerationTab canvas={stores.canvas} />}
+      />
       <InspectionPill {...inspection} />
       <DraftPill {...draft} isCompact={isCompact} />
+      <ModerationWindow {...moderation.window} />
+      <BannedWindow {...banned} />
     </>
   );
 };

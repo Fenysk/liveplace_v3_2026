@@ -1,9 +1,10 @@
 // La fenêtre (CDC 2026) : un seul menu flottant, une barre latérale et un contenu, par-dessus toute l'interface.
+// La petite fenêtre (JOURNAL 2026-09-25) : la même, sans barre latérale, pour une question ou un avis.
 // Sur un `<dialog>` natif : l'arrière devient inerte, le focus revient au bouton d'origine, `::backdrop` est le voile.
 
 import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
 import { Grabber } from "./grabber";
@@ -48,23 +49,36 @@ const useWindowMotion = (isOpen: boolean) => {
 
 const doNothing = (): void => undefined;
 
-export const Window = <Id extends string>({
+type WindowShellProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  titleId: string;
+  isSmall?: boolean;
+  isLocked?: boolean;
+  children: ReactNode;
+};
+
+// Le voile ne ferme pas la fenêtre : seuls Échap et le bouton Fermer le font, en passant par l'animation.
+const WindowShell = ({
   isOpen,
-  sections,
-  sectionId,
-  onSelect,
   onClose,
+  titleId,
+  isSmall = false,
+  isLocked = false,
   children,
-}: WindowProps<Id>) => {
+}: WindowShellProps) => {
   const { dialog, isShown } = useWindowMotion(isOpen);
-  const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
-  // Le voile ne ferme pas la fenêtre : seuls Échap et le bouton Fermer le font, en passant par l'animation.
   return (
     <dialog
       ref={dialog}
-      className={classNames("lp-pill lp-window", isShown && "is-open")}
+      className={classNames(
+        "lp-pill lp-window",
+        isSmall && "lp-window--small",
+        isLocked && "is-locked",
+        isShown && "is-open",
+      )}
       tabIndex={-1}
-      aria-labelledby="lp-window-title"
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -75,6 +89,35 @@ export const Window = <Id extends string>({
       <div className="lp-window-grabber">
         <Grabber label="Fermer" onUp={doNothing} onDown={onClose} onTap={doNothing} />
       </div>
+      {children}
+    </dialog>
+  );
+};
+
+type WindowHeadProps = { titleId: string; title: ReactNode; onClose: () => void };
+
+const WindowHead = ({ titleId, title, onClose }: WindowHeadProps) => (
+  <header className="lp-window-head">
+    <h2 id={titleId} className="lp-type-heading">
+      {title}
+    </h2>
+    <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
+  </header>
+);
+
+export const Window = <Id extends string>({
+  isOpen,
+  sections,
+  sectionId,
+  onSelect,
+  onClose,
+  children,
+}: WindowProps<Id>) => {
+  // Un identifiant par fenêtre : une petite fenêtre peut exister à côté (JOURNAL 2026-09-25).
+  const titleId = useId();
+  const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
+  return (
+    <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId}>
       <nav className="lp-window-nav" aria-label="Sections">
         <ul>
           {sections.map(({ id, label, icon: Icon }) => (
@@ -93,15 +136,40 @@ export const Window = <Id extends string>({
         </ul>
       </nav>
       <section className="lp-window-main">
-        <header className="lp-window-head">
-          <h2 id="lp-window-title" className="lp-type-heading">
-            {current?.label}
-          </h2>
-          <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
-        </header>
+        <WindowHead titleId={titleId} title={current?.label} onClose={onClose} />
         <div className="lp-window-body">{children}</div>
       </section>
-    </dialog>
+    </WindowShell>
+  );
+};
+
+type SmallWindowProps = {
+  isOpen: boolean;
+  title: string;
+  onClose: () => void; // Échap, Fermer, ou la poignée sur mobile
+  isLocked?: boolean; // pendant l'action qu'elle a confirmée : grisée, et rien ne la ferme
+  actions: ReactNode; // en bas, à droite
+  children: ReactNode;
+};
+
+export const SmallWindow = ({
+  isOpen,
+  title,
+  onClose,
+  isLocked = false,
+  actions,
+  children,
+}: SmallWindowProps) => {
+  const titleId = useId();
+  const close = isLocked ? doNothing : onClose;
+  return (
+    <WindowShell isOpen={isOpen} onClose={close} titleId={titleId} isSmall isLocked={isLocked}>
+      <section className="lp-window-main">
+        <WindowHead titleId={titleId} title={title} onClose={close} />
+        <div className="lp-window-body">{children}</div>
+        <footer className="lp-window-actions">{actions}</footer>
+      </section>
+    </WindowShell>
   );
 };
 

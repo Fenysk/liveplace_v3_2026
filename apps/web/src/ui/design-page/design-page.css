@@ -120,6 +120,26 @@
   width: 100%;
 }
 
+/* Un aperçu de pixels à la largeur d'une petite fenêtre */
+.design-preview-box {
+  width: 320px;
+  max-width: 100%;
+}
+
+/* Le contenu d'un onglet de la fenêtre, hors de la fenêtre */
+.design-window-box {
+  display: grid;
+  gap: var(--space-4);
+  width: min(520px, 100%);
+}
+
+/* Des boutons de démonstration : ils passent à la ligne sur un téléphone */
+.design-demo-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */
 .design-notice-box .lp-notice {
   min-height: 0;

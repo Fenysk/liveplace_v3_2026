@@ -1,0 +1,20 @@
+/* L'aperçu de pixels (JOURNAL 2026-09-25) : le canvas à son format, sur son damier, dans sa bordure. Immobile. */
+
+.lp-preview {
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--canvas-border);
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 16px 16px;
+}
+
+.lp-preview-surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Des cases nettes, jamais floutées, quelle que soit la taille affichée */
+  image-rendering: pixelated;
+}

@@ -1,7 +1,9 @@
 // La pill Inspection (CDC 2026), au centre à droite : l'auteur du pixel inspecté, sa couleur, sa date de pose.
-// L'affichage seul, nourri par `useInspectionPillProps`. La modération arrive au J11.
+// Pour qui modère, sous un filet : Retirer ses pixels et Bannir (maquette). L'affichage seul, nourri par
+// `useInspectionPillProps`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
+import type { InspectEntry } from "@liveplace/domain/ports";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
@@ -9,6 +11,7 @@ import { Button } from "../design/button";
 import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile } from "../design/profile";
+import type { ModerationControls } from "../moderation/use-moderation";
 import { formatPlacedAgo } from "./placed-ago";
 
 const DOCK: PillDock = "cr";
@@ -19,6 +22,7 @@ export type InspectionPillProps = {
   palette: readonly string[];
   nowMs: number; // pour la date relative
   onClose: () => void;
+  moderation?: ModerationControls | undefined; // absente : pas le droit de modérer
   isDocked?: boolean;
 };
 
@@ -26,11 +30,22 @@ const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
   <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
 );
 
-type InspectedCellProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose"> & {
+type ModerationRowProps = { moderation: ModerationControls; author: InspectEntry };
+
+// Jamais sur les pixels du streamer, ni sur les siens (maquette).
+const ModerationRow = ({ moderation, author }: ModerationRowProps) =>
+  moderation.isProtected(author.userId) ? null : (
+    <div className="lp-row lp-row--ruled">
+      <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", author)} />
+      <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", author)} />
+    </div>
+  );
+
+type InspectedCellProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose" | "moderation"> & {
   inspection: Exclude<Inspection, { status: "loading" }>;
 };
 
-const InspectedCell = ({ inspection, palette, nowMs, onClose }: InspectedCellProps) => {
+const InspectedCell = ({ inspection, palette, nowMs, onClose, moderation }: InspectedCellProps) => {
   const coordinates = `(${inspection.x}, ${inspection.y})`;
   if (inspection.status === "empty")
     return (
@@ -65,6 +80,7 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose }: InspectedCellPro
           {formatPlacedAgo(entry.placedAt, nowMs)}
         </span>
       </div>
+      {moderation && <ModerationRow moderation={moderation} author={entry} />}
     </>
   );
 };
@@ -93,13 +109,22 @@ export const InspectionPill = ({
   palette,
   nowMs,
   onClose,
+  moderation,
   isDocked = true,
 }: InspectionPillProps) => {
   const { shown, isVisible } = useShownInspection(inspection);
   if (!inspection && !shown) return null;
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={isVisible}>
-      {shown && <InspectedCell inspection={shown} palette={palette} nowMs={nowMs} onClose={onClose} />}
+      {shown && (
+        <InspectedCell
+          inspection={shown}
+          palette={palette}
+          nowMs={nowMs}
+          onClose={onClose}
+          moderation={moderation}
+        />
+      )}
     </Pill>
   );
 };
