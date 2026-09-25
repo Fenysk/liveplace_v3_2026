@@ -575,3 +575,82 @@ describe("inspect (§5.6, JOURNAL 2026-09-24)", () => {
     await redis.del(userKey(userId));
   });
 });
+
+describe("listEvents, the resync (§4.5)", () => {
+  const now = 1_700_000_000_000;
+
+  const canvasWithThreeEvents = async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    for (const x of [1, 2, 3])
+      await core.place(canvasId, {
+        userId: "user-1",
+        requestId: randomUUID(),
+        nowMs: now,
+        pixels: [{ x, y: 0, colorIndex: 1 }],
+      });
+    return canvasId;
+  };
+
+  // Rend les événements depuis fromVersion, dans l'ordre, et une liste vide quand rien n'a été manqué
+  it("gives the events from fromVersion in order, and an empty list when nothing was missed", async () => {
+    const canvasId = await canvasWithThreeEvents();
+
+    expect((await core.listEvents(canvasId, 2, 2000))?.map((event) => event.version)).toEqual([2, 3]);
+    expect(await core.listEvents(canvasId, 4, 2000)).toEqual([]);
+  });
+
+  // Rend null au-delà de maxCount, quand le stream ne remonte plus jusque-là, ou quand le client est en avance
+  it("gives null past maxCount, when the stream no longer reaches back, or when the client is ahead", async () => {
+    const canvasId = await canvasWithThreeEvents();
+
+    expect(await core.listEvents(canvasId, 1, 2)).toBeNull();
+    expect(await core.listEvents(canvasId, 10, 2000)).toBeNull();
+    await redis.xtrim(buildCanvasKeys(canvasId).events, "MAXLEN", 1);
+    expect(await core.listEvents(canvasId, 2, 2000)).toBeNull();
+    expect((await core.listEvents(canvasId, 3, 2000))?.map((event) => event.version)).toEqual([3]);
+  });
+});
+
+describe("listRecentEvents, the recent of the OBS view (§5.6, §9.5)", () => {
+  const now = 1_700_000_000_000;
+
+  // Rend les événements depuis sinceMs, du plus ancien au plus récent, et rien d'avant
+  it("gives the events since sinceMs, oldest first, and nothing before", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    for (const [x, age] of [
+      [1, 8000],
+      [2, 3000],
+      [3, 1000],
+    ] as const)
+      await core.place(canvasId, {
+        userId: "user-1",
+        requestId: randomUUID(),
+        nowMs: now - age,
+        pixels: [{ x, y: 0, colorIndex: 1 }],
+      });
+
+    const recent = await core.listRecentEvents(canvasId, now - 5000);
+
+    expect(recent.map((event) => event.version)).toEqual([2, 3]);
+  });
+});
+
+describe("setObsDelay (JOURNAL 2026-09-25)", () => {
+  // Écrit le délai dans meta et le publie aux pages du canvas, sans créer de version
+  it("writes the delay in meta and publishes it to the canvas pages, without a version", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    await core.setObsDelay(canvasId, 60_000);
+    await delay(100);
+    await unsubscribe();
+
+    expect((await core.getCanvas(canvasId))?.obsDelayMs).toBe(60_000);
+    expect(received).toEqual([{ ctl: { t: "obsDelay", obsDelayMs: 60_000 } }]);
+    expect(await redis.get(buildCanvasKeys(canvasId).version)).toBe("0");
+  });
+});

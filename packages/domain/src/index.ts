@@ -90,7 +90,15 @@ export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: 
   };
 }
 
-export const OBS_DELAY_MS = 5000;
+// Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai par crans, jusqu'à 10 min.
+export const OBS_DELAY_STEPS_MS = [
+  0, 5_000, 10_000, 20_000, 30_000, 60_000, 120_000, 300_000, 600_000,
+] as const;
+export const OBS_DELAY_MS = 10_000;
+
+export function isObsDelayStep(obsDelayMs: number): boolean {
+  return OBS_DELAY_STEPS_MS.some((step) => step === obsDelayMs);
+}
 
 // Un canvas neuf aux valeurs par défaut du jeu (CDC §1) : aucune interface ne les change en bloc 1.
 export function defaultCanvasMeta(ownerId: string): CanvasMeta {

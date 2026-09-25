@@ -25,9 +25,12 @@ import {
   type ServerFrame,
 } from "@liveplace/protocol";
 import type { Broadcast, CellsListener, ControlListener } from "./broadcast";
+import { toCellsFrame } from "./cells-frame";
 
 // « policy violation » : la frame est refusée et la connexion fermée.
 const CLOSE_POLICY = 1008;
+// Au-delà, le snapshot est plus court à transmettre que le rattrapage (§4.5).
+const RESYNC_MAX_VERSIONS = 2000;
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
@@ -35,13 +38,23 @@ type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
 type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
 type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
+type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
+// Un message de contrôle devenu frame pour cette socket : son ban, ou le délai OBS du canvas.
+type ControlFrame = Extract<ServerFrame, { t: "banned" | "unbanned" | "obsDelay" }>;
+
+// L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
+// `version` part dans le `welcome` ; `coveredVersion` est la dernière version déjà envoyée, pour dédupliquer (§6.1).
+type Arrival = { version: number; coveredVersion: number } & (
+  | { kind: "resync"; cells: CellsFrame | null }
+  | { kind: "snapshot"; state: Uint8Array; recent: CellsFrame | null }
+);
 
 // `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
 type ReadyState = { status: "ready"; canvasId: string; width: number; height: number; role: Role };
 type State =
   | { status: "awaitingHello" }
-  | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[]; pendingControls: LiveControl["t"][] }
+  | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[]; pendingControls: ControlFrame[] }
   | ReadyState;
 
 export type ConnectionDeps = {
@@ -57,6 +70,9 @@ export type ConnectionDeps = {
     | "moderate"
     | "listPixels"
     | "listBans"
+    | "listEvents"
+    | "listRecentEvents"
+    | "setObsDelay"
   >;
   broadcast: Broadcast;
   now: () => Timestamp;
@@ -108,6 +124,12 @@ const buildWelcome = (
   ...(gauge ? { gauge } : {}),
 });
 
+// Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas.
+const controlFrameOf = (control: LiveControl, session: Session | null): ControlFrame | null => {
+  if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
+  return control.userId === session?.userId ? { t: control.t } : null;
+};
+
 export function createConnection(
   deps: ConnectionDeps,
   socket: ClientSocket,
@@ -121,11 +143,12 @@ export function createConnection(
     else if (state.status === "ready") socket.sendFrame({ t: "cells", ...frame });
   };
 
-  // Écart §10.2 (JOURNAL 2026-09-25) : seules les sockets de la cible apprennent son ban, en direct.
-  const onControl: ControlListener = ({ t, userId }) => {
-    if (userId !== session?.userId) return;
-    if (state.status === "joining") state.pendingControls.push(t);
-    else if (state.status === "ready") socket.sendFrame({ t });
+  // Écart §10.2 et CDC v3 §1 (JOURNAL 2026-09-25) : le ban de cette personne, le délai OBS de ce canvas.
+  const onControl: ControlListener = (control) => {
+    const frame = controlFrameOf(control, session);
+    if (!frame) return;
+    if (state.status === "joining") state.pendingControls.push(frame);
+    else if (state.status === "ready") socket.sendFrame(frame);
   };
 
   const refuse = (code: ErrorCode): void => {
@@ -141,29 +164,68 @@ export function createConnection(
     }
   };
 
-  // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban aussi.
+  // Le client annonce, le serveur choisit (§4.5). Le `recent` ne suit qu'un snapshot, jamais plus récent que lui (§9.5).
+  const getArrival = async (frame: HelloFrame, meta: CanvasMeta): Promise<Arrival> => {
+    const { canvasId, lastVersion } = frame;
+    const missed =
+      lastVersion === undefined
+        ? null
+        : await deps.core.listEvents(canvasId, lastVersion + 1, RESYNC_MAX_VERSIONS);
+    if (missed && lastVersion !== undefined) {
+      const cells = toCellsFrame(missed);
+      return { kind: "resync", version: lastVersion, coveredVersion: cells?.toVersion ?? lastVersion, cells };
+    }
+    const { version, state: pixels } = await deps.core.getSnapshot(canvasId);
+    const recent =
+      frame.mode === "obs" ? await deps.core.listRecentEvents(canvasId, deps.now() - meta.obsDelayMs) : [];
+    const covered = recent.filter((event) => event.version <= version);
+    return {
+      kind: "snapshot",
+      version,
+      coveredVersion: version,
+      state: pixels,
+      recent: toCellsFrame(covered),
+    };
+  };
+
+  const sendArrival = (arrival: Arrival, welcome: WelcomeFrame): void => {
+    if (arrival.kind === "resync") {
+      socket.sendFrame(welcome);
+      if (arrival.cells) socket.sendFrame({ t: "cells", ...arrival.cells });
+      return;
+    }
+    socket.sendFrame(arrival.recent ? { ...welcome, recent: arrival.recent } : welcome);
+    socket.sendSnapshot(arrival.state);
+  };
+
+  // Ce qui est tombé pendant l'arrivée : un ban l'emporte sur celui qu'on a lu, un délai part après le `welcome`.
+  const sendHeldControls = (held: ControlFrame[], wasBanned: boolean): void => {
+    const lastBan = held.filter((frame) => frame.t !== "obsDelay").at(-1);
+    if (lastBan ? lastBan.t === "banned" : wasBanned) socket.sendFrame({ t: "banned" });
+    for (const frame of held) if (frame.t === "obsDelay") socket.sendFrame(frame);
+  };
+
+  // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban et le délai aussi.
   const joinCanvas = async (
-    canvasId: string,
+    frame: HelloFrame,
     meta: CanvasMeta,
     role: Role,
     gauge: AckFrame["gauge"] | null,
   ) => {
+    const { canvasId } = frame;
     state = { status: "joining", canvasId, pendingFrames: [], pendingControls: [] };
     await deps.broadcast.join(canvasId, listener, onControl);
-    const [snapshot, wasBanned] = await Promise.all([
-      deps.core.getSnapshot(canvasId),
+    const [arrival, wasBanned] = await Promise.all([
+      getArrival(frame, meta),
       session ? deps.core.isBanned(canvasId, session.userId) : false,
     ]);
 
-    socket.sendFrame(buildWelcome(canvasId, meta, snapshot.version, role, session, gauge));
-    socket.sendSnapshot(snapshot.state);
+    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge));
 
     const held = state.status === "joining" ? state : { pendingFrames: [], pendingControls: [] };
     state = { status: "ready", canvasId, width: meta.width, height: meta.height, role };
-    sendHeld(held.pendingFrames, snapshot.version);
-    // Écart §10.2 (JOURNAL 2026-09-25) : un ban tombé pendant l'arrivée l'emporte sur celui qu'on a lu.
-    const lastControl = held.pendingControls.at(-1);
-    if (lastControl ? lastControl === "banned" : wasBanned) socket.sendFrame({ t: "banned" });
+    sendHeld(held.pendingFrames, arrival.coveredVersion);
+    sendHeldControls(held.pendingControls, wasBanned);
   };
 
   const greet = async (frame: HelloFrame): Promise<void> => {
@@ -172,7 +234,7 @@ export function createConnection(
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
     // Écart §5.6 (JOURNAL 2026-09-24) : la jauge dès l'arrivée. Un invité n'en a pas.
     const gauge = session ? await deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null;
-    await joinCanvas(frame.canvasId, meta, roleFor(session, meta, isModerator), gauge);
+    await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge);
   };
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
@@ -227,12 +289,19 @@ export function createConnection(
     socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
   };
 
+  // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer seul. Le schéma n'a laissé passer qu'un cran.
+  const setObsDelay = async ({ obsDelayMs }: SetObsDelayFrame, ready: ReadyState): Promise<void> => {
+    if (ready.role !== "owner") return forbid();
+    await deps.core.setObsDelay(ready.canvasId, obsDelayMs);
+  };
+
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     if (frame.t === "place") return placePixels(frame, ready.canvasId);
     if (frame.t === "inspect") return inspectCell(frame, ready);
     if (frame.t === "moderate") return moderateCanvas(frame, ready);
     if (frame.t === "listPixels") return listPixels(frame, ready);
     if (frame.t === "listBans") return listBans(frame.requestId, ready);
+    if (frame.t === "setObsDelay") return setObsDelay(frame, ready);
     socket.sendFrame({ t: "pong" });
   };
 

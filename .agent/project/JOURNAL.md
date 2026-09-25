@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-25 — Écart CDC v3 §1, plan §9.5 et §15 : le délai OBS se règle, à chaud
+
+**Contexte.** Le CDC v3 §1 fixe le délai tampon « sans aucune interface pour le modifier », et le plan remet le changement à chaud à plus tard (§15). L'humain veut le régler dans la section Vue OBS, de 0 à 10 min, 10 s par défaut, et que les sources ouvertes le prennent aussitôt.
+**Décision.** Neuf crans dans `domain` (`OBS_DELAY_STEPS_MS`), `OBS_DELAY_MS` à 10 s. `setObsDelay` (client, `owner` seul, un cran seulement) écrit `meta` et publie un `ctl` en un `MULTI` : pas de version, ce n'est pas un pixel. La frame `obsDelay` le porte à toutes les sockets du canvas. La page calcule l'heure d'affichage au moment de vider sa file, avec le délai du moment. `PROTOCOL_VERSION` passe à 3. Les canvas existants passent à 10 s au déploiement.
+**Renoncement.** Pas de valeur libre (un champ, un curseur continu) : un cran absurde passerait. Pas de délai rangé dans Convex : `meta` est déjà lu au `welcome`, et le worker n'existe pas.
+
 ## 2026-09-25 — Écart §5.4, §4.2 et §4.4 : `clearArea` n'existe plus
 
 **Contexte.** Le §5.4 prévoit de retirer un rectangle (`clearArea`), que le protocole accepte déjà. L'humain l'a abandonné : on ne modère pas une zone, on modère ce que quelqu'un a posé.

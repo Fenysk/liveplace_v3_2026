@@ -79,6 +79,8 @@ type SetupOptions = {
   duringSnapshot?: () => void;
   isBanned?: boolean;
   slices?: ModerationSlice[];
+  resync?: Event[] | null; // ce que rend `listEvents` ; absent : le stream ne peut pas resynchroniser
+  recent?: Event[]; // ce que rend `listRecentEvents`
 };
 
 const setup = (options: SetupOptions = {}) => {
@@ -86,6 +88,8 @@ const setup = (options: SetupOptions = {}) => {
   const inspected: { x: number; y: number }[] = [];
   const moderations: Moderation[] = [];
   const listedPixels: string[] = [];
+  const recentSince: number[] = [];
+  const obsDelays: number[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const core = {
     async getCanvas(asked: string) {
@@ -123,6 +127,16 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listBans() {
       return bannedUsers;
+    },
+    async listEvents() {
+      return options.resync ?? null;
+    },
+    async listRecentEvents(_asked: string, sinceMs: number) {
+      recentSince.push(sinceMs);
+      return options.recent ?? [];
+    },
+    async setObsDelay(_asked: string, obsDelayMs: number) {
+      obsDelays.push(obsDelayMs);
     },
     async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
       publishTo = onMessage;
@@ -165,6 +179,8 @@ const setup = (options: SetupOptions = {}) => {
     inspected,
     moderations,
     listedPixels,
+    recentSince,
+    obsDelays,
     open,
     publish: (published: Event) => publishTo?.({ e: published }),
     control: (published: LiveControl) => publishTo?.({ ctl: published }),
@@ -502,6 +518,102 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
       "welcome",
       "snapshot",
       "banned",
+    ]);
+  });
+});
+
+describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
+  const cell = (version: number, x: number) => ({
+    x,
+    y: 2,
+    colorIndex: 5,
+    previousColorIndex: 0,
+    placedAt: now,
+    version,
+    kind: "place" as const,
+  });
+
+  // Reprend depuis lastVersion : un welcome sans snapshot, puis les cases manquées, sans conflation
+  it("resyncs from lastVersion: a welcome without a snapshot, then the missed cells, not conflated", async () => {
+    const { connection, sent } = setup({ resync: [event(4, 1, 5), event(5, 1, 5)] });
+
+    await connection.receive(hello({ lastVersion: 3 }));
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "cells"]);
+    expect(sent[0]).toMatchObject({ t: "welcome", version: 3 });
+    expect(sent[1]).toEqual({ t: "cells", toVersion: 5, cells: [cell(4, 1), cell(5, 1)] });
+  });
+
+  // Reprend sans rien envoyer de plus quand rien n'a été manqué
+  it("resyncs with nothing more when nothing was missed", async () => {
+    const { connection, sent } = setup({ resync: [] });
+
+    await connection.receive(hello({ lastVersion: 3 }));
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome"]);
+  });
+
+  // Repart d'un snapshot quand le stream ne peut pas resynchroniser
+  it("falls back to a snapshot when the stream cannot resync", async () => {
+    const { connection, sent } = setup({ resync: null });
+
+    await connection.receive(hello({ lastVersion: 3 }));
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Joint à un welcome OBS avec snapshot les cases récentes, jamais plus récentes que lui, lues à l'heure du délai
+  it("joins the recent cells to an OBS welcome with a snapshot, never newer than it, read at the delay", async () => {
+    const context = setup({ version: 5, recent: [event(4, 1, 5), event(6, 2, 5)] });
+
+    await context.connection.receive(hello({ mode: "obs" }));
+
+    expect(context.recentSince).toEqual([now - meta.obsDelayMs]);
+    expect(context.sent[0]).toMatchObject({ t: "welcome", recent: { toVersion: 4, cells: [cell(4, 1)] } });
+  });
+
+  // Ne joint jamais recent à un welcome du jeu, ni à un resync de la vue OBS
+  it("never joins recent to a game welcome, nor to an OBS resync", async () => {
+    const game = setup({ recent: [event(1, 1, 5)] });
+    const resync = setup({ resync: [], recent: [event(1, 1, 5)] });
+
+    await game.connection.receive(hello());
+    await resync.connection.receive(hello({ mode: "obs", lastVersion: 3 }));
+
+    expect(game.sent[0]).not.toHaveProperty("recent");
+    expect(resync.sent[0]).not.toHaveProperty("recent");
+  });
+
+  // Ne laisse que le streamer régler le délai OBS, et le transmet à toutes les pages du canvas
+  it("lets only the owner set the OBS delay, and hands it to every page of the canvas", async () => {
+    const context = setup({ session: owner });
+    const viewer = context.open(session);
+    const guest = context.open(null);
+    for (const opened of [context, viewer, guest]) await opened.connection.receive(hello());
+    const setObsDelay = JSON.stringify({ t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 });
+
+    await viewer.connection.receive(setObsDelay);
+    await context.connection.receive(setObsDelay);
+    context.control({ t: "obsDelay", obsDelayMs: 60_000 });
+
+    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden" });
+    expect(context.obsDelays).toEqual([60_000]);
+    for (const opened of [context, viewer, guest])
+      expect(opened.sent.at(-1)).toEqual({ t: "obsDelay", obsDelayMs: 60_000 });
+  });
+
+  // Garde un changement de délai tombé pendant l'arrivée, et l'envoie après le welcome
+  it("holds a delay change that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "obsDelay", obsDelayMs: 0 });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "obsDelay",
     ]);
   });
 });

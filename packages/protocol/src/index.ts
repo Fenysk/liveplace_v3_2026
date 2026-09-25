@@ -1,13 +1,13 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
-import { ROLES, type Timestamp } from "@liveplace/domain";
+import { isObsDelayStep, ROLES, type Timestamp } from "@liveplace/domain";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
 // --- Constantes et types de base --------------------------------------
 
-// 2 : cinq frames de modération, `cursor` et `clearArea` retirés (JOURNAL 2026-09-25).
-export const PROTOCOL_VERSION = 2;
+// 2 : cinq frames de modération, `cursor` et `clearArea` retirés. 3 : le délai OBS à chaud (JOURNAL 2026-09-25).
+export const PROTOCOL_VERSION = 3;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -156,6 +156,15 @@ const ListPixelsFrameSchema = z.object({
 
 const ListBansFrameSchema = z.object({ t: z.literal("listBans"), requestId: RequestIdSchema });
 
+// Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai de sa vue OBS, un cran à la fois.
+const ObsDelaySchema = z.number().int().refine(isObsDelayStep, "pas un cran du délai OBS");
+
+const SetObsDelayFrameSchema = z.object({
+  t: z.literal("setObsDelay"),
+  requestId: RequestIdSchema,
+  obsDelayMs: ObsDelaySchema,
+});
+
 const PingFrameSchema = z.object({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -165,6 +174,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ModerateFrameSchema,
   ListPixelsFrameSchema,
   ListBansFrameSchema,
+  SetObsDelayFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -256,6 +266,9 @@ const BansFrameSchema = z.object({
 
 const UnbannedFrameSchema = z.object({ t: z.literal("unbanned") });
 
+// Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
+const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: ObsDelaySchema });
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -275,6 +288,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   PixelsFrameSchema,
   BansFrameSchema,
   UnbannedFrameSchema,
+  ObsDelayFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);
