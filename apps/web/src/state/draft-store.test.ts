@@ -173,26 +173,43 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
     expect(store.getView().colorIndex).toBe(12);
   });
 
-  // Sur mobile, une couleur prise dans la palette entre dans les récentes ; en prendre une parmi elles garde leur ordre
-  it("remembers a color picked from the palette, and keeps the order when one is picked among the recent", () => {
+  // Sur mobile, une couleur nouvelle prend le bouton et celle qu'elle remplace entre en tête de la rangée ;
+  // une couleur de la rangée s'échange avec celle du bouton, sur place
+  it("puts the replaced color first for a new color, and swaps in place for a recent one", () => {
     const { store } = setup();
+    const first = store.getView().colorIndex;
     const before = store.getView().recentColorIndexes;
 
     store.selectColor(12);
-    expect(store.getView().recentColorIndexes).toEqual([12, ...before.slice(0, 4)]);
+    expect(store.getView().recentColorIndexes).toEqual([first, ...before.slice(0, 4)]);
 
-    store.pickRecentColor(before[1] ?? 0);
+    const row = store.getView().recentColorIndexes;
+    store.selectColor(row[2] ?? 0);
     expect(store.getView()).toMatchObject({
-      colorIndex: before[1],
-      recentColorIndexes: [12, ...before.slice(0, 4)],
+      colorIndex: row[2],
+      recentColorIndexes: row.map((index) => (index === row[2] ? 12 : index)),
     });
   });
 
-  // La couleur active est l'une des récentes dès l'arrivée : la rangée mobile la montre, sans doublon à côté
-  it("starts with the active color among the recent ones", () => {
+  // Gomme armée, une couleur de la rangée s'échange avec la couleur d'avant la gomme : aucune ne se perd
+  it("swaps a recent color with the color the eraser replaced", () => {
+    const { store } = setup();
+    store.selectColor(12);
+    store.toggleEraser();
+    const row = store.getView().recentColorIndexes;
+
+    store.selectColor(row[1] ?? 0);
+    expect(store.getView()).toMatchObject({
+      colorIndex: row[1],
+      recentColorIndexes: row.map((index) => (index === row[1] ? 12 : index)),
+    });
+  });
+
+  // La rangée ne montre jamais la couleur du bouton : aucun doublon
+  it("never has the active color in the row", () => {
     const { store } = setup();
 
-    expect(store.getView().recentColorIndexes).toContain(store.getView().colorIndex);
+    expect(store.getView().recentColorIndexes).not.toContain(store.getView().colorIndex);
   });
 });
 

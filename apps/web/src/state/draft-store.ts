@@ -28,7 +28,7 @@ export type DraftView = {
   isTouchTracing: boolean; // le Toggle tracé : un doigt trace, deux doigts déplacent
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
   isSignInPrompted: boolean; // un invité a voulu dessiner : la pill Dessin l'invite à se connecter (CDC 2026)
-  recentColorIndexes: readonly number[]; // sur mobile, quatre couleurs à portée de pouce (design system)
+  recentColorIndexes: readonly number[]; // sur mobile, la rangée : cinq couleurs, jamais celle du bouton (design system)
 };
 
 export type DraftStore = {
@@ -37,8 +37,7 @@ export type DraftStore = {
   enterDraftMode(): void;
   exitDraftMode(): void; // le brouillon est gardé
   discardDraft(): void;
-  selectColor(colorIndex: number): void; // prise dans la palette : elle entre dans les récentes
-  pickRecentColor(colorIndex: number): void; // prise parmi les récentes : leur ordre ne bouge pas
+  selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
   toggleCell(x: number, y: number): void;
   startTrace(): void;
@@ -108,11 +107,6 @@ export function createDraftStore(
   // Le brouillon ne bouge qu'en Dessin, et jamais pendant l'envoi.
   const isEditable = () => view.mode === "draft" && !view.isSending;
 
-  const armColor = (colorIndex: number, recentColorIndexes: readonly number[]): void => {
-    if (colorIndex !== TRANSPARENT_COLOR_INDEX) lastColorIndex = colorIndex;
-    publish({ colorIndex, recentColorIndexes });
-  };
-
   const leaveDraftMode = (): void => publish({ mode: "view", isTracing: false, isTouchTracing: false });
 
   const applyEdit = (edit: DraftEdit, canShake: boolean): void => {
@@ -165,10 +159,10 @@ export function createDraftStore(
       if (isEditable()) setDraft(EMPTY_DRAFT);
     },
     selectColor(colorIndex) {
-      armColor(colorIndex, rememberColorIndex(view.recentColorIndexes, colorIndex));
-    },
-    pickRecentColor(colorIndex) {
-      armColor(colorIndex, view.recentColorIndexes);
+      // Gomme armée, la couleur remplacée est celle d'avant la gomme : aucune ne se perd.
+      const recentColorIndexes = rememberColorIndex(view.recentColorIndexes, lastColorIndex, colorIndex);
+      if (colorIndex !== TRANSPARENT_COLOR_INDEX) lastColorIndex = colorIndex;
+      publish({ colorIndex, recentColorIndexes });
     },
     toggleEraser() {
       if (view.colorIndex === TRANSPARENT_COLOR_INDEX) publish({ colorIndex: lastColorIndex });

@@ -47,9 +47,12 @@
   padding-right: 6px;
 }
 
-.lp-profile-main:hover .lp-profile-name {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+/* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
+@media (hover: hover) {
+  .lp-profile-main:hover .lp-profile-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
 .lp-profile-main:focus-visible {
