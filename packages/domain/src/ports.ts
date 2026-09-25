@@ -34,7 +34,10 @@ export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>[
 export type Snapshot = { state: Uint8Array; version: number };
 
 // Canal `cv:<id>:live` : les événements, et les messages de contrôle de moderate.lua (§5.4).
-export type LiveControl = { t: "banned" | "unbanned"; userId: string };
+// Un ban pour les sockets d'une personne, ou le délai OBS pour toutes celles du canvas (JOURNAL 2026-09-25).
+export type LiveControl =
+  | { t: "banned" | "unbanned"; userId: string }
+  | { t: "obsDelay"; obsDelayMs: number };
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
@@ -61,6 +64,12 @@ export interface CanvasCore {
   isBanned(canvasId: string, userId: string): Promise<boolean>;
   listPixels(canvasId: string, userId: string): Promise<Pixel[]>; // un banni : sa preuve (§5.1)
   listBans(canvasId: string): Promise<BannedUser[]>;
+  // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
+  listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;
+  // Le `recent` de la vue OBS (§9.5) : les événements depuis `sinceMs`, du plus ancien au plus récent, 2000 au plus.
+  listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]>;
+  // Écart CDC v3 §1 (JOURNAL 2026-09-25) : `meta` et le `ctl` ensemble, sans version.
+  setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

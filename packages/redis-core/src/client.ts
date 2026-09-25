@@ -25,7 +25,7 @@ import type {
   Snapshot,
   Unsubscribe,
 } from "@liveplace/domain/ports";
-import { decodeServerFrame } from "@liveplace/protocol";
+import { decodeServerFrame, type Event } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
 import {
@@ -34,6 +34,7 @@ import {
   EVENTS_MAXLEN,
   GAUGE_TTL_SECONDS,
   HIST_DEPTH,
+  RECENT_MAX_EVENTS,
   REQ_TTL_SECONDS,
   userKey,
 } from "./keys";
@@ -57,6 +58,13 @@ const metaNumber = (fields: Record<string, string>, field: string): number => {
   const value = Number(metaText(fields, field));
   if (!Number.isFinite(value)) throw new Error(`meta.${field} n'est pas un nombre`);
   return value;
+};
+
+// Une entrée du stream : ses champs à plat, dont `e`, l'événement écrit par nos scripts Lua (§5.2).
+const eventOf = (fields: string[]): Event => {
+  const raw = fields[fields.indexOf("e") + 1];
+  if (raw === undefined) throw new Error("entrée du stream sans événement");
+  return JSON.parse(raw);
 };
 
 // Une commande d'un MULTI : ioredis rend `[erreur, valeur]` par commande.
@@ -294,6 +302,57 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         }),
       );
       return users.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    // L'ID du stream est la version (§5.2) : un XRANGE direct. Toute version a son entrée, donc un trou veut dire un trim.
+    async listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null> {
+      const keys = buildCanvasKeys(canvasId);
+      const results = await redis
+        .multi()
+        .xrange(keys.events, `${fromVersion}-0`, "+", "COUNT", maxCount + 1)
+        .get(keys.version)
+        .exec();
+      if (!results) throw new Error(`listEvents ${canvasId} : transaction annulée`);
+      const [entries, version] = results.map(unwrap);
+      if (!Array.isArray(entries) || typeof version !== "string")
+        throw new Error(`listEvents ${canvasId} : stream ou version illisible`);
+      const lastVersion = Number(version);
+      // Un client en avance sur le canvas (un Redis revenu en arrière) repart d'un snapshot.
+      if (fromVersion > lastVersion + 1 || entries.length > maxCount) return null;
+      const events = entries.map(([, fields]: [string, string[]]) => eventOf(fields));
+      const isComplete =
+        events.length === lastVersion - fromVersion + 1 &&
+        (events[0]?.version ?? fromVersion) === fromVersion;
+      return isComplete ? events : null;
+    },
+
+    // Seul accès par le temps (§5.6) : à l'envers depuis la fin, jusqu'au premier événement trop ancien.
+    async listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]> {
+      const entries = await redis.xrevrange(
+        buildCanvasKeys(canvasId).events,
+        "+",
+        "-",
+        "COUNT",
+        RECENT_MAX_EVENTS,
+      );
+      const recent: Event[] = [];
+      for (const [, fields] of entries) {
+        const event = eventOf(fields);
+        if (event.occurredAt < sinceMs) break;
+        recent.push(event);
+      }
+      return recent.reverse();
+    },
+
+    // Écart CDC v3 §1 (JOURNAL 2026-09-25) : un réglage, pas un pixel. Ni version, ni entrée dans le stream.
+    async setObsDelay(canvasId: string, obsDelayMs: number): Promise<void> {
+      const keys = buildCanvasKeys(canvasId);
+      const control: LiveMessage = { ctl: { t: "obsDelay", obsDelayMs } };
+      await redis
+        .multi()
+        .hset(keys.meta, "obsDelayMs", obsDelayMs)
+        .publish(keys.live, JSON.stringify(control))
+        .exec();
     },
 
     // Le comptage des abonnés appartient au gateway : premier client → abonnement, dernier → départ (§6.3).

@@ -64,4 +64,15 @@ describe("protocol frames", () => {
     expect(withPhoto.ok && withPhoto.value.t === "welcome" && withPhoto.value.you.avatarUrl).toBe(avatarUrl);
     expect(withoutPhoto.ok).toBe(true);
   });
+
+  // Accepte un cran du délai OBS, et refuse toute autre valeur (écart CDC v3 §1, JOURNAL 2026-09-25)
+  it("accepts an OBS delay step, and refuses any other value", () => {
+    const setObsDelay = (obsDelayMs: number) =>
+      decodeClientFrame({ t: "setObsDelay", requestId: "r-1", obsDelayMs });
+
+    expect(setObsDelay(10_000).ok).toBe(true);
+    expect(setObsDelay(0).ok).toBe(true);
+    expect(setObsDelay(7_000).ok).toBe(false);
+    expect(decodeServerFrame({ t: "obsDelay", obsDelayMs: 60_000 }).ok).toBe(true);
+  });
 });

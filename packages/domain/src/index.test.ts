@@ -8,7 +8,9 @@ import {
   defaultCanvasMeta,
   GAUGE_MAX,
   type GaugeParams,
+  isObsDelayStep,
   OBS_DELAY_MS,
+  OBS_DELAY_STEPS_MS,
   PALETTE,
   REFILL_CHARGES,
   REFILL_MS,
@@ -216,5 +218,23 @@ describe("defaultCanvasMeta (CDC §1)", () => {
       refillCharges: REFILL_CHARGES,
       obsDelayMs: OBS_DELAY_MS,
     });
+  });
+});
+
+describe("the OBS delay steps (JOURNAL 2026-09-25)", () => {
+  // Part de zéro, monte jusqu'à 10 min, et le défaut de 10 s en est un
+  it("goes from none up to 10 minutes, the 10 s default being one of them", () => {
+    expect(OBS_DELAY_STEPS_MS[0]).toBe(0);
+    expect(OBS_DELAY_STEPS_MS.at(-1)).toBe(10 * 60_000);
+    expect(OBS_DELAY_MS).toBe(10_000);
+    expect(isObsDelayStep(OBS_DELAY_MS)).toBe(true);
+  });
+
+  // N'accepte qu'un cran, jamais une valeur entre deux, négative ou au-delà
+  it("accepts a step only, never a value in between, negative or beyond", () => {
+    expect(OBS_DELAY_STEPS_MS.every(isObsDelayStep)).toBe(true);
+    expect(isObsDelayStep(7_000)).toBe(false);
+    expect(isObsDelayStep(-5_000)).toBe(false);
+    expect(isObsDelayStep(20 * 60_000)).toBe(false);
   });
 });

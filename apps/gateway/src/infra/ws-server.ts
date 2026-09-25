@@ -64,6 +64,10 @@ export function startGatewayServer(deps: GatewayServerDeps) {
 
   server.listen(deps.port);
   return {
+    // Au redéploiement (§6.3) : `1012`, « service restart », et les pages se reconnectent seules.
+    closeSockets: (code: number) => {
+      for (const socket of sockets.clients) socket.close(code);
+    },
     close: () =>
       new Promise<void>((resolve) => {
         sockets.close();
