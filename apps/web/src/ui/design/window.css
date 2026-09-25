@@ -113,6 +113,12 @@
   gap: var(--space-4);
 }
 
+/* Un réglage de la fenêtre : son libellé, son contrôle, sa phrase d'aide, les uns sous les autres (maquette) */
+.lp-setting {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .lp-window-row {
   display: flex;
   flex-wrap: wrap;

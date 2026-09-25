@@ -13,6 +13,7 @@ import { SignInButton } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill } from "../inspection/inspection-pill";
+import { ObsSettings } from "../obs/obs-settings";
 import { noop, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
@@ -127,6 +128,23 @@ const VIEWPORT_SPECIMENS: readonly { caption: string; framing: Framing; isCompac
   { caption: "Mobile, la vue a bougé", framing: { zoomPercent: 180, isArrival: false }, isCompact: true },
 ];
 
+// Le vrai curseur : un cran choisi s'affiche, comme le ferait la confirmation du gateway.
+const ObsSettingsSpecimen = () => {
+  const [obsDelayMs, setObsDelayMs] = useState(10_000);
+  return (
+    <Specimen caption="L'adresse, la marche à suivre et le délai">
+      <div className="design-window-box">
+        <ObsSettings
+          address="liveplace.tv/kalyss"
+          url="https://liveplace.tv/kalyss"
+          obsDelayMs={obsDelayMs}
+          onPickDelay={setObsDelayMs}
+        />
+      </div>
+    </Specimen>
+  );
+};
+
 export const GamePillsSection = () => {
   const [nowMs] = useState(() => Date.now());
   const themeChoice = useThemeChoice();
@@ -157,14 +175,17 @@ export const GamePillsSection = () => {
         <Specimen caption="Canvas, sur mobile">
           <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
         </Specimen>
+        <Specimen caption="Canvas, pour le streamer : Réglages ouvre la fenêtre sur Vue OBS">
+          <CanvasPill owner={SAMPLE_OWNER} onOpenSettings={noop} isDocked={false} />
+        </Specimen>
         {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact }) => (
           <Specimen key={caption} caption={caption}>
             <AccountPill
               identity={identity}
               signInHref="#"
-              signOutHref="#"
               themeChoice={themeChoice}
               onPickTheme={pickTheme}
+              onOpenAccount={noop}
               isCompact={isCompact ?? false}
               isDocked={false}
             />
@@ -205,6 +226,13 @@ export const GamePillsSection = () => {
             />
           </Specimen>
         ))}
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Fenêtre, section Vue OBS"
+        note="Pour le streamer : l'adresse, la marche à suivre, le délai."
+      >
+        <ObsSettingsSpecimen />
       </SpecimenSection>
 
       <SpecimenSection title="Message seul" note="La page d'accueil, un canvas introuvable.">

@@ -1,0 +1,26 @@
+/* Copier (maquette) : tout le champ est le bouton, l'action à droite, dans sa petite pill */
+
+.lp-copy {
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 4px 0 14px;
+}
+
+.lp-copy-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-copy-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(var(--control-size) - 8px);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--pill-surface);
+}
