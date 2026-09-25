@@ -23,7 +23,11 @@ export function fillImage(target: Uint32Array, pixels: Uint8Array, colorTable: U
     target[offset] = colorTable[pixels[offset] ?? 0] ?? 0;
 }
 
-export type CanvasImage = { source: HTMLCanvasElement; repaint(view: CanvasView): void };
+// Le jeu comme la vue OBS : seuls comptent la palette, la taille et les pixels.
+export type CanvasImage = {
+  source: HTMLCanvasElement;
+  repaint(view: Pick<CanvasView, "palette" | "width" | "height" | "pixels">): void;
+};
 
 export function createCanvasImage(): CanvasImage {
   const source = document.createElement("canvas");

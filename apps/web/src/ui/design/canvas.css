@@ -43,3 +43,22 @@
   /* Toujours la croix, en Vue comme en Dessin, même pendant un déplacement : jamais la main */
   cursor: crosshair;
 }
+
+/* La vue OBS (CDC 2026, JOURNAL 2026-09-25) : les pixels seuls, sur fond transparent, dès la première image.
+   Ni vide, ni damier, ni bordure, ni interface : OBS montre la scène du streamer derrière. */
+html[data-view="obs"],
+html[data-view="obs"] body {
+  background: transparent;
+}
+
+html[data-view="obs"] .lp-game {
+  display: none;
+}
+
+.lp-obs-surface {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}

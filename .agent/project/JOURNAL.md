@@ -25,6 +25,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 **Décision.** Une page qui a déjà reçu un `welcome` et qui se voit refuser une reprise pour `protocol_version` se recharge une fois, pour prendre le nouveau code. Au tout premier `hello`, pas de rechargement : la page est déjà la dernière, recharger bouclerait.
 **Renoncement.** Pas de négociation de version (§4.1) ni de vieux protocole gardé côté gateway.
 
+## 2026-09-25 — Écart §9.1 : la vue OBS se pose avant la première peinture
+
+**Contexte.** Le §9.1 accepte « une image ou deux d'interface » avant la bascule en vue OBS : le rendu serveur ne voit pas `window.obsstudio`. Sur le stream, c'est l'interface du jeu (fond gris, pills) qui passe à chaque chargement de la source.
+**Décision.** Un script émis par `ScriptOnce` en tête du `<head>`, comme celui du thème (JOURNAL 2026-09-24), pose `data-view="obs"` sur `<html>` quand `window.obsstudio` existe ou que l'adresse finit par `/obs`. Le CSS cache alors l'interface et rend le fond transparent dès la première image.
+**Renoncement.** Pas de lecture du User-Agent côté serveur : non documentée, donc fragile (§9.1).
+
 ## 2026-09-25 — Écart CDC v3 §1, plan §9.5 et §15 : le délai OBS se règle, à chaud
 
 **Contexte.** Le CDC v3 §1 fixe le délai tampon « sans aucune interface pour le modifier », et le plan remet le changement à chaud à plus tard (§15). L'humain veut le régler dans la section Vue OBS, de 0 à 10 min, 10 s par défaut, et que les sources ouvertes le prennent aussitôt.

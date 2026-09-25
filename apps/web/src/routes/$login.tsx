@@ -1,7 +1,6 @@
 // `/{login}` : l'unique adresse d'un canvas, dans le navigateur comme dans OBS (§9.1).
 
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
@@ -9,8 +8,6 @@ import { AccountPill } from "../ui/account/account-pill";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
-import { NoticePill } from "../ui/design/pill";
-import { SignInButton } from "../ui/design/twitch";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftKeys } from "../ui/draft/use-draft-keys";
@@ -22,12 +19,9 @@ import { ModerationTab } from "../ui/moderation/moderation-tab";
 import { ModerationWindow } from "../ui/moderation/moderation-window";
 import { useBannedWindowProps } from "../ui/moderation/use-banned-window";
 import { useModeration } from "../ui/moderation/use-moderation";
-import { resolveCanvas } from "../usecase/resolve-canvas";
-
-// Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
-const getCanvasPage = createServerFn({ method: "GET" })
-  .validator((login: string) => login)
-  .handler(({ data: login, context }) => resolveCanvas(context.deps.durable, login));
+import { ObsPage } from "../ui/obs/obs-page";
+import { isObsView, useIsObsView } from "../ui/obs/obs-view";
+import { CanvasNotFound, noStoreHeaders, resolveCanvasPage } from "./-canvas-page";
 
 // Lu à chaque accès : dans une fenêtre qui refuse le stockage, l'accès lui-même lève (le brouillon l'attrape).
 const getBrowserStorage = () => window.localStorage;
@@ -75,7 +69,7 @@ const LivePills = ({ stores, login, isCompact }: LivePillsProps) => {
   );
 };
 
-const CanvasPage = () => {
+const GamePage = () => {
   const { canvasId, owner } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
@@ -84,6 +78,8 @@ const CanvasPage = () => {
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
+    // Dans OBS, la page bascule juste après l'hydratation : le jeu n'ouvre rien.
+    if (isObsView()) return;
     const canvas = openCanvas(canvasId, "ui");
     const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock);
     setStores({ canvas, draft });
@@ -96,8 +92,9 @@ const CanvasPage = () => {
   useDraftKeys(stores);
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
+  // `lp-game` : caché dès la première image en vue OBS (JOURNAL 2026-09-25).
   return (
-    <main>
+    <main className="lp-game">
       <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
       {stores && <PixelCanvas store={stores.canvas} draftStore={stores.draft} canvasId={canvasId} />}
       <CanvasPill owner={owner} isCompact={isCompact} />
@@ -110,22 +107,16 @@ const CanvasPage = () => {
   );
 };
 
-const CanvasNotFound = () => (
-  <main>
-    <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
-      <SignInButton href="/auth/twitch" label="Se connecter avec Twitch" />
-    </NoticePill>
-  </main>
-);
+// La même adresse dans le navigateur et dans OBS (§9.1) : la marque posée avant la première peinture décide.
+const CanvasPage = () => {
+  const { canvasId } = Route.useLoaderData();
+  const { openCanvas } = Route.useRouteContext();
+  return useIsObsView() ? <ObsPage canvasId={canvasId} openCanvas={openCanvas} /> : <GamePage />;
+};
 
 export const Route = createFileRoute("/$login")({
-  loader: async ({ params }) => {
-    const page = await getCanvasPage({ data: params.login });
-    if (!page) throw notFound();
-    return page;
-  },
-  // OBS Studio met les pages en cache (§9.1, §13).
-  headers: () => ({ "Cache-Control": "no-store" }),
+  loader: resolveCanvasPage,
+  headers: noStoreHeaders,
   component: CanvasPage,
   notFoundComponent: CanvasNotFound,
 });
