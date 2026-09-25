@@ -1,7 +1,8 @@
 // Les phrases de la modération (JOURNAL 2026-09-25) : la confirmation, la fenêtre du banni et l'onglet Modération.
 
-// Sans reconnexion (J12), une connexion perdue ne revient qu'au rechargement de la page.
-export const CONNECTION_LOST = "Connexion perdue : recharge la page, puis réessaie.";
+// Une modération coupée ne repart pas à la reconnexion, contrairement aux lots : on la relance.
+export const CONNECTION_LOST =
+  "La connexion a sauté. Réessaie dans un instant : la page se reconnecte seule.";
 
 export function pixelCountLabel(count: number): string {
   if (count === 0) return "Aucun pixel visible";
