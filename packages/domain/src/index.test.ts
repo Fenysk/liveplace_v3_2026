@@ -4,6 +4,7 @@ import {
   CANVAS_WIDTH,
   CELL_STRIDE,
   type CellKey,
+  canModerate,
   defaultCanvasMeta,
   GAUGE_MAX,
   type GaugeParams,
@@ -16,6 +17,7 @@ import {
   type Session,
   type StateOffset,
   TRANSPARENT_COLOR_INDEX,
+  toCell,
   toCellKey,
   toSession,
   toSessionClaims,
@@ -46,6 +48,16 @@ describe("roleFor (§10.3)", () => {
   // Donne viewer à toute autre personne connectée
   it("gives viewer to anyone else signed in", () => {
     expect(roleFor(session("user-1"), meta, false)).toBe("viewer");
+  });
+});
+
+describe("canModerate (§5.4)", () => {
+  // Laisse modérer le propriétaire et un modérateur, jamais un viewer ni un invité
+  it("lets the owner and a moderator moderate, never a viewer nor a guest", () => {
+    expect(canModerate("owner")).toBe(true);
+    expect(canModerate("moderator")).toBe(true);
+    expect(canModerate("viewer")).toBe(false);
+    expect(canModerate("guest")).toBe(false);
   });
 });
 
@@ -119,6 +131,12 @@ describe("cell coordinates (D-15)", () => {
     expect(toStateOffset(x, y, CANVAS_WIDTH)).toBe(y * CANVAS_WIDTH + x);
     expect(toStateOffset(x, y, CANVAS_WIDTH * 2)).toBe(y * CANVAS_WIDTH * 2 + x);
     expect(toCellKey(x, y)).toBe(y * CELL_STRIDE + x);
+  });
+
+  // Retrouve la case d'une cellKey, sur la ligne 0 comme ailleurs
+  it("finds the cell back from its cellKey, on row 0 as elsewhere", () => {
+    expect(toCell(toCellKey(x, y))).toEqual({ x, y });
+    expect(toCell(toCellKey(CANVAS_WIDTH - 1, 0))).toEqual({ x: CANVAS_WIDTH - 1, y: 0 });
   });
 
   // Maintient les deux types d'index distincts

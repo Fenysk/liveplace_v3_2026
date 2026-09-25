@@ -7,13 +7,19 @@ import {
   PALETTE,
   refillGauge,
   type Timestamp,
+  toCell,
   toCellKey,
+  toStateOffset,
 } from "@liveplace/domain";
 import type {
   AckFrame,
+  BannedUser,
   CanvasCore,
   InspectEntry,
   LiveMessage,
+  Moderation,
+  ModerationSlice,
+  Pixel,
   Placement,
   SignInWrites,
   Snapshot,
@@ -24,6 +30,7 @@ import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
 import {
   buildCanvasKeys,
+  CLEAR_SLICE_CELLS,
   EVENTS_MAXLEN,
   GAUGE_TTL_SECONDS,
   HIST_DEPTH,
@@ -34,6 +41,9 @@ import {
 declare module "ioredis" {
   interface RedisCommander<Context> {
     place(...args: (string | number)[]): RedisResult<[status: string, ack?: string], Context>;
+    moderate(
+      ...args: (string | number)[]
+    ): RedisResult<[status: string, version?: number, cells?: number, isDone?: number], Context>;
   }
 }
 
@@ -83,6 +93,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     numberOfKeys: 7,
     lua: readFileSync(new URL("./place.lua", import.meta.url), "utf8"),
   });
+  redis.defineCommand("moderate", {
+    numberOfKeys: 10,
+    lua: readFileSync(new URL("./moderate.lua", import.meta.url), "utf8"),
+  });
 
   // Un seul rappel par canal, sur la seule connexion abonnée du process (§6.3).
   const listeners = new Map<string, (message: LiveMessage) => void>();
@@ -91,6 +105,9 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     const message: LiveMessage = JSON.parse(raw);
     listeners.get(channel)?.(message);
   });
+
+  const isBanned = async (canvasId: string, userId: string): Promise<boolean> =>
+    (await redis.sismember(buildCanvasKeys(canvasId).bans, userId)) === 1;
 
   return {
     ...createSignInWrites(redis),
@@ -192,6 +209,91 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         colorIndex: Number(colorIndex),
         placedAt: Number(placedAt),
       };
+    },
+
+    // L'ordre des arguments est celui que lit moderate.lua.
+    async moderate(
+      canvasId: string,
+      { by, nowMs, action: { action, target }, slice }: Moderation,
+    ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">> {
+      const keys = buildCanvasKeys(canvasId);
+      const [status, version, cells, isDone] = await redis.moderate(
+        keys.meta,
+        keys.state,
+        keys.version,
+        keys.events,
+        keys.bans,
+        keys.mods,
+        keys.cleared,
+        keys.clearing(target),
+        keys.cells(target),
+        keys.ban(target),
+        keys.histPrefix,
+        keys.cellsPrefix,
+        keys.live,
+        by,
+        action,
+        target,
+        slice,
+        nowMs,
+        CELL_STRIDE,
+        CLEAR_SLICE_CELLS,
+        EVENTS_MAXLEN,
+      );
+      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      if (status !== "moderated" || version === undefined || cells === undefined)
+        throw new Error(`moderate.lua a renvoyé une réponse invalide : ${status}`);
+      return { ok: true, value: { version, cells, isDone: isDone === 1 } };
+    },
+
+    isBanned,
+
+    // Un banni : sa preuve, figée au ban (§5.1). Sinon : les cases dont il est l'auteur visible, retrait interrompu compris.
+    async listPixels(canvasId: string, userId: string): Promise<Pixel[]> {
+      const keys = buildCanvasKeys(canvasId);
+      if (await isBanned(canvasId, userId)) {
+        const proof = await redis.hgetall(keys.ban(userId));
+        return Object.entries(proof).map(([cellKey, colorIndex]) => ({
+          ...toCell(Number(cellKey)),
+          colorIndex: Number(colorIndex),
+        }));
+      }
+      const results = await redis
+        .multi()
+        .sunion(keys.cells(userId), keys.clearing(userId))
+        .getBuffer(keys.state)
+        .hget(keys.meta, "width")
+        .exec();
+      if (!results) throw new Error(`listPixels ${canvasId} : transaction annulée`);
+      const [cellKeys, state, width] = results.map(unwrap);
+      if (!Array.isArray(cellKeys) || !Buffer.isBuffer(state) || typeof width !== "string")
+        throw new Error(`listPixels ${canvasId} : cases, état ou largeur illisibles`);
+      return cellKeys.map((cellKey) => {
+        const cell = toCell(Number(cellKey));
+        return { ...cell, colorIndex: state[toStateOffset(cell.x, cell.y, Number(width))] ?? 0 };
+      });
+    },
+
+    // Triés par nom d'affichage. Sans miroir, l'identifiant sert de nom, comme pour `inspect`.
+    async listBans(canvasId: string): Promise<BannedUser[]> {
+      const keys = buildCanvasKeys(canvasId);
+      const userIds = await redis.smembers(keys.bans);
+      const users = await Promise.all(
+        userIds.map(async (userId): Promise<BannedUser> => {
+          const [user, pixelCount] = await Promise.all([
+            redis.hgetall(userKey(userId)),
+            redis.hlen(keys.ban(userId)),
+          ]);
+          return {
+            userId,
+            login: user.login ?? userId,
+            displayName: user.displayName ?? userId,
+            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+            pixelCount,
+          };
+        }),
+      );
+      return users.sort((left, right) => left.displayName.localeCompare(right.displayName));
     },
 
     // Le comptage des abonnés appartient au gateway : premier client → abonnement, dernier → départ (§6.3).

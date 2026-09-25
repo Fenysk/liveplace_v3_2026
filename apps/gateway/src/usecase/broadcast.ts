@@ -1,19 +1,21 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
-import type { CanvasCore, Unsubscribe } from "@liveplace/domain/ports";
+import type { CanvasCore, LiveControl, Unsubscribe } from "@liveplace/domain/ports";
 import type { CellsFrame, Event } from "@liveplace/protocol";
 import { conflate } from "./conflate";
 
 export type CellsListener = (frame: CellsFrame) => void;
+// Un message de contrôle de moderate.lua (§5.4) : ni tick ni conflation, il n'a aucune case.
+export type ControlListener = (control: LiveControl) => void;
 
 export interface Broadcast {
-  join(canvasId: string, listener: CellsListener): Promise<void>;
+  join(canvasId: string, listener: CellsListener, onControl: ControlListener): Promise<void>;
   leave(canvasId: string, listener: CellsListener): Promise<void>;
   tick(): void;
 }
 
 type CanvasBroadcast = {
-  listeners: Set<CellsListener>;
+  listeners: Map<CellsListener, ControlListener>;
   pendingEvents: Event[];
   subscription: Promise<Unsubscribe>;
 };
@@ -23,9 +25,12 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
 
   const start = (canvasId: string): CanvasBroadcast => {
     const canvas: CanvasBroadcast = {
-      listeners: new Set(),
+      listeners: new Map(),
       pendingEvents: [],
-      subscription: core.subscribe(canvasId, (message) => canvas.pendingEvents.push(message.e)),
+      subscription: core.subscribe(canvasId, (message) => {
+        if ("e" in message) canvas.pendingEvents.push(message.e);
+        else for (const onControl of canvas.listeners.values()) onControl(message.ctl);
+      }),
     };
     canvases.set(canvasId, canvas);
     return canvas;
@@ -33,9 +38,9 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
 
   return {
     // S'abonner avant que l'appelant lise l'état : le pub/sub n'a aucune mémoire (§6.1).
-    async join(canvasId, listener) {
+    async join(canvasId, listener, onControl) {
       const canvas = canvases.get(canvasId) ?? start(canvasId);
-      canvas.listeners.add(listener);
+      canvas.listeners.set(listener, onControl);
       await canvas.subscription;
     },
 
@@ -55,7 +60,7 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
         const frame = conflate(canvas.pendingEvents);
         canvas.pendingEvents = [];
         if (!frame) continue;
-        for (const listener of canvas.listeners) listener(frame);
+        for (const listener of canvas.listeners.keys()) listener(frame);
       }
     },
   };

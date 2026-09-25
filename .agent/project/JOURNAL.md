@@ -13,6 +13,42 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-25 — Écart §5.4, §4.2 et §4.4 : `clearArea` n'existe plus
+
+**Contexte.** Le §5.4 prévoit de retirer un rectangle (`clearArea`), que le protocole accepte déjà. L'humain l'a abandonné : on ne modère pas une zone, on modère ce que quelqu'un a posé.
+**Décision.** `clearArea` sort de la frame `moderate` et du champ `moderation` de l'`Event`. Ce qui le remplacera, plus tard, est le retrait d'une pose (un brouillon validé, `clearPlacement`) : le dépilage est écrit à part dans `moderate.lua` pour lui servir.
+**Renoncement.** Pas de `clearArea` gardé « au cas où » dans le contrat : une frame que rien ne traite est une promesse que le gateway ne tient pas.
+
+## 2026-09-25 — Écart §4.2, §4.3 et §5.6 : cinq frames pour la modération, et `PROTOCOL_VERSION` à 2
+
+**Contexte.** La confirmation montre les pixels qu'on va retirer, le banni voit les siens, et l'onglet Modération liste les bannis. Le web ne sait pas qui a posé quelle case, et aucune frame du §4 ne le dit.
+**Décision.** `listPixels` → `pixels` (un banni : sa preuve ; sinon ses cases visibles, couleurs de `state`), ouverte au rôle `owner` ou `moderator` et à soi-même. `listBans` → `bans` (miroir `user:` et nombre de pixels), `owner` et `moderator`. `unbanned` prévient le débanni. `listPixels` et `listBans` rejoignent le port `CanvasCore`. Le retrait de `cursor` et de `clearArea` change une frame : `PROTOCOL_VERSION` passe à 2 (§4.1).
+**Renoncement.** Pas de liste des bannis jointe au `welcome` : elle vieillirait pendant la session. Pas de version gardée à 1 : sans reconnexion (J12), aucun ancien client ne survit à un déploiement.
+
+## 2026-09-25 — Écart §5.6 et §10.2 : `isBanned` sur le port, et `banned` après le `welcome`
+
+**Contexte.** Le §10.2 met un banni en lecture seule, mais le `welcome` n'a aucun champ pour le dire : un banni rechargeant la page verrait Dessiner, et tous ses pixels seraient refusés.
+**Décision.** `isBanned(canvasId, userId)` rejoint le port, sur le modèle d'`isModerator`. Le gateway envoie la frame `banned` juste après le `welcome` et le snapshot d'un banni, et en direct à ses seules sockets sur le `ctl` publié par `ban`.
+**Renoncement.** Pas de champ `banned` dans `you` : la frame existe déjà, et un seul chemin sert l'arrivée comme le direct.
+
+## 2026-09-25 — Écart §5.1 et §5.4 : la preuve d'un bannissement, `cv:<id>:ban:<userId>`
+
+**Contexte.** L'humain veut montrer au banni, et au streamer dans l'onglet Modération, les pixels qui lui ont valu le ban. `clearUser`, enchaîné juste après `ban`, les retire des piles : sans copie, la preuve n'existe plus.
+**Décision.** `ban` recopie les pixels visibles de la cible (`cellKey` → `colorIndex`) dans le HASH `cv:<id>:ban:<userId>`, dans le même script, avant de publier. Seulement si `SADD` l'ajoute vraiment : un second `ban` ne vide pas la preuve. Rétention : `unban` la supprime.
+**Renoncement.** Pas de copie de `state` entière par ban (64 Ko chacun). Pas de preuve lue dans le stream : il est trimmé à 20 000 entrées.
+
+## 2026-09-25 — Écart §5.4 : pas de champ `r` tant que le worker n'existe pas
+
+**Contexte.** Le §5.4 range les entrées retirées dans un champ `r` du stream, pour que le worker les archive. Le worker est sorti du bloc 1 sans remplacement (calendrier du 23/09).
+**Décision.** `moderate.lua` n'écrit pas `r`. Le champ `moderation` de l'`Event` (§4.4) est écrit : il ne pèse rien. `r` arrivera avec le worker.
+**Renoncement.** Pas d'archive sans lecteur : des centaines de Ko par tranche de 4096 cases, dans un Redis plafonné à 512 Mo.
+
+## 2026-09-25 — Écart §5.4 et §4.2 : `clearUser` vide un ensemble de travail, sans curseur
+
+**Contexte.** Le §5.4 parcourt `cells:<cible>` par tranches, avec un curseur. Ce set change entre deux tranches (le script en retire, `place.lua` y ajoute) : un `SSCAN` saute alors des cases ou les traite deux fois (analyse d'incohérence du plan).
+**Décision.** Le premier appel verse `cells:<cible>` dans `cv:<id>:clearing:<cible>` et pose la pierre tombale. Chaque tranche en retire 4096 cases par `SPOP` ; l'action est finie quand ce set est vide. Un appel suivant sur la même cible y reverse ce qui reste : une coupure reprend là où elle s'est arrêtée. Le gateway enchaîne les tranches : `cursor` sort de la frame du client (§4.3).
+**Renoncement.** Pas de curseur `SSCAN`. Pas de balayage en un seul appel : 65 536 cases au pire bloqueraient Redis, le §5.4 fixe 4096 exprès.
+
 ## 2026-09-24 — Écart §10.2 et §4.3 : la photo Twitch dans le cookie de session et dans `you`
 
 **Contexte.** Le design system montre sa propre photo dans la pill Compte. Le `you` du `welcome` vient du cookie de session (§10.2), qui ne porte que `sub`, `login` et `displayName`, figés à la connexion.
