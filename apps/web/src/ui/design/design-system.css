@@ -12,6 +12,8 @@
 @import "./window.css";
 @import "./grabber.css";
 @import "./pixel-preview.css";
+@import "./copy-button.css";
+@import "./slider.css";
 
 html,
 body {

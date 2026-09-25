@@ -12,10 +12,12 @@ const toIdentity = ({ role, userId, login, displayName, avatarUrl }: CanvasView)
   return { kind: "signedIn", user: { displayName, login, avatarUrl } };
 };
 
-export function useAccountPillProps(
-  canvas: CanvasStore,
-  login: string,
-): Omit<AccountPillProps, "isCompact" | "isDocked"> {
+// Ce que la pill Compte montre, et ce que la fenêtre ouverte par elle en reprend.
+export type AccountProps = Omit<AccountPillProps, "onOpenAccount" | "isCompact" | "isDocked"> & {
+  signOutHref: string;
+};
+
+export function useAccountPillProps(canvas: CanvasStore, login: string): AccountProps {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const themeChoice = useThemeChoice();
   return {

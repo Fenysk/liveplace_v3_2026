@@ -5,11 +5,13 @@ import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Settings, Trash, User,
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { Button, type ButtonProps } from "../design/button";
+import { CopyButton } from "../design/copy-button";
 import { Grabber } from "../design/grabber";
 import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
+import { Slider } from "../design/slider";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
 import { SignInButton, TwitchGlyph } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
@@ -250,6 +252,24 @@ const SmallWindowSpecimen = () => {
   );
 };
 
+const SLIDER_STEPS = [
+  { value: 0, label: "Aucun" },
+  { value: 1, label: "Peu" },
+  { value: 2, label: "Moyen" },
+  { value: 3, label: "Beaucoup" },
+] as const;
+
+const SliderSpecimen = () => {
+  const [value, setValue] = useState(1);
+  return (
+    <Specimen caption="Des crans fixes : la valeur choisie, les deux bouts">
+      <div className="design-preview-box">
+        <Slider label="Réglage" steps={SLIDER_STEPS} value={value} onPick={setValue} />
+      </div>
+    </Specimen>
+  );
+};
+
 const PREVIEWS = [
   { caption: "Un petit dessin : cadré de près, la gomme en croix", pixels: SAMPLE_DRAWING },
   { caption: "Des pixels dispersés : tout le canvas", pixels: SAMPLE_SPREAD },
@@ -326,6 +346,23 @@ export const ComponentsSection = () => {
 
       <SpecimenSection title="Palette" note="Les couleurs arrivent par props : la palette de `domain`.">
         <PaletteSpecimens />
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Slider et CopyButton"
+        note="Un curseur à crans fixes, et une valeur à copier : tout le champ est le bouton."
+      >
+        <SliderSpecimen />
+        <Specimen caption="Copier, puis « Copié » un instant">
+          <div className="design-preview-box">
+            <CopyButton value="liveplace.tv/kalyss" copyText="https://liveplace.tv/kalyss" />
+          </div>
+        </Specimen>
+        <Specimen caption="Désactivé">
+          <div className="design-preview-box">
+            <Slider label="Réglage" steps={SLIDER_STEPS} value={2} onPick={noop} isDisabled />
+          </div>
+        </Specimen>
       </SpecimenSection>
 
       <SpecimenSection

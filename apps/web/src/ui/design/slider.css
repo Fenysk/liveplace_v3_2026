@@ -1,0 +1,30 @@
+/* Un curseur à crans fixes (JOURNAL 2026-09-25) : aux couleurs de l'accent, aussi haut qu'un contrôle */
+
+.lp-slider {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-slider-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lp-range {
+  width: 100%;
+  height: var(--control-size);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.lp-range:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.lp-range:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
