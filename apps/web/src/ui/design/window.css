@@ -122,6 +122,27 @@
   min-height: var(--control-size);
 }
 
+/* La petite fenêtre (JOURNAL 2026-09-25) : une question ou un avis, au centre, aussi haute que son contenu */
+.lp-window--small {
+  width: min(400px, calc(100% - 2 * var(--space-4)));
+  height: fit-content;
+}
+
+.lp-window-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* Pendant l'action qu'elle a confirmée : grisée comme une pill verrouillée, et rien n'y répond */
+.lp-window.is-locked :is(.lp-window-head, .lp-window-body, .lp-window-actions) {
+  filter: grayscale(1);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* Écran étroit : une feuille modale qui monte du bas, la barre latérale devient une rangée d'onglets */
 @media (max-width: 640px) {
   .lp-window {
@@ -177,5 +198,9 @@
 
   .lp-window-body {
     order: 2;
+  }
+
+  .lp-window-actions {
+    order: 3;
   }
 }

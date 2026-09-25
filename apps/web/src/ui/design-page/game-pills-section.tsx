@@ -58,6 +58,7 @@ type DraftSpecimen = { caption: string; state: DraftPillState; isCompact?: boole
 const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
   { caption: "Connexion : floue, Valider bloqué", state: { kind: "connecting" } },
   { caption: "Connexion perdue", state: { kind: "closed" } },
+  { caption: "Banni : lecture seule", state: { kind: "banned" } },
   { caption: "Invité : Dessiner seul", state: { kind: "guest", isSignInPrompted: false, signInHref: "#" } },
   { caption: "Invité, après Dessiner", state: { kind: "guest", isSignInPrompted: true, signInHref: "#" } },
   { caption: "Vue : jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10) } },

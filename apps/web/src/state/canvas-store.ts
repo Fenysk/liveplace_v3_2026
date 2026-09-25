@@ -1,8 +1,15 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
 import { type Role, toStateOffset } from "@liveplace/domain";
-import type { AckFrame, InspectEntry, Placement, Transport } from "@liveplace/domain/ports";
-import { type CellsFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
+import type {
+  AckFrame,
+  BannedUser,
+  InspectEntry,
+  Moderation,
+  Placement,
+  Transport,
+} from "@liveplace/domain/ports";
+import { type CellsFrame, type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
@@ -12,6 +19,9 @@ export type Pixel = Placement["pixels"][number];
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
+// Une requête de modération ou de lecture (JOURNAL 2026-09-25), réglée par la réponse de son `requestId`.
+export type RequestResult<T> = Result<T, ErrorCode | "closed">;
+export type ModerationAction = Moderation["action"];
 
 // La case inspectée (CDC 2026) : en attente de la réponse, avec son auteur, ou jamais posée.
 export type Inspection =
@@ -26,6 +36,8 @@ export type CanvasView = {
   palette: readonly string[];
   version: number;
   role?: Role;
+  ownerId?: string; // le streamer : jamais modéré sur son canvas (JOURNAL 2026-09-25)
+  isBanned: boolean; // lecture seule (§10.2), mis par `banned`, retiré par `unbanned`
   userId?: string; // absent pour un invité
   login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
@@ -44,6 +56,10 @@ export type CanvasStore = {
   placeBatch(pixels: readonly Pixel[]): Promise<PlaceResult>;
   inspect(x: number, y: number): void;
   closeInspection(): void;
+  // Réglée à la dernière tranche, avec le total des cases retirées (§4.3).
+  moderate(action: ModerationAction): Promise<RequestResult<{ cells: number }>>;
+  listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
+  listBans(): Promise<RequestResult<BannedUser[]>>;
   close(): void;
 };
 
@@ -58,6 +74,11 @@ type PendingBatch = {
   resolve(result: PlaceResult): void;
 };
 
+type ReplyFrame = Extract<ServerFrame, { t: "moderated" | "pixels" | "bans" }>;
+
+// Une requête en attente : `receive` rend vrai quand la réponse est complète.
+type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCode | "closed"): void };
+
 const toInspection = ({ x, y, entry }: Extract<ServerFrame, { t: "inspected" }>): Inspection =>
   entry ? { status: "found", x, y, entry } : { status: "empty", x, y };
 
@@ -71,10 +92,12 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
     gauge: null,
     lastError: null,
     inspection: null,
+    isBanned: false,
     pixels: new Uint8Array(0),
   };
   const listeners = new Set<() => void>();
   const pending = new Map<string, PendingBatch>();
+  const requests = new Map<string, PendingRequest>();
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
 
   // Un nouvel objet à chaque changement : `useSyncExternalStore` compare les références.
@@ -102,6 +125,32 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
     }
   };
 
+  const failAllRequests = (error: ErrorCode | "closed"): void => {
+    for (const request of requests.values()) request.fail(error);
+    requests.clear();
+  };
+
+  const answer = (reply: ReplyFrame): void => {
+    if (requests.get(reply.requestId)?.receive(reply)) requests.delete(reply.requestId);
+  };
+
+  // `settle` rend la valeur quand la réponse est complète, rien sinon.
+  const request = <T>(
+    frame: Extract<ClientFrame, { requestId: string }>,
+    settle: (reply: ReplyFrame) => T | undefined,
+  ): Promise<RequestResult<T>> =>
+    new Promise((resolve) => {
+      requests.set(frame.requestId, {
+        receive(reply) {
+          const value = settle(reply);
+          if (value !== undefined) resolve({ ok: true, value });
+          return value !== undefined;
+        },
+        fail: (error) => resolve({ ok: false, error }),
+      });
+      transport.send(frame);
+    });
+
   // Sans ack (erreur ou coupure), aucun pixel n'est confirmé : tous reprennent leur couleur.
   const settleAllPending = (result: PlaceResult): void => {
     for (const batch of pending.values()) {
@@ -128,12 +177,13 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
   };
 
   const welcomeView = (frame: WelcomeFrame): Partial<CanvasView> => {
-    const { width, height } = frame.canvas;
+    const { width, height, ownerId } = frame.canvas;
     const { userId, login, displayName, avatarUrl, role } = frame.you;
     return {
       status: "live",
       width,
       height,
+      ownerId,
       palette: frame.palette,
       version: frame.version,
       role,
@@ -166,8 +216,19 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
         inspectRequestId = null;
         publish({ inspection: toInspection(frame) });
         break;
+      case "moderated":
+      case "pixels":
+      case "bans":
+        answer(frame);
+        break;
+      case "banned":
+      case "unbanned":
+        publish({ isBanned: frame.t === "banned" });
+        break;
       case "error":
+        // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
         settleAllPending({ ok: false, error: frame.code });
+        failAllRequests(frame.code);
         publish({ lastError: frame.code });
         break;
       default:
@@ -180,6 +241,7 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
     onSnapshot: (state) => publish({ pixels: state.slice() }),
     onClose: () => {
       settleAllPending({ ok: false, error: "closed" });
+      failAllRequests("closed");
       publish({ status: "closed" });
     },
   });
@@ -215,6 +277,22 @@ export function createCanvasStore(canvasId: string, transport: Transport): Canva
       inspectRequestId = null;
       publish({ inspection: null });
     },
+    moderate(action) {
+      let cells = 0;
+      return request({ t: "moderate", requestId: crypto.randomUUID(), action }, (reply) => {
+        if (reply.t !== "moderated") return undefined;
+        cells += reply.cells;
+        return reply.done ? { cells } : undefined;
+      });
+    },
+    listPixels: (userId) =>
+      request({ t: "listPixels", requestId: crypto.randomUUID(), userId }, (reply) =>
+        reply.t === "pixels" ? reply.pixels : undefined,
+      ),
+    listBans: () =>
+      request({ t: "listBans", requestId: crypto.randomUUID() }, (reply) =>
+        reply.t === "bans" ? reply.users : undefined,
+      ),
     close: () => transport.close(),
   };
 }

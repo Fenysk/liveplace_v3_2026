@@ -11,6 +11,7 @@
 @import "./segmented.css";
 @import "./window.css";
 @import "./grabber.css";
+@import "./pixel-preview.css";
 
 html,
 body {

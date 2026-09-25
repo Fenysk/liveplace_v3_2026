@@ -53,6 +53,12 @@
   flex: 1;
 }
 
+/* Une rangée sous un filet : la modération de la pill Inspection (maquette) */
+.lp-row--ruled {
+  border-top: 1px solid var(--chip);
+  padding-top: var(--space-2);
+}
+
 /* La rangée d'outils de la feuille Dessin, sur mobile : répartie sur toute la largeur */
 .lp-sheet-tools {
   justify-content: space-between;

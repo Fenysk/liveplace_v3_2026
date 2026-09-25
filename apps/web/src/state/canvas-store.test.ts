@@ -257,3 +257,81 @@ describe("inspect (CDC 2026, la pill Inspection)", () => {
     expect(store.getView().inspection).toBeNull();
   });
 });
+
+describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
+  const lastRequestId = (sent: ClientFrame[]): string => {
+    const frame = sent.at(-1);
+    if (!frame || !("requestId" in frame)) throw new Error("aucune requête envoyée");
+    return frame.requestId;
+  };
+
+  // Garde le propriétaire du canvas, tiré du welcome : la pill Inspection ne propose rien sur ses pixels
+  it("keeps the canvas owner from the welcome", () => {
+    const { store } = setup();
+
+    expect(store.getView().ownerId).toBe("owner-1");
+  });
+
+  // Additionne les cases de chaque tranche, et ne se résout qu'à la dernière
+  it("adds up the cells of every slice, and resolves only on the last one", async () => {
+    const { store, sent, receive } = setup();
+    let isSettled = false;
+    const moderating = store.moderate({ action: "clearUser", target: "user-2" }).then((result) => {
+      isSettled = true;
+      return result;
+    });
+    const requestId = lastRequestId(sent);
+
+    expect(sent.at(-1)).toEqual({
+      t: "moderate",
+      requestId,
+      action: { action: "clearUser", target: "user-2" },
+    });
+    receive({ t: "moderated", requestId, version: 8, cells: 4096, done: false });
+    await Promise.resolve();
+    expect(isSettled).toBe(false);
+
+    receive({ t: "moderated", requestId, version: 9, cells: 5, done: true });
+    expect(await moderating).toEqual({ ok: true, value: { cells: 4101 } });
+  });
+
+  // Rend les pixels d'un auteur, puis la liste des bannis, chacun sur la réponse de sa requête
+  it("gives an author's pixels, then the banned users, each on the answer to its own request", async () => {
+    const { store, sent, receive } = setup();
+    const pixels = [{ x: 1, y: 2, colorIndex: 3 }];
+    const users = [{ userId: "user-2", login: "user2", displayName: "User 2", pixelCount: 1 }];
+
+    const listing = store.listPixels("user-2");
+    receive({ t: "pixels", requestId: lastRequestId(sent), userId: "user-2", pixels });
+    const banning = store.listBans();
+    receive({ t: "bans", requestId: lastRequestId(sent), users });
+
+    expect(await listing).toEqual({ ok: true, value: pixels });
+    expect(await banning).toEqual({ ok: true, value: users });
+  });
+
+  // Échoue une modération en cours quand la connexion tombe, ou quand le gateway refuse
+  it("fails a pending moderation when the connection drops, or when the gateway refuses", async () => {
+    const dropped = setup();
+    const refused = setup();
+
+    const dropping = dropped.store.moderate({ action: "ban", target: "user-2" });
+    dropped.close();
+    const refusing = refused.store.listBans();
+    refused.receive({ t: "error", code: "forbidden" });
+
+    expect(await dropping).toEqual({ ok: false, error: "closed" });
+    expect(await refusing).toEqual({ ok: false, error: "forbidden" });
+  });
+
+  // Passe en banni sur banned, et en sort sur unbanned
+  it("turns banned on banned, and back on unbanned", () => {
+    const { store, receive } = setup();
+
+    expect(store.getView().isBanned).toBe(false);
+    receive({ t: "banned" });
+    expect(store.getView().isBanned).toBe(true);
+    receive({ t: "unbanned" });
+    expect(store.getView().isBanned).toBe(false);
+  });
+});

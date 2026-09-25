@@ -8,12 +8,21 @@ import { Button, type ButtonProps } from "../design/button";
 import { Grabber } from "../design/grabber";
 import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
+import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
 import { SignInButton, TwitchGlyph } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
-import { Window, WindowRow } from "../design/window";
-import { noop, SAMPLE_BROKEN_PHOTO, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
+import { SmallWindow, Window, WindowRow } from "../design/window";
+import {
+  noop,
+  SAMPLE_BROKEN_PHOTO,
+  SAMPLE_CANVAS,
+  SAMPLE_DRAWING,
+  SAMPLE_OWNER,
+  SAMPLE_SPREAD,
+  SAMPLE_VIEWER,
+} from "./design-fixtures";
 import { GaugeSpecimens } from "./gauge-specimens";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
@@ -219,6 +228,33 @@ const WindowSpecimen = () => {
   );
 };
 
+const SmallWindowSpecimen = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Specimen caption="Petite fenêtre : une question ou un avis, sans barre latérale">
+      <Button label="Ouvrir la petite fenêtre" onPress={() => setIsOpen(true)} />
+      <SmallWindow
+        isOpen={isOpen}
+        title="Une question"
+        onClose={() => setIsOpen(false)}
+        actions={
+          <>
+            <Button label="Annuler" kbd="Échap" onPress={() => setIsOpen(false)} />
+            <Button label="Confirmer" variant="primary" onPress={() => setIsOpen(false)} />
+          </>
+        }
+      >
+        <p className="lp-type-body lp-prompt">Une phrase courte, puis la décision.</p>
+      </SmallWindow>
+    </Specimen>
+  );
+};
+
+const PREVIEWS = [
+  { caption: "Un petit dessin : cadré de près, la gomme en croix", pixels: SAMPLE_DRAWING },
+  { caption: "Des pixels dispersés : tout le canvas", pixels: SAMPLE_SPREAD },
+];
+
 export const ComponentsSection = () => {
   const themeChoice = useThemeChoice();
   return (
@@ -305,10 +341,24 @@ export const ComponentsSection = () => {
       </SpecimenSection>
 
       <SpecimenSection
+        title="PixelPreview"
+        note="Des pixels seuls, sur le damier du canvas et dans sa bordure. Immobile."
+      >
+        {PREVIEWS.map(({ caption, pixels }) => (
+          <Specimen key={caption} caption={caption}>
+            <div className="design-preview-box">
+              <PixelPreview {...SAMPLE_CANVAS} pixels={pixels} label={caption} />
+            </div>
+          </Specimen>
+        ))}
+      </SpecimenSection>
+
+      <SpecimenSection
         title="Window"
         note="Les sections dépendent du rôle ; seules celles qui servent aujourd'hui existent."
       >
         <WindowSpecimen />
+        <SmallWindowSpecimen />
         <Specimen caption="Fermer">
           <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={noop} />
         </Specimen>

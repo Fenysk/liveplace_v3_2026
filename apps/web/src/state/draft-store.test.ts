@@ -18,6 +18,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   gauge: null,
   lastError: null,
   inspection: null,
+  isBanned: false,
   pixels: new Uint8Array(256 * 4).fill(9),
   ...overrides,
 });
@@ -31,9 +32,10 @@ const liveView = (overrides: Partial<CanvasView> = {}): CanvasView =>
     ...overrides,
   });
 
-type Setup = { view?: CanvasView; results?: PlaceResult[]; saved?: string };
+// `onPlace` : ce qui arrive pendant qu'un lot part, avant sa réponse.
+type Setup = { view?: CanvasView; results?: PlaceResult[]; saved?: string; onPlace?: () => void };
 
-const setup = ({ view = liveView(), results = [], saved }: Setup = {}) => {
+const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) => {
   let canvasView = view;
   const canvasListeners = new Set<() => void>();
   const sentBatches: Pixel[][] = [];
@@ -45,11 +47,15 @@ const setup = ({ view = liveView(), results = [], saved }: Setup = {}) => {
     getView: () => canvasView,
     placeBatch: async (pixels) => {
       sentBatches.push([...pixels]);
+      onPlace?.();
       const accepted = { ok: true as const, value: acceptAll(pixels) };
       return results.shift() ?? accepted;
     },
     inspect: () => undefined,
     closeInspection: () => undefined,
+    moderate: async () => ({ ok: true as const, value: { cells: 0 } }),
+    listPixels: async () => ({ ok: true as const, value: [] }),
+    listBans: async () => ({ ok: true as const, value: [] }),
     close: () => undefined,
   };
   const entries = new Map<string, string>();
@@ -362,5 +368,49 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
 
     expect(store.getView().isSending).toBe(false);
     expect(cells()).toEqual([]);
+  });
+});
+
+describe("createDraftStore — a banned user (§10.2, JOURNAL 2026-09-25)", () => {
+  const fill = (store: ReturnType<typeof setup>["store"], count: number) => {
+    store.enterDraftMode();
+    store.startTrace();
+    store.traceCells(Array.from({ length: count }, (_, x) => ({ x, y: 0 })));
+    store.endTrace();
+  };
+
+  // Sort du Dessin quand il est banni, n'y revient plus, n'envoie rien, et garde son brouillon
+  it("leaves draft mode once banned, never enters it again, sends nothing, and keeps the draft", async () => {
+    const { store, sentBatches, setCanvasView, cells } = setup();
+    fill(store, 3);
+
+    setCanvasView(liveView({ isBanned: true }));
+    store.enterDraftMode();
+    await store.submit();
+
+    expect(store.getView().mode).toBe("view");
+    expect(sentBatches).toEqual([]);
+    expect(cells()).toHaveLength(3);
+  });
+
+  // Arrête l'envoi quand le ban tombe pendant qu'il part : les lots suivants ne partent pas
+  it("stops sending when the ban lands mid-send: the next batches never leave", async () => {
+    const context: { ban?: () => void } = {};
+    const banned = {
+      ...acceptAll([]),
+      rejected: Array.from({ length: 64 }, (_, index) => ({ index, reason: "banned" })),
+    };
+    const { store, sentBatches, setCanvasView, cells } = setup({
+      results: [{ ok: true, value: banned }],
+      onPlace: () => context.ban?.(),
+    });
+    context.ban = () => setCanvasView(liveView({ isBanned: true }));
+    fill(store, 130);
+
+    await store.submit();
+
+    expect(sentBatches).toHaveLength(1);
+    expect(cells()).toHaveLength(130);
+    expect(store.getView()).toMatchObject({ mode: "view", isSending: false });
   });
 });

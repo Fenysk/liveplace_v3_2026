@@ -15,6 +15,7 @@ import { SignInButton } from "../design/twitch";
 export type DraftPillState =
   | { kind: "connecting" }
   | { kind: "closed" } // la reconnexion arrive au J12 : on recharge la page
+  | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; isSignInPrompted: boolean; signInHref: string }
   | { kind: "view"; gauge: GaugeProps; refusal?: string }
   | {
@@ -235,6 +236,8 @@ const contentOf = (
           </>
         ),
       };
+    case "banned":
+      return { content: <span className="lp-type-body lp-prompt">Tu es banni·e de ce canvas</span> };
     case "guest":
       return guestContent(state, actions);
     case "view":
