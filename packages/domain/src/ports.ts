@@ -15,12 +15,16 @@ export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
 
 export type Pixel = Placement["pixels"][number];
 
+// D'où vient une action ou un rôle : LivePlace, ou la chaîne Twitch du streamer (JOURNAL 2026-09-27).
+export type ModerationSource = "liveplace" | "twitch";
+
 // Une action de modération (§5.4), et la tranche demandée : `first` pose la pierre tombale, `next` continue.
 export type Moderation = {
   by: string;
   nowMs: Timestamp;
   action: Extract<ClientFrame, { t: "moderate" }>["action"];
   slice: "first" | "next";
+  source?: ModerationSource; // absente : LivePlace
 };
 
 // Une tranche faite : sa version, les cases dont le pixel visible a changé, et s'il en reste.

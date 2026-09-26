@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §5.1 et §5.4 : un ban garde son origine, et un déban Twitch ne lève qu'un ban venu de Twitch
+
+**Contexte.** La synchro Twitch (plan du jour « Synchro Twitch », A3) bannit ici qui l'est sur Twitch. Mais un déban Twitch ne doit jamais lever un ban posé sur LivePlace, et `cv:<id>:bans` ne dit pas d'où vient un ban.
+**Décision.** `moderate.lua` reçoit une origine (`liveplace` par défaut, ou `twitch`). Un `ban` Twitch n'entre dans le SET `cv:<id>:bans:twitch` que s'il ajoute vraiment le ban. Un `unban` Twitch hors de ce SET ne fait rien : ni version, ni événement. Tout `unban` l'en retire.
+**Renoncement.** Pas d'origine dans `bans` lui-même (un HASH à la place du SET) : `place.lua` et `isBanned` le lisent tels quels, et resteraient à réécrire pour rien.
+
 ## 2026-09-27 — Écart §10.1 et §8.1 : le droit `user:read:email`, et l'e-mail et le lien de découverte dans Convex seulement
 
 **Contexte.** L'humain veut l'e-mail de chaque compte, et savoir par quel streamer chacun a découvert LivePlace. Le §10.1 ne demande aucun droit à Twitch, et `users` (§8.1) ne garde que l'identité publique.

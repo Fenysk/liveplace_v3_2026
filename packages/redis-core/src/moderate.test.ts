@@ -348,6 +348,60 @@ describe("ban and unban (§5.4, JOURNAL 2026-09-25)", () => {
   });
 });
 
+describe("the origin of a ban (JOURNAL 2026-09-27)", () => {
+  const byTwitch = async (canvasId: string, action: Moderation["action"]) =>
+    moderateOnce(canvasId, { by: OWNER, nowMs: later, action, slice: "first", source: "twitch" });
+
+  // Un ban venu de Twitch est retenu comme tel, et un déban Twitch le lève
+  it("remembers a Twitch ban as such, and a Twitch unban lifts it", async () => {
+    const { canvasId, keys } = await readyCanvas();
+
+    await byTwitch(canvasId, ban("troll"));
+    expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(1);
+
+    await byTwitch(canvasId, unban("troll"));
+    expect(await core.isBanned(canvasId, "troll")).toBe(false);
+    expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(0);
+  });
+
+  // Un déban Twitch ne lève jamais un ban posé sur LivePlace, et n'écrit rien
+  it("never lifts a LivePlace ban on a Twitch unban, and writes nothing", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await moderateAll(canvasId, OWNER, ban("troll"));
+
+    const skipped = await byTwitch(canvasId, unban("troll"));
+
+    expect(skipped).toEqual({ version: 1, cells: 0, isDone: true });
+    expect(await redis.get(keys.version)).toBe("1");
+    expect(await core.isBanned(canvasId, "troll")).toBe(true);
+  });
+
+  // Banni ici puis sur Twitch, il reste un ban LivePlace : le déban Twitch ne le lève pas
+  it("keeps a LivePlace ban that Twitch bans again: the Twitch unban leaves it", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await moderateAll(canvasId, OWNER, ban("troll"));
+
+    await byTwitch(canvasId, ban("troll"));
+    await byTwitch(canvasId, unban("troll"));
+
+    expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(0);
+    expect(await core.isBanned(canvasId, "troll")).toBe(true);
+  });
+
+  // Un déban LivePlace oublie aussi l'origine Twitch
+  it("forgets the Twitch origin on a LivePlace unban", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await byTwitch(canvasId, ban("troll"));
+
+    await moderateAll(canvasId, OWNER, unban("troll"));
+    await moderateAll(canvasId, OWNER, ban("troll"));
+    await byTwitch(canvasId, unban("troll"));
+
+    expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(0);
+    expect(await core.isBanned(canvasId, "troll")).toBe(true);
+  });
+});
+
 describe("the rights of moderate (§5.4)", () => {
   // Refuse un viewer, et toute action qui vise le propriétaire, sans rien écrire
   it("refuses a viewer, and any action aimed at the owner, and writes nothing", async () => {

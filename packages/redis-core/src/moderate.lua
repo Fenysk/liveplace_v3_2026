@@ -2,9 +2,12 @@
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, modsKey, clearedKey, clearingKey, targetCellsKey, banKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8], KEYS[9], KEYS[10]
+local bansTwitchKey = KEYS[11]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), ARGV[11]
+-- Écart §5.4 (JOURNAL 2026-09-27) : `liveplace` ou `twitch`, l'origine d'un ban et d'un déban.
+local source = ARGV[12]
 
 -- Entrée d'une pile : `<userId>:<colorIndex>:<placedAt>:<version>`, lue par la fin (comme place.lua).
 local ENTRY = "^(.*):(%d+):(%d+):(%d+)$"
@@ -55,6 +58,10 @@ if action == "ban" then
       local stateOffset = stateOffsetOf(tonumber(cellKey))
       redis.call("HSET", banKey, cellKey, string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset)))
     end
+    -- Un ban déjà posé ici reste à LivePlace : Twitch ne pourra pas le lever.
+    if source == "twitch" then
+      redis.call("SADD", bansTwitchKey, target)
+    end
   end
   local version = redis.call("INCR", versionKey)
   publish(version, {})
@@ -64,7 +71,12 @@ end
 
 -- 3. unban : la pierre tombale reste, ses pixels retirés ne reviennent jamais. Sa preuve part avec le ban.
 if action == "unban" then
+  -- Un déban Twitch ne lève qu'un ban venu de Twitch. Sinon rien : la version reste celle du canvas.
+  if source == "twitch" and redis.call("SISMEMBER", bansTwitchKey, target) == 0 then
+    return { "moderated", tonumber(redis.call("GET", versionKey)) or 0, 0, 1 }
+  end
   redis.call("SREM", bansKey, target)
+  redis.call("SREM", bansTwitchKey, target)
   redis.call("DEL", banKey)
   local version = redis.call("INCR", versionKey)
   publish(version, {})

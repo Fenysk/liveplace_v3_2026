@@ -102,7 +102,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     lua: readFileSync(new URL("./place.lua", import.meta.url), "utf8"),
   });
   redis.defineCommand("moderate", {
-    numberOfKeys: 10,
+    numberOfKeys: 11,
     lua: readFileSync(new URL("./moderate.lua", import.meta.url), "utf8"),
   });
 
@@ -222,7 +222,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     // L'ordre des arguments est celui que lit moderate.lua.
     async moderate(
       canvasId: string,
-      { by, nowMs, action: { action, target }, slice }: Moderation,
+      { by, nowMs, action: { action, target }, slice, source = "liveplace" }: Moderation,
     ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">> {
       const keys = buildCanvasKeys(canvasId);
       const [status, version, cells, isDone] = await redis.moderate(
@@ -236,6 +236,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.clearing(target),
         keys.cells(target),
         keys.ban(target),
+        keys.bansTwitch,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -247,6 +248,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         CELL_STRIDE,
         CLEAR_SLICE_CELLS,
         EVENTS_MAXLEN,
+        source,
       );
       if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)

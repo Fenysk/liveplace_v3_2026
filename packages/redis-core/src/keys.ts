@@ -21,6 +21,7 @@ export function buildCanvasKeys(canvasId: string) {
     events: `${prefix}events`,
     cleared: `${prefix}cleared`, // aucun EXPIRE : il rouvrirait le trou de D-16
     bans: `${prefix}bans`,
+    bansTwitch: `${prefix}bans:twitch`, // Écart §5.1 (JOURNAL 2026-09-27) : les bans venus de Twitch
     mods: `${prefix}mods`,
     live: `${prefix}live`, // canal PUB/SUB, éphémère
     histPrefix,
