@@ -8,7 +8,13 @@ import {
   toCellKey,
   toStateOffset,
 } from "@liveplace/domain";
-import type { LiveMessage, Moderation, ModerationSlice, Pixel } from "@liveplace/domain/ports";
+import type {
+  LiveMessage,
+  Moderation,
+  ModerationSlice,
+  ModerationSource,
+  Pixel,
+} from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -399,6 +405,82 @@ describe("the origin of a ban (JOURNAL 2026-09-27)", () => {
 
     expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(0);
     expect(await core.isBanned(canvasId, "troll")).toBe(true);
+  });
+});
+
+describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
+  const setModerator = async (
+    canvasId: string,
+    userId: string,
+    source: ModerationSource,
+    isModerator: boolean,
+  ) => {
+    const result = await core.setModerator(canvasId, { userId, source, isModerator });
+    if (!result.ok) throw new Error(result.error);
+  };
+
+  // Un modérateur nommé sur Twitch et ici le reste tant qu'une des deux origines le garde
+  it("keeps a moderator named on Twitch and here until both origins let go", async () => {
+    const { canvasId } = await readyCanvas();
+
+    await setModerator(canvasId, "mod-1", "twitch", true);
+    await setModerator(canvasId, "mod-1", "liveplace", true);
+    await setModerator(canvasId, "mod-1", "twitch", false);
+    expect(await core.isModerator(canvasId, "mod-1")).toBe(true);
+
+    await setModerator(canvasId, "mod-1", "liveplace", false);
+    expect(await core.isModerator(canvasId, "mod-1")).toBe(false);
+  });
+
+  // Ne fait jamais du propriétaire un modérateur, et publie chaque changement de rôle
+  it("never makes the owner a moderator, and publishes each role change", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    const refused = await core.setModerator(canvasId, { userId: OWNER, source: "twitch", isModerator: true });
+    await setModerator(canvasId, "mod-1", "twitch", true);
+    await delay(100);
+    await unsubscribe();
+
+    expect(refused).toEqual({ ok: false, error: "forbidden" });
+    expect(await redis.sismember(keys.mods, OWNER)).toBe(0);
+    expect(received).toEqual([{ ctl: { t: "role", userId: "mod-1" } }]);
+  });
+
+  // Liste les modérateurs avec leur origine, leur miroir ou leur nom Twitch, et s'ils ont un compte
+  it("lists the moderators with their origin, their mirror or Twitch name, and whether they have an account", async () => {
+    const { canvasId } = await readyCanvas();
+    const [withAccount, withoutAccount] = [`${runId}-mod-a`, `${runId}-mod-b`];
+    await writes.setUser({
+      userId: withAccount,
+      login: "moda",
+      displayName: "ModA",
+      avatarUrl: "https://a/m.png",
+    });
+    await core.setTwitchUsers(canvasId, [{ userId: withoutAccount, login: "modb", displayName: "ModB" }]);
+    await setModerator(canvasId, withAccount, "liveplace", true);
+    await setModerator(canvasId, withoutAccount, "twitch", true);
+
+    expect(await core.listModerators(canvasId)).toEqual([
+      {
+        userId: withAccount,
+        login: "moda",
+        displayName: "ModA",
+        avatarUrl: "https://a/m.png",
+        isFromTwitch: false,
+        isNamedHere: true,
+        hasAccount: true,
+      },
+      {
+        userId: withoutAccount,
+        login: "modb",
+        displayName: "ModB",
+        isFromTwitch: true,
+        isNamedHere: false,
+        hasAccount: false,
+      },
+    ]);
   });
 });
 

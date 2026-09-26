@@ -23,6 +23,10 @@ export function buildCanvasKeys(canvasId: string) {
     bans: `${prefix}bans`,
     bansTwitch: `${prefix}bans:twitch`, // Écart §5.1 (JOURNAL 2026-09-27) : les bans venus de Twitch
     mods: `${prefix}mods`,
+    // Écart §5.1 (JOURNAL 2026-09-27) : l'origine des modérateurs ; `mods` en est l'union, tenue par moderators.lua.
+    modsTwitch: `${prefix}mods:twitch`,
+    modsLiveplace: `${prefix}mods:liveplace`,
+    twitchUsers: `${prefix}twitch:users`, // `userId` → `{login, displayName}`, pour qui n'a pas de miroir `user:`
     live: `${prefix}live`, // canal PUB/SUB, éphémère
     histPrefix,
     cellsPrefix,

@@ -32,6 +32,23 @@ export type ModerationSlice = { version: number; cells: number; isDone: boolean 
 
 export type BannedUser = Extract<ServerFrame, { t: "bans" }>["users"][number];
 
+// Écart §5.1 (JOURNAL 2026-09-27) : un modérateur et d'où il vient. Sans compte LivePlace, son nom vient de Twitch.
+export type Moderator = {
+  userId: string;
+  login: string;
+  displayName: string;
+  avatarUrl?: string;
+  isFromTwitch: boolean;
+  isNamedHere: boolean;
+  hasAccount: boolean;
+};
+
+// Nommer ou retirer un modérateur, pour une origine : l'autre origine peut le garder.
+export type ModeratorRole = { userId: string; source: ModerationSource; isModerator: boolean };
+
+// Le nom Twitch de quelqu'un qui n'a pas (encore) de compte LivePlace.
+export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
+
 // L'auteur du pixel visible d'une case (§4.3).
 export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>["entry"]>;
 
@@ -74,6 +91,13 @@ export interface CanvasCore {
   listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]>;
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : `meta` et le `ctl` ensemble, sans version.
   setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
+  // Écart §5.1 (JOURNAL 2026-09-27) : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
+  setModerator(
+    canvasId: string,
+    change: ModeratorRole,
+  ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
+  listModerators(canvasId: string): Promise<Moderator[]>;
+  setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

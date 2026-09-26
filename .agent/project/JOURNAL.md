@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §5.1 : les modérateurs gardent leur origine, et les noms Twitch de ceux qui n'ont pas de compte
+
+**Contexte.** La synchro Twitch (A4, A5) nomme modérateurs ceux de la chaîne, le streamer peut en nommer d'autres ici, et un retrait sur Twitch ne doit pas retirer celui qu'il a nommé. Le §5.1 n'a que `cv:<id>:mods`, vide jusqu'ici.
+**Décision.** `mods` reste le seul SET lu (`isModerator`, `moderate.lua`) : l'union de `cv:<id>:mods:twitch` et `cv:<id>:mods:liveplace`, tenue par `moderators.lua`, sans version, qui publie un `ctl` `role`. Le streamer n'en est jamais membre. Le HASH `cv:<id>:twitch:users` (`userId → {login, displayName}`) nomme qui n'a pas de miroir `user:`.
+**Renoncement.** Pas de miroir `user:` écrit pour qui n'a pas de compte : son existence dit qu'on a un compte, `hasAccount` en dépend.
+
 ## 2026-09-27 — Écart §5.1 et §5.4 : un ban garde son origine, et un déban Twitch ne lève qu'un ban venu de Twitch
 
 **Contexte.** La synchro Twitch (plan du jour « Synchro Twitch », A3) bannit ici qui l'est sur Twitch. Mais un déban Twitch ne doit jamais lever un ban posé sur LivePlace, et `cv:<id>:bans` ne dit pas d'où vient un ban.

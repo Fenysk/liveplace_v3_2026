@@ -19,6 +19,7 @@ import type {
   LiveMessage,
   Moderation,
   ModerationSlice,
+  Moderator,
   Pixel,
   Placement,
   SignInWrites,
@@ -45,6 +46,7 @@ declare module "ioredis" {
     moderate(
       ...args: (string | number)[]
     ): RedisResult<[status: string, version?: number, cells?: number, isDone?: number], Context>;
+    moderators(...args: (string | number)[]): RedisResult<string, Context>;
   }
 }
 
@@ -66,6 +68,10 @@ const eventOf = (fields: string[]): Event => {
   if (raw === undefined) throw new Error("entrée du stream sans événement");
   return JSON.parse(raw);
 };
+
+// Le nom Twitch gardé pour qui n'a pas de compte (JOURNAL 2026-09-27) : écrit par setTwitchUsers, lu ici seulement.
+const twitchNameOf = (raw: string | null): { login?: string; displayName?: string } =>
+  raw === null ? {} : JSON.parse(raw);
 
 // Une commande d'un MULTI : ioredis rend `[erreur, valeur]` par commande.
 const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
@@ -104,6 +110,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   redis.defineCommand("moderate", {
     numberOfKeys: 11,
     lua: readFileSync(new URL("./moderate.lua", import.meta.url), "utf8"),
+  });
+  redis.defineCommand("moderators", {
+    numberOfKeys: 4,
+    lua: readFileSync(new URL("./moderators.lua", import.meta.url), "utf8"),
   });
 
   // Un seul rappel par canal, sur la seule connexion abonnée du process (§6.3).
@@ -304,6 +314,61 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         }),
       );
       return users.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    // L'ordre des arguments est celui que lit moderators.lua.
+    async setModerator(canvasId, { userId, source, isModerator }) {
+      const keys = buildCanvasKeys(canvasId);
+      const status = await redis.moderators(
+        keys.meta,
+        keys.mods,
+        keys.modsTwitch,
+        keys.modsLiveplace,
+        keys.live,
+        userId,
+        source,
+        isModerator ? 1 : 0,
+      );
+      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      if (status !== "ok") throw new Error(`moderators.lua a renvoyé une réponse invalide : ${status}`);
+      return { ok: true, value: undefined };
+    },
+
+    // Triés par nom d'affichage : le miroir d'un compte, sinon le nom venu de Twitch, sinon l'identifiant.
+    async listModerators(canvasId: string): Promise<Moderator[]> {
+      const keys = buildCanvasKeys(canvasId);
+      const userIds = await redis.smembers(keys.mods);
+      const moderators = await Promise.all(
+        userIds.map(async (userId): Promise<Moderator> => {
+          const [user, twitchUser, isFromTwitch, isNamedHere] = await Promise.all([
+            redis.hgetall(userKey(userId)),
+            redis.hget(keys.twitchUsers, userId),
+            redis.sismember(keys.modsTwitch, userId),
+            redis.sismember(keys.modsLiveplace, userId),
+          ]);
+          const hasAccount = user.login !== undefined;
+          const named = hasAccount ? user : twitchNameOf(twitchUser);
+          return {
+            userId,
+            login: named.login ?? userId,
+            displayName: named.displayName ?? userId,
+            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+            isFromTwitch: isFromTwitch === 1,
+            isNamedHere: isNamedHere === 1,
+            hasAccount,
+          };
+        }),
+      );
+      return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    async setTwitchUsers(canvasId, users) {
+      if (users.length === 0) return;
+      const entries = users.map(({ userId, login, displayName }) => [
+        userId,
+        JSON.stringify({ login, displayName }),
+      ]);
+      await redis.hset(buildCanvasKeys(canvasId).twitchUsers, Object.fromEntries(entries));
     },
 
     // L'ID du stream est la version (§5.2) : un XRANGE direct. Toute version a son entrée, donc un trou veut dire un trim.
