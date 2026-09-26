@@ -7,6 +7,7 @@ import { createDraftStore, type DraftClock, type DraftStore } from "../state/dra
 import { AccountPill } from "../ui/account/account-pill";
 import { type AccountSection, AccountWindow } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
+import { useSigningIn } from "../ui/account/use-signing-in";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import type { ProfileUser } from "../ui/design/profile";
@@ -46,6 +47,7 @@ const CONNECTING_ACTIONS: DraftPillActions = {
   onToggleEraser: doNothing,
   onToggleTouchTracing: doNothing,
   onReload: doNothing,
+  onSignIn: doNothing,
 };
 
 type LivePillsProps = { stores: Stores; login: string; owner: ProfileUser; isCompact: boolean };
@@ -56,7 +58,8 @@ type WindowState = { isOpen: boolean; sectionId: AccountSection };
 // Les pills qui lisent les stores : chacune reçoit ses props de son hook (JOURNAL 2026-09-24).
 const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
-  const draft = useDraftPillProps(stores, login);
+  const signingIn = useSigningIn();
+  const draft = useDraftPillProps(stores, login, signingIn);
   const moderation = useModeration(stores.canvas);
   const inspection = useInspectionPillProps(stores, moderation.controls);
   const banned = useBannedWindowProps(stores.canvas);
@@ -71,7 +74,12 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
         isCompact={isCompact}
         onOpenSettings={isOwner ? () => openWindow("obs") : undefined}
       />
-      <AccountPill {...account} isCompact={isCompact} onOpenAccount={() => openWindow("account")} />
+      <AccountPill
+        {...account}
+        isCompact={isCompact}
+        onOpenAccount={() => openWindow("account")}
+        onSignIn={signingIn.onSignIn}
+      />
       {account.identity.kind === "signedIn" && (
         <AccountWindow
           {...windowState}

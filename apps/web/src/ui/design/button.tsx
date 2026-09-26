@@ -12,9 +12,9 @@ export type ButtonIcon = ComponentType<{ "aria-hidden"?: "true" }>;
 // Sans libellé, le bouton n'a que son icône : `title` devient son nom accessible, il est donc obligatoire.
 type ButtonText = { label: string; title?: string } | { label?: never; title: string };
 
-// Un lien (Se connecter, une chaîne Twitch) ou une action.
+// Un lien (Se connecter, une chaîne Twitch) ou une action. Un lien peut prévenir de son clic : il part quand même.
 type ButtonAction =
-  | { href: string; isNewTab?: boolean; onPress?: never }
+  | { href: string; isNewTab?: boolean; onPress?: () => void }
   | { onPress: () => void; href?: never; isNewTab?: never };
 
 export type ButtonProps = ButtonText &
@@ -60,6 +60,7 @@ export const Button = (props: ButtonProps) => {
         href={props.href}
         title={title}
         aria-label={accessibleName}
+        onClick={props.onPress}
         {...(props.isNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
         {content}

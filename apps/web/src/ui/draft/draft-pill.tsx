@@ -18,6 +18,7 @@ export type DraftPillState =
   | { kind: "reconnecting"; shown: Exclude<DraftPillState, { kind: "reconnecting" }> } // son contenu, flouté (§4.5)
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
+  | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
   | { kind: "view"; gauge: GaugeProps; refusal?: string }
   | {
       kind: "draft";
@@ -42,6 +43,7 @@ export type DraftPillActions = {
   onToggleEraser: () => void;
   onToggleTouchTracing: () => void;
   onReload: () => void;
+  onSignIn: () => void; // la page part chez Twitch
 };
 
 type DraftPillProps = {
@@ -173,11 +175,11 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
 };
 
 // Un seul bouton, qui dit tout. Empilée : au téléphone, la barre prend toute la largeur, et le bouton aussi.
-const guestContent = ({ signInHref }: Extract<DraftPillState, { kind: "guest" }>): DraftPillContent => ({
+const guestContent = (signInHref: string, onSignIn: () => void): DraftPillContent => ({
   layout: "stack",
   content: (
     <div className="lp-invitation">
-      <SignInButton href={signInHref} label="Se connecter pour dessiner" />
+      <SignInButton href={signInHref} label="Se connecter pour dessiner" onPress={onSignIn} />
       <SignInNote />
     </div>
   ),
@@ -236,7 +238,12 @@ const contentOf = (
     case "banned":
       return { content: <span className="lp-type-body lp-prompt">Tu es banni·e de ce canvas</span> };
     case "guest":
-      return guestContent(state);
+      return guestContent(state.signInHref, actions.onSignIn);
+    case "signingIn":
+      return {
+        ...guestContent(state.signInHref, actions.onSignIn),
+        pillState: { kind: "reconnecting", label: "Connexion à Twitch" },
+      };
     case "view":
       return {
         content: (

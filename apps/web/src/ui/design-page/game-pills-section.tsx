@@ -29,6 +29,7 @@ const DRAFT_ACTIONS: DraftPillActions = {
   onToggleEraser: noop,
   onToggleTouchTracing: noop,
   onReload: noop,
+  onSignIn: noop,
 };
 
 const gaugeAt = (nowMs: number, charges: number, draft = 0): GaugeProps => ({
@@ -65,6 +66,10 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
   },
   { caption: "Banni : lecture seule", state: { kind: "banned" } },
   { caption: "Invité : l'invitation, directement", state: { kind: "guest", signInHref: "#" } },
+  {
+    caption: "Invité, parti chez Twitch : Connexion à Twitch",
+    state: { kind: "signingIn", signInHref: "#" },
+  },
   { caption: "Vue : jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10) } },
   {
     caption: "Vue, après un refus",

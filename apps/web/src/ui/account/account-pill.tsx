@@ -20,6 +20,7 @@ export type AccountPillProps = {
   themeChoice: ThemeChoice;
   onPickTheme: (choice: ThemeChoice) => void;
   onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte
+  onSignIn?: () => void; // la page part chez Twitch
   isCompact?: boolean;
   isDocked?: boolean;
 };
@@ -30,6 +31,7 @@ export const AccountPill = ({
   themeChoice,
   onPickTheme,
   onOpenAccount,
+  onSignIn,
   isCompact = false,
   isDocked = true,
 }: AccountPillProps) => (
@@ -38,9 +40,9 @@ export const AccountPill = ({
     {identity.kind === "guest" &&
       // Sur mobile, l'icône seule : la place manque en haut de l'écran.
       (isCompact ? (
-        <SignInButton href={signInHref} />
+        <SignInButton href={signInHref} onPress={onSignIn} />
       ) : (
-        <SignInButton href={signInHref} label="Se connecter" />
+        <SignInButton href={signInHref} label="Se connecter" onPress={onSignIn} />
       ))}
     {identity.kind === "signedIn" && (
       <AvatarButton user={identity.user} title="Mon compte" onPress={onOpenAccount} />

@@ -10,14 +10,17 @@ export const TwitchGlyph = () => (
 );
 
 // Se connecter, toujours avec Twitch : texte blanc sur violet Twitch, et son logo. Sans libellé : le logo seul.
-type SignInButtonProps = { href: string; label?: string };
+// `onPress` : la page part chez Twitch, elle peut le dire en attendant.
+type SignInButtonProps = { href: string; label?: string; onPress?: (() => void) | undefined };
 
-export const SignInButton = ({ href, label }: SignInButtonProps) =>
-  label ? (
-    <Button label={label} icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" href={href} />
+export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
+  const action = { href, ...(onPress ? { onPress } : {}) };
+  return label ? (
+    <Button label={label} icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" {...action} />
   ) : (
-    <Button icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" href={href} />
+    <Button icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" {...action} />
   );
+};
 
 // La page de confidentialité, provisoire (JOURNAL 2026-09-27).
 const PRIVACY_PATH = "/confidentialite";

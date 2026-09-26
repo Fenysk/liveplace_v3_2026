@@ -5,6 +5,7 @@ import type { CanvasStore, CanvasView } from "../../state/canvas-store";
 import type { DraftStore, DraftView } from "../../state/draft-store";
 import { predictGauge } from "../../state/gauge";
 import { signInHref } from "../account/auth-links";
+import type { useSigningIn } from "../account/use-signing-in";
 import type { GaugeProps } from "../design/gauge";
 import { TOUCH_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import type { DraftPillActions, DraftPillState } from "./draft-pill";
@@ -103,9 +104,12 @@ const toDraftPillState = (...shown: Parameters<typeof toShownState>): DraftPillS
 
 type DraftPillStores = { canvas: CanvasStore; draft: DraftStore };
 
+type SigningIn = ReturnType<typeof useSigningIn>;
+
 export function useDraftPillProps(
   { canvas, draft }: DraftPillStores,
   login: string,
+  { isSigningIn, onSignIn }: SigningIn,
 ): { state: DraftPillState; actions: DraftPillActions } {
   const canvasView = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const draftView = useSyncExternalStore(draft.subscribe, draft.getView, draft.getView);
@@ -113,7 +117,10 @@ export function useDraftPillProps(
   const nowMs = useNowMs();
   const gauge = toGaugeProps(canvasView, draftView, nowMs);
   return {
-    state: toDraftPillState(canvasView, draftView, gauge, login, isTouchScreen),
+    // Parti chez Twitch, la page perd sa connexion : la pill dit où elle va, jamais « Reconnexion ».
+    state: isSigningIn
+      ? { kind: "signingIn", signInHref: signInHref(login) }
+      : toDraftPillState(canvasView, draftView, gauge, login, isTouchScreen),
     actions: {
       onEnter: () => draft.enterDraftMode(),
       onExit: () => draft.exitDraftMode(),
@@ -123,6 +130,7 @@ export function useDraftPillProps(
       onToggleEraser: () => draft.toggleEraser(),
       onToggleTouchTracing: () => draft.toggleTouchTracing(),
       onReload: () => window.location.reload(),
+      onSignIn,
     },
   };
 }
