@@ -41,7 +41,28 @@ export const SAMPLE_SPREAD: readonly Pixel[] = Array.from({ length: 48 }, (_, in
 }));
 
 export const SAMPLE_BANNED_USERS: readonly BannedUser[] = [
-  { userId: "3", login: "troll42", displayName: "Troll42", pixelCount: SAMPLE_DRAWING.length },
-  { userId: "4", login: "spam_bot", displayName: "spam_bot", pixelCount: 412 },
-  { userId: "5", login: "sans_pixel", displayName: "sans_pixel", pixelCount: 0 },
+  {
+    userId: "3",
+    login: "troll42",
+    displayName: "Troll42",
+    pixelCount: SAMPLE_DRAWING.length,
+    isFromTwitch: false,
+    hasAccount: true,
+  },
+  {
+    userId: "4",
+    login: "spam_bot",
+    displayName: "spam_bot",
+    pixelCount: 412,
+    isFromTwitch: true,
+    hasAccount: true,
+  },
+  {
+    userId: "5",
+    login: "sans_pixel",
+    displayName: "sans_pixel",
+    pixelCount: 0,
+    isFromTwitch: true,
+    hasAccount: false,
+  },
 ];

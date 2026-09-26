@@ -88,6 +88,7 @@ export type ConnectionDeps = {
     | "moderate"
     | "listPixels"
     | "listBans"
+    | "listModerators"
     | "listEvents"
     | "listRecentEvents"
     | "setObsDelay"
@@ -353,20 +354,38 @@ export function createConnection(
     socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
   };
 
+  // Écart §4.2 (JOURNAL 2026-09-27) : pour qui modère, comme la liste des bannis.
+  const listModerators = async (requestId: string, ready: ReadyState): Promise<void> => {
+    if (!canModerate(ready.role)) return forbid();
+    socket.sendFrame({ t: "moderators", requestId, users: await deps.core.listModerators(ready.canvasId) });
+  };
+
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer seul. Le schéma n'a laissé passer qu'un cran.
   const setObsDelay = async ({ obsDelayMs }: SetObsDelayFrame, ready: ReadyState): Promise<void> => {
     if (ready.role !== "owner") return forbid();
     await deps.core.setObsDelay(ready.canvasId, obsDelayMs);
   };
 
+  // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
-    if (frame.t === "place") return placePixels(frame, ready.canvasId);
-    if (frame.t === "inspect") return inspectCell(frame, ready);
-    if (frame.t === "moderate") return moderateCanvas(frame, ready);
-    if (frame.t === "listPixels") return listPixels(frame, ready);
-    if (frame.t === "listBans") return listBans(frame.requestId, ready);
-    if (frame.t === "setObsDelay") return setObsDelay(frame, ready);
-    socket.sendFrame({ t: "pong" });
+    switch (frame.t) {
+      case "place":
+        return placePixels(frame, ready.canvasId);
+      case "inspect":
+        return inspectCell(frame, ready);
+      case "moderate":
+        return moderateCanvas(frame, ready);
+      case "listPixels":
+        return listPixels(frame, ready);
+      case "listBans":
+        return listBans(frame.requestId, ready);
+      case "listModerators":
+        return listModerators(frame.requestId, ready);
+      case "setObsDelay":
+        return setObsDelay(frame, ready);
+      case "ping":
+        return socket.sendFrame({ t: "pong" });
+    }
   };
 
   const onFrame = async (text: string): Promise<void> => {

@@ -8,6 +8,7 @@ import type {
   LiveMessage,
   Moderation,
   ModerationSlice,
+  Moderator,
   Pixel,
   Placement,
 } from "@liveplace/domain/ports";
@@ -34,7 +35,24 @@ const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Ow
 
 const proof: Pixel[] = [{ x: 1, y: 2, colorIndex: 3 }];
 const bannedUsers: BannedUser[] = [
-  { userId: "user-2", login: "user2", displayName: "User 2", pixelCount: 1 },
+  {
+    userId: "user-2",
+    login: "user2",
+    displayName: "User 2",
+    pixelCount: 1,
+    isFromTwitch: true,
+    hasAccount: true,
+  },
+];
+const moderators: Moderator[] = [
+  {
+    userId: "mod-1",
+    login: "mod1",
+    displayName: "Mod 1",
+    isFromTwitch: true,
+    isNamedHere: false,
+    hasAccount: false,
+  },
 ];
 
 const ack: AckFrame = {
@@ -128,6 +146,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listBans() {
       return bannedUsers;
+    },
+    async listModerators() {
+      return moderators;
     },
     async listEvents() {
       return options.resync ?? null;
@@ -528,6 +549,24 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
 
     expect(sent.at(-1)).toEqual({ t: "bans", requestId: "bans-1", users: bannedUsers });
+  });
+
+  // Rend les modérateurs au propriétaire et à un modérateur, jamais à un viewer (JOURNAL 2026-09-27)
+  it("gives the moderators to the owner and to a moderator, never to a viewer", async () => {
+    const byOwner = setup({ session: owner });
+    const byModerator = setup({ isModerator: true });
+    const byViewer = setup();
+    const listModerators = JSON.stringify({ t: "listModerators", requestId: "mods-1" });
+
+    for (const { connection } of [byOwner, byModerator, byViewer]) {
+      await connection.receive(hello());
+      await connection.receive(listModerators);
+    }
+
+    const answer = { t: "moderators", requestId: "mods-1", users: moderators };
+    expect(byOwner.sent.at(-1)).toEqual(answer);
+    expect(byModerator.sent.at(-1)).toEqual(answer);
+    expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
   });
 
   // Envoie banned juste après le welcome et le snapshot d'un banni

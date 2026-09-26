@@ -341,13 +341,22 @@ describe("ban and unban (§5.4, JOURNAL 2026-09-25)", () => {
     await moderateAll(canvasId, OWNER, ban(spammer));
 
     expect(await core.listBans(canvasId)).toEqual([
-      { userId: spammer, login: spammer, displayName: spammer, pixelCount: 0 },
+      {
+        userId: spammer,
+        login: spammer,
+        displayName: spammer,
+        pixelCount: 0,
+        isFromTwitch: false,
+        hasAccount: false,
+      },
       {
         userId: troll,
         login: "troll42",
         displayName: "Troll42",
         avatarUrl: "https://a/t.png",
         pixelCount: 3,
+        isFromTwitch: false,
+        hasAccount: true,
       },
     ]);
     expect(await redis.exists(userKey(spammer))).toBe(0);
@@ -392,6 +401,26 @@ describe("the origin of a ban (JOURNAL 2026-09-27)", () => {
 
     expect(await redis.sismember(keys.bansTwitch, "troll")).toBe(0);
     expect(await core.isBanned(canvasId, "troll")).toBe(true);
+  });
+
+  // Marque un ban venu de Twitch, et nomme par son nom Twitch un banni sans compte
+  it("marks a ban from Twitch, and names a banned user without an account by their Twitch name", async () => {
+    const { canvasId } = await readyCanvas();
+    const troll = `${runId}-twitch-troll`;
+    await core.setTwitchUsers(canvasId, [{ userId: troll, login: "trolltv", displayName: "TrollTV" }]);
+
+    await byTwitch(canvasId, ban(troll));
+
+    expect(await core.listBans(canvasId)).toEqual([
+      {
+        userId: troll,
+        login: "trolltv",
+        displayName: "TrollTV",
+        pixelCount: 0,
+        isFromTwitch: true,
+        hasAccount: false,
+      },
+    ]);
   });
 
   // Un déban LivePlace oublie aussi l'origine Twitch

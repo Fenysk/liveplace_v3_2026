@@ -6,6 +6,7 @@ import type {
   BannedUser,
   InspectEntry,
   Moderation,
+  Moderator,
   Placement,
   Transport,
 } from "@liveplace/domain/ports";
@@ -78,6 +79,7 @@ export type CanvasStore = {
   moderate(action: ModerationAction): Promise<RequestResult<{ cells: number }>>;
   listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
   listBans(): Promise<RequestResult<BannedUser[]>>;
+  listModerators(): Promise<RequestResult<Moderator[]>>; // JOURNAL 2026-09-27
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
@@ -96,7 +98,7 @@ type PendingBatch = {
   resolve(result: PlaceResult): void;
 };
 
-type ReplyFrame = Extract<ServerFrame, { t: "moderated" | "pixels" | "bans" }>;
+type ReplyFrame = Extract<ServerFrame, { t: "moderated" | "pixels" | "bans" | "moderators" }>;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
 type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCode | "closed"): void };
@@ -300,6 +302,7 @@ export function createCanvasStore(
       case "moderated":
       case "pixels":
       case "bans":
+      case "moderators":
         answer(frame);
         break;
       case "banned":
@@ -393,6 +396,10 @@ export function createCanvasStore(
     listBans: () =>
       request({ t: "listBans", requestId: crypto.randomUUID() }, (reply) =>
         reply.t === "bans" ? reply.users : undefined,
+      ),
+    listModerators: () =>
+      request({ t: "listModerators", requestId: crypto.randomUUID() }, (reply) =>
+        reply.t === "moderators" ? reply.users : undefined,
       ),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),

@@ -294,22 +294,28 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       });
     },
 
-    // Triés par nom d'affichage. Sans miroir, l'identifiant sert de nom, comme pour `inspect`.
+    // Triés par nom d'affichage. Sans miroir, le nom Twitch, sinon l'identifiant, comme pour `inspect`.
     async listBans(canvasId: string): Promise<BannedUser[]> {
       const keys = buildCanvasKeys(canvasId);
       const userIds = await redis.smembers(keys.bans);
       const users = await Promise.all(
         userIds.map(async (userId): Promise<BannedUser> => {
-          const [user, pixelCount] = await Promise.all([
+          const [user, twitchUser, pixelCount, isFromTwitch] = await Promise.all([
             redis.hgetall(userKey(userId)),
+            redis.hget(keys.twitchUsers, userId),
             redis.hlen(keys.ban(userId)),
+            redis.sismember(keys.bansTwitch, userId),
           ]);
+          const hasAccount = user.login !== undefined;
+          const named = hasAccount ? user : twitchNameOf(twitchUser);
           return {
             userId,
-            login: user.login ?? userId,
-            displayName: user.displayName ?? userId,
+            login: named.login ?? userId,
+            displayName: named.displayName ?? userId,
             ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
             pixelCount,
+            isFromTwitch: isFromTwitch === 1,
+            hasAccount,
           };
         }),
       );

@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §4.2 et §4.3 : `listModerators`, et les bannis marqués par leur origine et leur compte
+
+**Contexte.** La section Modération doit montrer les modérateurs, d'où ils viennent, et qui n'a pas encore de compte LivePlace (A4, A5). Aucune frame ne liste les modérateurs, et `bans` ne dit ni l'origine ni le compte.
+**Décision.** `listModerators` → `moderators`, pour `owner` et `moderator`, comme `listBans`. Un modérateur porte `isFromTwitch`, `isNamedHere` et `hasAccount` ; un banni, `isFromTwitch` et `hasAccount`, et son nom Twitch quand il n'a pas de miroir. Le test « lists the banned users » attend donc ces deux marques.
+**Renoncement.** Pas de modérateurs joints au `welcome` : la liste vieillirait pendant la session, comme celle des bannis (JOURNAL 2026-09-25).
+
 ## 2026-09-27 — Écart §10.3 et §4.3 : le rôle se relit en direct, et `PROTOCOL_VERSION` passe à 5
 
 **Contexte.** Le §10.3 fixe le rôle au `hello`, pour toute la connexion. Avec la synchro Twitch, un modérateur est nommé ou retiré pendant qu'il a la page ouverte : retiré, il garderait Retirer et Bannir jusqu'à sa reconnexion.

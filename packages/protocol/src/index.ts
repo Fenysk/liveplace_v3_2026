@@ -158,6 +158,9 @@ const ListPixelsFrameSchema = z.object({
 
 const ListBansFrameSchema = z.object({ t: z.literal("listBans"), requestId: RequestIdSchema });
 
+// Écart §4.2 (JOURNAL 2026-09-27) : les modérateurs du canvas, et d'où ils viennent.
+const ListModeratorsFrameSchema = z.object({ t: z.literal("listModerators"), requestId: RequestIdSchema });
+
 // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai de sa vue OBS, un cran à la fois.
 const ObsDelaySchema = z.number().int().refine(isObsDelayStep, "pas un cran du délai OBS");
 
@@ -176,6 +179,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ModerateFrameSchema,
   ListPixelsFrameSchema,
   ListBansFrameSchema,
+  ListModeratorsFrameSchema,
   SetObsDelayFrameSchema,
   PingFrameSchema,
 ]);
@@ -258,6 +262,8 @@ const BannedUserSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   pixelCount: z.number().int().nonnegative(),
+  isFromTwitch: z.boolean(), // Écart §4.3 (JOURNAL 2026-09-27) : un déban Twitch le lèverait
+  hasAccount: z.boolean(), // sans compte LivePlace : son nom vient de Twitch
 });
 
 const BansFrameSchema = z.object({
@@ -267,6 +273,23 @@ const BansFrameSchema = z.object({
 });
 
 const UnbannedFrameSchema = z.object({ t: z.literal("unbanned") });
+
+// Écart §4.3 (JOURNAL 2026-09-27) : un modérateur, nommé sur Twitch, ici, ou les deux.
+const ModeratorSchema = z.object({
+  userId: UserIdSchema,
+  login: TwitchLoginSchema,
+  displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(),
+  isFromTwitch: z.boolean(),
+  isNamedHere: z.boolean(),
+  hasAccount: z.boolean(),
+});
+
+const ModeratorsFrameSchema = z.object({
+  t: z.literal("moderators"),
+  requestId: RequestIdSchema,
+  users: z.array(ModeratorSchema),
+});
 
 // Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé pendant la session.
 const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
@@ -293,6 +316,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   BannedFrameSchema,
   PixelsFrameSchema,
   BansFrameSchema,
+  ModeratorsFrameSchema,
   UnbannedFrameSchema,
   RoleFrameSchema,
   ObsDelayFrameSchema,

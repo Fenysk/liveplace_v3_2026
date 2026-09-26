@@ -33,15 +33,7 @@ export type ModerationSlice = { version: number; cells: number; isDone: boolean 
 export type BannedUser = Extract<ServerFrame, { t: "bans" }>["users"][number];
 
 // Écart §5.1 (JOURNAL 2026-09-27) : un modérateur et d'où il vient. Sans compte LivePlace, son nom vient de Twitch.
-export type Moderator = {
-  userId: string;
-  login: string;
-  displayName: string;
-  avatarUrl?: string;
-  isFromTwitch: boolean;
-  isNamedHere: boolean;
-  hasAccount: boolean;
-};
+export type Moderator = Extract<ServerFrame, { t: "moderators" }>["users"][number];
 
 // Nommer ou retirer un modérateur, pour une origine : l'autre origine peut le garder.
 export type ModeratorRole = { userId: string; source: ModerationSource; isModerator: boolean };

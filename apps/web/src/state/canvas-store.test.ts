@@ -366,7 +366,16 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
   it("gives an author's pixels, then the banned users, each on the answer to its own request", async () => {
     const { store, sent, receive } = setup();
     const pixels = [{ x: 1, y: 2, colorIndex: 3 }];
-    const users = [{ userId: "user-2", login: "user2", displayName: "User 2", pixelCount: 1 }];
+    const users = [
+      {
+        userId: "user-2",
+        login: "user2",
+        displayName: "User 2",
+        pixelCount: 1,
+        isFromTwitch: false,
+        hasAccount: true,
+      },
+    ];
 
     const listing = store.listPixels("user-2");
     receive({ t: "pixels", requestId: lastRequestId(sent), userId: "user-2", pixels });
@@ -375,6 +384,26 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
 
     expect(await listing).toEqual({ ok: true, value: pixels });
     expect(await banning).toEqual({ ok: true, value: users });
+  });
+
+  // Rend les modérateurs sur la réponse de sa requête (JOURNAL 2026-09-27)
+  it("gives the moderators on the answer to its own request", async () => {
+    const { store, sent, receive } = setup();
+    const users = [
+      {
+        userId: "mod-1",
+        login: "mod1",
+        displayName: "Mod 1",
+        isFromTwitch: true,
+        isNamedHere: false,
+        hasAccount: false,
+      },
+    ];
+
+    const listing = store.listModerators();
+    receive({ t: "moderators", requestId: lastRequestId(sent), users });
+
+    expect(await listing).toEqual({ ok: true, value: users });
   });
 
   // Échoue une modération en cours quand la connexion tombe, ou quand le gateway refuse
