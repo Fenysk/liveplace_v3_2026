@@ -125,6 +125,7 @@ export function createCanvasStore(
   const pending = new Map<string, PendingBatch>();
   const requests = new Map<string, PendingRequest>();
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
+  let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
@@ -266,6 +267,17 @@ export function createCanvasStore(
     publish({ status: "closed" });
   };
 
+  // Écart §4.3 (JOURNAL 2026-09-27) : une `error` qui nomme sa requête ne concerne qu'elle.
+  const refuseRequest = (requestId: string, code: ErrorCode): void => {
+    if (requestId === inspectRequestId) {
+      inspectRequestId = null;
+      publish({ inspection: previousInspection });
+      return;
+    }
+    requests.get(requestId)?.fail(code);
+    requests.delete(requestId);
+  };
+
   const onFrame = (frame: ServerFrame): void => {
     switch (frame.t) {
       case "welcome":
@@ -298,7 +310,8 @@ export function createCanvasStore(
         if (view.params) publish({ params: { ...view.params, obsDelayMs: frame.obsDelayMs } });
         break;
       case "error":
-        refuse(frame.code);
+        if (frame.requestId) refuseRequest(frame.requestId, frame.code);
+        else refuse(frame.code);
         break;
       default:
     }
@@ -352,6 +365,7 @@ export function createCanvasStore(
       return placed;
     },
     inspect(x, y) {
+      if (view.inspection?.status !== "loading") previousInspection = view.inspection;
       inspectRequestId = crypto.randomUUID();
       publish({ inspection: { status: "loading", x, y } });
       transport.send({ t: "inspect", requestId: inspectRequestId, x, y });

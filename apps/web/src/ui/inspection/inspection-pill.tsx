@@ -32,14 +32,18 @@ const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
 
 type ModerationRowProps = { moderation: ModerationControls; author: InspectEntry };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette).
-const ModerationRow = ({ moderation, author }: ModerationRowProps) =>
-  moderation.isProtected(author.userId) ? null : (
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). Écart §4.3 (JOURNAL 2026-09-27) : ni sans identifiant.
+const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
+  const { userId } = author;
+  if (!userId || moderation.isProtected(userId)) return null;
+  const moderated = { ...author, userId };
+  return (
     <div className="lp-row lp-row--ruled">
-      <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", author)} />
-      <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", author)} />
+      <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", moderated)} />
+      <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
     </div>
   );
+};
 
 type InspectedCellProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose" | "moderation"> & {
   inspection: Exclude<Inspection, { status: "loading" }>;

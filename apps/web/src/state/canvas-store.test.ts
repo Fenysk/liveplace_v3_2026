@@ -292,6 +292,26 @@ describe("inspect (CDC 2026, la pill Inspection)", () => {
 
     expect(store.getView().inspection).toBeNull();
   });
+
+  // Garde l'inspection d'avant quand le gateway refuse la nouvelle, sans erreur ni lot échoué (écart §4.3, JOURNAL 2026-09-27)
+  it("keeps the previous inspection when the gateway refuses the new one, with no error and no failed batch", async () => {
+    const { store, sent, receive, pixelAt } = setup();
+    store.inspect(1, 2);
+    receive({ t: "inspected", requestId: lastInspect(sent).requestId, x: 1, y: 2, entry });
+    let isSettled = false;
+    void store.placeBatch([{ x: 0, y: 0, colorIndex: 5 }]).then(() => {
+      isSettled = true;
+    });
+
+    store.inspect(3, 3);
+    receive({ t: "error", code: "rate_limited", requestId: lastInspect(sent).requestId });
+    await Promise.resolve();
+
+    expect(store.getView().inspection).toEqual({ status: "found", x: 1, y: 2, entry });
+    expect(store.getView().lastError).toBeNull();
+    expect(isSettled).toBe(false);
+    expect(pixelAt(0, 0)).toBe(5);
+  });
 });
 
 describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {

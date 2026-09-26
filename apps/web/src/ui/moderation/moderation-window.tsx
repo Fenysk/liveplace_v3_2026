@@ -12,8 +12,11 @@ import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 // Ce que la pill Inspection propose : retirer ses pixels, ou le bannir (qui les retire aussi).
 export type ModerationKind = Extract<ModerationAction["action"], "clearUser" | "ban">;
 
+// Écart §4.3 (JOURNAL 2026-09-27) : l'identifiant de l'auteur n'arrive qu'à qui modère.
+export type ModeratedAuthor = InspectEntry & { userId: string };
+
 // La cible est l'auteur affiché au moment du clic, jamais la case relue : elle peut changer pendant qu'on hésite.
-export type ModerationRequest = { kind: ModerationKind; author: InspectEntry };
+export type ModerationRequest = { kind: ModerationKind; author: ModeratedAuthor };
 
 // `running` : verrouillée jusqu'à la dernière tranche. `failed` : la fenêtre reste ouverte et le dit.
 export type ModerationStatus = "idle" | "running" | "failed";

@@ -46,13 +46,9 @@ const ack: AckFrame = {
   gauge: { charges: 2, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs },
 };
 
-const entry: InspectEntry = {
-  userId: "user-2",
-  login: "user2",
-  displayName: "User 2",
-  colorIndex: 3,
-  placedAt: now,
-};
+// Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (écart §4.3, JOURNAL 2026-09-27).
+const publicEntry: InspectEntry = { login: "user2", displayName: "User 2", colorIndex: 3, placedAt: now };
+const entry: InspectEntry = { userId: "user-2", ...publicEntry };
 
 const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", requestId: "inspect-1", x, y });
 
@@ -75,6 +71,7 @@ const moderate = (action: string, target = "user-2") =>
 
 type SetupOptions = {
   session?: Session | null;
+  isModerator?: boolean;
   version?: number;
   duringSnapshot?: () => void;
   isBanned?: boolean;
@@ -96,7 +93,7 @@ const setup = (options: SetupOptions = {}) => {
       return asked === canvasId ? meta : null;
     },
     async isModerator() {
-      return false;
+      return options.isModerator ?? false;
     },
     async getSnapshot() {
       options.duringSnapshot?.();
@@ -147,6 +144,7 @@ const setup = (options: SetupOptions = {}) => {
   };
 
   const broadcast = createBroadcast(core);
+  const clock = { nowMs: now };
   // Une connexion de plus sur le même noyau : un autre onglet, ou un autre joueur.
   const open = (opened: Session | null) => {
     const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
@@ -163,7 +161,7 @@ const setup = (options: SetupOptions = {}) => {
       },
     };
     return {
-      connection: createConnection({ core, broadcast, now: () => now }, socket, opened),
+      connection: createConnection({ core, broadcast, now: () => clock.nowMs }, socket, opened),
       sent,
       closed,
     };
@@ -181,6 +179,7 @@ const setup = (options: SetupOptions = {}) => {
     listedPixels,
     recentSince,
     obsDelays,
+    clock,
     open,
     publish: (published: Event) => publishTo?.({ e: published }),
     control: (published: LiveControl) => publishTo?.({ ctl: published }),
@@ -320,14 +319,48 @@ describe("createConnection (§6.1)", () => {
     expect(closed).toEqual([1008]);
   });
 
-  // Répond à une inspection par l'auteur du pixel, invité compris (JOURNAL 2026-09-24)
-  it("answers an inspection with the pixel's author, for a guest too", async () => {
+  // Répond à une inspection par l'auteur du pixel sans son identifiant, invité compris (écart §4.3, JOURNAL 2026-09-27)
+  it("answers an inspection with the pixel's author but not its id, for a guest too", async () => {
     const { connection, sent } = setup({ session: null });
     await connection.receive(hello());
 
     await connection.receive(inspect(1, 2));
 
-    expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 1, y: 2, entry });
+    expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 1, y: 2, entry: publicEntry });
+  });
+
+  // Tait l'identifiant de l'auteur à un viewer, et le donne au propriétaire et à un modérateur, qui modèrent
+  it("hides the author's id from a viewer, and gives it to the owner and to a moderator", async () => {
+    const byViewer = setup();
+    const byOwner = setup({ session: owner });
+    const byModerator = setup({ isModerator: true });
+
+    for (const { connection } of [byViewer, byOwner, byModerator]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
+    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: publicEntry });
+    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry });
+    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry });
+  });
+
+  // Refuse la 11e inspection d'une même seconde sans fermer, en nommant la requête, puis accepte une seconde plus tard
+  it("refuses the 11th inspection within a second without closing, naming the request, then accepts a second later", async () => {
+    const { connection, sent, closed, inspected, clock } = setup({ session: null });
+    await connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await connection.receive(inspect(1, 2));
+
+    await connection.receive(JSON.stringify({ t: "inspect", requestId: "inspect-11", x: 1, y: 2 }));
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "inspect-11" });
+    expect(inspected).toHaveLength(10);
+    expect(closed).toEqual([]);
+
+    clock.nowMs += 1000;
+    await connection.receive(inspect(1, 2));
+    expect(sent.at(-1)).toMatchObject({ t: "inspected", requestId: "inspect-1" });
   });
 
   // Répond sans entrée pour une case où personne n'a posé

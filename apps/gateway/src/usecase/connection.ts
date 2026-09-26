@@ -14,6 +14,7 @@ import type {
   CanvasCore,
   ClientConnection,
   ClientSocket,
+  InspectEntry,
   LiveControl,
   Moderation,
 } from "@liveplace/domain/ports";
@@ -31,6 +32,8 @@ import { toCellsFrame } from "./cells-frame";
 const CLOSE_POLICY = 1008;
 // Au-delà, le snapshot est plus court à transmettre que le rattrapage (§4.5).
 const RESYNC_MAX_VERSIONS = 2000;
+// Écart §4.3 (JOURNAL 2026-09-27) : un humain n'y arrive jamais, un script ne balaie plus le canvas.
+const INSPECT_MAX_PER_SECOND = 10;
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
@@ -102,6 +105,8 @@ const youOf = ({ userId, login, displayName, avatarUrl }: Session) => ({
   ...(avatarUrl ? { avatarUrl } : {}),
 });
 
+const withoutUserId = ({ userId, ...entry }: InspectEntry): InspectEntry => entry;
+
 const buildWelcome = (
   canvasId: string,
   meta: CanvasMeta,
@@ -137,6 +142,7 @@ export function createConnection(
 ): ClientConnection {
   let state: State = { status: "awaitingHello" };
   let queue: Promise<void> = Promise.resolve();
+  const inspectedAt: Timestamp[] = []; // les dernières inspections acceptées, la plus ancienne en tête
 
   const listener: CellsListener = (frame) => {
     if (state.status === "joining") state.pendingFrames.push(frame);
@@ -250,10 +256,23 @@ export function createConnection(
     socket.sendFrame(result.value);
   };
 
+  // Une fenêtre glissante d'une seconde : la plus ancienne des dernières inspections doit en être sortie.
+  const isInspectAllowed = (nowMs: Timestamp): boolean => {
+    const oldest = inspectedAt.length < INSPECT_MAX_PER_SECOND ? undefined : inspectedAt[0];
+    if (oldest !== undefined && nowMs - oldest < 1000) return false;
+    inspectedAt.push(nowMs);
+    if (inspectedAt.length > INSPECT_MAX_PER_SECOND) inspectedAt.shift();
+    return true;
+  };
+
   // Ouverte à tous, invités compris : l'auteur d'un pixel est public (CDC 2026).
+  // Écart §4.3 (JOURNAL 2026-09-27) : son identifiant ne part qu'à qui modère, et le débit est plafonné.
   const inspectCell = async ({ requestId, x, y }: InspectFrame, ready: ReadyState): Promise<void> => {
+    if (!isInspectAllowed(deps.now()))
+      return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
     const isInside = x < ready.width && y < ready.height;
-    const entry = isInside ? await deps.core.inspect(ready.canvasId, x, y) : null;
+    const found = isInside ? await deps.core.inspect(ready.canvasId, x, y) : null;
+    const entry = found && !canModerate(ready.role) ? withoutUserId(found) : found;
     socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
   };
 

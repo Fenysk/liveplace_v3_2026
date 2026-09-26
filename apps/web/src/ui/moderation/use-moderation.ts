@@ -2,10 +2,11 @@
 // puis l'action. Bannir enchaîne `ban` puis `clearUser`, jamais l'inverse (§5.4).
 
 import { canModerate } from "@liveplace/domain";
-import type { InspectEntry, Pixel } from "@liveplace/domain/ports";
+import type { Pixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type {
+  ModeratedAuthor,
   ModerationKind,
   ModerationRequest,
   ModerationStatus,
@@ -15,7 +16,7 @@ import type {
 // Ce que la pill Inspection reçoit quand on peut modérer. Le web affiche, le gateway décide (§10.3).
 export type ModerationControls = {
   isProtected: (userId: string) => boolean; // le streamer et soi-même : aucun bouton
-  onModerate: (kind: ModerationKind, author: InspectEntry) => void;
+  onModerate: (kind: ModerationKind, author: ModeratedAuthor) => void;
 };
 
 export function useModeration(canvas: CanvasStore): {
@@ -29,7 +30,7 @@ export function useModeration(canvas: CanvasStore): {
   // La demande en cours : une réponse arrivée pour une demande abandonnée n'y touche plus.
   const current = useRef<ModerationRequest | null>(null);
 
-  const open = (kind: ModerationKind, author: InspectEntry): void => {
+  const open = (kind: ModerationKind, author: ModeratedAuthor): void => {
     const next = { kind, author };
     current.current = next;
     setRequest(next);

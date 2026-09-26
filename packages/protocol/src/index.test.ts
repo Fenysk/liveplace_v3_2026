@@ -75,4 +75,19 @@ describe("protocol frames", () => {
     expect(setObsDelay(7_000).ok).toBe(false);
     expect(decodeServerFrame({ t: "obsDelay", obsDelayMs: 60_000 }).ok).toBe(true);
   });
+
+  // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
+  it("accepts an inspected author without its id, and a refusal that names its request", () => {
+    const inspected = {
+      t: "inspected",
+      requestId: "inspect-1",
+      x: 1,
+      y: 2,
+      entry: { login: "fenysk", displayName: "Fenysk", colorIndex: 3, placedAt: 1 },
+    };
+    const refused = { t: "error", code: "rate_limited", requestId: "inspect-2" };
+
+    expect(decodeServerFrame(inspected)).toEqual({ ok: true, value: inspected });
+    expect(decodeServerFrame(refused)).toEqual({ ok: true, value: refused });
+  });
 });

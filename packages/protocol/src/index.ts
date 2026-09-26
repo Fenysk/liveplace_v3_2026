@@ -7,7 +7,8 @@ import { z } from "zod";
 // --- Constantes et types de base --------------------------------------
 
 // 2 : cinq frames de modération, `cursor` et `clearArea` retirés. 3 : le délai OBS à chaud (JOURNAL 2026-09-25).
-export const PROTOCOL_VERSION = 3;
+// 4 : l'identifiant de l'auteur inspecté devient optionnel, et une `error` peut nommer sa requête (JOURNAL 2026-09-27).
+export const PROTOCOL_VERSION = 4;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -94,7 +95,7 @@ const RejectedPixelSchema = z.object({
 });
 
 const InspectEntrySchema = z.object({
-  userId: UserIdSchema,
+  userId: UserIdSchema.optional(), // Écart §4.3 (JOURNAL 2026-09-27) : seulement pour qui modère
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
@@ -272,6 +273,7 @@ const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: Obs
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
+  requestId: RequestIdSchema.optional(), // Écart §4.3 (JOURNAL 2026-09-27) : le refus d'une seule requête
   message: z.string().optional(),
 });
 

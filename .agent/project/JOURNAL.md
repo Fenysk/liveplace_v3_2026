@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §4.3 : l'identifiant de l'auteur inspecté ne part qu'à qui modère, et `inspect` est plafonné
+
+**Contexte.** L'audit de sécurité du 26/09 (§1) : sans compte, un script lisait l'identité Twitch complète de chaque auteur, sur tout le canvas et sans limite. Le CDC 2026 veut pourtant qu'un invité inspecte.
+**Décision.** `userId` devient optionnel dans `InspectEntry` : il ne part qu'aux rôles `owner` et `moderator`, qui s'en servent pour Retirer et Bannir. Au plus 10 `inspect` par seconde et par connexion ; au-delà, un `rate_limited` qui porte le `requestId` refusé, sans fermer. Le test « for a guest too » attend donc un auteur sans identifiant. `PROTOCOL_VERSION` passe à 4.
+**Renoncement.** Pas d'identifiant propre à LivePlace : Redis, la session et les bans sont rangés par l'identifiant Twitch. Pas de plafond par IP : derrière Cloudflare, il faudrait lire l'en-tête du proxy (au bilan).
+
 ## 2026-09-26 — Écart D-13 : un gros canvas est diffusé moins souvent, et sa frame n'est sérialisée qu'une fois
 
 **Contexte.** Au test de charge du 26/09 (vault, `Test_de_charge--Bloc_1`), le CPU du gateway lâche sur le VPS vers 1 000 viewers d'un stream. Une micro-mesure montre qu'un message coûte presque autant à 6 cases qu'à 20 : c'est le nombre de messages qui pèse.
