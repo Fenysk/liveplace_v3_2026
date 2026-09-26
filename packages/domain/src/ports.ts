@@ -44,7 +44,10 @@ export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
 // Écart §2 (JOURNAL 2026-09-27) : une action venue de Twitch. Le web la dépose, le gateway l'applique avec ses scripts.
 export type TwitchCommand =
   | { kind: "ban" | "unban"; canvasId: string; userId: string }
-  | { kind: "moderator"; canvasId: string; userId: string; isModerator: boolean };
+  | { kind: "moderator"; canvasId: string; userId: string; isModerator: boolean }
+  // La liste complète, à la synchro : ce qui manque s'ajoute, ce qui n'y est plus part, l'origine LivePlace reste.
+  | { kind: "moderators"; canvasId: string; userIds: string[] }
+  | { kind: "bans"; canvasId: string; userIds: string[] };
 
 // Ce que le web écrit pour la synchro Twitch : jamais un pixel, donc jamais de script (§2).
 export interface TwitchWrites {

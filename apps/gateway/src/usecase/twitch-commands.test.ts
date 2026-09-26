@@ -1,7 +1,9 @@
 import type { CanvasMeta } from "@liveplace/domain";
 import type {
+  BannedUser,
   Moderation,
   ModerationSlice,
+  Moderator,
   ModeratorRole,
   TwitchCommand,
   TwitchCommandQueue,
@@ -22,11 +24,37 @@ const meta: CanvasMeta = {
   obsDelayMs: 5000,
 };
 
+// Ce que le canvas a déjà : `twitch` vient de Twitch, `here` de LivePlace.
+const moderatorOf = (userId: string, isFromTwitch: boolean): Moderator => ({
+  userId,
+  login: userId,
+  displayName: userId,
+  isFromTwitch,
+  isNamedHere: !isFromTwitch,
+  hasAccount: true,
+});
+const bannedOf = (userId: string, isFromTwitch: boolean): BannedUser => ({
+  userId,
+  login: userId,
+  displayName: userId,
+  pixelCount: 0,
+  isFromTwitch,
+  hasAccount: true,
+});
+
+type Current = { moderators?: Moderator[]; bans?: BannedUser[] };
+
 // Un noyau qui note ce qu'on lui demande. `slices` : ce que rend chaque appel à `moderate`, dans l'ordre.
-const setup = (slices: ModerationSlice[] = []) => {
+const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
   const moderations: Moderation[] = [];
   const roles: ModeratorRole[] = [];
   const core = {
+    async listModerators() {
+      return current.moderators ?? [];
+    },
+    async listBans() {
+      return current.bans ?? [];
+    },
     async getCanvas(asked: string) {
       return asked === canvasId ? meta : null;
     },
@@ -90,6 +118,37 @@ describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
 
     expect(roles).toEqual([{ userId: "mod-1", source: "twitch", isModerator: true }]);
     expect(moderations).toEqual([]);
+  });
+});
+
+describe("a full Twitch list (JOURNAL 2026-09-27)", () => {
+  // Nomme les modérateurs Twitch qui manquent, retire ceux qui n'y sont plus, et ne touche jamais à ceux nommés ici
+  it("names the missing Twitch moderators, removes those gone, and never touches those named here", async () => {
+    const { deps, roles } = setup([], {
+      moderators: [moderatorOf("kept", true), moderatorOf("gone", true), moderatorOf("named-here", false)],
+    });
+
+    await applyTwitchCommand(deps, { kind: "moderators", canvasId, userIds: ["kept", "added"] });
+
+    expect(roles).toEqual([
+      { userId: "added", source: "twitch", isModerator: true },
+      { userId: "gone", source: "twitch", isModerator: false },
+    ]);
+  });
+
+  // Bannit les bannis Twitch qui manquent, débannit ceux que Twitch a levés, et laisse les bans posés ici
+  it("bans the missing Twitch bans, lifts those Twitch lifted, and leaves the bans set here", async () => {
+    const { deps, moderations } = setup([], {
+      bans: [bannedOf("kept", true), bannedOf("lifted", true), bannedOf("banned-here", false)],
+    });
+
+    await applyTwitchCommand(deps, { kind: "bans", canvasId, userIds: ["kept", "added"] });
+
+    expect(moderations.map(({ action, slice }) => `${action.action}:${action.target}:${slice}`)).toEqual([
+      "ban:added:first",
+      "clearUser:added:first",
+      "unban:lifted:first",
+    ]);
   });
 });
 
