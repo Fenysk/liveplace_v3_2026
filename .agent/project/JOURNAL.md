@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-26 — Écart D-13 : un gros canvas est diffusé moins souvent, et sa frame n'est sérialisée qu'une fois
+
+**Contexte.** Au test de charge du 26/09 (vault, `Test_de_charge--Bloc_1`), le CPU du gateway lâche sur le VPS vers 1 000 viewers d'un stream. Une micro-mesure montre qu'un message coûte presque autant à 6 cases qu'à 20 : c'est le nombre de messages qui pèse.
+**Décision.** Le tick reste à `BROADCAST_HZ`, mais un canvas n'est vidé qu'un tick sur N, avec N = ⌈clients / 500⌉, au plus 3 : 10 Hz jusqu'à 500 clients, 5 Hz jusqu'à 1 000, 3,3 Hz au-delà (50 à 100 ms de latence en plus). La frame `cells` est construite une fois par tick, et `ws-server` n'en fait le JSON qu'une fois.
+**Renoncement.** Pas de `BROADCAST_HZ` baissé pour tous : les petits canvas, peu coûteux, perdraient leur réactivité. Pas de compression : elle coûte le CPU qui manque.
+
 ## 2026-09-25 — Une pose non confirmée attend la reprise : un test du J10 change d'attente
 
 **Contexte.** Sans reconnexion, une coupure échouait les lots en attente (« closed ») et rendait leurs couleurs : c'est ce que vérifie le test du J10 « resolves as closed when the connection drops ». Le CDC 2026 (Envoi) veut que le `requestId` empêche toute double pose au renvoi, et le plan du J10 remettait ce renvoi à la reconnexion.

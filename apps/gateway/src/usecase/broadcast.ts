@@ -1,10 +1,11 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
 import type { CanvasCore, LiveControl, Unsubscribe } from "@liveplace/domain/ports";
-import type { CellsFrame, Event } from "@liveplace/protocol";
+import type { Event, ServerFrame } from "@liveplace/protocol";
 import { conflate } from "./conflate";
 
-export type CellsListener = (frame: CellsFrame) => void;
+// La frame telle qu'elle part : construite une fois par tick, le même objet pour chaque client du canvas.
+export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => void;
 // Un message de contrôle de moderate.lua (§5.4) : ni tick ni conflation, il n'a aucune case.
 export type ControlListener = (control: LiveControl) => void;
 
@@ -17,8 +18,16 @@ export interface Broadcast {
 type CanvasBroadcast = {
   listeners: Map<CellsListener, ControlListener>;
   pendingEvents: Event[];
+  ticksWaited: number;
   subscription: Promise<Unsubscribe>;
 };
+
+// Écart D-13 (JOURNAL 2026-09-26) : un canvas n'est vidé qu'un tick sur N, N = ⌈clients / 500⌉, au plus 3.
+const CLIENTS_PER_TICK = 500;
+const MAX_TICKS_BETWEEN_FRAMES = 3;
+
+const ticksBetweenFrames = (clients: number): number =>
+  Math.min(MAX_TICKS_BETWEEN_FRAMES, Math.max(1, Math.ceil(clients / CLIENTS_PER_TICK)));
 
 export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast {
   const canvases = new Map<string, CanvasBroadcast>();
@@ -27,6 +36,7 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
     const canvas: CanvasBroadcast = {
       listeners: new Map(),
       pendingEvents: [],
+      ticksWaited: 0,
       subscription: core.subscribe(canvasId, (message) => {
         if ("e" in message) canvas.pendingEvents.push(message.e);
         else for (const onControl of canvas.listeners.values()) onControl(message.ctl);
@@ -57,9 +67,13 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
 
     tick() {
       for (const canvas of canvases.values()) {
-        const frame = conflate(canvas.pendingEvents);
+        canvas.ticksWaited += 1;
+        if (canvas.ticksWaited < ticksBetweenFrames(canvas.listeners.size)) continue;
+        canvas.ticksWaited = 0;
+        const conflated = conflate(canvas.pendingEvents);
         canvas.pendingEvents = [];
-        if (!frame) continue;
+        if (!conflated) continue;
+        const frame = { t: "cells" as const, ...conflated };
         for (const listener of canvas.listeners.keys()) listener(frame);
       }
     },
