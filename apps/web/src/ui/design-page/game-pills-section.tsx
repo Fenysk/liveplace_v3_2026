@@ -9,7 +9,7 @@ import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
-import { SignInButton } from "../design/twitch";
+import { SignInButton, SignInNote } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill } from "../inspection/inspection-pill";
@@ -244,6 +244,7 @@ export const GamePillsSection = () => {
           <div className="design-notice-box">
             <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
               <SignInButton href="#" label="Se connecter avec Twitch" />
+              <SignInNote />
             </NoticePill>
           </div>
         </Specimen>

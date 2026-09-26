@@ -1,0 +1,15 @@
+/* La ligne sous chaque bouton Se connecter : discrète, centrée, jamais plus large que ce qu'elle accompagne. */
+
+.lp-sign-in-note {
+  max-width: 300px;
+  margin: 0 auto;
+  padding: 0 6px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.lp-sign-in-note a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

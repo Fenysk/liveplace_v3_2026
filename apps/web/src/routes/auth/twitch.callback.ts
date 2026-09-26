@@ -32,7 +32,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
         if (!code) return redirectWithCookies(pending.returnPath ?? "/", [clearOAuth]);
 
         try {
-          const { signedSession, login } = await completeSignIn(deps, code);
+          const { signedSession, login } = await completeSignIn(deps, code, pending.returnPath);
           const session = serializeCookie(SESSION_COOKIE, signedSession, SESSION_TTL_SECONDS, deps.isSecure);
           return redirectWithCookies(pending.returnPath ?? `/${login}`, [clearOAuth, session]);
         } catch (error) {

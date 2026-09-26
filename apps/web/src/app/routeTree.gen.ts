@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './../routes/__root'
 import { Route as IndexRouteImport } from './../routes/index'
 import { Route as LoginRouteImport } from './../routes/$login'
+import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
@@ -25,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/$login',
   path: '/$login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
+  id: '/confidentialite',
+  path: '/confidentialite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignRoute = DesignRouteImport.update({
@@ -56,6 +62,7 @@ const AuthTwitchCallbackRoute = AuthTwitchCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$login': typeof LoginRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/$login_/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$login'
+    | '/confidentialite'
     | '/design'
     | '/$login/obs'
     | '/auth/signout'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$login'
+    | '/confidentialite'
     | '/design'
     | '/$login/obs'
     | '/auth/signout'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$login'
+    | '/confidentialite'
     | '/design'
     | '/$login_/obs'
     | '/auth/signout'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
   LoginObsRoute: typeof LoginObsRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
@@ -134,6 +147,13 @@ declare module '@tanstack/react-router' {
       path: '/$login'
       fullPath: '/$login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/confidentialite': {
+      id: '/confidentialite'
+      path: '/confidentialite'
+      fullPath: '/confidentialite'
+      preLoaderRoute: typeof ConfidentialiteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design': {
@@ -189,6 +209,7 @@ const AuthTwitchRouteWithChildren = AuthTwitchRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
   LoginObsRoute: LoginObsRoute,
   AuthSignoutRoute: AuthSignoutRoute,

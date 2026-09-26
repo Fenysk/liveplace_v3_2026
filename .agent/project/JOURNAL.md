@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §10.1 et §8.1 : le droit `user:read:email`, et l'e-mail et le lien de découverte dans Convex seulement
+
+**Contexte.** L'humain veut l'e-mail de chaque compte, et savoir par quel streamer chacun a découvert LivePlace. Le §10.1 ne demande aucun droit à Twitch, et `users` (§8.1) ne garde que l'identité publique.
+**Décision.** L'OAuth demande `user:read:email`. `users` gagne `email` (réécrit à chaque connexion quand Twitch en donne un) et `discoveredViaUserId` (le streamer de la page d'où part la première connexion, jamais soi-même, jamais réécrit), tous deux optionnels. L'e-mail ne va qu'à Convex : ni dans la session, ni dans le miroir `user:`, ni dans une frame. Aucun envoi avant un consentement (bloc 2).
+**Renoncement.** Pas de reconnexion forcée : l'e-mail arrive à la prochaine connexion de chacun, 30 jours au plus. Pas de lien pour les comptes d'avant : l'adresse de leur première connexion est perdue.
+
 ## 2026-09-27 — Écart §4.3 : l'identifiant de l'auteur inspecté ne part qu'à qui modère, et `inspect` est plafonné
 
 **Contexte.** L'audit de sécurité du 26/09 (§1) : sans compte, un script lisait l'identité Twitch complète de chaque auteur, sur tout le canvas et sans limite. Le CDC 2026 veut pourtant qu'un invité inspecte.

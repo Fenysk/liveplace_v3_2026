@@ -10,7 +10,7 @@ import { Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
-import { SignInButton } from "../design/twitch";
+import { SignInButton, SignInNote } from "../design/twitch";
 
 export type DraftPillState =
   | { kind: "connecting" }
@@ -178,6 +178,7 @@ const guestContent = ({ signInHref }: Extract<DraftPillState, { kind: "guest" }>
   content: (
     <div className="lp-invitation">
       <SignInButton href={signInHref} label="Se connecter pour dessiner" />
+      <SignInNote />
     </div>
   ),
 });

@@ -4,7 +4,7 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { NoticePill } from "../ui/design/pill";
-import { SignInButton } from "../ui/design/twitch";
+import { SignInButton, SignInNote } from "../ui/design/twitch";
 import { resolveCanvas } from "../usecase/resolve-canvas";
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
@@ -26,6 +26,7 @@ export const CanvasNotFound = () => (
   <main className="lp-game">
     <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
       <SignInButton href="/auth/twitch" label="Se connecter avec Twitch" />
+      <SignInNote />
     </NoticePill>
   </main>
 );

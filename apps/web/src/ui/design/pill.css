@@ -261,9 +261,14 @@ html[data-panning] .lp-floating > .lp-pill,
     max-width: none;
   }
 
+  /* La hauteur de la barre du bas est mesurée (pill.tsx) : une ligne de contrôles, tant qu'elle ne l'est pas */
   .lp-floating[data-dock="cr"],
   .lp-floating[data-dock="br"] {
-    bottom: calc(max(var(--space-2), env(safe-area-inset-bottom)) + var(--control-size) + 3 * var(--space-2));
+    bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+      var(--space-2)
+    );
   }
 
   .lp-floating[data-dock="br"] {

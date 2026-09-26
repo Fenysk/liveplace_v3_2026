@@ -14,6 +14,7 @@ const TwitchUserSchema = z.object({
   login: z.string().min(1),
   display_name: z.string().min(1),
   profile_image_url: z.string(),
+  email: z.string().optional(), // avec le droit `user:read:email` ; absent si le compte n'en a pas de vérifié
 });
 
 // Sans paramètre, `helix/users` rend exactement l'utilisateur du token.
@@ -24,12 +25,12 @@ type TwitchAuthOptions = { clientId: string; clientSecret: string; redirectUri: 
 export function createTwitchAuth({ clientId, clientSecret, redirectUri }: TwitchAuthOptions): TwitchAuth {
   return {
     authorizeUrl(state) {
-      // Aucun scope : l'identité publique suffit (§10.1).
+      // Écart §10.1 (JOURNAL 2026-09-27) : l'e-mail seulement, en plus de l'identité publique.
       const query = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: "code",
-        scope: "",
+        scope: "user:read:email",
         state,
       });
       return `${AUTHORIZE_URL}?${query}`;
@@ -61,6 +62,7 @@ export function createTwitchAuth({ clientId, clientSecret, redirectUri }: Twitch
         login: twitchUser.login,
         displayName: twitchUser.display_name,
         avatarUrl: twitchUser.profile_image_url,
+        ...(twitchUser.email ? { email: twitchUser.email } : {}),
       };
     },
   };

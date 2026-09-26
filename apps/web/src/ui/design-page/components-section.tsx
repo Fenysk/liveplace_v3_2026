@@ -13,7 +13,7 @@ import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { Slider } from "../design/slider";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
-import { SignInButton, TwitchGlyph } from "../design/twitch";
+import { SignInButton, SignInNote, TwitchGlyph } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { SmallWindow, Window, WindowRow } from "../design/window";
 import {
@@ -310,6 +310,9 @@ export const ComponentsSection = () => {
         </Specimen>
         <Specimen caption="Se connecter, logo seul (mobile)">
           <SignInButton href="#" />
+        </Specimen>
+        <Specimen caption="La ligne sous chaque bouton Se connecter">
+          <SignInNote />
         </Specimen>
         <Specimen caption="Le logo, à la couleur du texte">
           <span className="design-icon">

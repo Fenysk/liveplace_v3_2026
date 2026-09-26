@@ -11,8 +11,11 @@ export const upsertFromTwitch = mutation({
     login: v.string(),
     displayName: v.string(),
     avatarUrl: v.string(),
+    email: v.optional(v.string()),
+    discoveredViaUserId: v.optional(v.string()),
   },
-  handler: async (ctx, { serviceKey, ...user }) => {
+  // Écart §8.1 (JOURNAL 2026-09-27) : l'e-mail à chaque connexion, le lien de découverte à la création seulement.
+  handler: async (ctx, { serviceKey, email, discoveredViaUserId, ...user }) => {
     requireServiceKey(serviceKey);
     const now = Date.now();
     const existing = await ctx.db
@@ -21,10 +24,22 @@ export const upsertFromTwitch = mutation({
       .unique();
     if (existing) {
       const { login, displayName, avatarUrl } = user;
-      await ctx.db.patch(existing._id, { login, displayName, avatarUrl, lastSignInAt: now });
+      await ctx.db.patch(existing._id, {
+        login,
+        displayName,
+        avatarUrl,
+        ...(email ? { email } : {}),
+        lastSignInAt: now,
+      });
       return;
     }
-    await ctx.db.insert("users", { ...user, createdAt: now, lastSignInAt: now });
+    await ctx.db.insert("users", {
+      ...user,
+      ...(email ? { email } : {}),
+      ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
+      createdAt: now,
+      lastSignInAt: now,
+    });
   },
 });
 

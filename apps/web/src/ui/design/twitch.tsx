@@ -18,3 +18,16 @@ export const SignInButton = ({ href, label }: SignInButtonProps) =>
   ) : (
     <Button icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" href={href} />
   );
+
+// La page de confidentialité, provisoire (JOURNAL 2026-09-27).
+const PRIVACY_PATH = "/confidentialite";
+
+// Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
+export const SignInNote = () => (
+  <p className="lp-sign-in-note lp-type-caption lp-muted">
+    En te connectant, tu acceptes la{" "}
+    <a href={PRIVACY_PATH} target="_blank" rel="noopener">
+      politique de confidentialité
+    </a>
+  </p>
+);

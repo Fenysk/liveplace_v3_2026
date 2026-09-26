@@ -187,6 +187,13 @@ describe("session claims (§10.2)", () => {
     expect(toSession({ sub: 1234, login: "fenysk", displayName: "Fenysk" })).toBeNull();
   });
 
+  // Ne met jamais l'e-mail d'un compte dans la session (écart §10.1, JOURNAL 2026-09-27)
+  it("never puts an account's email in the session", () => {
+    const signedIn = { ...session, avatarUrl: "https://avatar", email: "fenysk@example.com" };
+    expect(toSessionClaims(signedIn)).not.toHaveProperty("email");
+    expect(toSession({ ...toSessionClaims(signedIn), email: signedIn.email })).not.toHaveProperty("email");
+  });
+
   // Porte la photo Twitch quand la session en a une, et la retrouve (écart §10.2, JOURNAL 2026-09-24)
   it("carries the Twitch photo when the session has one, and reads it back", () => {
     const withPhoto: Session = {

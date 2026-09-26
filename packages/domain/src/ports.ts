@@ -79,9 +79,14 @@ export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser">;
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
 
+// Ce que Twitch rend à la connexion : l'utilisateur, et son e-mail quand il en a un (JOURNAL 2026-09-27).
+// L'e-mail ne va qu'à Convex : ni dans la session, ni dans le miroir `user:`.
+export type SignedInUser = User & { email?: string };
+
 // Le stockage durable (§8.2) : des fonctions Convex, toutes gardées par la clé du service.
 export interface DurableStore {
-  upsertUserFromTwitch(user: User): Promise<void>;
+  // Écart §8.1 (JOURNAL 2026-09-27) : `discoveredViaUserId` ne s'écrit qu'à la création du compte.
+  upsertUserFromTwitch(user: SignedInUser, discoveredViaUserId?: string): Promise<void>;
   getUserByLogin(login: string): Promise<User | null>;
   // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
   ensureCanvasForOwner(ownerId: string, candidate: OwnedCanvas): Promise<string>;
@@ -101,7 +106,7 @@ export interface SessionSigner {
 // Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.
 export interface TwitchAuth {
   authorizeUrl(state: string): string;
-  getUserFromCode(code: string): Promise<User>;
+  getUserFromCode(code: string): Promise<SignedInUser>;
 }
 
 // Une connexion vue de la socket : le pendant de `ClientSocket`, pour que l'infra n'importe pas le usecase.

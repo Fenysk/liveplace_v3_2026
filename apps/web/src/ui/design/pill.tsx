@@ -1,6 +1,6 @@
 // La seule bulle d'interface (CDC 2026) : la taille suit le contenu, ronde et concentrique à toute taille.
 
-import type { ReactNode } from "react";
+import { type ReactNode, type RefObject, useEffect } from "react";
 import { classNames } from "./class-names";
 import { useMorph } from "./use-morph";
 
@@ -27,8 +27,28 @@ const LAYOUT_CLASSES: Record<PillLayout, { pill?: string; content?: string }> = 
   rail: { pill: "lp-pill--v" },
 };
 
+const BOTTOM_BAR_HEIGHT = "--lp-bottom-bar";
+
+// Sur mobile, l'inspection et Recentrer se posent au-dessus de la barre du bas, à sa hauteur du moment (pill.css).
+const useBottomBarHeight = (content: RefObject<HTMLElement | null>, isBottomBar: boolean) => {
+  useEffect(() => {
+    const element = content.current;
+    if (!isBottomBar || !element) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() =>
+      root.style.setProperty(BOTTOM_BAR_HEIGHT, `${element.offsetHeight}px`),
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty(BOTTOM_BAR_HEIGHT);
+    };
+  }, [content, isBottomBar]);
+};
+
 export const Pill = ({ dock, layout = "row", state, isVisible = true, children }: PillProps) => {
   const morph = useMorph<HTMLDivElement, HTMLDivElement>();
+  useBottomBarHeight(morph.content, dock === "bc");
   const pill = (
     <div
       ref={morph.pill}
@@ -72,8 +92,8 @@ export const Pill = ({ dock, layout = "row", state, isVisible = true, children }
 // Un trait fin entre deux groupes de contrôles, qui suit l'axe de la pill.
 export const PillSeparator = () => <span className="lp-sep" aria-hidden="true" />;
 
-// Un message seul au centre de l'écran, dans une pill : la page d'accueil, un canvas introuvable.
-type NoticePillProps = { title: string; children: ReactNode };
+// Un message seul au centre de l'écran, dans une pill : la page d'accueil, un canvas introuvable, une page à venir.
+type NoticePillProps = { title: string; children?: ReactNode };
 
 export const NoticePill = ({ title, children }: NoticePillProps) => (
   <div className="lp-notice">
