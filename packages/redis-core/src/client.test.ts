@@ -10,12 +10,12 @@ import {
   toCellKey,
   toStateOffset,
 } from "@liveplace/domain";
-import type { LiveMessage, Placement } from "@liveplace/domain/ports";
+import type { LiveMessage, Placement, TwitchCommand } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore, createSignInWrites } from "./client";
-import { buildCanvasKeys, HIST_DEPTH, userKey } from "./keys";
+import { createCanvasCore, createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
+import { buildCanvasKeys, HIST_DEPTH, TWITCH_COMMANDS_KEY, userKey } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
 const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
@@ -50,6 +50,34 @@ afterAll(async () => {
   if (found.length > 0) await redis.del(...found);
   liveSubscriber.disconnect();
   await redis.quit();
+});
+
+describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
+  // Rend au gateway, dans l'ordre, ce que le web a déposé, et le rend encore après un redémarrage tant qu'il n'est pas acquitté
+  it("hands the gateway the web's commands in order, and again after a restart until acknowledged", async () => {
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const reader = redis.duplicate(); // une lecture qui attend bloque sa connexion : elle a la sienne
+    const commands: TwitchCommand[] = [
+      { kind: "ban", canvasId: "canvas-1", userId: "troll" },
+      { kind: "moderator", canvasId: "canvas-1", userId: "mod-1", isModerator: true },
+    ];
+
+    await createTwitchWrites(redis).queueTwitchCommands(commands);
+    const first = await createTwitchCommandQueue(reader).listTwitchCommands(100);
+    await createTwitchCommandQueue(reader).ackTwitchCommand(first[0]?.id ?? "");
+    const restarted = createTwitchCommandQueue(reader);
+    const again = await restarted.listTwitchCommands(100);
+    await restarted.ackTwitchCommand(again[0]?.id ?? "");
+    const drained = await restarted.listTwitchCommands(100);
+    const waiting = await restarted.listTwitchCommands(50);
+
+    expect(first.map(({ command }) => command)).toEqual(commands);
+    expect(again.map(({ command }) => command)).toEqual([commands[1]]);
+    expect(drained).toEqual([]);
+    expect(waiting).toEqual([]);
+    reader.disconnect();
+    await redis.del(TWITCH_COMMANDS_KEY);
+  });
 });
 
 describe("createCanvas (§5.6)", () => {

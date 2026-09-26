@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §2 : les actions venues de Twitch passent par une file que le gateway applique
+
+**Contexte.** Le plan de la synchro faisait appliquer les bans Twitch par le web. Or le §2 le lui interdit (« le web ne parle jamais aux pixels ») et `clearUser` retire des pixels. Et dans le serveur empaqueté par Nitro, `redis-core` ne trouverait pas ses `.lua` (JOURNAL 2026-09-19).
+**Décision.** Le web dépose chaque action (`ban`, `unban`, modérateur) dans le stream `twitch:commands`. Le gateway la lit par un groupe de consommateurs, sur sa propre connexion, et l'applique avec l'origine Twitch, au nom du streamer. Une action lue mais pas acquittée avant un arrêt repasse au démarrage. Une action qui échoue est journalisée puis acquittée : la synchro suivante la rattrape. Le web écrit lui-même `twitch:users`, qui n'est qu'un nom.
+**Renoncement.** Pas de Lua dans le web, ni d'import du Lua comme texte. Pas de PUB/SUB : un message publié pendant un redéploiement du gateway serait perdu.
+
 ## 2026-09-27 — Écart §4.2 et §4.3 : `listModerators`, et les bannis marqués par leur origine et leur compte
 
 **Contexte.** La section Modération doit montrer les modérateurs, d'où ils viennent, et qui n'a pas encore de compte LivePlace (A4, A5). Aucune frame ne liste les modérateurs, et `bans` ne dit ni l'origine ni le compte.

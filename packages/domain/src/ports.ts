@@ -41,6 +41,23 @@ export type ModeratorRole = { userId: string; source: ModerationSource; isModera
 // Le nom Twitch de quelqu'un qui n'a pas (encore) de compte LivePlace.
 export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
 
+// Écart §2 (JOURNAL 2026-09-27) : une action venue de Twitch. Le web la dépose, le gateway l'applique avec ses scripts.
+export type TwitchCommand =
+  | { kind: "ban" | "unban"; canvasId: string; userId: string }
+  | { kind: "moderator"; canvasId: string; userId: string; isModerator: boolean };
+
+// Ce que le web écrit pour la synchro Twitch : jamais un pixel, donc jamais de script (§2).
+export interface TwitchWrites {
+  setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
+  queueTwitchCommands(commands: readonly TwitchCommand[]): Promise<void>;
+}
+
+// Ce que le gateway lit : les actions pas encore acquittées d'abord (un arrêt en plein travail), puis les nouvelles.
+export interface TwitchCommandQueue {
+  listTwitchCommands(blockMs: number): Promise<{ id: string; command: TwitchCommand }[]>;
+  ackTwitchCommand(id: string): Promise<void>;
+}
+
 // L'auteur du pixel visible d'une case (§4.3).
 export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>["entry"]>;
 
@@ -90,7 +107,6 @@ export interface CanvasCore {
     change: ModeratorRole,
   ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
-  setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

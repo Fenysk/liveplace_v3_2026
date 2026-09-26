@@ -24,6 +24,9 @@ import type {
   Placement,
   SignInWrites,
   Snapshot,
+  TwitchCommand,
+  TwitchCommandQueue,
+  TwitchWrites,
   Unsubscribe,
 } from "@liveplace/domain/ports";
 import { decodeServerFrame, type Event } from "@liveplace/protocol";
@@ -37,6 +40,10 @@ import {
   HIST_DEPTH,
   RECENT_MAX_EVENTS,
   REQ_TTL_SECONDS,
+  TWITCH_COMMANDS_CONSUMER,
+  TWITCH_COMMANDS_KEY,
+  TWITCH_COMMANDS_MAXLEN,
+  TWITCH_COMMANDS_READER,
   userKey,
 } from "./keys";
 
@@ -98,6 +105,113 @@ export function createSignInWrites(redis: Redis): SignInWrites {
 
     async setUser({ userId, login, displayName, avatarUrl }): Promise<void> {
       await redis.hset(userKey(userId), { login, displayName, ...(avatarUrl ? { avatarUrl } : {}) });
+    },
+  };
+}
+
+// Écart §2 (JOURNAL 2026-09-27) : des noms et des actions à appliquer, jamais un pixel ni un script.
+export function createTwitchWrites(redis: Redis): TwitchWrites {
+  return {
+    async setTwitchUsers(canvasId, users) {
+      if (users.length === 0) return;
+      const entries = users.map(({ userId, login, displayName }) => [
+        userId,
+        JSON.stringify({ login, displayName }),
+      ]);
+      await redis.hset(buildCanvasKeys(canvasId).twitchUsers, Object.fromEntries(entries));
+    },
+
+    async queueTwitchCommands(commands) {
+      if (commands.length === 0) return;
+      const transaction = redis.multi();
+      for (const command of commands)
+        transaction.xadd(
+          TWITCH_COMMANDS_KEY,
+          "MAXLEN",
+          "~",
+          TWITCH_COMMANDS_MAXLEN,
+          "*",
+          "c",
+          JSON.stringify(command),
+        );
+      await transaction.exec();
+    },
+  };
+}
+
+// La réponse d'un XREADGROUP sur un seul stream : ses entrées, `[id, [champ, valeur, …]]`.
+const streamEntriesOf = (reply: unknown): { id: string; command: TwitchCommand }[] => {
+  const entries: unknown = Array.isArray(reply) && Array.isArray(reply[0]) ? reply[0][1] : [];
+  if (!Array.isArray(entries)) return [];
+  return entries.flatMap((entry: unknown) => {
+    if (!Array.isArray(entry) || typeof entry[0] !== "string" || !Array.isArray(entry[1])) return [];
+    const fields: unknown[] = entry[1];
+    const raw = fields[fields.indexOf("c") + 1];
+    if (typeof raw !== "string") return [];
+    // Déposé par createTwitchWrites ; la forme est couverte par les tests.
+    const command: TwitchCommand = JSON.parse(raw);
+    return [{ id: entry[0], command }];
+  });
+};
+
+const TWITCH_COMMANDS_READ_COUNT = 50;
+
+// Sur sa propre connexion : un XREADGROUP qui attend bloque toute autre commande.
+export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
+  let hasReader = false;
+  let isRecovered = false; // ce qu'un arrêt a laissé lu mais pas acquitté passe avant les nouvelles actions
+
+  // Ce qui a été lu par ce consommateur sans être acquitté : rendu tout de suite, sans attendre.
+  const listUnacknowledged = () =>
+    redis.xreadgroup(
+      "GROUP",
+      TWITCH_COMMANDS_READER,
+      TWITCH_COMMANDS_CONSUMER,
+      "COUNT",
+      TWITCH_COMMANDS_READ_COUNT,
+      "STREAMS",
+      TWITCH_COMMANDS_KEY,
+      "0",
+    );
+
+  // Ce qu'aucun consommateur n'a encore lu : attend au plus `blockMs`.
+  const listUnread = (blockMs: number) =>
+    redis.xreadgroup(
+      "GROUP",
+      TWITCH_COMMANDS_READER,
+      TWITCH_COMMANDS_CONSUMER,
+      "COUNT",
+      TWITCH_COMMANDS_READ_COUNT,
+      "BLOCK",
+      blockMs,
+      "STREAMS",
+      TWITCH_COMMANDS_KEY,
+      ">",
+    );
+
+  const ensureReader = async (): Promise<void> => {
+    if (hasReader) return;
+    try {
+      await redis.xgroup("CREATE", TWITCH_COMMANDS_KEY, TWITCH_COMMANDS_READER, "0", "MKSTREAM");
+    } catch (error) {
+      if (!(error instanceof Error && error.message.startsWith("BUSYGROUP"))) throw error;
+    }
+    hasReader = true;
+  };
+
+  return {
+    async listTwitchCommands(blockMs) {
+      await ensureReader();
+      if (!isRecovered) {
+        const pending = streamEntriesOf(await listUnacknowledged());
+        if (pending.length > 0) return pending;
+        isRecovered = true;
+      }
+      return streamEntriesOf(await listUnread(blockMs));
+    },
+
+    async ackTwitchCommand(id) {
+      await redis.xack(TWITCH_COMMANDS_KEY, TWITCH_COMMANDS_READER, id);
     },
   };
 }
@@ -366,15 +480,6 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         }),
       );
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
-    },
-
-    async setTwitchUsers(canvasId, users) {
-      if (users.length === 0) return;
-      const entries = users.map(({ userId, login, displayName }) => [
-        userId,
-        JSON.stringify({ login, displayName }),
-      ]);
-      await redis.hset(buildCanvasKeys(canvasId).twitchUsers, Object.fromEntries(entries));
     },
 
     // L'ID du stream est la version (§5.2) : un XRANGE direct. Toute version a son entrée, donc un trou veut dire un trim.

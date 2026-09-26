@@ -18,7 +18,7 @@ import type {
 import type { Event } from "@liveplace/protocol";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore, createSignInWrites } from "./client";
+import { createCanvasCore, createSignInWrites, createTwitchWrites } from "./client";
 import { buildCanvasKeys, CLEAR_SLICE_CELLS, userKey } from "./keys";
 
 // Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
@@ -26,6 +26,7 @@ const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStr
 const liveSubscriber = redis.duplicate();
 const core = createCanvasCore(redis, liveSubscriber);
 const writes = createSignInWrites(redis);
+const twitchWrites = createTwitchWrites(redis);
 
 const runId = randomUUID();
 let canvasCount = 0;
@@ -407,7 +408,9 @@ describe("the origin of a ban (JOURNAL 2026-09-27)", () => {
   it("marks a ban from Twitch, and names a banned user without an account by their Twitch name", async () => {
     const { canvasId } = await readyCanvas();
     const troll = `${runId}-twitch-troll`;
-    await core.setTwitchUsers(canvasId, [{ userId: troll, login: "trolltv", displayName: "TrollTV" }]);
+    await twitchWrites.setTwitchUsers(canvasId, [
+      { userId: troll, login: "trolltv", displayName: "TrollTV" },
+    ]);
 
     await byTwitch(canvasId, ban(troll));
 
@@ -487,7 +490,9 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
       displayName: "ModA",
       avatarUrl: "https://a/m.png",
     });
-    await core.setTwitchUsers(canvasId, [{ userId: withoutAccount, login: "modb", displayName: "ModB" }]);
+    await twitchWrites.setTwitchUsers(canvasId, [
+      { userId: withoutAccount, login: "modb", displayName: "ModB" },
+    ]);
     await setModerator(canvasId, withAccount, "liveplace", true);
     await setModerator(canvasId, withoutAccount, "twitch", true);
 

@@ -9,6 +9,12 @@ export const REQ_TTL_SECONDS = 120;
 export const RECENT_MAX_EVENTS = 2000; // §5.6 : le `recent` de la vue OBS, borné même avec un délai de 10 min
 export const CLEAR_SLICE_CELLS = 4096; // §5.4 : la latence Redis pire cas d'une tranche, connue d'avance
 
+// Écart §2 (JOURNAL 2026-09-27) : les actions venues de Twitch, déposées par le web, lues par le seul gateway.
+export const TWITCH_COMMANDS_KEY = "twitch:commands";
+export const TWITCH_COMMANDS_MAXLEN = 10_000; // `MAXLEN ~` : une action acquittée n'a plus besoin de rester
+export const TWITCH_COMMANDS_READER = "gateway";
+export const TWITCH_COMMANDS_CONSUMER = "gateway"; // un seul gateway : au redémarrage, il retrouve ce qu'il n'a pas fini
+
 export function buildCanvasKeys(canvasId: string) {
   const prefix = `cv:${canvasId}:`;
   // Le Lua construit `hist:` et `cells:` en concaténant ces préfixes.

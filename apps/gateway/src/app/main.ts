@@ -1,11 +1,12 @@
 // Le câblage du gateway : config, Redis, usecases, serveur (§3.3).
 
-import { createCanvasCore } from "@liveplace/redis-core";
+import { createCanvasCore, createTwitchCommandQueue } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionVerifier } from "../infra/session";
 import { startGatewayServer } from "../infra/ws-server";
 import { createBroadcast } from "../usecase/broadcast";
 import { createConnection } from "../usecase/connection";
+import { consumeTwitchCommands } from "../usecase/twitch-commands";
 import { parseGatewayConfig } from "./config";
 
 const GATEWAY_PORT = 8080; // §11.1 : le port que vise Traefik
@@ -23,6 +24,18 @@ const broadcast = createBroadcast(core);
 
 setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
 
+// Écart §2 (JOURNAL 2026-09-27) : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
+let isRunning = true;
+consumeTwitchCommands(
+  { core, now: Date.now },
+  createTwitchCommandQueue(new Redis(config.redisUrl)),
+  () => isRunning,
+).catch((error: unknown) => {
+  // Redis injoignable : le conteneur redémarre (restart: unless-stopped), et reprend ce qu'il n'avait pas acquitté.
+  console.error("gateway: file des actions Twitch arrêtée", error);
+  process.exit(1);
+});
+
 const server = startGatewayServer({
   port: GATEWAY_PORT,
   verifier: createSessionVerifier(config.sessionSecret),
@@ -30,6 +43,7 @@ const server = startGatewayServer({
 });
 
 const shutDown = (): void => {
+  isRunning = false;
   server.closeSockets(CLOSE_RESTART);
   setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS).unref();
   server.close().then(
