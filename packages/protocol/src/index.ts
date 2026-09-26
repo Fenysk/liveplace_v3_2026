@@ -8,7 +8,8 @@ import { z } from "zod";
 
 // 2 : cinq frames de modération, `cursor` et `clearArea` retirés. 3 : le délai OBS à chaud (JOURNAL 2026-09-25).
 // 4 : l'identifiant de l'auteur inspecté devient optionnel, et une `error` peut nommer sa requête (JOURNAL 2026-09-27).
-export const PROTOCOL_VERSION = 4;
+// 5 : le rôle se relit en direct (frame `role`), et les modérateurs se listent (JOURNAL 2026-09-27).
+export const PROTOCOL_VERSION = 5;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -267,6 +268,9 @@ const BansFrameSchema = z.object({
 
 const UnbannedFrameSchema = z.object({ t: z.literal("unbanned") });
 
+// Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé pendant la session.
+const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
+
 // Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
 const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: ObsDelaySchema });
 
@@ -290,6 +294,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   PixelsFrameSchema,
   BansFrameSchema,
   UnbannedFrameSchema,
+  RoleFrameSchema,
   ObsDelayFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,

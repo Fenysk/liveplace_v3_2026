@@ -50,6 +50,9 @@ const ack: AckFrame = {
 const publicEntry: InspectEntry = { login: "user2", displayName: "User 2", colorIndex: 3, placedAt: now };
 const entry: InspectEntry = { userId: "user-2", ...publicEntry };
 
+// Laisse finir ce qu'un message de contrôle a lancé : la relecture d'un rôle est asynchrone.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", requestId: "inspect-1", x, y });
 
 const hello = (overrides: Record<string, unknown> = {}) =>
@@ -88,12 +91,13 @@ const setup = (options: SetupOptions = {}) => {
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
+  const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   const core = {
     async getCanvas(asked: string) {
       return asked === canvasId ? meta : null;
     },
     async isModerator() {
-      return options.isModerator ?? false;
+      return roles.isModerator;
     },
     async getSnapshot() {
       options.duringSnapshot?.();
@@ -180,6 +184,7 @@ const setup = (options: SetupOptions = {}) => {
     recentSince,
     obsDelays,
     clock,
+    roles,
     open,
     publish: (published: Event) => publishTo?.({ e: published }),
     control: (published: LiveControl) => publishTo?.({ ctl: published }),
@@ -550,6 +555,28 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
 
     expect(context.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "unbanned" }]);
     expect(secondTab.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "unbanned" }]);
+    expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Relit en direct le rôle des seules sockets de la personne nommée puis retirée, sans reconnexion (JOURNAL 2026-09-27)
+  it("rereads, live, the role of the named then removed person's sockets only, without reconnecting", async () => {
+    const context = setup();
+    const other = context.open({ ...session, userId: "user-3" });
+    for (const opened of [context, other]) await opened.connection.receive(hello());
+
+    context.roles.isModerator = true;
+    context.control({ t: "role", userId: session.userId });
+    await flush();
+    expect(context.sent.at(-1)).toEqual({ t: "role", role: "moderator" });
+    await context.connection.receive(moderate("clearUser"));
+    expect(context.moderations).toHaveLength(1);
+
+    context.roles.isModerator = false;
+    context.control({ t: "role", userId: session.userId });
+    await flush();
+    expect(context.sent.at(-1)).toEqual({ t: "role", role: "viewer" });
+    await context.connection.receive(moderate("clearUser"));
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
     expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
   });
 

@@ -306,6 +306,10 @@ export function createCanvasStore(
       case "unbanned":
         publish({ isBanned: frame.t === "banned" });
         break;
+      // Écart §10.3 (JOURNAL 2026-09-27) : nommé ou retiré pendant la session, la modération apparaît ou part.
+      case "role":
+        publish({ role: frame.role });
+        break;
       case "obsDelay":
         if (view.params) publish({ params: { ...view.params, obsDelayMs: frame.obsDelayMs } });
         break;

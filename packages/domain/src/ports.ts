@@ -58,6 +58,7 @@ export type Snapshot = { state: Uint8Array; version: number };
 // Un ban pour les sockets d'une personne, ou le délai OBS pour toutes celles du canvas (JOURNAL 2026-09-25).
 export type LiveControl =
   | { t: "banned" | "unbanned"; userId: string }
+  | { t: "role"; userId: string } // ses droits de modération ont changé (JOURNAL 2026-09-27)
   | { t: "obsDelay"; obsDelayMs: number };
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 

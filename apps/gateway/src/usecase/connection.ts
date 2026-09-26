@@ -54,10 +54,25 @@ type Arrival = { version: number; coveredVersion: number } & (
 );
 
 // `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
-type ReadyState = { status: "ready"; canvasId: string; width: number; height: number; role: Role };
+// Écart §10.3 (JOURNAL 2026-09-27) : le rôle se relit en direct, d'où `ownerId`.
+type ReadyState = {
+  status: "ready";
+  canvasId: string;
+  ownerId: string;
+  width: number;
+  height: number;
+  role: Role;
+};
+// `isRoleStale` : un `ctl` `role` est tombé pendant l'arrivée, le rôle lu au `hello` a pu vieillir.
 type State =
   | { status: "awaitingHello" }
-  | { status: "joining"; canvasId: string; pendingFrames: CellsFrame[]; pendingControls: ControlFrame[] }
+  | {
+      status: "joining";
+      canvasId: string;
+      pendingFrames: CellsFrame[];
+      pendingControls: ControlFrame[];
+      isRoleStale: boolean;
+    }
   | ReadyState;
 
 export type ConnectionDeps = {
@@ -130,7 +145,11 @@ const buildWelcome = (
 });
 
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas.
-const controlFrameOf = (control: LiveControl, session: Session | null): ControlFrame | null => {
+// Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
+const controlFrameOf = (
+  control: Exclude<LiveControl, { t: "role" }>,
+  session: Session | null,
+): ControlFrame | null => {
   if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
   return control.userId === session?.userId ? { t: control.t } : null;
 };
@@ -149,8 +168,25 @@ export function createConnection(
     else if (state.status === "ready") socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
   };
 
+  // Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé, le rôle se relit et la page l'apprend.
+  const refreshRole = async (): Promise<void> => {
+    if (state.status !== "ready" || !session) return;
+    const ready = state;
+    const isModerator = await deps.core.isModerator(ready.canvasId, session.userId);
+    const role = roleFor(session, ready, isModerator);
+    if (state !== ready || role === ready.role) return;
+    state = { ...ready, role };
+    socket.sendFrame({ t: "role", role });
+  };
+
   // Écart §10.2 et CDC v3 §1 (JOURNAL 2026-09-25) : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
+    if (control.t === "role") {
+      if (control.userId !== session?.userId) return;
+      if (state.status === "joining") state.isRoleStale = true;
+      else void refreshRole().catch((error: unknown) => console.error("rôle non relu", error));
+      return;
+    }
     const frame = controlFrameOf(control, session);
     if (!frame) return;
     if (state.status === "joining") state.pendingControls.push(frame);
@@ -219,7 +255,7 @@ export function createConnection(
     gauge: AckFrame["gauge"] | null,
   ) => {
     const { canvasId } = frame;
-    state = { status: "joining", canvasId, pendingFrames: [], pendingControls: [] };
+    state = { status: "joining", canvasId, pendingFrames: [], pendingControls: [], isRoleStale: false };
     await deps.broadcast.join(canvasId, listener, onControl);
     const [arrival, wasBanned] = await Promise.all([
       getArrival(frame, meta),
@@ -228,10 +264,19 @@ export function createConnection(
 
     sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge));
 
-    const held = state.status === "joining" ? state : { pendingFrames: [], pendingControls: [] };
-    state = { status: "ready", canvasId, width: meta.width, height: meta.height, role };
+    const held =
+      state.status === "joining" ? state : { pendingFrames: [], pendingControls: [], isRoleStale: false };
+    state = {
+      status: "ready",
+      canvasId,
+      ownerId: meta.ownerId,
+      width: meta.width,
+      height: meta.height,
+      role,
+    };
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
+    if (held.isRoleStale) await refreshRole();
   };
 
   const greet = async (frame: HelloFrame): Promise<void> => {

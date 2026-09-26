@@ -328,6 +328,17 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
     expect(store.getView().ownerId).toBe("owner-1");
   });
 
+  // Prend le rôle que le gateway envoie en direct : nommé modérateur, puis retiré (JOURNAL 2026-09-27)
+  it("takes the role the gateway sends live: named moderator, then removed", () => {
+    const { store, receive } = setup();
+
+    receive({ t: "role", role: "moderator" });
+    expect(store.getView().role).toBe("moderator");
+
+    receive({ t: "role", role: "viewer" });
+    expect(store.getView().role).toBe("viewer");
+  });
+
   // Additionne les cases de chaque tranche, et ne se résout qu'à la dernière
   it("adds up the cells of every slice, and resolves only on the last one", async () => {
     const { store, sent, receive } = setup();

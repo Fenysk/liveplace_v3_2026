@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §10.3 et §4.3 : le rôle se relit en direct, et `PROTOCOL_VERSION` passe à 5
+
+**Contexte.** Le §10.3 fixe le rôle au `hello`, pour toute la connexion. Avec la synchro Twitch, un modérateur est nommé ou retiré pendant qu'il a la page ouverte : retiré, il garderait Retirer et Bannir jusqu'à sa reconnexion.
+**Décision.** Sur le `ctl` `role` de `moderators.lua`, le gateway relit `isModerator` pour les seules sockets de cette personne, met leur rôle à jour et leur envoie la frame `role`. Chaque commande lit ce rôle à jour. Une nouvelle frame : `PROTOCOL_VERSION` passe à 5.
+**Renoncement.** Pas de relecture de `mods` à chaque commande : une lecture Redis de plus par action, pour un changement rare, et la page ne l'apprendrait toujours pas.
+
 ## 2026-09-27 — Écart §5.1 : les modérateurs gardent leur origine, et les noms Twitch de ceux qui n'ont pas de compte
 
 **Contexte.** La synchro Twitch (A4, A5) nomme modérateurs ceux de la chaîne, le streamer peut en nommer d'autres ici, et un retrait sur Twitch ne doit pas retirer celui qu'il a nommé. Le §5.1 n'a que `cv:<id>:mods`, vide jusqu'ici.

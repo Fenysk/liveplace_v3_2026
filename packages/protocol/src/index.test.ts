@@ -76,6 +76,15 @@ describe("protocol frames", () => {
     expect(decodeServerFrame({ t: "obsDelay", obsDelayMs: 60_000 }).ok).toBe(true);
   });
 
+  // Accepte le rôle envoyé en direct, et rien d'autre qu'un rôle (JOURNAL 2026-09-27)
+  it("accepts a role sent live, and nothing but a role", () => {
+    expect(decodeServerFrame({ t: "role", role: "moderator" })).toEqual({
+      ok: true,
+      value: { t: "role", role: "moderator" },
+    });
+    expect(decodeServerFrame({ t: "role", role: "admin" }).ok).toBe(false);
+  });
+
   // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
   it("accepts an inspected author without its id, and a refusal that names its request", () => {
     const inspected = {
