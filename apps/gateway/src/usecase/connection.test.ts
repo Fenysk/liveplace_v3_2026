@@ -381,6 +381,20 @@ describe("createConnection (§6.1)", () => {
     });
   });
 
+  // Remet le même objet frame à deux clients du canvas : l'infra ne le sérialise qu'une fois (JOURNAL 2026-09-26)
+  it("hands the very same frame object to two clients of the canvas", async () => {
+    const context = setup();
+    const other = context.open(null);
+    await context.connection.receive(hello());
+    await other.connection.receive(hello());
+
+    context.publish(event(1, 1, 5));
+    context.broadcast.tick();
+
+    expect(context.sent.at(-1)).toMatchObject({ t: "cells", toVersion: 1 });
+    expect(other.sent.at(-1)).toBe(context.sent.at(-1));
+  });
+
   // Traite les frames une par une : une pose envoyée juste après le hello attend le welcome
   it("handles frames one at a time: a placement sent right after hello waits for the welcome", async () => {
     const { connection, sent } = setup();

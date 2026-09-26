@@ -140,7 +140,7 @@ export function createConnection(
 
   const listener: CellsListener = (frame) => {
     if (state.status === "joining") state.pendingFrames.push(frame);
-    else if (state.status === "ready") socket.sendFrame({ t: "cells", ...frame });
+    else if (state.status === "ready") socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
   };
 
   // Écart §10.2 et CDC v3 §1 (JOURNAL 2026-09-25) : le ban de cette personne, le délai OBS de ce canvas.

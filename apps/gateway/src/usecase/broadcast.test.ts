@@ -98,6 +98,48 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     expect(received).toHaveLength(1);
   });
 
+  // Au-delà de 500 clients, ne vide le canvas qu'un tick sur deux, en conflatant les deux (écart D-13, JOURNAL 2026-09-26)
+  it("flushes a canvas of more than 500 clients every second tick, conflating across both", async () => {
+    const { core, publish } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const received: CellsFrame[] = [];
+    await broadcast.join("canvas-1", (frame) => received.push(frame), ignoreControl);
+    for (let client = 0; client < 500; client++)
+      await broadcast.join("canvas-1", () => undefined, ignoreControl);
+
+    publish("canvas-1", event(1, 3, 5));
+    broadcast.tick();
+
+    expect(received).toHaveLength(0);
+
+    publish("canvas-1", event(2, 3, 6));
+    broadcast.tick();
+
+    expect(received).toHaveLength(1);
+    expect(received[0]?.toVersion).toBe(2);
+    expect(received[0]?.cells).toHaveLength(1);
+  });
+
+  // Au-delà de 1 000 clients, un tick sur trois, et jamais moins souvent
+  it("flushes a canvas of more than 1000 clients every third tick, and never less often", async () => {
+    const { core, publish } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const received: CellsFrame[] = [];
+    await broadcast.join("canvas-1", (frame) => received.push(frame), ignoreControl);
+    for (let client = 0; client < 2000; client++)
+      await broadcast.join("canvas-1", () => undefined, ignoreControl);
+
+    publish("canvas-1", event(1, 3, 5));
+    broadcast.tick();
+    broadcast.tick();
+
+    expect(received).toHaveLength(0);
+
+    broadcast.tick();
+
+    expect(received).toHaveLength(1);
+  });
+
   // Ne mélange jamais deux canvas
   it("never mixes two canvases", async () => {
     const { core, publish } = fakeCore();

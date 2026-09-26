@@ -3,6 +3,7 @@
 import { createServer } from "node:http";
 import type { Session } from "@liveplace/domain";
 import type { ClientConnection, ClientSocket, SessionVerifier } from "@liveplace/domain/ports";
+import type { ServerFrame } from "@liveplace/protocol";
 import { type WebSocket, WebSocketServer } from "ws";
 
 const MAX_PAYLOAD_BYTES = 8 * 1024;
@@ -16,8 +17,19 @@ export type GatewayServerDeps = {
   openConnection: (socket: ClientSocket, session: Session | null) => ClientConnection;
 };
 
+// Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
+const encodedFrames = new WeakMap<ServerFrame, Buffer>();
+
+const encode = (frame: ServerFrame): Buffer => {
+  const known = encodedFrames.get(frame);
+  if (known) return known;
+  const encoded = Buffer.from(JSON.stringify(frame));
+  encodedFrames.set(frame, encoded);
+  return encoded;
+};
+
 const toClientSocket = (socket: WebSocket): ClientSocket => ({
-  sendFrame: (frame) => socket.send(JSON.stringify(frame)),
+  sendFrame: (frame) => socket.send(encode(frame), { binary: false }),
   sendSnapshot: (state) => socket.send(state, { binary: true }),
   close: (code) => socket.close(code),
 });
