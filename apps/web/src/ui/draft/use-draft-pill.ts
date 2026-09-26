@@ -86,8 +86,7 @@ const toShownState = (
   isTouchScreen: boolean,
 ): ShownDraftPillState => {
   if (canvas.status === "connecting" || canvas.status === "closed") return { kind: canvas.status };
-  if (!canvas.userId)
-    return { kind: "guest", isSignInPrompted: draft.isSignInPrompted, signInHref: signInHref(login) };
+  if (!canvas.userId) return { kind: "guest", signInHref: signInHref(login) };
   if (canvas.isBanned) return { kind: "banned" };
   // Un compte connecté reçoit sa jauge dans le `welcome` : sans elle, on attend encore.
   if (!gauge) return { kind: "connecting" };

@@ -49,11 +49,11 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("d", "KeyD", true), "view")).toBeNull();
   });
 
-  // Pendant l'invitation d'un invité, Échap la referme, et rien d'autre n'agit
-  it("while a guest is invited to sign in, Escape closes the invitation and nothing else acts", () => {
-    expect(keyCommand(press("Escape", "Escape"), "signInPrompt")).toBe("exitDraftMode");
-    expect(keyCommand(press(" ", "Space"), "signInPrompt")).toBeNull();
-    expect(keyCommand(press("Enter", "Enter"), "signInPrompt")).toBeNull();
-    expect(keyCommand(press("d", "KeyD"), "signInPrompt")).toBeNull();
+  // Ne fait rien des autres touches, dans aucun mode : Tab garde le focus, une lettre libre ne déclenche rien
+  it("does nothing with any other key, in any mode", () => {
+    expect(keyCommand(press("Tab", "Tab"), "view")).toBeNull();
+    expect(keyCommand(press("x", "KeyX"), "view")).toBeNull();
+    expect(keyCommand(press("x", "KeyX"), "draft")).toBeNull();
+    expect(keyCommand(press("Tab", "Tab"), "inspecting")).toBeNull();
   });
 });

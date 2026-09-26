@@ -26,8 +26,7 @@ const toKeyPress = (event: KeyboardEvent): KeyPress => ({
 });
 
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
-  const { mode, isSignInPrompted } = draft.getView();
-  if (isSignInPrompted) return "signInPrompt";
+  const { mode } = draft.getView();
   return mode === "view" && canvas.getView().inspection ? "inspecting" : mode;
 };
 

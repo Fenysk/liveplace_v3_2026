@@ -116,27 +116,29 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
     expect(store.getView().mode).toBe("view");
   });
 
-  // Quand un invité veut dessiner, la pill Dessin l'invite à se connecter ; Annuler referme l'invitation (CDC 2026)
-  it("invites a guest to sign in instead of entering draft mode, and cancel closes the invitation", () => {
+  // Un invité reste en Vue quoi qu'il fasse : la pill Dessin lui montre déjà l'invitation (CDC 2026)
+  it("keeps a guest in view mode whatever it does, the draft pill already showing the invitation", () => {
     const { store } = setup({ view: guestView() });
 
     store.enterDraftMode();
-    expect(store.getView().isSignInPrompted).toBe(true);
+    expect(store.getView().mode).toBe("view");
+
+    store.toggleCell(1, 1);
+    expect(store.getView().draft.size).toBe(0);
 
     store.exitDraftMode();
-    expect(store.getView().isSignInPrompted).toBe(false);
     expect(store.getView().mode).toBe("view");
   });
 
-  // Un compte connecté entre en Dessin sans invitation, et rien n'invite avant le `welcome`
-  it("never invites a signed-in user, nor anyone before the welcome", () => {
+  // Un compte connecté entre en Dessin, et personne avant le `welcome`
+  it("lets a signed-in user into draft mode, and nobody before the welcome", () => {
     const signedIn = setup();
     signedIn.store.enterDraftMode();
-    expect(signedIn.store.getView()).toMatchObject({ mode: "draft", isSignInPrompted: false });
+    expect(signedIn.store.getView().mode).toBe("draft");
 
     const connecting = setup({ view: guestView({ status: "connecting" }) });
     connecting.store.enterDraftMode();
-    expect(connecting.store.getView().isSignInPrompted).toBe(false);
+    expect(connecting.store.getView().mode).toBe("view");
   });
 
   // Ne touche au brouillon qu'en Dessin, et le sauvegarde à chaque changement

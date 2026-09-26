@@ -78,6 +78,15 @@
   padding: 0 6px;
 }
 
+/* L'invitation d'un invité (la pill Dessin) : son bouton prend toute la largeur de la barre, sur mobile */
+.lp-invitation {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  text-align: center;
+}
+
 /* Verticale : mêmes règles, l'axe tourne. Exactement la largeur d'un contrôle et de ses marges */
 .lp-pill--v .lp-pill-content {
   flex-direction: column;

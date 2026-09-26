@@ -1,5 +1,5 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
-// Vue : la jauge et Dessiner. Dessin : la palette, puis la jauge, Vider, Annuler, Valider.
+// Vue : la jauge et Dessiner. Dessin : la palette, puis la jauge, Vider, Annuler, Valider. Invité : l'invitation.
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
@@ -17,7 +17,7 @@ export type DraftPillState =
   | { kind: "closed" } // pour de bon : on recharge la page
   | { kind: "reconnecting"; shown: Exclude<DraftPillState, { kind: "reconnecting" }> } // son contenu, flouté (§4.5)
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
-  | { kind: "guest"; isSignInPrompted: boolean; signInHref: string }
+  | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "view"; gauge: GaugeProps; refusal?: string }
   | {
       kind: "draft";
@@ -34,8 +34,8 @@ export type DraftPillState =
     };
 
 export type DraftPillActions = {
-  onEnter: () => void; // Dessiner, ou l'invitation d'un invité
-  onExit: () => void; // Annuler : sort du Dessin, ou referme l'invitation
+  onEnter: () => void; // Dessiner
+  onExit: () => void; // Annuler : sort du Dessin
   onSubmit: () => void;
   onDiscard: () => void;
   onPickColor: (colorIndex: number) => void; // dans la palette, ou dans la rangée des récentes sur mobile
@@ -172,25 +172,15 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
   );
 };
 
-const guestContent = (
-  state: Extract<DraftPillState, { kind: "guest" }>,
-  actions: DraftPillActions,
-): DraftPillContent => {
-  if (!state.isSignInPrompted) return { content: <EnterButton onEnter={actions.onEnter} /> };
-  return {
-    layout: "stack",
-    content: (
-      <>
-        <p className="lp-type-body lp-prompt">Connecte-toi avec Twitch pour dessiner.</p>
-        <div className="lp-row">
-          <span className="lp-spacer" />
-          <CancelButton onExit={actions.onExit} />
-          <SignInButton href={state.signInHref} label="Se connecter" />
-        </div>
-      </>
-    ),
-  };
-};
+// Un seul bouton, qui dit tout. Empilée : au téléphone, la barre prend toute la largeur, et le bouton aussi.
+const guestContent = ({ signInHref }: Extract<DraftPillState, { kind: "guest" }>): DraftPillContent => ({
+  layout: "stack",
+  content: (
+    <div className="lp-invitation">
+      <SignInButton href={signInHref} label="Se connecter pour dessiner" />
+    </div>
+  ),
+});
 
 const draftContent = (
   state: DraftModeState,
@@ -245,7 +235,7 @@ const contentOf = (
     case "banned":
       return { content: <span className="lp-type-body lp-prompt">Tu es banni·e de ce canvas</span> };
     case "guest":
-      return guestContent(state, actions);
+      return guestContent(state);
     case "view":
       return {
         content: (

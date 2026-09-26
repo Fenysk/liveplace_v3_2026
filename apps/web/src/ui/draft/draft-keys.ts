@@ -1,10 +1,10 @@
 // Les raccourcis du CDC 2026 : ce que fait une touche, selon le mode. Pur : l'écouteur de `window` ne fait que l'appeler.
-// `inspecting` : le mode Vue, pendant qu'une case est inspectée. `signInPrompt` : un invité est invité à se connecter.
+// `inspecting` : le mode Vue, pendant qu'une case est inspectée.
 
 import type { DraftMode } from "../../state/draft-store";
 
 export type KeyPress = { key: string; code: string; hasModifier: boolean };
-export type KeyMode = DraftMode | "inspecting" | "signInPrompt";
+export type KeyMode = DraftMode | "inspecting";
 export type DraftKeyCommand =
   | "enterDraftMode"
   | "submit"
@@ -21,19 +21,16 @@ const DRAFT_KEYS: Record<string, DraftKeyCommand> = {
   e: "toggleEraser",
 };
 const INSPECTING_KEYS: Record<string, DraftKeyCommand> = { ...VIEW_KEYS, escape: "closeInspection" };
-const SIGN_IN_PROMPT_KEYS: Record<string, DraftKeyCommand> = { escape: "exitDraftMode" };
 const KEYS_BY_MODE = {
   view: VIEW_KEYS,
   draft: DRAFT_KEYS,
   inspecting: INSPECTING_KEYS,
-  signInPrompt: SIGN_IN_PROMPT_KEYS,
 } as const;
 // Espace entre en Dessin comme Entrée, puis trace : elle ne valide jamais.
 const SPACE_COMMANDS: Record<KeyMode, DraftKeyCommand | null> = {
   view: "enterDraftMode",
   inspecting: "enterDraftMode",
   draft: "startTrace",
-  signInPrompt: null,
 };
 
 // Ctrl, Alt ou Cmd : la touche appartient au navigateur (Ctrl+E, Ctrl+D…).

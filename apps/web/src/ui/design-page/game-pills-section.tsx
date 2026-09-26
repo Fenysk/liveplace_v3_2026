@@ -64,8 +64,7 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
     state: { kind: "reconnecting", shown: draftState(nowMs) },
   },
   { caption: "Banni : lecture seule", state: { kind: "banned" } },
-  { caption: "Invité : Dessiner seul", state: { kind: "guest", isSignInPrompted: false, signInHref: "#" } },
-  { caption: "Invité, après Dessiner", state: { kind: "guest", isSignInPrompted: true, signInHref: "#" } },
+  { caption: "Invité : l'invitation, directement", state: { kind: "guest", signInHref: "#" } },
   { caption: "Vue : jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10) } },
   {
     caption: "Vue, après un refus",
@@ -87,6 +86,11 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
     isCompact: true,
   },
   { caption: "Mobile, Dessin : la feuille, palette repliée", state: draftState(nowMs), isCompact: true },
+  {
+    caption: "Mobile, invité : l'invitation au centre",
+    state: { kind: "guest", signInHref: "#" },
+    isCompact: true,
+  },
 ];
 
 const inspections = (nowMs: number): readonly { caption: string; inspection: Inspection }[] => [
