@@ -179,6 +179,11 @@ export interface TwitchWebhook {
   read(message: TwitchWebhookMessage, nowMs: Timestamp): TwitchWebhookEvent | null;
 }
 
+// Écart §10.1 (JOURNAL 2026-09-27) : les abonnements EventSub d'une chaîne, pris avec le jeton de l'application.
+export interface TwitchEventSub {
+  subscribeToModeration(broadcasterId: string): Promise<void>;
+}
+
 // Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.
 export interface TwitchAuth {
   authorizeUrl(state: string, purpose: TwitchPurpose): string;

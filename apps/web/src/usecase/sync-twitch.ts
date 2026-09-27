@@ -2,10 +2,14 @@
 // la chaîne confiés au gateway, qui les applique (§2). Le web n'écrit que des noms, des actions et l'état.
 
 import type { Timestamp } from "@liveplace/domain";
-import type { TwitchChannel, TwitchWrites } from "@liveplace/domain/ports";
+import type { TwitchChannel, TwitchEventSub, TwitchWrites } from "@liveplace/domain/ports";
 import { type SignInDeps, type SignInResult, signInTwitchUser } from "./sign-in";
 
-export type TwitchSyncDeps = SignInDeps & { twitchWrites: TwitchWrites; now: () => Timestamp };
+export type TwitchSyncDeps = SignInDeps & {
+  twitchWrites: TwitchWrites;
+  eventSub: TwitchEventSub;
+  now: () => Timestamp;
+};
 
 const syncChannel = async (
   deps: TwitchSyncDeps,
@@ -26,6 +30,8 @@ const syncChannel = async (
     { kind: "moderators", canvasId, userIds: moderators.map((moderator) => moderator.userId) },
     { kind: "bans", canvasId, userIds: permanentBans.map((ban) => ban.userId) },
   ]);
+  // A2 : rester à jour ensuite, sans garder de jeton. Un échec remonte : la synchro n'est pas notée faite.
+  await deps.eventSub.subscribeToModeration(user.userId);
   await deps.twitchWrites.setTwitchSync(canvasId, { status: "ok", syncedAt: deps.now() });
 };
 

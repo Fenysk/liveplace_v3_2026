@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { TwitchWebhookMessage } from "@liveplace/domain/ports";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createTwitchAuth, createTwitchWebhook } from "./twitch";
+import { createTwitchAuth, createTwitchEventSub, createTwitchWebhook } from "./twitch";
 
 const twitch = createTwitchAuth({
   clientId: "client-id",
@@ -158,5 +158,68 @@ describe("createTwitchWebhook (JOURNAL 2026-09-27)", () => {
     expect(webhook.read(messageOf("notification", BAN, "another-secret"), sentAt)).toBeNull();
     expect(webhook.read(tampered, sentAt)).toBeNull();
     expect(webhook.read(messageOf("notification", BAN), sentAt + 11 * 60_000)).toBeNull();
+  });
+});
+
+describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
+  const options = {
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    callbackUrl: "https://liveplace.tv/twitch/eventsub",
+    secret: "eventsub-secret",
+  };
+
+  // Twitch, joué par URL : le jeton de l'application, puis les abonnements de la chaîne.
+  const stubSubscriptions = (existing: string) => {
+    const created: unknown[] = [];
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
+      const url = new URL(input);
+      asked.push(`${init?.method ?? "GET"} ${url.pathname}`);
+      if (url.pathname === "/oauth2/token") return json('{"access_token":"app-token","expires_in":3600}');
+      if (url.pathname === "/helix/eventsub/subscriptions" && init?.method === "POST") {
+        created.push(String(init.body));
+        return new Response("{}", { status: 202 });
+      }
+      if (url.pathname === "/helix/eventsub/subscriptions") return json(existing);
+      return new Response("inconnu", { status: 404 });
+    });
+    return { created, asked };
+  };
+
+  // Abonne la chaîne à ce qui lui manque, par webhook signé, avec un seul jeton d'application
+  it("subscribes the channel to what it lacks, by signed webhook, with a single app token", async () => {
+    const { created, asked } = stubSubscriptions(
+      '{"data":[{"type":"channel.ban","status":"enabled","transport":{"callback":"https://liveplace.tv/twitch/eventsub"}},' +
+        '{"type":"channel.unban","status":"authorization_revoked",' +
+        '"transport":{"callback":"https://liveplace.tv/twitch/eventsub"}}],"pagination":{}}',
+    );
+
+    await createTwitchEventSub(options).subscribeToModeration("1234");
+
+    // Le corps tel que Twitch le reçoit : du texte en snake_case.
+    const transport = `{"method":"webhook","callback":"${options.callbackUrl}","secret":"${options.secret}"}`;
+    expect(created).toEqual(
+      ["channel.unban", "channel.moderator.add", "channel.moderator.remove"].map(
+        (type) =>
+          `{"type":"${type}","version":"1","condition":{"broadcaster_user_id":"1234"},"transport":${transport}}`,
+      ),
+    );
+    expect(asked.filter((line) => line === "POST /oauth2/token")).toHaveLength(1);
+  });
+
+  // Ne demande rien à Twitch quand l'adresse n'est pas publique en https : le poste de développement
+  it("asks Twitch nothing when the address is not public https: the development machine", async () => {
+    const { asked } = stubSubscriptions('{"data":[],"pagination":{}}');
+    const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await createTwitchEventSub({
+      ...options,
+      callbackUrl: "http://localhost:3000/twitch/eventsub",
+    }).subscribeToModeration("1234");
+
+    expect(asked).toEqual([]);
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 });

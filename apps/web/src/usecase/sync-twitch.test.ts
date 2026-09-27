@@ -26,6 +26,7 @@ const doubles = () => {
   const names: TwitchUser[] = [];
   const commands: TwitchCommand[] = [];
   const syncs: { canvasId: string; sync: TwitchSync }[] = [];
+  const subscribed: string[] = [];
   const signedUsers: string[] = [];
   const deps: SignInDeps = {
     twitch: {
@@ -60,7 +61,19 @@ const doubles = () => {
       syncs.push({ canvasId, sync });
     },
   };
-  return { deps: { ...deps, twitchWrites, now: () => now }, names, commands, syncs, signedUsers };
+  const eventSub = {
+    subscribeToModeration: async (broadcasterId: string) => {
+      subscribed.push(broadcasterId);
+    },
+  };
+  return {
+    deps: { ...deps, twitchWrites, eventSub, now: () => now },
+    names,
+    commands,
+    syncs,
+    signedUsers,
+    subscribed,
+  };
 };
 
 describe("completeTwitchSync (JOURNAL 2026-09-27)", () => {
@@ -76,6 +89,15 @@ describe("completeTwitchSync (JOURNAL 2026-09-27)", () => {
       { kind: "moderators", canvasId: "canvas-1", userIds: ["21"] },
       { kind: "bans", canvasId: "canvas-1", userIds: ["31"] },
     ]);
+  });
+
+  // Abonne la chaîne du streamer à ses bans et à ses modérateurs, pour rester à jour sans garder de jeton (A2)
+  it("subscribes the streamer's channel to its bans and moderators, to stay up to date without a token", async () => {
+    const { deps, subscribed } = doubles();
+
+    await completeTwitchSync(deps, "code", null);
+
+    expect(subscribed).toEqual([owner.userId]);
   });
 
   // Garde le nom Twitch des modérateurs et des bannis, sans leur e-mail ni rien d'autre, et note la synchro

@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type {
   SignedInUser,
   TwitchAuth,
+  TwitchEventSub,
   TwitchPurpose,
   TwitchUser,
   TwitchWebhook,
@@ -215,6 +216,103 @@ export function createTwitchWebhook(secret: string): TwitchWebhook {
           broadcasterId: RevocationSchema.parse(body).subscription.condition.broadcaster_user_id,
         };
       return toNotificationEvent(body);
+    },
+  };
+}
+
+// --- Les abonnements EventSub (JOURNAL 2026-09-27) : pris avec le jeton de l'application, jamais celui du streamer --
+
+const SUBSCRIPTIONS_URL = "https://api.twitch.tv/helix/eventsub/subscriptions";
+// Ce que la synchro suit : les bans et les modérateurs de la chaîne (A2).
+const MODERATION_TYPES = [
+  "channel.ban",
+  "channel.unban",
+  "channel.moderator.add",
+  "channel.moderator.remove",
+];
+// Un abonnement dans un autre état (révoqué, échoué) ne livre plus rien : on en recrée un.
+const LIVE_STATUSES = new Set(["enabled", "webhook_callback_verification_pending"]);
+
+const AppGrantSchema = z.object({ access_token: z.string().min(1) });
+const SubscriptionsSchema = z.object({
+  data: z.array(
+    z.object({
+      type: z.string(),
+      status: z.string(),
+      transport: z.object({ callback: z.string().optional() }),
+    }),
+  ),
+});
+
+type TwitchEventSubOptions = { clientId: string; clientSecret: string; callbackUrl: string; secret: string };
+
+export function createTwitchEventSub({
+  clientId,
+  clientSecret,
+  callbackUrl,
+  secret,
+}: TwitchEventSubOptions): TwitchEventSub {
+  let appGrant: string | null = null; // gardé en mémoire seulement, redemandé quand Twitch le refuse
+
+  const getAppGrant = async (): Promise<string> => {
+    if (appGrant) return appGrant;
+    const answer = await fetch(CODE_EXCHANGE_URL, {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "client_credentials",
+      }),
+    });
+    if (!answer.ok) throw new Error(`Twitch refuse le jeton de l'application (${answer.status})`);
+    appGrant = AppGrantSchema.parse(await answer.json()).access_token;
+    return appGrant;
+  };
+
+  // Un appel à l'API avec le jeton de l'application, redemandé une fois s'il a expiré.
+  const callHelix = async (url: string, init: RequestInit = {}, isRetry = false): Promise<Response> => {
+    const headers = {
+      ...init.headers,
+      Authorization: `Bearer ${await getAppGrant()}`,
+      "Client-Id": clientId,
+    };
+    const answer = await fetch(url, { ...init, headers });
+    if (answer.status !== 401 || isRetry) return answer;
+    appGrant = null;
+    return callHelix(url, init, true);
+  };
+
+  return {
+    async subscribeToModeration(broadcasterId) {
+      // Twitch ne livre qu'à une adresse publique en https : sur le poste de développement, rien à prendre.
+      if (!callbackUrl.startsWith("https://")) {
+        console.info("EventSub sauté : l'adresse de retour n'est pas publique", callbackUrl);
+        return;
+      }
+      const listed = await callHelix(
+        `${SUBSCRIPTIONS_URL}?${new URLSearchParams({ user_id: broadcasterId })}`,
+      );
+      if (!listed.ok) throw new Error(`eventsub/subscriptions refuse la liste (${listed.status})`);
+      const live = new Set(
+        SubscriptionsSchema.parse(await listed.json())
+          .data.filter((found) => LIVE_STATUSES.has(found.status) && found.transport.callback === callbackUrl)
+          .map((found) => found.type),
+      );
+      for (const type of MODERATION_TYPES.filter((wanted) => !live.has(wanted))) {
+        const created = await callHelix(SUBSCRIPTIONS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type,
+            version: "1",
+            condition: { broadcaster_user_id: broadcasterId },
+            transport: { method: "webhook", callback: callbackUrl, secret },
+          }),
+        });
+        // 409 : Twitch l'a déjà, créé entre la liste et maintenant.
+        if (!created.ok && created.status !== 409)
+          throw new Error(`eventsub ${type} refusé (${created.status})`);
+      }
     },
   };
 }

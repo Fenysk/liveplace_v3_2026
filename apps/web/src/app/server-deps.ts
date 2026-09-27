@@ -5,7 +5,7 @@ import { createDurableStore } from "@liveplace/durable";
 import { createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionSigner } from "../infra/session";
-import { createTwitchAuth, createTwitchWebhook } from "../infra/twitch";
+import { createTwitchAuth, createTwitchEventSub, createTwitchWebhook } from "../infra/twitch";
 import { parseWebConfig } from "./config";
 
 const buildServerDeps = () => {
@@ -22,6 +22,12 @@ const buildServerDeps = () => {
     redis: createSignInWrites(redis),
     twitchWrites: createTwitchWrites(redis), // JOURNAL 2026-09-27
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
+    eventSub: createTwitchEventSub({
+      clientId: config.twitchClientId,
+      clientSecret: config.twitchClientSecret,
+      callbackUrl: `${config.publicUrl}/twitch/eventsub`,
+      secret: config.twitchEventSubSecret,
+    }),
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
     randomCanvasId: randomUUID,
