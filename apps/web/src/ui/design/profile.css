@@ -12,6 +12,14 @@
   color: var(--ink);
 }
 
+/* Sans compte LivePlace : rien à montrer derrière l'avatar, son contour le dit plutôt qu'un fond plein */
+.lp-avatar--no-account {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.5px dashed var(--muted);
+  color: var(--muted);
+}
+
 .lp-avatar-img {
   position: absolute;
   inset: 0;
@@ -58,6 +66,20 @@
 .lp-profile-main:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* Sans compte : un bouton, pas un lien. Il répond au clic (l'erreur), mais ne promet aucune navigation. */
+button.lp-profile-main {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.lp-profile-main:hover .lp-profile-name {
+  text-decoration: none;
 }
 
 .lp-avatar-btn {

@@ -1,5 +1,6 @@
-// Ce qu'on dit d'un modérateur ou d'un banni juste après son nom (JOURNAL 2026-09-27) : d'où il vient, et s'il n'a
-// pas encore de compte LivePlace.
+// Ce qu'on dit d'un modérateur ou d'un banni juste après son nom (JOURNAL 2026-09-27) : d'où il vient, et — par le
+// contour de son avatar plutôt qu'une étiquette — s'il n'a pas encore de compte LivePlace (`Profile` le porte).
+// Sans compte, le bouton Twitch de `Profile` dit déjà « Twitch » : l'étiquette serait redondante.
 
 import { Badge } from "../design/badge";
 import { Profile, type ProfileUser } from "../design/profile";
@@ -19,9 +20,10 @@ export const MarkedProfile = ({
   hasAccount,
 }: MarkedProfileProps) => (
   <span className="lp-row">
-    <Profile user={user} variant="name" />
-    {isFromTwitch && <Badge label="Twitch" icon={TwitchGlyph} title="Venu de ta chaîne Twitch" />}
+    <Profile user={user} variant="name" hasAccount={hasAccount} />
+    {isFromTwitch && hasAccount && (
+      <Badge label="Twitch" icon={TwitchGlyph} title="Venu de ta chaîne Twitch" />
+    )}
     {isNamedHere && <Badge label="Nommé ici" />}
-    {!hasAccount && <Badge label="Sans compte" title="Pas encore sur LivePlace" />}
   </span>
 );
