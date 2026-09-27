@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §9 et §11.5 : `/twitch/eventsub`, une route publique gardée par la seule signature de Twitch
+
+**Contexte.** Pour rester à jour sans garder de jeton (A2), Twitch prévient d'un ban ou d'un modérateur par un POST sur une adresse publique. N'importe qui peut poster sur cette adresse.
+**Décision.** Le web sert `POST /twitch/eventsub`. L'adaptateur Twitch vérifie le HMAC-SHA256 (`id + horodatage + corps`, comparaison à temps constant) avec `TWITCH_EVENTSUB_SECRET`, refuse plus de 10 minutes d'écart (`403`, rien d'écrit), puis lit le snake_case. Le usecase répond au `challenge` ; il dépose les bans définitifs, les débans et les modérateurs dans `twitch:commands` ; il note une révocation dans `meta`. La variable est obligatoire, de 10 à 100 caractères (bornes de Twitch).
+**Renoncement.** Pas de liste des `message_id` déjà vus : chaque action est idempotente côté gateway, un message rejoué ne double rien.
+
 ## 2026-09-27 — Écart §10.1 : deux droits de plus, pour le seul streamer qui synchronise sa chaîne
 
 **Contexte.** La synchro Twitch (A1) lit les modérateurs et les bans d'une chaîne (`moderation:read`), puis s'abonne à ses bans (`channel:moderate`, EventSub). Le §10.1 ne demande aucun droit, et l'écran de Twitch affiche chacun.

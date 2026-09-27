@@ -10,6 +10,7 @@ const env = {
   CONVEX_URL: "https://example.convex.cloud",
   CONVEX_SERVICE_KEY: "service-key",
   REDIS_URL: "redis://127.0.0.1:6379",
+  TWITCH_EVENTSUB_SECRET: "e".repeat(32),
 };
 
 // Le message de l'erreur levée, ou l'échec du test si rien n'est levé.
@@ -31,6 +32,17 @@ describe("parseWebConfig (§11.5)", () => {
 
     expect(message).toContain("TWITCH_CLIENT_SECRET");
     expect(message).toContain("CONVEX_SERVICE_KEY");
+  });
+
+  // Refuse un secret EventSub hors de 10 à 100 caractères, les bornes de Twitch (JOURNAL 2026-09-27)
+  it("refuses an EventSub secret outside Twitch's 10 to 100 characters", () => {
+    expect(messageOf(() => parseWebConfig({ ...env, TWITCH_EVENTSUB_SECRET: "e".repeat(9) }))).toContain(
+      "TWITCH_EVENTSUB_SECRET",
+    );
+    expect(messageOf(() => parseWebConfig({ ...env, TWITCH_EVENTSUB_SECRET: "e".repeat(101) }))).toContain(
+      "TWITCH_EVENTSUB_SECRET",
+    );
+    expect(parseWebConfig(env).twitchEventSubSecret).toBe(env.TWITCH_EVENTSUB_SECRET);
   });
 
   // Refuse un secret trop court sans jamais écrire sa valeur (§10.2)

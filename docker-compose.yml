@@ -58,6 +58,8 @@ services:
       CONVEX_URL: ${CONVEX_URL:?CONVEX_URL manquante}
       CONVEX_SERVICE_KEY: ${CONVEX_SERVICE_KEY:?CONVEX_SERVICE_KEY manquante}
       REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
+      # JOURNAL 2026-09-27 : la signature des messages que Twitch poste sur /twitch/eventsub.
+      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:?TWITCH_EVENTSUB_SECRET manquante}
     # Le callback OAuth crée le canvas dans Redis (§10.1).
     depends_on:
       redis:

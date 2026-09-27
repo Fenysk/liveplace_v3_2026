@@ -1,5 +1,7 @@
+import { createHmac } from "node:crypto";
+import type { TwitchWebhookMessage } from "@liveplace/domain/ports";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createTwitchAuth } from "./twitch";
+import { createTwitchAuth, createTwitchWebhook } from "./twitch";
 
 const twitch = createTwitchAuth({
   clientId: "client-id",
@@ -88,5 +90,73 @@ describe("createTwitchAuth (§10.1, JOURNAL 2026-09-27)", () => {
     expect(new Set(asked.slice(1).map(({ authorization }) => authorization))).toEqual(
       new Set(["Bearer user-token"]),
     );
+  });
+});
+
+describe("createTwitchWebhook (JOURNAL 2026-09-27)", () => {
+  const secret = "eventsub-secret";
+  const sentAt = Date.parse("2026-09-27T12:00:00Z");
+  const webhook = createTwitchWebhook(secret);
+
+  // Un message tel que Twitch l'envoie : signé par le secret partagé, sur l'id, l'heure et le corps
+  const messageOf = (type: string, body: string, signedWith = secret): TwitchWebhookMessage => {
+    const id = "message-1";
+    const timestamp = "2026-09-27T12:00:00Z";
+    const hmac = createHmac("sha256", signedWith)
+      .update(id + timestamp + body)
+      .digest("hex");
+    return { id, timestamp, signature: `sha256=${hmac}`, type, body };
+  };
+
+  const BAN =
+    '{"subscription":{"type":"channel.ban"},"event":{"broadcaster_user_id":"1234","user_id":"31",' +
+    '"user_login":"troll","user_name":"Troll","is_permanent":true}}';
+  const TIMEOUT = BAN.replace('"is_permanent":true', '"is_permanent":false');
+  const MODERATOR_REMOVE =
+    '{"subscription":{"type":"channel.moderator.remove"},"event":{"broadcaster_user_id":"1234",' +
+    '"user_id":"21","user_login":"mod1","user_name":"Mod1"}}';
+  const CHALLENGE = '{"challenge":"pogchamp-kappa-360noscope","subscription":{"type":"channel.ban"}}';
+  const REVOCATION =
+    '{"subscription":{"type":"channel.ban","status":"authorization_revoked",' +
+    '"condition":{"broadcaster_user_id":"1234"}}}';
+
+  // Lit un ban définitif, un timeout et un modérateur retiré, signés par le bon secret
+  it("reads a permanent ban, a timeout and a removed moderator, signed with the right secret", () => {
+    const troll = { userId: "31", login: "troll", displayName: "Troll" };
+
+    expect(webhook.read(messageOf("notification", BAN), sentAt)).toEqual({
+      kind: "ban",
+      broadcasterId: "1234",
+      user: troll,
+      isPermanent: true,
+    });
+    expect(webhook.read(messageOf("notification", TIMEOUT), sentAt)).toMatchObject({ isPermanent: false });
+    expect(webhook.read(messageOf("notification", MODERATOR_REMOVE), sentAt)).toEqual({
+      kind: "moderator",
+      broadcasterId: "1234",
+      user: { userId: "21", login: "mod1", displayName: "Mod1" },
+      isModerator: false,
+    });
+  });
+
+  // Lit la vérification d'un abonnement et la révocation des droits
+  it("reads the verification of a subscription and the revocation of the rights", () => {
+    expect(webhook.read(messageOf("webhook_callback_verification", CHALLENGE), sentAt)).toEqual({
+      kind: "verification",
+      challenge: "pogchamp-kappa-360noscope",
+    });
+    expect(webhook.read(messageOf("revocation", REVOCATION), sentAt)).toEqual({
+      kind: "revocation",
+      broadcasterId: "1234",
+    });
+  });
+
+  // Refuse une signature d'un autre secret, un corps retouché, et un message de plus de 10 minutes
+  it("refuses a signature from another secret, a tampered body, and a message older than 10 minutes", () => {
+    const tampered = { ...messageOf("notification", BAN), body: BAN.replace("31", "32") };
+
+    expect(webhook.read(messageOf("notification", BAN, "another-secret"), sentAt)).toBeNull();
+    expect(webhook.read(tampered, sentAt)).toBeNull();
+    expect(webhook.read(messageOf("notification", BAN), sentAt + 11 * 60_000)).toBeNull();
   });
 });

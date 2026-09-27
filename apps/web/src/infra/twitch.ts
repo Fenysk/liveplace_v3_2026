@@ -1,6 +1,15 @@
 // L'OAuth de Twitch (§10.1). Les champs de Twitch sont en snake_case (JOURNAL 2026-09-22) et ne sortent pas d'ici.
 
-import type { SignedInUser, TwitchAuth, TwitchPurpose, TwitchUser } from "@liveplace/domain/ports";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import type {
+  SignedInUser,
+  TwitchAuth,
+  TwitchPurpose,
+  TwitchUser,
+  TwitchWebhook,
+  TwitchWebhookEvent,
+  TwitchWebhookMessage,
+} from "@liveplace/domain/ports";
 import { z } from "zod";
 
 const AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize";
@@ -138,6 +147,74 @@ export function createTwitchAuth({ clientId, clientSecret, redirectUri }: Twitch
         moderators: moderators.map(toTwitchUser),
         bans: banned.map((ban) => ({ ...toTwitchUser(ban), isPermanent: ban.expires_at === "" })),
       };
+    },
+  };
+}
+
+// --- EventSub (JOURNAL 2026-09-27) : ce que Twitch poste sur /twitch/eventsub ------------------------------------
+
+const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // la règle de Twitch contre le rejeu
+
+const VerificationSchema = z.object({ challenge: z.string().min(1) });
+const RevocationSchema = z.object({
+  subscription: z.object({ condition: z.object({ broadcaster_user_id: z.string().min(1) }) }),
+});
+const ChannelUserEventSchema = ModerationUserSchema.extend({ broadcaster_user_id: z.string().min(1) });
+const NotificationSchema = z.object({ subscription: z.object({ type: z.string() }), event: z.unknown() });
+
+// Une signature juste, à temps constant : une comparaison ordinaire laisse deviner la bonne octet par octet.
+const isSignedBy = (secret: string, { id, timestamp, body, signature }: TwitchWebhookMessage): boolean => {
+  const expected = Buffer.from(
+    `sha256=${createHmac("sha256", secret)
+      .update(id + timestamp + body)
+      .digest("hex")}`,
+  );
+  const received = Buffer.from(signature);
+  return expected.length === received.length && timingSafeEqual(expected, received);
+};
+
+const toUser = (event: z.infer<typeof ChannelUserEventSchema>) => ({
+  broadcasterId: event.broadcaster_user_id,
+  user: toTwitchUser(event),
+});
+
+// Un événement suivi : les bans et les modérateurs de la chaîne. Tout autre type est ignoré.
+const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
+  const { subscription, event } = NotificationSchema.parse(body);
+  switch (subscription.type) {
+    case "channel.ban": {
+      const ban = ChannelUserEventSchema.extend({ is_permanent: z.boolean() }).parse(event);
+      return { kind: "ban", ...toUser(ban), isPermanent: ban.is_permanent };
+    }
+    case "channel.unban":
+      return { kind: "unban", ...toUser(ChannelUserEventSchema.parse(event)) };
+    case "channel.moderator.add":
+    case "channel.moderator.remove":
+      return {
+        kind: "moderator",
+        ...toUser(ChannelUserEventSchema.parse(event)),
+        isModerator: subscription.type === "channel.moderator.add",
+      };
+    default:
+      return { kind: "ignored" };
+  }
+};
+
+export function createTwitchWebhook(secret: string): TwitchWebhook {
+  return {
+    read(message, nowMs) {
+      if (!isSignedBy(secret, message)) return null;
+      const sentAt = Date.parse(message.timestamp);
+      if (!Number.isFinite(sentAt) || Math.abs(nowMs - sentAt) > MAX_MESSAGE_AGE_MS) return null;
+      const body: unknown = JSON.parse(message.body);
+      if (message.type === "webhook_callback_verification")
+        return { kind: "verification", challenge: VerificationSchema.parse(body).challenge };
+      if (message.type === "revocation")
+        return {
+          kind: "revocation",
+          broadcasterId: RevocationSchema.parse(body).subscription.condition.broadcaster_user_id,
+        };
+      return toNotificationEvent(body);
     },
   };
 }

@@ -156,6 +156,29 @@ export type TwitchBan = TwitchUser & { isPermanent: boolean };
 // La chaîne du streamer, lue au retour de Twitch avec le jeton qu'il vient d'accorder.
 export type TwitchChannel = { user: SignedInUser; moderators: TwitchUser[]; bans: TwitchBan[] };
 
+// Écart §2 (JOURNAL 2026-09-27) : un message de Twitch tel qu'il arrive sur `/twitch/eventsub`.
+export type TwitchWebhookMessage = {
+  id: string;
+  timestamp: string;
+  signature: string;
+  type: string;
+  body: string;
+};
+
+// Ce qu'il veut dire, une fois sa signature et son heure vérifiées. `ignored` : un type qu'on ne suit pas.
+export type TwitchWebhookEvent =
+  | { kind: "verification"; challenge: string }
+  | { kind: "revocation"; broadcasterId: string }
+  | { kind: "ban"; broadcasterId: string; user: TwitchUser; isPermanent: boolean }
+  | { kind: "unban"; broadcasterId: string; user: TwitchUser }
+  | { kind: "moderator"; broadcasterId: string; user: TwitchUser; isModerator: boolean }
+  | { kind: "ignored" };
+
+// `null` : pas signé par notre secret, ou plus vieux que 10 minutes. On n'en fait rien.
+export interface TwitchWebhook {
+  read(message: TwitchWebhookMessage, nowMs: Timestamp): TwitchWebhookEvent | null;
+}
+
 // Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.
 export interface TwitchAuth {
   authorizeUrl(state: string, purpose: TwitchPurpose): string;

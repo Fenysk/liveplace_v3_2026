@@ -16,6 +16,7 @@ import { Route as DesignRouteImport } from './../routes/design'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
+import { Route as TwitchEventsubRouteImport } from './../routes/twitch/eventsub'
 import { Route as AuthTwitchCallbackRouteImport } from './../routes/auth/twitch.callback'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +54,11 @@ const AuthTwitchRoute = AuthTwitchRouteImport.update({
   path: '/auth/twitch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TwitchEventsubRoute = TwitchEventsubRouteImport.update({
+  id: '/twitch/eventsub',
+  path: '/twitch/eventsub',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthTwitchCallbackRoute = AuthTwitchCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/twitch/eventsub': typeof TwitchEventsubRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/twitch/eventsub': typeof TwitchEventsubRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/$login_/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/twitch/eventsub': typeof TwitchEventsubRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/twitch/eventsub'
     | '/auth/twitch/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/twitch/eventsub'
     | '/auth/twitch/callback'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/$login_/obs'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/twitch/eventsub'
     | '/auth/twitch/callback'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   LoginObsRoute: typeof LoginObsRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
+  TwitchEventsubRoute: typeof TwitchEventsubRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthTwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/twitch/eventsub': {
+      id: '/twitch/eventsub'
+      path: '/twitch/eventsub'
+      fullPath: '/twitch/eventsub'
+      preLoaderRoute: typeof TwitchEventsubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/twitch/callback': {
       id: '/auth/twitch/callback'
       path: '/callback'
@@ -214,6 +234,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginObsRoute: LoginObsRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
+  TwitchEventsubRoute: TwitchEventsubRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
