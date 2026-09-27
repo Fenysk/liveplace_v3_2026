@@ -14,12 +14,15 @@ import {
   type ModerationStatus,
   ModerationWindow,
 } from "../moderation/moderation-window";
+import { ModeratorUsers } from "../moderation/moderator-users";
+import { TwitchSyncBlock, type TwitchSyncView } from "../moderation/twitch-sync";
 import type { ModerationControls } from "../moderation/use-moderation";
 import {
   noop,
   SAMPLE_BANNED_USERS,
   SAMPLE_CANVAS,
   SAMPLE_DRAWING,
+  SAMPLE_MODERATORS,
   SAMPLE_OWNER,
   SAMPLE_VIEWER,
 } from "./design-fixtures";
@@ -133,6 +136,15 @@ const TAB_STATES: readonly { caption: string; props: BannedUsersProps }[] = [
   { caption: "Connexion perdue", props: { ...TAB_BASE, list: { status: "failed" } } },
 ];
 
+const SYNC_STATES = (nowMs: number): readonly { caption: string; sync: TwitchSyncView }[] => [
+  { caption: "Pour le streamer, jamais synchronisé", sync: { status: "never" } },
+  { caption: "Pour le streamer, synchronisé", sync: { status: "ok", syncedAt: nowMs - 3 * MINUTE } },
+  {
+    caption: "Pour le streamer, accès retiré sur Twitch : à refaire",
+    sync: { status: "revoked", syncedAt: nowMs - 90 * MINUTE },
+  },
+];
+
 export const ModerationSection = () => {
   const [nowMs] = useState(() => Date.now());
   return (
@@ -189,6 +201,18 @@ export const ModerationSection = () => {
         title="L'onglet Modération"
         note="Dans la fenêtre, pour le streamer et ses modérateurs."
       >
+        {SYNC_STATES(nowMs).map(({ caption, sync }) => (
+          <Specimen key={caption} caption={caption}>
+            <div className="design-window-box">
+              <TwitchSyncBlock sync={sync} syncHref="#" onSync={noop} />
+            </div>
+          </Specimen>
+        ))}
+        <Specimen caption="Les modérateurs : de Twitch, nommé ici, pas encore sur LivePlace">
+          <div className="design-window-box">
+            <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} />
+          </div>
+        </Specimen>
         {TAB_STATES.map(({ caption, props }) => (
           <Specimen key={caption} caption={caption}>
             <div className="design-window-box">

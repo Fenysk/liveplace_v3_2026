@@ -1,11 +1,28 @@
 // L'onglet Modération, branché sur le store (JOURNAL 2026-09-25) : monté à l'ouverture de l'onglet, il relit alors
-// la liste des bannis. L'affichage est dans `banned-users.tsx`.
+// la liste des bannis, et celle des modérateurs avec l'état de la synchro Twitch (JOURNAL 2026-09-27).
+// L'affichage est dans `banned-users.tsx`, `moderator-users.tsx` et `twitch-sync.tsx`.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
+import { syncHref } from "../account/auth-links";
 import { type BannedList, BannedUsers, type BanPreview } from "./banned-users";
+import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
+import { TwitchSyncBlock, type TwitchSyncView } from "./twitch-sync";
 
-type ModerationTabProps = { canvas: CanvasStore };
+// `onSync` : la page part chez Twitch, la pill Dessin le dit (use-signing-in.ts).
+type ModerationTabProps = { canvas: CanvasStore; login: string; onSync: () => void };
+
+const useModeratorsProps = (canvas: CanvasStore) => {
+  const [moderators, setModerators] = useState<ModeratorListView>({ status: "loading" });
+  const [sync, setSync] = useState<TwitchSyncView>({ status: "loading" });
+  useEffect(() => {
+    void canvas.listModerators().then((result) => {
+      setModerators(result.ok ? { status: "ready", users: result.value.users } : { status: "failed" });
+      setSync(result.ok && result.value.twitchSync ? result.value.twitchSync : { status: "never" });
+    });
+  }, [canvas]);
+  return { moderators, sync };
+};
 
 const useModerationTabProps = (canvas: CanvasStore) => {
   const { width, height, palette } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
@@ -47,6 +64,14 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   return { list, preview, unbanningUserId, canvas: { width, height, palette }, onPreview, onUnban };
 };
 
-export const ModerationTab = ({ canvas }: ModerationTabProps) => (
-  <BannedUsers {...useModerationTabProps(canvas)} />
-);
+export const ModerationTab = ({ canvas, login, onSync }: ModerationTabProps) => {
+  const { role } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
+  const { moderators, sync } = useModeratorsProps(canvas);
+  return (
+    <>
+      {role === "owner" && <TwitchSyncBlock sync={sync} syncHref={syncHref(login)} onSync={onSync} />}
+      <ModeratorUsers list={moderators} />
+      <BannedUsers {...useModerationTabProps(canvas)} />
+    </>
+  );
+};

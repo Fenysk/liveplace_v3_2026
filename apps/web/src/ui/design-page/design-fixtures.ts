@@ -1,7 +1,7 @@
 // Les exemples de /design : des utilisateurs de démonstration, et rien d'autre. Aucune connexion, aucun store.
 
 import { PALETTE } from "@liveplace/domain";
-import type { BannedUser, Pixel } from "@liveplace/domain/ports";
+import type { BannedUser, Moderator, Pixel } from "@liveplace/domain/ports";
 import type { ProfileUser } from "../design/profile";
 import sampleAvatarUrl from "./sample-avatar.svg?url";
 
@@ -39,6 +39,35 @@ export const SAMPLE_SPREAD: readonly Pixel[] = Array.from({ length: 48 }, (_, in
   y: 240 - index * 4,
   colorIndex: 28,
 }));
+
+// Un modérateur de chaque origine, et un qui n'a pas encore de compte (JOURNAL 2026-09-27).
+export const SAMPLE_MODERATORS: readonly Moderator[] = [
+  {
+    userId: "6",
+    login: "kalyss",
+    displayName: "Kalyss",
+    avatarUrl: sampleAvatarUrl,
+    isFromTwitch: true,
+    isNamedHere: false,
+    hasAccount: true,
+  },
+  {
+    userId: "7",
+    login: "pixelmoth",
+    displayName: "pixelmoth",
+    isFromTwitch: false,
+    isNamedHere: true,
+    hasAccount: true,
+  },
+  {
+    userId: "8",
+    login: "modo_du_chat",
+    displayName: "Modo_du_chat",
+    isFromTwitch: true,
+    isNamedHere: false,
+    hasAccount: false,
+  },
+];
 
 export const SAMPLE_BANNED_USERS: readonly BannedUser[] = [
   {

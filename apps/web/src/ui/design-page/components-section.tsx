@@ -4,6 +4,7 @@ import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Settings, Trash, User, X } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
+import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
 import { CopyButton } from "../design/copy-button";
 import { Grabber } from "../design/grabber";
@@ -313,6 +314,12 @@ export const ComponentsSection = () => {
         </Specimen>
         <Specimen caption="La ligne sous chaque bouton Se connecter">
           <SignInNote />
+        </Specimen>
+        <Specimen caption="Les badges : d'où vient un modérateur ou un ban">
+          <div className="lp-row">
+            <Badge label="Twitch" icon={TwitchGlyph} />
+            <Badge label="Nommé ici" />
+          </div>
         </Specimen>
         <Specimen caption="Le logo, à la couleur du texte">
           <span className="design-icon">

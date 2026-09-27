@@ -1,0 +1,17 @@
+/* Une étiquette courte à côté d'un nom : discrète, sur le fond des contrôles, jamais cliquable. */
+
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.lp-badge svg {
+  width: 12px;
+  height: 12px;
+}

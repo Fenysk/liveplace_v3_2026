@@ -5,8 +5,8 @@ import type { BannedUser, Pixel } from "@liveplace/domain/ports";
 import { Eye } from "lucide-react";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
-import { Profile } from "../design/profile";
 import { WindowRow } from "../design/window";
+import { MarkedProfile } from "./marked-profile";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 
@@ -33,7 +33,7 @@ const BannedRow = ({ user, preview, unbanningUserId, canvas, onPreview, onUnban 
   const isPreviewed = preview?.userId === user.userId;
   return (
     <div className="lp-col">
-      <WindowRow label={<Profile user={user} variant="name" />}>
+      <WindowRow label={<MarkedProfile {...user} user={user} />}>
         <div className="lp-row">
           <span className="lp-type-caption lp-muted">{pixelCountLabel(user.pixelCount)}</span>
           <Button

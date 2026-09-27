@@ -89,7 +89,11 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
           signOutHref={signOutHref}
           themeChoice={account.themeChoice}
           onPickTheme={account.onPickTheme}
-          moderationTab={moderation.controls && <ModerationTab canvas={stores.canvas} />}
+          moderationTab={
+            moderation.controls && (
+              <ModerationTab canvas={stores.canvas} login={login} onSync={signingIn.onSignIn} />
+            )
+          }
           obsTab={isOwner ? <ObsTab canvas={stores.canvas} login={login} /> : undefined}
         />
       )}
