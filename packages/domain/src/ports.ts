@@ -35,6 +35,9 @@ export type BannedUser = Extract<ServerFrame, { t: "bans" }>["users"][number];
 // Écart §5.1 (JOURNAL 2026-09-27) : un modérateur et d'où il vient. Sans compte LivePlace, son nom vient de Twitch.
 export type Moderator = Extract<ServerFrame, { t: "moderators" }>["users"][number];
 
+// D'où vient le rôle d'un modérateur : de Twitch, d'ici, ou des deux.
+export type ModeratorOrigin = NonNullable<InspectEntry["moderatorOrigin"]>;
+
 // Nommer ou retirer un modérateur, pour une origine : l'autre origine peut le garder.
 export type ModeratorRole = { userId: string; source: ModerationSource; isModerator: boolean };
 
@@ -115,6 +118,8 @@ export interface CanvasCore {
   ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
   getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
+  // `null` : pas modérateur. Pour la pill Inspection du streamer (JOURNAL 2026-09-27).
+  getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

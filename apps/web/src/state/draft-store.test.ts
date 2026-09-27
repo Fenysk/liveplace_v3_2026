@@ -57,6 +57,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     listPixels: async () => ({ ok: true as const, value: [] }),
     listBans: async () => ({ ok: true as const, value: [] }),
     listModerators: async () => ({ ok: true as const, value: { users: [] } }),
+    setModerator: async () => ({ ok: true as const, value: { users: [] } }),
     setObsDelay: () => undefined,
     listenArrivals: () => () => undefined,
     close: () => undefined,

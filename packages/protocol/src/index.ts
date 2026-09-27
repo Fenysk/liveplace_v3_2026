@@ -95,8 +95,12 @@ const RejectedPixelSchema = z.object({
   reason: z.string(),
 });
 
+// L'origine d'un rôle de modérateur : nommé sur Twitch, ici, ou les deux (JOURNAL 2026-09-27).
+const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
+
 const InspectEntrySchema = z.object({
   userId: UserIdSchema.optional(), // Écart §4.3 (JOURNAL 2026-09-27) : seulement pour qui modère
+  moderatorOrigin: ModeratorOriginSchema.optional(), // pour le seul streamer, quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
@@ -161,6 +165,14 @@ const ListBansFrameSchema = z.object({ t: z.literal("listBans"), requestId: Requ
 // Écart §4.2 (JOURNAL 2026-09-27) : les modérateurs du canvas, et d'où ils viennent.
 const ListModeratorsFrameSchema = z.object({ t: z.literal("listModerators"), requestId: RequestIdSchema });
 
+// JOURNAL 2026-09-27 : le streamer nomme ou retire un modérateur ici. Répond par `moderators`.
+const SetModeratorFrameSchema = z.object({
+  t: z.literal("setModerator"),
+  requestId: RequestIdSchema,
+  userId: UserIdSchema,
+  isModerator: z.boolean(),
+});
+
 // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai de sa vue OBS, un cran à la fois.
 const ObsDelaySchema = z.number().int().refine(isObsDelayStep, "pas un cran du délai OBS");
 
@@ -180,6 +192,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListPixelsFrameSchema,
   ListBansFrameSchema,
   ListModeratorsFrameSchema,
+  SetModeratorFrameSchema,
   SetObsDelayFrameSchema,
   PingFrameSchema,
 ]);

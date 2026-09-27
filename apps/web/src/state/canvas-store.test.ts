@@ -408,6 +408,18 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
     expect(await listing).toEqual({ ok: true, value: { users, twitchSync } });
   });
 
+  // Nomme un modérateur et rend la liste qui répond (JOURNAL 2026-09-27)
+  it("names a moderator and gives back the list that answers", async () => {
+    const { store, sent, receive } = setup();
+
+    const naming = store.setModerator("user-2", true);
+    const frame = sent.at(-1);
+    receive({ t: "moderators", requestId: lastRequestId(sent), users: [] });
+
+    expect(frame).toMatchObject({ t: "setModerator", userId: "user-2", isModerator: true });
+    expect(await naming).toEqual({ ok: true, value: { users: [] } });
+  });
+
   // Échoue une modération en cours quand la connexion tombe, ou quand le gateway refuse
   it("fails a pending moderation when the connection drops, or when the gateway refuses", async () => {
     const dropped = setup();

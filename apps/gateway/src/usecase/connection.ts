@@ -42,6 +42,7 @@ type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
 type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
 type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
+type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, ou le délai OBS du canvas.
 type ControlFrame = Extract<ServerFrame, { t: "banned" | "unbanned" | "obsDelay" }>;
@@ -77,7 +78,7 @@ type State =
 
 export type ConnectionDeps = {
   // Tout le noyau, sauf ce qu'écrit le web à la connexion et l'abonnement, que tient `broadcast`.
-  core: Omit<CanvasCore, "createCanvas" | "setUser" | "setModerator" | "subscribe">;
+  core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe">;
   broadcast: Broadcast;
   now: () => Timestamp;
 };
@@ -298,12 +299,21 @@ export function createConnection(
 
   // Ouverte à tous, invités compris : l'auteur d'un pixel est public (CDC 2026).
   // Écart §4.3 (JOURNAL 2026-09-27) : son identifiant ne part qu'à qui modère, et le débit est plafonné.
+  // Ce que ce rôle voit de l'auteur : sans identifiant hors modération. JOURNAL 2026-09-27 : le streamer apprend en
+  // plus s'il est modérateur, pour le nommer ou le retirer.
+  const entryFor = async (found: InspectEntry, ready: ReadyState): Promise<InspectEntry> => {
+    if (!canModerate(ready.role)) return withoutUserId(found);
+    if (ready.role !== "owner" || !found.userId) return found;
+    const moderatorOrigin = await deps.core.getModeratorOrigin(ready.canvasId, found.userId);
+    return moderatorOrigin ? { ...found, moderatorOrigin } : found;
+  };
+
   const inspectCell = async ({ requestId, x, y }: InspectFrame, ready: ReadyState): Promise<void> => {
     if (!isInspectAllowed(deps.now()))
       return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
     const isInside = x < ready.width && y < ready.height;
     const found = isInside ? await deps.core.inspect(ready.canvasId, x, y) : null;
-    const entry = found && !canModerate(ready.role) ? withoutUserId(found) : found;
+    const entry = found ? await entryFor(found, ready) : null;
     socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
   };
 
@@ -349,6 +359,14 @@ export function createConnection(
     socket.sendFrame({ t: "moderators", requestId, users, ...(twitchSync ? { twitchSync } : {}) });
   };
 
+  // JOURNAL 2026-09-27 : le streamer seul, et l'origine LivePlace seule : un rôle venu de Twitch se retire sur Twitch.
+  const setModerator = async ({ requestId, userId, isModerator }: SetModeratorFrame, ready: ReadyState) => {
+    if (ready.role !== "owner") return forbid();
+    const result = await deps.core.setModerator(ready.canvasId, { userId, source: "liveplace", isModerator });
+    if (!result.ok) return forbid();
+    await listModerators(requestId, ready);
+  };
+
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer seul. Le schéma n'a laissé passer qu'un cran.
   const setObsDelay = async ({ obsDelayMs }: SetObsDelayFrame, ready: ReadyState): Promise<void> => {
     if (ready.role !== "owner") return forbid();
@@ -372,6 +390,8 @@ export function createConnection(
         return listModerators(frame.requestId, ready);
       case "setObsDelay":
         return setObsDelay(frame, ready);
+      case "setModerator":
+        return setModerator(frame, ready);
       case "ping":
         return socket.sendFrame({ t: "pong" });
     }

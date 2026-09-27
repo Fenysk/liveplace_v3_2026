@@ -480,6 +480,19 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
     expect(received).toEqual([{ ctl: { t: "role", userId: "mod-1" } }]);
   });
 
+  // Dit d'où vient un modérateur, et rien pour qui ne l'est pas
+  it("tells where a moderator comes from, and nothing for someone who is not one", async () => {
+    const { canvasId } = await readyCanvas();
+    await setModerator(canvasId, "mod-1", "twitch", true);
+    await setModerator(canvasId, "mod-1", "liveplace", true);
+
+    expect(await core.getModeratorOrigin(canvasId, "mod-1")).toEqual({
+      isFromTwitch: true,
+      isNamedHere: true,
+    });
+    expect(await core.getModeratorOrigin(canvasId, "viewer-1")).toBeNull();
+  });
+
   // Liste les modérateurs avec leur origine, leur miroir ou leur nom Twitch, et s'ils ont un compte
   it("lists the moderators with their origin, their mirror or Twitch name, and whether they have an account", async () => {
     const { canvasId } = await readyCanvas();

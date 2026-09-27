@@ -9,6 +9,7 @@ import type {
   Moderation,
   ModerationSlice,
   Moderator,
+  ModeratorRole,
   Pixel,
   Placement,
   TwitchSync,
@@ -110,6 +111,7 @@ const setup = (options: SetupOptions = {}) => {
   const listedPixels: string[] = [];
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
+  const namedModerators: ModeratorRole[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   const core = {
@@ -165,6 +167,13 @@ const setup = (options: SetupOptions = {}) => {
     async setObsDelay(_asked: string, obsDelayMs: number) {
       obsDelays.push(obsDelayMs);
     },
+    async setModerator(_asked: string, role: ModeratorRole) {
+      namedModerators.push(role);
+      return { ok: true as const, value: undefined };
+    },
+    async getModeratorOrigin() {
+      return roles.isModerator ? { isFromTwitch: true, isNamedHere: false } : null;
+    },
     async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
       publishTo = onMessage;
       return async () => {
@@ -209,6 +218,7 @@ const setup = (options: SetupOptions = {}) => {
     listedPixels,
     recentSince,
     obsDelays,
+    namedModerators,
     clock,
     roles,
     open,
@@ -374,6 +384,22 @@ describe("createConnection (§6.1)", () => {
     const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
     expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: publicEntry });
     expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry });
+    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry });
+  });
+
+  // Dit au propriétaire, en inspectant, que l'auteur est modérateur et d'où il vient, et à lui seul (JOURNAL 2026-09-27)
+  it("tells the owner, on inspection, that the author is a moderator and where from, and only the owner", async () => {
+    const byOwner = setup({ session: owner, isModerator: true });
+    const byModerator = setup({ isModerator: true });
+
+    for (const { connection } of [byOwner, byModerator]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
+    const moderatorOrigin = { isFromTwitch: true, isNamedHere: false };
+    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, moderatorOrigin } });
     expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry });
   });
 
@@ -583,6 +609,28 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await connection.receive(JSON.stringify({ t: "listModerators", requestId: "mods-1" }));
 
     expect(sent.at(-1)).toEqual({ t: "moderators", requestId: "mods-1", users: moderators, twitchSync });
+  });
+
+  // Laisse le seul propriétaire nommer ou retirer un modérateur ici, et répond par la liste (JOURNAL 2026-09-27)
+  it("lets only the owner name or remove a moderator here, and answers with the list", async () => {
+    const byOwner = setup({ session: owner });
+    const byModerator = setup({ isModerator: true });
+    const name = JSON.stringify({
+      t: "setModerator",
+      requestId: "name-1",
+      userId: "user-2",
+      isModerator: true,
+    });
+
+    for (const { connection } of [byOwner, byModerator]) {
+      await connection.receive(hello());
+      await connection.receive(name);
+    }
+
+    expect(byOwner.namedModerators).toEqual([{ userId: "user-2", source: "liveplace", isModerator: true }]);
+    expect(byOwner.sent.at(-1)).toEqual({ t: "moderators", requestId: "name-1", users: moderators });
+    expect(byModerator.namedModerators).toEqual([]);
+    expect(byModerator.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
   });
 
   // Envoie banned juste après le welcome et le snapshot d'un banni

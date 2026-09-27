@@ -84,6 +84,7 @@ export type CanvasStore = {
   listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
   listBans(): Promise<RequestResult<BannedUser[]>>;
   listModerators(): Promise<RequestResult<ModeratorList>>; // JOURNAL 2026-09-27
+  setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
@@ -109,6 +110,12 @@ type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCo
 
 const toInspection = ({ x, y, entry }: Extract<ServerFrame, { t: "inspected" }>): Inspection =>
   entry ? { status: "found", x, y, entry } : { status: "empty", x, y };
+
+// La réponse `moderators`, à `listModerators` comme à `setModerator`.
+const toModeratorList = (reply: ReplyFrame): ModeratorList | undefined =>
+  reply.t === "moderators"
+    ? { users: reply.users, ...(reply.twitchSync ? { twitchSync: reply.twitchSync } : {}) }
+    : undefined;
 
 export function createCanvasStore(
   canvasId: string,
@@ -401,12 +408,9 @@ export function createCanvasStore(
       request({ t: "listBans", requestId: crypto.randomUUID() }, (reply) =>
         reply.t === "bans" ? reply.users : undefined,
       ),
-    listModerators: () =>
-      request({ t: "listModerators", requestId: crypto.randomUUID() }, (reply) =>
-        reply.t === "moderators"
-          ? { users: reply.users, ...(reply.twitchSync ? { twitchSync: reply.twitchSync } : {}) }
-          : undefined,
-      ),
+    listModerators: () => request({ t: "listModerators", requestId: crypto.randomUUID() }, toModeratorList),
+    setModerator: (userId, isModerator) =>
+      request({ t: "setModerator", requestId: crypto.randomUUID(), userId, isModerator }, toModeratorList),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
     listenArrivals(listener) {

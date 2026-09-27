@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart CDC 2026 §2 et §4.2 : le streamer nomme un modérateur depuis la pill Inspection
+
+**Contexte.** Le CDC 2026 met « délégation à des modérateurs » hors du MVP. L'humain veut pouvoir nommer quelqu'un qui n'est pas modérateur sur sa chaîne Twitch (A4). La pill Inspection connaît l'identifiant de l'auteur, le streamer l'y reçoit.
+**Décision.** Une frame `setModerator` (`userId`, `isModerator`), pour le seul `owner`, change l'origine LivePlace (`moderators.lua`) et répond par `moderators`. L'entrée d'inspection gagne, pour le seul `owner`, `moderatorOrigin` quand l'auteur est modérateur : la pill propose Nommer, Retirer (s'il est nommé ici) ou rien (s'il ne vient que de Twitch).
+**Renoncement.** Pas de recherche par pseudo : il faudrait appeler Twitch pour qui n'a jamais posé ici (bloc 2). Un modérateur venu de Twitch ne se retire que sur Twitch.
+
 ## 2026-09-27 — Écart §9 et §11.5 : `/twitch/eventsub`, une route publique gardée par la seule signature de Twitch
 
 **Contexte.** Pour rester à jour sans garder de jeton (A2), Twitch prévient d'un ban ou d'un modérateur par un POST sur une adresse publique. N'importe qui peut poster sur cette adresse.

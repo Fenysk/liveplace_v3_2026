@@ -20,6 +20,7 @@ import type {
   Moderation,
   ModerationSlice,
   Moderator,
+  ModeratorOrigin,
   Pixel,
   Placement,
   SignInWrites,
@@ -485,6 +486,19 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         }),
       );
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    async getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null> {
+      const keys = buildCanvasKeys(canvasId);
+      const results = await redis
+        .multi()
+        .sismember(keys.mods, userId)
+        .sismember(keys.modsTwitch, userId)
+        .sismember(keys.modsLiveplace, userId)
+        .exec();
+      if (!results) throw new Error(`getModeratorOrigin ${canvasId} : transaction annulée`);
+      const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
+      return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
     },
 
     // Écrit par le web dans `meta` (createTwitchWrites), lu ici pour l'onglet Modération (JOURNAL 2026-09-27).

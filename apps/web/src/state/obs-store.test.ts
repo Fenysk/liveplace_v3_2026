@@ -46,6 +46,7 @@ const setup = () => {
     listPixels: unused,
     listBans: unused,
     listModerators: unused,
+    setModerator: unused,
     setObsDelay: unused,
     close: () => undefined,
   };
