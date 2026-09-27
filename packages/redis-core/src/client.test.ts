@@ -92,6 +92,18 @@ describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
       await redis.hmget(buildCanvasKeys(canvasId).meta, "twitchSync", "twitchSyncedAt", "ready"),
     ).toEqual(["revoked", "1234", "1"]);
   });
+
+  // Relit l'état noté, et rien pour un canvas jamais synchronisé
+  it("reads the recorded state back, and nothing for a canvas never synced", async () => {
+    const [synced, never] = [uniqueCanvasId(), uniqueCanvasId()];
+    await core.createCanvas(synced, meta);
+    await core.createCanvas(never, meta);
+
+    await createTwitchWrites(redis).setTwitchSync(synced, { status: "ok", syncedAt: 5678 });
+
+    expect(await core.getTwitchSync(synced)).toEqual({ status: "ok", syncedAt: 5678 });
+    expect(await core.getTwitchSync(never)).toBeNull();
+  });
 });
 
 describe("createCanvas (§5.6)", () => {

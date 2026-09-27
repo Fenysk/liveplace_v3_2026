@@ -400,10 +400,12 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
       },
     ];
 
-    const listing = store.listModerators();
-    receive({ t: "moderators", requestId: lastRequestId(sent), users });
+    const twitchSync = { status: "revoked", syncedAt: now } as const;
 
-    expect(await listing).toEqual({ ok: true, value: users });
+    const listing = store.listModerators();
+    receive({ t: "moderators", requestId: lastRequestId(sent), users, twitchSync });
+
+    expect(await listing).toEqual({ ok: true, value: { users, twitchSync } });
   });
 
   // Échoue une modération en cours quand la connexion tombe, ou quand le gateway refuse

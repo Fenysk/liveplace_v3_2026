@@ -11,6 +11,7 @@ import type {
   Moderator,
   Pixel,
   Placement,
+  TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
@@ -93,6 +94,7 @@ const moderate = (action: string, target = "user-2") =>
 type SetupOptions = {
   session?: Session | null;
   isModerator?: boolean;
+  twitchSync?: TwitchSync; // l'état de la synchro Twitch lu dans `meta`
   version?: number;
   duringSnapshot?: () => void;
   isBanned?: boolean;
@@ -149,6 +151,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listModerators() {
       return moderators;
+    },
+    async getTwitchSync() {
+      return options.twitchSync ?? null;
     },
     async listEvents() {
       return options.resync ?? null;
@@ -567,6 +572,17 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     expect(byOwner.sent.at(-1)).toEqual(answer);
     expect(byModerator.sent.at(-1)).toEqual(answer);
     expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+  });
+
+  // Joint aux modérateurs l'état de la synchro Twitch, quand elle a été faite (JOURNAL 2026-09-27)
+  it("joins the state of the Twitch sync to the moderators, once it was done", async () => {
+    const twitchSync = { status: "ok", syncedAt: now } as const;
+    const { connection, sent } = setup({ session: owner, twitchSync });
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "listModerators", requestId: "mods-1" }));
+
+    expect(sent.at(-1)).toEqual({ t: "moderators", requestId: "mods-1", users: moderators, twitchSync });
   });
 
   // Envoie banned juste après le welcome et le snapshot d'un banni

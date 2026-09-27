@@ -50,7 +50,7 @@ export type TwitchCommand =
   | { kind: "bans"; canvasId: string; userIds: string[] };
 
 // L'état de la synchro d'un canvas : faite, ou à refaire parce que le streamer a retiré ses droits chez Twitch.
-export type TwitchSync = { status: "ok" | "revoked"; syncedAt: Timestamp };
+export type TwitchSync = NonNullable<Extract<ServerFrame, { t: "moderators" }>["twitchSync"]>;
 
 // Ce que le web écrit pour la synchro Twitch : jamais un pixel, donc jamais de script (§2).
 export interface TwitchWrites {
@@ -114,6 +114,7 @@ export interface CanvasCore {
     change: ModeratorRole,
   ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
+  getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 

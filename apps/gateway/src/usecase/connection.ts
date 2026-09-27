@@ -76,23 +76,8 @@ type State =
   | ReadyState;
 
 export type ConnectionDeps = {
-  core: Pick<
-    CanvasCore,
-    | "getCanvas"
-    | "isModerator"
-    | "isBanned"
-    | "getSnapshot"
-    | "getGauge"
-    | "place"
-    | "inspect"
-    | "moderate"
-    | "listPixels"
-    | "listBans"
-    | "listModerators"
-    | "listEvents"
-    | "listRecentEvents"
-    | "setObsDelay"
-  >;
+  // Tout le noyau, sauf ce qu'écrit le web à la connexion et l'abonnement, que tient `broadcast`.
+  core: Omit<CanvasCore, "createCanvas" | "setUser" | "setModerator" | "subscribe">;
   broadcast: Broadcast;
   now: () => Timestamp;
 };
@@ -354,10 +339,14 @@ export function createConnection(
     socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-27) : pour qui modère, comme la liste des bannis.
+  // Écart §4.2 (JOURNAL 2026-09-27) : pour qui modère, comme la liste des bannis, avec l'état de la synchro Twitch.
   const listModerators = async (requestId: string, ready: ReadyState): Promise<void> => {
     if (!canModerate(ready.role)) return forbid();
-    socket.sendFrame({ t: "moderators", requestId, users: await deps.core.listModerators(ready.canvasId) });
+    const [users, twitchSync] = await Promise.all([
+      deps.core.listModerators(ready.canvasId),
+      deps.core.getTwitchSync(ready.canvasId),
+    ]);
+    socket.sendFrame({ t: "moderators", requestId, users, ...(twitchSync ? { twitchSync } : {}) });
   };
 
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer seul. Le schéma n'a laissé passer qu'un cran.

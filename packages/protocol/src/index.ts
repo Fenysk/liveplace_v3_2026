@@ -285,10 +285,14 @@ const ModeratorSchema = z.object({
   hasAccount: z.boolean(),
 });
 
+// La synchro Twitch du canvas : faite, ou à refaire (droits retirés chez Twitch). Absente : jamais faite.
+const TwitchSyncSchema = z.object({ status: z.enum(["ok", "revoked"]), syncedAt: TimestampSchema });
+
 const ModeratorsFrameSchema = z.object({
   t: z.literal("moderators"),
   requestId: RequestIdSchema,
   users: z.array(ModeratorSchema),
+  twitchSync: TwitchSyncSchema.optional(),
 });
 
 // Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé pendant la session.

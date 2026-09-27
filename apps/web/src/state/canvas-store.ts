@@ -9,6 +9,7 @@ import type {
   Moderator,
   Placement,
   Transport,
+  TwitchSync,
 } from "@liveplace/domain/ports";
 import { type CellsFrame, type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
@@ -38,6 +39,9 @@ export type Pixel = Placement["pixels"][number];
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
+// Les modérateurs, et l'état de la synchro Twitch quand elle a été faite (JOURNAL 2026-09-27).
+export type ModeratorList = { users: Moderator[]; twitchSync?: TwitchSync };
+
 // Une requête de modération ou de lecture (JOURNAL 2026-09-25), réglée par la réponse de son `requestId`.
 export type RequestResult<T> = Result<T, ErrorCode | "closed">;
 export type ModerationAction = Moderation["action"];
@@ -79,7 +83,7 @@ export type CanvasStore = {
   moderate(action: ModerationAction): Promise<RequestResult<{ cells: number }>>;
   listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
   listBans(): Promise<RequestResult<BannedUser[]>>;
-  listModerators(): Promise<RequestResult<Moderator[]>>; // JOURNAL 2026-09-27
+  listModerators(): Promise<RequestResult<ModeratorList>>; // JOURNAL 2026-09-27
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
@@ -399,7 +403,9 @@ export function createCanvasStore(
       ),
     listModerators: () =>
       request({ t: "listModerators", requestId: crypto.randomUUID() }, (reply) =>
-        reply.t === "moderators" ? reply.users : undefined,
+        reply.t === "moderators"
+          ? { users: reply.users, ...(reply.twitchSync ? { twitchSync: reply.twitchSync } : {}) }
+          : undefined,
       ),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),

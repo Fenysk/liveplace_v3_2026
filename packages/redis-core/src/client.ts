@@ -26,6 +26,7 @@ import type {
   Snapshot,
   TwitchCommand,
   TwitchCommandQueue,
+  TwitchSync,
   TwitchWrites,
   Unsubscribe,
 } from "@liveplace/domain/ports";
@@ -484,6 +485,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         }),
       );
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    // Écrit par le web dans `meta` (createTwitchWrites), lu ici pour l'onglet Modération (JOURNAL 2026-09-27).
+    async getTwitchSync(canvasId: string): Promise<TwitchSync | null> {
+      const [status, syncedAt] = await redis.hmget(
+        buildCanvasKeys(canvasId).meta,
+        "twitchSync",
+        "twitchSyncedAt",
+      );
+      if ((status !== "ok" && status !== "revoked") || !syncedAt) return null;
+      return { status, syncedAt: Number(syncedAt) };
     },
 
     // L'ID du stream est la version (§5.2) : un XRANGE direct. Toute version a son entrée, donc un trou veut dire un trim.
