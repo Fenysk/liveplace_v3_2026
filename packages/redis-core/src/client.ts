@@ -121,6 +121,10 @@ export function createTwitchWrites(redis: Redis): TwitchWrites {
       await redis.hset(buildCanvasKeys(canvasId).twitchUsers, Object.fromEntries(entries));
     },
 
+    async setTwitchSync(canvasId, { status, syncedAt }) {
+      await redis.hset(buildCanvasKeys(canvasId).meta, { twitchSync: status, twitchSyncedAt: syncedAt });
+    },
+
     async queueTwitchCommands(commands) {
       if (commands.length === 0) return;
       const transaction = redis.multi();

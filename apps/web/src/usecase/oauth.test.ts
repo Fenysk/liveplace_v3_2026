@@ -32,19 +32,34 @@ describe("toReturnPath (Écart §10.1)", () => {
 describe("OAuth cookie (§10.1)", () => {
   // Retrouve le state et le chemin de retour posés à l'aller
   it("gives back the state and return path set on the way out", () => {
-    const pending = { state: "state-1", returnPath: "/fenysk" };
+    const pending = { state: "state-1", returnPath: "/fenysk", purpose: "signIn" } as const;
     expect(parseOAuthCookie(toOAuthCookieValue(pending))).toEqual(pending);
   });
 
   // Garde le state quand il n'y a pas de chemin de retour
   it("keeps the state when there is no return path", () => {
-    const pending = { state: "state-1", returnPath: null };
+    const pending = { state: "state-1", returnPath: null, purpose: "signIn" } as const;
     expect(parseOAuthCookie(toOAuthCookieValue(pending))).toEqual(pending);
   });
 
   // Revalide le chemin au retour : un cookie trafiqué ne mène pas ailleurs
   it("validates the path again on the way back: a forged cookie leads nowhere else", () => {
-    expect(parseOAuthCookie("state-1|//evil.com")).toEqual({ state: "state-1", returnPath: null });
+    expect(parseOAuthCookie("state-1|//evil.com")).toEqual({
+      state: "state-1",
+      returnPath: null,
+      purpose: "signIn",
+    });
+  });
+
+  // Retrouve une synchro Twitch, et lit tout autre but comme une simple connexion (JOURNAL 2026-09-27)
+  it("gives back a Twitch sync, and reads any other purpose as a plain sign-in", () => {
+    const pending = { state: "state-1", returnPath: "/fenysk", purpose: "sync" } as const;
+    expect(parseOAuthCookie(toOAuthCookieValue(pending))).toEqual(pending);
+    expect(parseOAuthCookie("state-1|/fenysk|admin")).toEqual({
+      state: "state-1",
+      returnPath: "/fenysk",
+      purpose: "signIn",
+    });
   });
 
   // Rend null sans cookie ou sans state

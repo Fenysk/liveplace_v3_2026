@@ -1,7 +1,13 @@
 // Le callback OAuth, dans l'ordre du §10.1. Chaque étape est idempotente : un callback rejoué ne crée rien en double.
 
 import { defaultCanvasMeta, type User } from "@liveplace/domain";
-import type { DurableStore, SessionSigner, SignInWrites, TwitchAuth } from "@liveplace/domain/ports";
+import type {
+  DurableStore,
+  SessionSigner,
+  SignedInUser,
+  SignInWrites,
+  TwitchAuth,
+} from "@liveplace/domain/ports";
 
 export type SignInDeps = {
   twitch: TwitchAuth;
@@ -31,8 +37,17 @@ export async function completeSignIn(
   code: string,
   returnPath: string | null,
 ): Promise<SignInResult> {
+  return signInTwitchUser(deps, await deps.twitch.getUserFromCode(code), returnPath);
+}
+
+// La connexion d'un utilisateur que Twitch vient de rendre : par le code seul, ou avec sa chaîne (sync-twitch.ts).
+export async function signInTwitchUser(
+  deps: SignInDeps,
+  signedIn: SignedInUser,
+  returnPath: string | null,
+): Promise<SignInResult> {
   // Écart §10.1 (JOURNAL 2026-09-27) : l'e-mail ne va qu'à Convex, jamais dans Redis ni dans la session.
-  const { email, ...user } = await deps.twitch.getUserFromCode(code);
+  const { email, ...user } = signedIn;
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);
   const meta = defaultCanvasMeta(user.userId);

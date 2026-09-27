@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { createDurableStore } from "@liveplace/durable";
-import { createSignInWrites } from "@liveplace/redis-core";
+import { createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionSigner } from "../infra/session";
 import { createTwitchAuth } from "../infra/twitch";
@@ -11,6 +11,7 @@ import { parseWebConfig } from "./config";
 const buildServerDeps = () => {
   // Fail-closed (§11.5) : une variable manquante lève ici, en la nommant.
   const config = parseWebConfig(process.env);
+  const redis = new Redis(config.redisUrl);
   return {
     twitch: createTwitchAuth({
       clientId: config.twitchClientId,
@@ -18,7 +19,9 @@ const buildServerDeps = () => {
       redirectUri: `${config.publicUrl}/auth/twitch/callback`,
     }),
     durable: createDurableStore(config.convexUrl, config.convexServiceKey),
-    redis: createSignInWrites(new Redis(config.redisUrl)),
+    redis: createSignInWrites(redis),
+    twitchWrites: createTwitchWrites(redis), // JOURNAL 2026-09-27
+    now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
     randomCanvasId: randomUUID,
     // Derrière Traefik, la requête arrive en http : c'est l'URL publique qui dit si le site est en https.

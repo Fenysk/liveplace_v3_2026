@@ -6,6 +6,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { redirectWithCookies } from "../../shared/redirect";
 import { OAUTH_COOKIE, parseOAuthCookie } from "../../usecase/oauth";
 import { completeSignIn } from "../../usecase/sign-in";
+import { completeTwitchSync } from "../../usecase/sync-twitch";
 
 export const Route = createFileRoute("/auth/twitch/callback")({
   server: {
@@ -32,7 +33,10 @@ export const Route = createFileRoute("/auth/twitch/callback")({
         if (!code) return redirectWithCookies(pending.returnPath ?? "/", [clearOAuth]);
 
         try {
-          const { signedSession, login } = await completeSignIn(deps, code, pending.returnPath);
+          const { signedSession, login } =
+            pending.purpose === "sync"
+              ? await completeTwitchSync(deps, code, pending.returnPath)
+              : await completeSignIn(deps, code, pending.returnPath);
           const session = serializeCookie(SESSION_COOKIE, signedSession, SESSION_TTL_SECONDS, deps.isSecure);
           return redirectWithCookies(pending.returnPath ?? `/${login}`, [clearOAuth, session]);
         } catch (error) {

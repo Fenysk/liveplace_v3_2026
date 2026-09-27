@@ -80,6 +80,20 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
   });
 });
 
+describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
+  // Note l'état de la synchro dans `meta`, sans toucher au reste
+  it("records the sync state in meta, leaving the rest alone", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    await createTwitchWrites(redis).setTwitchSync(canvasId, { status: "revoked", syncedAt: 1234 });
+
+    expect(
+      await redis.hmget(buildCanvasKeys(canvasId).meta, "twitchSync", "twitchSyncedAt", "ready"),
+    ).toEqual(["revoked", "1234", "1"]);
+  });
+});
+
 describe("createCanvas (§5.6)", () => {
   // Crée un canvas prêt : meta complète, state de width × height octets à zéro, version 0
   it("creates a ready canvas with a zeroed state at version 0", async () => {

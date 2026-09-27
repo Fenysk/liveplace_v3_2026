@@ -3,16 +3,25 @@
 import { serializeCookie } from "@liveplace/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { redirectWithCookies } from "../../shared/redirect";
-import { OAUTH_COOKIE, OAUTH_TTL_SECONDS, toOAuthCookieValue, toReturnPath } from "../../usecase/oauth";
+import {
+  OAUTH_COOKIE,
+  OAUTH_TTL_SECONDS,
+  type PendingSignIn,
+  toOAuthCookieValue,
+  toReturnPath,
+} from "../../usecase/oauth";
 
 export const Route = createFileRoute("/auth/twitch")({
   server: {
     handlers: {
       GET: ({ request, context }) => {
         const { deps } = context;
-        const pending = {
+        const query = new URL(request.url).searchParams;
+        const pending: PendingSignIn = {
           state: crypto.randomUUID(),
-          returnPath: toReturnPath(new URL(request.url).searchParams.get("returnTo")),
+          returnPath: toReturnPath(query.get("returnTo")),
+          // Écart §10.1 (JOURNAL 2026-09-27) : `sync=1`, le streamer synchronise sa chaîne.
+          purpose: query.get("sync") === "1" ? "sync" : "signIn",
         };
         const cookie = serializeCookie(
           OAUTH_COOKIE,
@@ -20,7 +29,7 @@ export const Route = createFileRoute("/auth/twitch")({
           OAUTH_TTL_SECONDS,
           deps.isSecure,
         );
-        return redirectWithCookies(deps.twitch.authorizeUrl(pending.state, "signIn"), [cookie]);
+        return redirectWithCookies(deps.twitch.authorizeUrl(pending.state, pending.purpose), [cookie]);
       },
     },
   },

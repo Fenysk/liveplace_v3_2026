@@ -49,10 +49,14 @@ export type TwitchCommand =
   | { kind: "moderators"; canvasId: string; userIds: string[] }
   | { kind: "bans"; canvasId: string; userIds: string[] };
 
+// L'état de la synchro d'un canvas : faite, ou à refaire parce que le streamer a retiré ses droits chez Twitch.
+export type TwitchSync = { status: "ok" | "revoked"; syncedAt: Timestamp };
+
 // Ce que le web écrit pour la synchro Twitch : jamais un pixel, donc jamais de script (§2).
 export interface TwitchWrites {
   setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
   queueTwitchCommands(commands: readonly TwitchCommand[]): Promise<void>;
+  setTwitchSync(canvasId: string, sync: TwitchSync): Promise<void>; // dans `meta`
 }
 
 // Ce que le gateway lit : les actions pas encore acquittées d'abord (un arrêt en plein travail), puis les nouvelles.

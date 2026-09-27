@@ -1,9 +1,12 @@
-// L'aller-retour chez Twitch (§10.1) : le `state` attendu au retour, et le canvas où revenir.
+// L'aller-retour chez Twitch (§10.1) : le `state` attendu au retour, le canvas où revenir, et le but.
+
+import type { TwitchPurpose } from "@liveplace/domain/ports";
 
 export const OAUTH_COOKIE = "lp_oauth";
 export const OAUTH_TTL_SECONDS = 10 * 60;
 
-export type PendingSignIn = { state: string; returnPath: string | null };
+// Écart §10.1 (JOURNAL 2026-09-27) : `sync`, le streamer synchronise sa chaîne ; sinon, une simple connexion.
+export type PendingSignIn = { state: string; returnPath: string | null; purpose: TwitchPurpose };
 
 // Exactement `/<pseudo>` : un pseudo Twitch, en minuscules dans les URL.
 const CANVAS_PATH = /^\/[a-z0-9_]{1,25}$/;
@@ -16,12 +19,12 @@ export function toReturnPath(candidate: string | null | undefined): string | nul
 }
 
 export function toOAuthCookieValue(pending: PendingSignIn): string {
-  return `${pending.state}|${pending.returnPath ?? ""}`;
+  return `${pending.state}|${pending.returnPath ?? ""}|${pending.purpose}`;
 }
 
 // Le chemin se revalide au retour : un cookie trafiqué ne mène pas plus loin qu'un lien trafiqué.
 export function parseOAuthCookie(value: string | undefined): PendingSignIn | null {
-  const [state, returnPath] = value?.split("|") ?? [];
+  const [state, returnPath, purpose] = value?.split("|") ?? [];
   if (!state) return null;
-  return { state, returnPath: toReturnPath(returnPath) };
+  return { state, returnPath: toReturnPath(returnPath), purpose: purpose === "sync" ? "sync" : "signIn" };
 }
