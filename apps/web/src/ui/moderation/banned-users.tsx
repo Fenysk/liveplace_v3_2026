@@ -1,11 +1,12 @@
 // L'onglet Modération de la fenêtre (CDC 2026, JOURNAL 2026-09-25) : les bannis, les pixels de chaque bannissement
-// à l'œil, et Débannir. L'affichage seul, nourri par `useModerationTabProps`.
+// à l'œil, dans une fenêtre superposée (JOURNAL 2026-09-27), et Débannir. L'affichage seul, nourri par
+// `useModerationTabProps`.
 
 import type { BannedUser, Pixel } from "@liveplace/domain/ports";
 import { Eye } from "lucide-react";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
-import { WindowRow } from "../design/window";
+import { SmallWindow, useShownWhileClosing, WindowRow } from "../design/window";
 import { MarkedProfile } from "./marked-profile";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
@@ -27,50 +28,91 @@ export type BannedUsersProps = {
   onUnban: (userId: string) => void;
 };
 
-type BannedRowProps = Omit<BannedUsersProps, "list"> & { user: BannedUser };
+type BannedRowProps = Omit<BannedUsersProps, "list" | "canvas"> & { user: BannedUser };
 
-const BannedRow = ({ user, preview, unbanningUserId, canvas, onPreview, onUnban }: BannedRowProps) => {
-  const isPreviewed = preview?.userId === user.userId;
-  return (
-    <div className="lp-col">
-      <WindowRow label={<MarkedProfile {...user} user={user} />}>
-        <div className="lp-row">
-          <span className="lp-type-caption lp-muted">{pixelCountLabel(user.pixelCount)}</span>
-          <Button
-            icon={Eye}
-            variant="ghost"
-            title="Voir ses pixels"
-            isPressed={isPreviewed}
-            isDisabled={user.pixelCount === 0}
-            onPress={() => onPreview(user.userId)}
-          />
-          <Button
-            label="Débannir"
-            isDisabled={unbanningUserId === user.userId}
-            onPress={() => onUnban(user.userId)}
-          />
-        </div>
-      </WindowRow>
-      {isPreviewed &&
-        (preview.pixels ? (
-          <PixelPreview {...canvas} pixels={preview.pixels} label={`Les pixels de ${user.displayName}`} />
-        ) : (
-          <span className="lp-type-caption lp-muted">Chargement de l'aperçu…</span>
-        ))}
+const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: BannedRowProps) => (
+  <WindowRow label={<MarkedProfile {...user} user={user} />}>
+    <div className="lp-row">
+      <span className="lp-type-caption lp-muted">{pixelCountLabel(user.pixelCount)}</span>
+      <Button
+        icon={Eye}
+        variant="ghost"
+        title="Voir ses pixels"
+        isPressed={preview?.userId === user.userId}
+        isDisabled={user.pixelCount === 0}
+        onPress={() => onPreview(user.userId)}
+      />
+      <Button
+        label="Débannir"
+        isDisabled={unbanningUserId === user.userId}
+        onPress={() => onUnban(user.userId)}
+      />
     </div>
+  </WindowRow>
+);
+
+// Ce que la fenêtre affiche : déjà résolu (le nom de l'auteur, pas juste son id), pour qu'elle n'ait plus qu'à montrer.
+type ShownPreview = { displayName: string; pixels: readonly Pixel[] | null };
+
+type PreviewWindowProps = {
+  isOpen: boolean;
+  shown: ShownPreview | null; // gardé par l'appelant pendant la fermeture (useShownWhileClosing)
+  canvas: CanvasPreviewProps;
+  onClose: () => void;
+};
+
+// L'œil ouvre cette fenêtre par-dessus la fenêtre du jeu, jamais un aperçu qui pousse la liste (JOURNAL 2026-09-27).
+const PreviewWindow = ({ isOpen, shown, canvas, onClose }: PreviewWindowProps) => {
+  if (!shown) return null;
+  return (
+    <SmallWindow
+      isOpen={isOpen}
+      title={`Les pixels de ${shown.displayName}`}
+      onClose={onClose}
+      actions={<Button label="Fermer" kbd="Échap" onPress={onClose} />}
+    >
+      {shown.pixels ? (
+        <PixelPreview {...canvas} pixels={shown.pixels} label={`Les pixels de ${shown.displayName}`} />
+      ) : (
+        <span className="lp-type-caption lp-muted">Chargement de l'aperçu…</span>
+      )}
+    </SmallWindow>
   );
 };
 
-const listContent = ({ list, ...row }: BannedUsersProps) => {
+const listContent = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
   if (list.status === "failed") return <span className="lp-type-caption lp-danger">{CONNECTION_LOST}</span>;
   if (list.users.length === 0) return <span className="lp-type-caption lp-muted">Personne n'est banni.</span>;
-  return list.users.map((user) => <BannedRow key={user.userId} {...row} user={user} />);
+  return list.users.map((user) => (
+    <BannedRow
+      key={user.userId}
+      user={user}
+      preview={preview}
+      unbanningUserId={unbanningUserId}
+      onPreview={onPreview}
+      onUnban={onUnban}
+    />
+  ));
 };
 
-export const BannedUsers = (props: BannedUsersProps) => (
-  <>
-    <span className="lp-type-body">Utilisateurs bannis</span>
-    {listContent(props)}
-  </>
-);
+export const BannedUsers = (props: BannedUsersProps) => {
+  const { list, preview, canvas, onPreview } = props;
+  const matched =
+    list.status === "ready" ? list.users.find(({ userId }) => userId === preview?.userId) : undefined;
+  const shown = useShownWhileClosing(
+    preview && matched ? { displayName: matched.displayName, pixels: preview.pixels } : null,
+  );
+  const close = () => {
+    if (preview) onPreview(preview.userId);
+  };
+  return (
+    <>
+      <span className="lp-type-body">Utilisateurs bannis</span>
+      {listContent(props)}
+      {list.status === "ready" && (
+        <PreviewWindow isOpen={preview !== null} shown={shown} canvas={canvas} onClose={close} />
+      )}
+    </>
+  );
+};

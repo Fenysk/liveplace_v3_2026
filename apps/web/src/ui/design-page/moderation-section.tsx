@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Button } from "../design/button";
 import { InspectionPill } from "../inspection/inspection-pill";
-import { BannedUsers, type BannedUsersProps } from "../moderation/banned-users";
+import { BannedUsers, type BannedUsersProps, type BanPreview } from "../moderation/banned-users";
 import { BannedWindow } from "../moderation/banned-window";
 import {
   type ModerationRequest,
@@ -123,15 +123,29 @@ const TAB_BASE: Omit<BannedUsersProps, "list"> = {
   onUnban: noop,
 };
 
+// L'œil ouvre une vraie fenêtre (JOURNAL 2026-09-27) : figée « ouverte » avec `onPreview: noop`, elle capturerait le
+// focus sans qu'on puisse la refermer. Cette illustration reste interactive, comme BannedWindowSpecimen.
+const BannedUsersSpecimen = () => {
+  const [preview, setPreview] = useState<BanPreview | null>(null);
+  const onPreview = (userId: string) =>
+    setPreview((shown) => (shown?.userId === userId ? null : { userId, pixels: SAMPLE_DRAWING }));
+  return (
+    <Specimen caption="Les bannis : l'œil ouvre l'aperçu de ses pixels, dans une fenêtre">
+      <div className="design-window-box">
+        <BannedUsers
+          list={{ status: "ready", users: SAMPLE_BANNED_USERS }}
+          preview={preview}
+          unbanningUserId={null}
+          canvas={SAMPLE_CANVAS}
+          onPreview={onPreview}
+          onUnban={noop}
+        />
+      </div>
+    </Specimen>
+  );
+};
+
 const TAB_STATES: readonly { caption: string; props: BannedUsersProps }[] = [
-  {
-    caption: "Les bannis, l'aperçu de Troll42 ouvert",
-    props: {
-      ...TAB_BASE,
-      list: { status: "ready", users: SAMPLE_BANNED_USERS },
-      preview: { userId: "3", pixels: SAMPLE_DRAWING },
-    },
-  },
   {
     caption: "Débannir attend sa réponse",
     props: { ...TAB_BASE, list: { status: "ready", users: SAMPLE_BANNED_USERS }, unbanningUserId: "4" },
@@ -241,6 +255,7 @@ export const ModerationSection = () => {
             <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} onRemove={noop} />
           </div>
         </Specimen>
+        <BannedUsersSpecimen />
         {TAB_STATES.map(({ caption, props }) => (
           <Specimen key={caption} caption={caption}>
             <div className="design-window-box">

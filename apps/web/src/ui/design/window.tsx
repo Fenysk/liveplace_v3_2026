@@ -12,6 +12,15 @@ import { motionMs } from "./motion";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
 
+// Une petite fenêtre garde sa dernière valeur non nulle pendant qu'elle se ferme : son contenu ne s'efface pas avant
+// la fin de l'animation. Écrire le ref pendant le rendu (plutôt qu'un `useEffect`) évite un second rendu à chaque
+// changement.
+export const useShownWhileClosing = <T,>(value: T | null): T | null => {
+  const lastShown = useRef<T | null>(null);
+  if (value !== null) lastShown.current = value;
+  return value ?? lastShown.current;
+};
+
 type WindowProps<Id extends string> = {
   isOpen: boolean;
   sections: readonly WindowSection<Id>[]; // selon le rôle, ouvertes directement sur la bonne

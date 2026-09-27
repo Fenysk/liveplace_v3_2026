@@ -2,11 +2,10 @@
 // partent, leur nombre, puis Annuler ou l'action. L'affichage seul, nourri par `useModeration`.
 
 import type { InspectEntry, Pixel } from "@liveplace/domain/ports";
-import { useEffect, useState } from "react";
 import type { ModerationAction } from "../../state/canvas-store";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
-import { SmallWindow } from "../design/window";
+import { SmallWindow, useShownWhileClosing } from "../design/window";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 
 // Ce que la pill Inspection propose : retirer ses pixels, ou le bannir (qui les retire aussi).
@@ -48,15 +47,6 @@ const TEXTS: Record<
   },
 };
 
-// La fenêtre garde la dernière demande pendant qu'elle se ferme : son contenu s'efface avec elle.
-const useShownRequest = (request: ModerationRequest | null) => {
-  const [lastShown, setLastShown] = useState(request);
-  useEffect(() => {
-    if (request) setLastShown(request);
-  }, [request]);
-  return request ?? lastShown;
-};
-
 type PreviewProps = Pick<ModerationWindowProps, "pixels" | "canvas"> & { author: InspectEntry };
 
 const Preview = ({ pixels, canvas, author }: PreviewProps) => {
@@ -73,7 +63,7 @@ export const ModerationWindow = ({
   onConfirm,
   onClose,
 }: ModerationWindowProps) => {
-  const shown = useShownRequest(request);
+  const shown = useShownWhileClosing(request);
   if (!shown) return null;
   const texts = TEXTS[shown.kind];
   return (
