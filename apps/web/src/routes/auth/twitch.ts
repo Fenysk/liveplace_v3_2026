@@ -20,7 +20,7 @@ export const Route = createFileRoute("/auth/twitch")({
           OAUTH_TTL_SECONDS,
           deps.isSecure,
         );
-        return redirectWithCookies(deps.twitch.authorizeUrl(pending.state), [cookie]);
+        return redirectWithCookies(deps.twitch.authorizeUrl(pending.state, "signIn"), [cookie]);
       },
     },
   },

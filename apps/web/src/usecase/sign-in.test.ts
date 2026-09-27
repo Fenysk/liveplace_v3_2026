@@ -21,7 +21,11 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
   const signed: object[] = [];
   const known = [user, owner];
   const deps: SignInDeps = {
-    twitch: { authorizeUrl: () => "", getUserFromCode: async () => twitchUser },
+    twitch: {
+      authorizeUrl: () => "",
+      getUserFromCode: async () => twitchUser,
+      getChannelFromCode: async () => ({ user: twitchUser, moderators: [], bans: [] }),
+    },
     durable: {
       upsertUserFromTwitch: async (upserted, discoveredViaUserId) => {
         upserts.push({ user: upserted, discoveredViaUserId });

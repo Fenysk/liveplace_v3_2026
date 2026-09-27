@@ -143,10 +143,20 @@ export interface SessionSigner {
   sign(session: Session): Promise<string>;
 }
 
+// Pourquoi on part chez Twitch : se connecter, ou synchroniser la modération de sa chaîne (JOURNAL 2026-09-27).
+export type TwitchPurpose = "signIn" | "sync";
+
+// Un ban Twitch. Un timeout n'est pas définitif : la synchro l'ignore.
+export type TwitchBan = TwitchUser & { isPermanent: boolean };
+
+// La chaîne du streamer, lue au retour de Twitch avec le jeton qu'il vient d'accorder.
+export type TwitchChannel = { user: SignedInUser; moderators: TwitchUser[]; bans: TwitchBan[] };
+
 // Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.
 export interface TwitchAuth {
-  authorizeUrl(state: string): string;
+  authorizeUrl(state: string, purpose: TwitchPurpose): string;
   getUserFromCode(code: string): Promise<SignedInUser>;
+  getChannelFromCode(code: string): Promise<TwitchChannel>;
 }
 
 // Une connexion vue de la socket : le pendant de `ClientSocket`, pour que l'infra n'importe pas le usecase.

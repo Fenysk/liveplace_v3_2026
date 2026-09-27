@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-27 — Écart §10.1 : deux droits de plus, pour le seul streamer qui synchronise sa chaîne
+
+**Contexte.** La synchro Twitch (A1) lit les modérateurs et les bans d'une chaîne (`moderation:read`), puis s'abonne à ses bans (`channel:moderate`, EventSub). Le §10.1 ne demande aucun droit, et l'écran de Twitch affiche chacun.
+**Décision.** `authorizeUrl` reçoit un but : `signIn` demande l'e-mail seul (JOURNAL du même jour), `sync` y ajoute ces deux droits. `getChannelFromCode` lit l'utilisateur, ses modérateurs et ses bans, 100 par page, avec le token qui vient d'arriver. Le token ne sort pas de l'adaptateur et n'est pas gardé.
+**Renoncement.** Pas ces droits à chaque connexion : tous les viewers verraient l'écran de modération. Pas de token gardé pour relire la chaîne plus tard : EventSub prévient, avec le jeton de l'application.
+
 ## 2026-09-27 — Écart §2 : les actions venues de Twitch passent par une file que le gateway applique
 
 **Contexte.** Le plan de la synchro faisait appliquer les bans Twitch par le web. Or le §2 le lui interdit (« le web ne parle jamais aux pixels ») et `clearUser` retire des pixels. Et dans le serveur empaqueté par Nitro, `redis-core` ne trouverait pas ses `.lua` (JOURNAL 2026-09-19).
