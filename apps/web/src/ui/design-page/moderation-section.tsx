@@ -2,7 +2,7 @@
 // l'onglet Modération. Les vrais composants du jeu, avec des props d'exemple.
 
 import { PALETTE } from "@liveplace/domain";
-import type { Pixel } from "@liveplace/domain/ports";
+import type { InspectEntry, Pixel } from "@liveplace/domain/ports";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Button } from "../design/button";
@@ -35,8 +35,13 @@ const TROLL = { userId: "3", login: "troll42", displayName: "Troll42", colorInde
 
 const MODERATING: ModerationControls = { isProtected: () => false, onModerate: noop };
 const PROTECTING: ModerationControls = { isProtected: () => true, onModerate: noop };
+const OWNING: ModerationControls = { isProtected: () => false, onModerate: noop, onSetModerator: noop };
 
-const inspectionOf = (nowMs: number, author: typeof TROLL | (typeof SAMPLE_OWNER & { userId: string })) =>
+// L'auteur d'exemple : sa couleur par défaut, et `moderatorOrigin` quand le streamer inspecte un modérateur.
+const inspectionOf = <Author extends Omit<InspectEntry, "colorIndex" | "placedAt">>(
+  nowMs: number,
+  author: Author,
+) =>
   ({
     status: "found",
     x: 122,
@@ -177,6 +182,29 @@ export const ModerationSection = () => {
             isDocked={false}
           />
         </Specimen>
+        <Specimen caption="Pour le streamer : nommer modérateur">
+          <InspectionPill
+            inspection={inspectionOf(nowMs, TROLL)}
+            palette={PALETTE}
+            nowMs={nowMs}
+            onClose={noop}
+            moderation={OWNING}
+            isDocked={false}
+          />
+        </Specimen>
+        <Specimen caption="Pour le streamer : un modérateur venu de Twitch">
+          <InspectionPill
+            inspection={inspectionOf(nowMs, {
+              ...TROLL,
+              moderatorOrigin: { isFromTwitch: true, isNamedHere: false },
+            })}
+            palette={PALETTE}
+            nowMs={nowMs}
+            onClose={noop}
+            moderation={OWNING}
+            isDocked={false}
+          />
+        </Specimen>
         <Specimen caption="Sans photo">
           <InspectionPill
             inspection={inspectionOf(nowMs, { userId: "2", ...SAMPLE_VIEWER })}
@@ -210,7 +238,7 @@ export const ModerationSection = () => {
         ))}
         <Specimen caption="Les modérateurs : de Twitch, nommé ici, pas encore sur LivePlace">
           <div className="design-window-box">
-            <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} />
+            <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} onRemove={noop} />
           </div>
         </Specimen>
         {TAB_STATES.map(({ caption, props }) => (

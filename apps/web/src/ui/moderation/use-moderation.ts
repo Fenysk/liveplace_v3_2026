@@ -17,6 +17,8 @@ import type {
 export type ModerationControls = {
   isProtected: (userId: string) => boolean; // le streamer et soi-même : aucun bouton
   onModerate: (kind: ModerationKind, author: ModeratedAuthor) => void;
+  // JOURNAL 2026-09-27 : le streamer seul nomme ou retire un modérateur. Absent pour un modérateur.
+  onSetModerator?: ((author: ModeratedAuthor, isModerator: boolean) => void) | undefined;
 };
 
 export function useModeration(canvas: CanvasStore): {
@@ -63,11 +65,20 @@ export function useModeration(canvas: CanvasStore): {
     canvas.closeInspection();
   };
 
+  // La pill se relit après : elle montre alors le nouveau rôle de l'auteur.
+  const setModerator = (author: ModeratedAuthor, isModerator: boolean): void => {
+    void canvas.setModerator(author.userId, isModerator).then(() => {
+      const { inspection } = canvas.getView();
+      if (inspection) canvas.inspect(inspection.x, inspection.y);
+    });
+  };
+
   const controls: ModerationControls | undefined =
     view.role && canModerate(view.role)
       ? {
           isProtected: (userId) => userId === view.ownerId || userId === view.userId,
           onModerate: open,
+          ...(view.role === "owner" ? { onSetModerator: setModerator } : {}),
         }
       : undefined;
 

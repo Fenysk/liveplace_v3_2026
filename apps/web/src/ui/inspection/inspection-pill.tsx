@@ -7,10 +7,13 @@ import type { InspectEntry } from "@liveplace/domain/ports";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
+import { Badge } from "../design/badge";
 import { Button } from "../design/button";
 import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile } from "../design/profile";
+import { TwitchGlyph } from "../design/twitch";
+import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { formatPlacedAgo } from "./placed-ago";
 
@@ -32,16 +35,46 @@ const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
 
 type ModerationRowProps = { moderation: ModerationControls; author: InspectEntry };
 
+type RoleRowProps = {
+  author: ModeratedAuthor;
+  onSetModerator: (author: ModeratedAuthor, isModerator: boolean) => void;
+};
+
+// JOURNAL 2026-09-27 : pour le streamer. Nommé ici, il se retire ici ; venu de Twitch seul, il se retire sur Twitch.
+const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
+  const origin = author.moderatorOrigin;
+  if (origin?.isNamedHere)
+    return (
+      <div className="lp-row">
+        <Button label="Retirer modérateur" onPress={() => onSetModerator(author, false)} />
+      </div>
+    );
+  if (origin?.isFromTwitch)
+    return (
+      <div className="lp-row">
+        <Badge label="Modérateur Twitch" icon={TwitchGlyph} title="Il se retire depuis ta chaîne Twitch" />
+      </div>
+    );
+  return (
+    <div className="lp-row">
+      <Button label="Nommer modérateur" onPress={() => onSetModerator(author, true)} />
+    </div>
+  );
+};
+
 // Jamais sur les pixels du streamer, ni sur les siens (maquette). Écart §4.3 (JOURNAL 2026-09-27) : ni sans identifiant.
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const { userId } = author;
   if (!userId || moderation.isProtected(userId)) return null;
   const moderated = { ...author, userId };
   return (
-    <div className="lp-row lp-row--ruled">
-      <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", moderated)} />
-      <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
-    </div>
+    <>
+      <div className="lp-row lp-row--ruled">
+        <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", moderated)} />
+        <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+      </div>
+      {moderation.onSetModerator && <RoleRow author={moderated} onSetModerator={moderation.onSetModerator} />}
+    </>
   );
 };
 

@@ -12,16 +12,35 @@ import { TwitchSyncBlock, type TwitchSyncView } from "./twitch-sync";
 // `onSync` : la page part chez Twitch, la pill Dessin le dit (use-signing-in.ts).
 type ModerationTabProps = { canvas: CanvasStore; login: string; onSync: () => void };
 
+type ModeratorsAnswer = Awaited<ReturnType<CanvasStore["listModerators"]>>;
+
+// La réponse `moderators`, à la lecture comme au retrait : la liste, et l'état de la synchro Twitch.
+const viewsOf = (result: ModeratorsAnswer): { moderators: ModeratorListView; sync: TwitchSyncView } => ({
+  moderators: result.ok ? { status: "ready", users: result.value.users } : { status: "failed" },
+  sync: result.ok && result.value.twitchSync ? result.value.twitchSync : { status: "never" },
+});
+
 const useModeratorsProps = (canvas: CanvasStore) => {
-  const [moderators, setModerators] = useState<ModeratorListView>({ status: "loading" });
-  const [sync, setSync] = useState<TwitchSyncView>({ status: "loading" });
+  const [views, setViews] = useState<{ moderators: ModeratorListView; sync: TwitchSyncView }>({
+    moderators: { status: "loading" },
+    sync: { status: "loading" },
+  });
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+
   useEffect(() => {
-    void canvas.listModerators().then((result) => {
-      setModerators(result.ok ? { status: "ready", users: result.value.users } : { status: "failed" });
-      setSync(result.ok && result.value.twitchSync ? result.value.twitchSync : { status: "never" });
-    });
+    void canvas.listModerators().then((result) => setViews(viewsOf(result)));
   }, [canvas]);
-  return { moderators, sync };
+
+  // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour.
+  const onRemove = (userId: string) => {
+    setRemovingUserId(userId);
+    void canvas.setModerator(userId, false).then((result) => {
+      setRemovingUserId(null);
+      setViews(viewsOf(result));
+    });
+  };
+
+  return { ...views, removingUserId, onRemove };
 };
 
 const useModerationTabProps = (canvas: CanvasStore) => {
@@ -66,11 +85,16 @@ const useModerationTabProps = (canvas: CanvasStore) => {
 
 export const ModerationTab = ({ canvas, login, onSync }: ModerationTabProps) => {
   const { role } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
-  const { moderators, sync } = useModeratorsProps(canvas);
+  const { moderators, sync, removingUserId, onRemove } = useModeratorsProps(canvas);
+  const isOwner = role === "owner";
   return (
     <>
-      {role === "owner" && <TwitchSyncBlock sync={sync} syncHref={syncHref(login)} onSync={onSync} />}
-      <ModeratorUsers list={moderators} />
+      {isOwner && <TwitchSyncBlock sync={sync} syncHref={syncHref(login)} onSync={onSync} />}
+      <ModeratorUsers
+        list={moderators}
+        removingUserId={removingUserId}
+        onRemove={isOwner ? onRemove : undefined}
+      />
       <BannedUsers {...useModerationTabProps(canvas)} />
     </>
   );
