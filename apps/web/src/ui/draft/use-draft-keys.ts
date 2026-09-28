@@ -36,6 +36,7 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores): voi
     submit: () => submitDraft(draft),
     exitDraftMode: () => draft.exitDraftMode(),
     toggleEraser: () => draft.toggleEraser(),
+    togglePicker: () => draft.togglePicker(),
     startTrace: () => draft.startTrace(),
     closeInspection: () => canvas.closeInspection(),
   };

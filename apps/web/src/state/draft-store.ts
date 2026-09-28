@@ -27,6 +27,7 @@ export type DraftView = {
   isSending: boolean; // la pill est verrouillée jusqu'au dernier ack ou à la coupure
   isTracing: boolean;
   isTouchTracing: boolean; // le Toggle tracé : un doigt trace, deux doigts déplacent
+  isPicking: boolean; // la pipette armée : le prochain clic prend une couleur (CDC 2026, `I`)
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
   recentColorIndexes: readonly number[]; // sur mobile, la rangée : cinq couleurs, jamais celle du bouton (design system)
 };
@@ -39,6 +40,7 @@ export type DraftStore = {
   discardDraft(): void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
+  togglePicker(): void; // `I` : la pipette, pour un seul clic
   toggleCell(x: number, y: number): void;
   startTrace(): void;
   traceCells(cells: readonly { x: number; y: number }[]): void;
@@ -70,6 +72,7 @@ export function createDraftStore(
     isSending: false,
     isTracing: false,
     isTouchTracing: false,
+    isPicking: false,
     shakeCount: 0,
     recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES,
   };
@@ -83,7 +86,8 @@ export function createDraftStore(
     for (const listener of listeners) listener();
   };
 
-  const leaveDraftMode = (): void => publish({ mode: "view", isTracing: false, isTouchTracing: false });
+  const leaveDraftMode = (): void =>
+    publish({ mode: "view", isTracing: false, isTouchTracing: false, isPicking: false });
 
   // Le brouillon d'un utilisateur ne se lit qu'après le `welcome` : c'est lui qui donne le `userId`.
   const applySavedDraft = (): void => {
@@ -123,6 +127,20 @@ export function createDraftStore(
 
   // Le brouillon ne bouge qu'en Dessin, et jamais pendant l'envoi.
   const isEditable = () => view.mode === "draft" && !view.isSending;
+
+  // Gomme armée, la couleur remplacée est celle d'avant la gomme : aucune ne se perd.
+  const selectColor = (colorIndex: number): void => {
+    const recentColorIndexes = rememberColorIndex(view.recentColorIndexes, lastColorIndex, colorIndex);
+    if (colorIndex !== TRANSPARENT_COLOR_INDEX) lastColorIndex = colorIndex;
+    publish({ colorIndex, recentColorIndexes, isPicking: false });
+  };
+
+  // CDC 2026, `I` : la couleur réellement posée, jamais celle du brouillon. Sur un pixel transparent, rien ne change
+  // et la pipette reste armée ; sinon elle sort de la gomme, et la couleur devient celle que `E` retrouve.
+  const pickColorAt = (x: number, y: number): void => {
+    const colorIndex = context().colorIndexAt(x, y);
+    if (colorIndex !== TRANSPARENT_COLOR_INDEX) selectColor(colorIndex);
+  };
 
   const applyEdit = (edit: DraftEdit, canShake: boolean): void => {
     setDraft(edit.draft);
@@ -176,22 +194,22 @@ export function createDraftStore(
     discardDraft() {
       if (isEditable()) setDraft(EMPTY_DRAFT);
     },
-    selectColor(colorIndex) {
-      // Gomme armée, la couleur remplacée est celle d'avant la gomme : aucune ne se perd.
-      const recentColorIndexes = rememberColorIndex(view.recentColorIndexes, lastColorIndex, colorIndex);
-      if (colorIndex !== TRANSPARENT_COLOR_INDEX) lastColorIndex = colorIndex;
-      publish({ colorIndex, recentColorIndexes });
-    },
+    selectColor,
     toggleEraser() {
-      if (view.colorIndex === TRANSPARENT_COLOR_INDEX) publish({ colorIndex: lastColorIndex });
-      else this.selectColor(TRANSPARENT_COLOR_INDEX);
+      if (view.colorIndex === TRANSPARENT_COLOR_INDEX)
+        publish({ colorIndex: lastColorIndex, isPicking: false });
+      else selectColor(TRANSPARENT_COLOR_INDEX);
+    },
+    togglePicker() {
+      if (view.mode === "draft") publish({ isPicking: !view.isPicking });
     },
     toggleCell(x, y) {
+      if (view.mode === "draft" && view.isPicking) return pickColorAt(x, y);
       if (isEditable())
         applyEdit(toggleDraftCell(view.draft, { x, y, colorIndex: view.colorIndex }, context()), true);
     },
     startTrace() {
-      if (!isEditable() || view.isTracing) return;
+      if (!isEditable() || view.isTracing || view.isPicking) return;
       hasShakenThisTrace = false;
       publish({ isTracing: true });
     },

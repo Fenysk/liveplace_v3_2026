@@ -3,7 +3,7 @@
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, Trash } from "lucide-react";
+import { Brush, Eraser, Pipette, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { Gauge, type GaugeProps } from "../design/gauge";
@@ -31,6 +31,7 @@ export type DraftPillState =
       canDiscard: boolean;
       isTouchScreen: boolean;
       isTouchTracing: boolean;
+      isPicking: boolean;
       refusal?: string;
     };
 
@@ -41,6 +42,7 @@ export type DraftPillActions = {
   onDiscard: () => void;
   onPickColor: (colorIndex: number) => void; // dans la palette, ou dans la rangée des récentes sur mobile
   onToggleEraser: () => void;
+  onTogglePicker: () => void; // la pipette, pour un seul clic (CDC 2026, `I`)
   onToggleTouchTracing: () => void;
   onReload: () => void;
   onSignIn: () => void; // la page part chez Twitch
@@ -111,6 +113,16 @@ const TraceButton = ({ state, actions }: { state: DraftModeState; actions: Draft
   />
 );
 
+const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => (
+  <Button
+    icon={Pipette}
+    variant="ghost"
+    title="Pipette (I) : prend la couleur d'un pixel posé"
+    isPressed={state.isPicking}
+    onPress={actions.onTogglePicker}
+  />
+);
+
 // La feuille Dessin, sur mobile. Repliée ou dépliée, c'est son affaire : elle repart repliée à chaque entrée en Dessin.
 const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -157,6 +169,7 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
           isPressed={isEraser}
           onPress={actions.onToggleEraser}
         />
+        <PickerButton state={state} actions={actions} />
         <TraceButton state={state} actions={actions} />
         <DiscardButton canDiscard={state.canDiscard} onDiscard={actions.onDiscard} />
       </div>
@@ -201,6 +214,7 @@ const draftContent = (
         <Gauge {...state.gauge} />
         <span className="lp-spacer" />
         {state.isTouchScreen && <TraceButton state={state} actions={actions} />}
+        <PickerButton state={state} actions={actions} />
         <DiscardButton canDiscard={state.canDiscard} onDiscard={actions.onDiscard} />
         <CancelButton onExit={actions.onExit} />
         <SubmitButton canSubmit={state.canSubmit} onSubmit={actions.onSubmit} />

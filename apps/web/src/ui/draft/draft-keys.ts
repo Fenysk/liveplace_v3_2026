@@ -10,6 +10,7 @@ export type DraftKeyCommand =
   | "submit"
   | "exitDraftMode"
   | "toggleEraser"
+  | "togglePicker"
   | "startTrace"
   | "closeInspection";
 
@@ -19,6 +20,7 @@ const DRAFT_KEYS: Record<string, DraftKeyCommand> = {
   enter: "submit",
   escape: "exitDraftMode",
   e: "toggleEraser",
+  i: "togglePicker",
 };
 const INSPECTING_KEYS: Record<string, DraftKeyCommand> = { ...VIEW_KEYS, escape: "closeInspection" };
 const KEYS_BY_MODE = {

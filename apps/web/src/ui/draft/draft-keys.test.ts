@@ -21,6 +21,13 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press(" ", "Space"), "draft")).toBe("startTrace");
   });
 
+  // En Dessin seulement, I arme la pipette (CDC 2026)
+  it("arms the picker with I, in draft mode only", () => {
+    expect(keyCommand(press("i", "KeyI"), "draft")).toBe("togglePicker");
+    expect(keyCommand(press("I", "KeyI"), "draft")).toBe("togglePicker");
+    expect(keyCommand(press("i", "KeyI"), "view")).toBeNull();
+  });
+
   // Lit les lettres par la touche tapée, pas par sa place : sur un clavier AZERTY, D reste D
   it("reads letters by the typed key, not its position: on AZERTY, D stays D", () => {
     expect(keyCommand(press("d", "KeyQ"), "view")).toBe("enterDraftMode");

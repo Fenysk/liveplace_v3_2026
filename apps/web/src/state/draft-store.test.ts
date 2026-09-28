@@ -224,6 +224,38 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
     });
   });
 
+  // La pipette prend la couleur réellement posée, jamais celle du brouillon, sort de la gomme, et E la retrouve
+  it("the picker takes the color actually placed, never the draft's, leaves the eraser, and E finds it again", () => {
+    const { store, cells } = setup();
+    store.enterDraftMode();
+    store.selectColor(12);
+    store.toggleCell(3, 1);
+    store.toggleEraser();
+
+    store.togglePicker();
+    store.toggleCell(3, 1);
+
+    expect(store.getView()).toMatchObject({ colorIndex: 9, isPicking: false });
+    expect(cells()).toEqual([{ x: 3, y: 1, colorIndex: 12 }]);
+    store.toggleEraser();
+    store.toggleEraser();
+    expect(store.getView().colorIndex).toBe(9);
+  });
+
+  // Sur un pixel transparent, la pipette ne fait rien et reste armée
+  it("on a transparent pixel, the picker does nothing and stays armed", () => {
+    const { store, setCanvasView } = setup();
+    setCanvasView(liveView({ pixels: new Uint8Array(256 * 4) }));
+    store.enterDraftMode();
+    store.selectColor(12);
+
+    store.togglePicker();
+    store.toggleCell(0, 0);
+
+    expect(store.getView()).toMatchObject({ colorIndex: 12, isPicking: true });
+    expect(store.getView().draft.size).toBe(0);
+  });
+
   // La rangée ne montre jamais la couleur du bouton : aucun doublon
   it("never has the active color in the row", () => {
     const { store } = setup();

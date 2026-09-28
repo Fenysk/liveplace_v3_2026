@@ -72,6 +72,7 @@ const draftModeState = (
     canDiscard: isEditable,
     isTouchScreen,
     isTouchTracing: draft.isTouchTracing,
+    isPicking: draft.isPicking,
     ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
   };
 };
@@ -128,6 +129,7 @@ export function useDraftPillProps(
       onDiscard: () => draft.discardDraft(),
       onPickColor: (colorIndex) => draft.selectColor(colorIndex),
       onToggleEraser: () => draft.toggleEraser(),
+      onTogglePicker: () => draft.togglePicker(),
       onToggleTouchTracing: () => draft.toggleTouchTracing(),
       onReload: () => window.location.reload(),
       onSignIn,

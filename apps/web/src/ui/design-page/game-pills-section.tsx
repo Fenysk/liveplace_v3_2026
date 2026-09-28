@@ -29,6 +29,7 @@ const DRAFT_ACTIONS: DraftPillActions = {
   onDiscard: noop,
   onPickColor: noop,
   onToggleEraser: noop,
+  onTogglePicker: noop,
   onToggleTouchTracing: noop,
   onReload: noop,
   onSignIn: noop,
@@ -54,6 +55,7 @@ const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { 
     canDiscard: true,
     isTouchScreen: false,
     isTouchTracing: false,
+    isPicking: false,
     ...overrides,
   }) satisfies DraftPillState;
 
@@ -83,6 +85,7 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
     state: draftState(nowMs, { gauge: gaugeAt(nowMs, 8), canSubmit: false, canDiscard: false }),
   },
   { caption: "Dessin, pendant l'envoi : verrouillée", state: draftState(nowMs, { isSending: true }) },
+  { caption: "Dessin, pipette armée (I)", state: draftState(nowMs, { isPicking: true }) },
   {
     caption: "Dessin, écran tactile : Tracé armé",
     state: draftState(nowMs, { isTouchScreen: true, isTouchTracing: true }),
