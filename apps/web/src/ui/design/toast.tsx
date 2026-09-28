@@ -1,5 +1,6 @@
 // Le toast (CDC 2026, Toasts) : une pill courte, une icône et une phrase, 3 s, un seul à la fois,
-// succès ou erreur. Il entre et sort comme les pills. `ToastProvider` le tient pour toute la page, `useToast` l'affiche.
+// succès ou erreur. Il monte du bas en fondu et y redescend. `ToastProvider` le tient pour toute la page,
+// `useToast` l'affiche.
 
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from "react";
@@ -19,8 +20,9 @@ export const Toast = ({ message, isDocked = true }: ToastProps) => {
   const shown = useShownWhileClosing(message);
   if (!shown) return null;
   const Icon = shown.tone === "success" ? CircleCheck : CircleAlert;
+  // Une clé par message : celui qui en remplace un autre refait son entrée.
   return (
-    <Pill dock={isDocked ? "toast" : undefined} isVisible={message !== null}>
+    <Pill key={shown.id} dock={isDocked ? "toast" : undefined} isVisible={message !== null}>
       <span className={`lp-toast lp-toast--${shown.tone} lp-type-body`} role="status">
         <Icon aria-hidden="true" />
         {shown.text}

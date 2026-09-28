@@ -159,6 +159,11 @@
   left: var(--space-4);
 }
 
+/* Il monte du bas en fondu, et y redescend en s'effaçant, au PC comme sur mobile */
+.lp-floating[data-dock="toast"] > .lp-pill {
+  animation: lp-toast-in var(--lp-dur) var(--lp-ease);
+}
+
 /* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
 html[data-panning] .lp-floating {
   opacity: 0;
@@ -173,6 +178,18 @@ html[data-panning] .lp-floating {
 html[data-panning] .lp-floating > .lp-pill,
 .lp-floating > .lp-pill.is-hidden {
   pointer-events: none;
+}
+
+/* La sortie du toast, après la règle commune des pills cachées qu'elle remplace */
+.lp-floating[data-dock="toast"] > .lp-pill.is-hidden {
+  transform: translateY(var(--space-4));
+}
+
+@keyframes lp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-4));
+  }
 }
 
 /* Envoi en cours : le contenu grisé, non cliquable */
