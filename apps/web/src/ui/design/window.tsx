@@ -88,11 +88,16 @@ const WindowShell = ({
       )}
       tabIndex={-1}
       aria-labelledby={titleId}
+      // React fait remonter `cancel` et `close` d'une petite fenêtre ouverte dedans (la taille du canvas) :
+      // seuls les siens la ferment.
       onCancel={(event) => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         onClose();
       }}
-      onClose={onClose}
+      onClose={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
       <div className="lp-window-grabber">
