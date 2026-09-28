@@ -44,6 +44,7 @@ const meta: CanvasMeta = {
   refillMs: 1000,
   refillCharges: 1,
   obsDelayMs: 5000,
+  obsBackground: "transparent",
 };
 
 beforeAll(async () => {

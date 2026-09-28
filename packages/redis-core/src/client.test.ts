@@ -36,6 +36,7 @@ const meta: CanvasMeta = {
   refillMs: 1000,
   refillCharges: 2, // ≠ 1 : un oubli du `× refillCharges` ne passerait pas
   obsDelayMs: 5000,
+  obsBackground: "transparent",
 };
 
 beforeAll(async () => {
@@ -753,5 +754,22 @@ describe("setObsDelay (JOURNAL 2026-09-25)", () => {
     expect((await core.getCanvas(canvasId))?.obsDelayMs).toBe(60_000);
     expect(received).toEqual([{ ctl: { t: "obsDelay", obsDelayMs: 60_000 } }]);
     expect(await redis.get(buildCanvasKeys(canvasId).version)).toBe("0");
+  });
+
+  // Écrit le fond OBS dans meta et prévient les pages ; un canvas d'avant est transparent (JOURNAL 2026-09-29)
+  it("writes the OBS background into meta and tells the pages; a canvas from before is transparent", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    await redis.hdel(buildCanvasKeys(canvasId).meta, "obsBackground");
+    expect((await core.getCanvas(canvasId))?.obsBackground).toBe("transparent");
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    await core.setObsBackground(canvasId, "white");
+    await delay(100);
+    await unsubscribe();
+
+    expect((await core.getCanvas(canvasId))?.obsBackground).toBe("white");
+    expect(received).toEqual([{ ctl: { t: "obsBackground", obsBackground: "white" } }]);
   });
 });

@@ -2,10 +2,28 @@
 // sans se déformer, centré : une case peut faire 4 px et sa voisine 5 px (JOURNAL 2026-09-25). Ni geste, ni curseur.
 
 import { useEffect, useRef } from "react";
-import type { ObsStore } from "../../state/obs-store";
+import type { ObsStore, ObsView } from "../../state/obs-store";
 import { createCanvasImage } from "../canvas/canvas-image";
 
 type ObsCanvasProps = { store: ObsStore };
+
+type Rect = { left: number; top: number; width: number; height: number };
+
+// La surface en pixels physiques, à sa taille affichée : nette sur un écran Retina.
+const sizeSurface = (element: HTMLCanvasElement): { width: number; height: number } => {
+  const ratio = window.devicePixelRatio || 1;
+  const [width, height] = [Math.round(element.clientWidth * ratio), Math.round(element.clientHeight * ratio)];
+  if (element.width !== width) element.width = width;
+  if (element.height !== height) element.height = height;
+  return { width, height };
+};
+
+// Le cadre du canvas dans la surface : rempli sans déformation, centré.
+const fitRect = (surface: { width: number; height: number }, view: ObsView): Rect => {
+  const scale = Math.min(surface.width / view.width, surface.height / view.height);
+  const [width, height] = [view.width * scale, view.height * scale];
+  return { left: (surface.width - width) / 2, top: (surface.height - height) / 2, width, height };
+};
 
 export const ObsCanvas = ({ store }: ObsCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
@@ -23,24 +41,17 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
       const view = store.getView();
       if (!view.isReady) return;
       image.repaint(view);
-      const ratio = window.devicePixelRatio || 1;
-      const [width, height] = [
-        Math.round(element.clientWidth * ratio),
-        Math.round(element.clientHeight * ratio),
-      ];
-      if (element.width !== width) element.width = width;
-      if (element.height !== height) element.height = height;
-      const scale = Math.min(width / view.width, height / view.height);
-      const [drawnWidth, drawnHeight] = [view.width * scale, view.height * scale];
+      const { width, height } = sizeSurface(element);
+      const { left, top, width: drawnWidth, height: drawnHeight } = fitRect({ width, height }, view);
       context.clearRect(0, 0, width, height);
+      // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le fond blanc, sous les pixels, dans le cadre du canvas seulement.
+      context.fillStyle =
+        view.background === "white"
+          ? getComputedStyle(element).getPropertyValue("--obs-white")
+          : "transparent";
+      context.fillRect(left, top, drawnWidth, drawnHeight);
       context.imageSmoothingEnabled = false;
-      context.drawImage(
-        image.source,
-        (width - drawnWidth) / 2,
-        (height - drawnHeight) / 2,
-        drawnWidth,
-        drawnHeight,
-      );
+      context.drawImage(image.source, left, top, drawnWidth, drawnHeight);
     };
     // Une image par `requestAnimationFrame`, seulement quand quelque chose a changé (§9.3).
     const requestPaint = (): void => {

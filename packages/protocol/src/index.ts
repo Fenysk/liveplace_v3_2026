@@ -1,6 +1,6 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
-import { isCanvasSize, isObsDelayStep, ROLES, type Timestamp } from "@liveplace/domain";
+import { isCanvasSize, isObsDelayStep, OBS_BACKGROUNDS, ROLES, type Timestamp } from "@liveplace/domain";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
@@ -12,7 +12,8 @@ import { z } from "zod";
 // 6 : la pose, le signalement et la case vue par le stream (JOURNAL 2026-09-28).
 // 7 : signaler une plage d'heures, et les pixels de l'auteur d'une pose pour la choisir (JOURNAL 2026-09-29).
 // 8 : le streamer change la taille de son canvas (JOURNAL 2026-09-29).
-export const PROTOCOL_VERSION = 8;
+// 9 : le fond de la vue OBS, transparent ou blanc (JOURNAL 2026-09-29).
+export const PROTOCOL_VERSION = 9;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -252,6 +253,13 @@ const ResizeCanvasFrameSchema = z
   })
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
+// Écart CDC v3 §1 (JOURNAL 2026-09-29) : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
+const SetObsBackgroundFrameSchema = z.object({
+  t: z.literal("setObsBackground"),
+  requestId: RequestIdSchema,
+  obsBackground: z.enum(OBS_BACKGROUNDS),
+});
+
 const PingFrameSchema = z.object({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -268,6 +276,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListAuthorPixelsFrameSchema,
   ListReportsFrameSchema,
   ResizeCanvasFrameSchema,
+  SetObsBackgroundFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -290,6 +299,7 @@ const WelcomeFrameSchema = z.object({
     refillMs: z.number().int().positive(),
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
+    obsBackground: z.enum(OBS_BACKGROUNDS), // JOURNAL 2026-09-29
   }),
   palette: z.array(z.string()),
   version: VersionSchema,
@@ -432,6 +442,12 @@ const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 // Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
 const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: ObsDelaySchema });
 
+// Le fond vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-29).
+const ObsBackgroundFrameSchema = z.object({
+  t: z.literal("obsBackground"),
+  obsBackground: z.enum(OBS_BACKGROUNDS),
+});
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -455,6 +471,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   UnbannedFrameSchema,
   RoleFrameSchema,
   ObsDelayFrameSchema,
+  ObsBackgroundFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,
   AuthorPixelsFrameSchema,

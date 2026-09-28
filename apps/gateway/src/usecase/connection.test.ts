@@ -34,6 +34,7 @@ const meta: CanvasMeta = {
   refillMs: 1000,
   refillCharges: 1,
   obsDelayMs: 5000,
+  obsBackground: "transparent",
 };
 
 const session: Session = { userId: "user-1", login: "user1", displayName: "User 1" };
@@ -146,6 +147,7 @@ const setup = (options: SetupOptions = {}) => {
   const listedPixels: string[] = [];
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
+  const obsBackgrounds: string[] = [];
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
@@ -206,6 +208,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     async setObsDelay(_asked: string, obsDelayMs: number) {
       obsDelays.push(obsDelayMs);
+    },
+    async setObsBackground(_asked: string, obsBackground: "transparent" | "white") {
+      obsBackgrounds.push(obsBackground);
     },
     async setModerator(_asked: string, role: ModeratorRole) {
       namedModerators.push(role);
@@ -281,6 +286,7 @@ const setup = (options: SetupOptions = {}) => {
     listedPixels,
     recentSince,
     obsDelays,
+    obsBackgrounds,
     namedModerators,
     reports,
     clock,
@@ -848,6 +854,24 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     expect(context.obsDelays).toEqual([60_000]);
     for (const opened of [context, viewer, guest])
       expect(opened.sent.at(-1)).toEqual({ t: "obsDelay", obsDelayMs: 60_000 });
+  });
+
+  // Donne le fond OBS au welcome, ne laisse que le streamer le changer, et le transmet à toutes les pages (JOURNAL 2026-09-29)
+  it("gives the OBS background in the welcome, lets only the owner change it, and hands it to every page", async () => {
+    const context = setup({ session: owner });
+    const viewer = context.open(session);
+    for (const opened of [context, viewer]) await opened.connection.receive(hello());
+    const setWhite = JSON.stringify({ t: "setObsBackground", requestId: "bg-1", obsBackground: "white" });
+
+    await viewer.connection.receive(setWhite);
+    await context.connection.receive(setWhite);
+    context.control({ t: "obsBackground", obsBackground: "white" });
+
+    expect(viewer.sent[0]).toMatchObject({ t: "welcome", params: { obsBackground: "transparent" } });
+    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden" });
+    expect(context.obsBackgrounds).toEqual(["white"]);
+    for (const opened of [context, viewer])
+      expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
   });
 
   // Garde un changement de délai tombé pendant l'arrivée, et l'envoie après le welcome

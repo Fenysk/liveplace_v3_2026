@@ -1,7 +1,7 @@
 // La section Vue OBS, branchée sur le store (JOURNAL 2026-09-25) : le délai choisi part au gateway, et la valeur
 // affichée est la demandée tant que la frame `obsDelay` ne l'a pas confirmée.
 
-import { OBS_DELAY_MS } from "@liveplace/domain";
+import { OBS_BACKGROUND, OBS_DELAY_MS, type ObsBackground } from "@liveplace/domain";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
@@ -9,6 +9,26 @@ import { obsDelayLabel } from "./obs-delay-label";
 import { ObsSettings } from "./obs-settings";
 
 type ObsTabProps = { canvas: CanvasStore; login: string };
+
+// Le fond, comme le délai : la valeur demandée tant que la frame `obsBackground` ne l'a pas confirmée (JOURNAL 2026-09-29).
+const useObsBackground = (canvas: CanvasStore) => {
+  const getConfirmed = () => canvas.getView().params?.obsBackground ?? OBS_BACKGROUND;
+  const confirmed = useSyncExternalStore(canvas.subscribe, getConfirmed, getConfirmed);
+  const [requested, setRequested] = useState<ObsBackground | null>(null);
+  const toast = useToast();
+  useEffect(() => {
+    if (requested !== confirmed) return;
+    setRequested(null);
+    toast("success", `Fond enregistré : ${confirmed === "white" ? "blanc" : "transparent"}`);
+  }, [requested, confirmed, toast]);
+  return {
+    obsBackground: requested ?? confirmed,
+    onPickBackground: (obsBackground: ObsBackground) => {
+      setRequested(obsBackground);
+      canvas.setObsBackground(obsBackground);
+    },
+  };
+};
 
 export const ObsTab = ({ canvas, login }: ObsTabProps) => {
   const getConfirmed = () => canvas.getView().params?.obsDelayMs ?? OBS_DELAY_MS;
@@ -23,6 +43,7 @@ export const ObsTab = ({ canvas, login }: ObsTabProps) => {
   }, [requested, confirmed, toast]);
   // Montée seulement quand la fenêtre s'ouvre sur cette section : toujours dans le navigateur.
   const url = `${window.location.origin}/${login}`;
+  const background = useObsBackground(canvas);
   return (
     <ObsSettings
       address={url.replace(/^https?:\/\//, "")}
@@ -32,6 +53,7 @@ export const ObsTab = ({ canvas, login }: ObsTabProps) => {
         setRequested(obsDelayMs);
         canvas.setObsDelay(obsDelayMs);
       }}
+      {...background}
     />
   );
 };

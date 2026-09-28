@@ -14,7 +14,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   palette: PALETTE,
   version: 1,
   role: "guest",
-  params: { gaugeMax: 200, refillMs, refillCharges: 1, obsDelayMs: 5000 },
+  params: { gaugeMax: 200, refillMs, refillCharges: 1, obsDelayMs: 5000, obsBackground: "transparent" },
   gauge: null,
   reportCount: 0,
   lastError: null,
@@ -66,6 +66,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     listAuthorPixels: async () => ({ ok: true as const, value: [] }),
     resizeCanvas: async () => ({ ok: true as const, value: true as const }),
     setObsDelay: () => undefined,
+    setObsBackground: () => undefined,
     listenArrivals: () => () => undefined,
     close: () => undefined,
   };

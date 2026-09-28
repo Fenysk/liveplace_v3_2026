@@ -13,7 +13,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   palette: PALETTE,
   version: 1,
   role: "guest",
-  params: { gaugeMax: 10, refillMs: 10_000, refillCharges: 1, obsDelayMs },
+  params: { gaugeMax: 10, refillMs: 10_000, refillCharges: 1, obsDelayMs, obsBackground: "transparent" },
   gauge: null,
   reportCount: 0,
   lastError: null,
@@ -49,6 +49,7 @@ const setup = () => {
     listModerators: unused,
     setModerator: unused,
     setObsDelay: unused,
+    setObsBackground: unused,
     report: unused,
     listReports: unused,
     listAuthorPixels: unused,
@@ -80,8 +81,13 @@ const setup = () => {
     view = viewWithDelay(obsDelayMs);
     for (const listener of listeners) listener();
   };
+  const setWhite = () => {
+    const params = viewWithDelay(10_000).params;
+    if (params) view = { ...view, params: { ...params, obsBackground: "white" } };
+    for (const listener of listeners) listener();
+  };
   const store = createObsStore(canvas, obsClock);
-  return { store, advanceTo, arrive, setDelay };
+  return { store, advanceTo, arrive, setDelay, setWhite };
 };
 
 const pose = (placedAt: number) => ({
@@ -121,6 +127,17 @@ describe("createObsStore (§9.5, JOURNAL 2026-09-25)", () => {
 
     setDelay(5000);
     expect(store.getView().pixels[OFFSET]).toBe(5);
+  });
+
+  // Prend un fond changé à chaud, sans rechargement (JOURNAL 2026-09-29)
+  it("takes a background changed live, without a reload", () => {
+    const { store, arrive, setWhite } = setup();
+    arrive({ kind: "snapshot", pixels: new Uint8Array(16), recent: null });
+    expect(store.getView().background).toBe("transparent");
+
+    setWhite();
+
+    expect(store.getView().background).toBe("white");
   });
 
   // N'est prête qu'après son premier snapshot

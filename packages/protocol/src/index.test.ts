@@ -52,7 +52,13 @@ describe("protocol frames", () => {
     const welcome = {
       t: "welcome",
       canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
-      params: { gaugeMax: 10, refillMs: 10_000, refillCharges: 1, obsDelayMs: 5000 },
+      params: {
+        gaugeMax: 10,
+        refillMs: 10_000,
+        refillCharges: 1,
+        obsDelayMs: 5000,
+        obsBackground: "transparent",
+      },
       palette: ["#00000000"],
       version: 0,
       you: { userId: "1234", login: "fenysk", displayName: "Fenysk", role: "viewer" },

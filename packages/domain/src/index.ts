@@ -109,7 +109,18 @@ export type Gauge = { charges: number; at: Timestamp };
 export type GaugeParams = { gaugeMax: number; refillMs: number; refillCharges: number };
 
 // `cv:<id>:meta` sans `ready` (§5.1).
-export type CanvasMeta = GaugeParams & { ownerId: string; width: number; height: number; obsDelayMs: number };
+export type CanvasMeta = GaugeParams & {
+  ownerId: string;
+  width: number;
+  height: number;
+  obsDelayMs: number;
+  obsBackground: ObsBackground;
+};
+
+// Écart CDC v3 §1 (JOURNAL 2026-09-29) : le fond de la vue OBS. Transparent par défaut, et sur un canvas d'avant.
+export const OBS_BACKGROUNDS = ["transparent", "white"] as const;
+export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
+export const OBS_BACKGROUND: ObsBackground = "transparent";
 
 export const GAUGE_MAX = 10;
 export const REFILL_MS = 10_000;
@@ -143,6 +154,7 @@ export function defaultCanvasMeta(ownerId: string): CanvasMeta {
     refillMs: REFILL_MS,
     refillCharges: REFILL_CHARGES,
     obsDelayMs: OBS_DELAY_MS,
+    obsBackground: OBS_BACKGROUND,
   };
 }
 

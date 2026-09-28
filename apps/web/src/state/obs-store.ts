@@ -1,7 +1,7 @@
 // L'image du stream (§9.5) : ce que la vue OBS montre, nourri par les arrivées du store du canvas, vidé par un seul
 // minuteur réglé sur la prochaine case. Le store du canvas garde l'état réel ; celui-ci, ce que les viewers voient.
 
-import type { Timestamp } from "@liveplace/domain";
+import { OBS_BACKGROUND, type ObsBackground, type Timestamp } from "@liveplace/domain";
 import type { CanvasStore } from "./canvas-store";
 import {
   createObsQueue,
@@ -21,6 +21,7 @@ export type ObsView = {
   height: number;
   palette: readonly string[];
   pixels: Uint8Array; // modifiés sur place : chaque changement publie une nouvelle vue
+  background: ObsBackground; // JOURNAL 2026-09-29 : blanc, la vue OBS le peint sous ses pixels
 };
 
 export type ObsStore = {
@@ -30,7 +31,15 @@ export type ObsStore = {
 };
 
 export function createObsStore(canvas: CanvasStore, clock: ObsClock): ObsStore {
-  let view: ObsView = { isReady: false, width: 0, height: 0, palette: [], pixels: new Uint8Array(0) };
+  const backgroundOf = (): ObsBackground => canvas.getView().params?.obsBackground ?? OBS_BACKGROUND;
+  let view: ObsView = {
+    isReady: false,
+    width: 0,
+    height: 0,
+    palette: [],
+    pixels: new Uint8Array(0),
+    background: backgroundOf(),
+  };
   let queue: ObsQueue | null = null;
   let cancelTimer = (): void => undefined;
   const listeners = new Set<() => void>();
@@ -50,7 +59,7 @@ export function createObsStore(canvas: CanvasStore, clock: ObsClock): ObsStore {
     cancelTimer();
     showDueCells(queue, clock.now(), delayMs());
     const { width, height, palette } = canvas.getView();
-    publish({ isReady: true, width, height, palette, pixels: queue.shown });
+    publish({ isReady: true, width, height, palette, pixels: queue.shown, background: backgroundOf() });
     const next = nextShowAt(queue, delayMs());
     if (next !== null) cancelTimer = clock.wait(Math.max(0, next - clock.now()), showDue);
   };
@@ -64,8 +73,9 @@ export function createObsStore(canvas: CanvasStore, clock: ObsClock): ObsStore {
     showDue();
   });
 
-  // Le délai change à chaud : ce qui attend suit le nouveau, sans que le streamer recharge sa source.
+  // Le délai change à chaud : ce qui attend suit le nouveau, sans que le streamer recharge sa source. Le fond aussi.
   const unsubscribe = canvas.subscribe(() => {
+    if (backgroundOf() !== view.background) publish({ background: backgroundOf() });
     if (delayMs() === knownDelayMs) return;
     knownDelayMs = delayMs();
     showDue();

@@ -22,6 +22,7 @@ const meta: CanvasMeta = {
   refillMs: 1000,
   refillCharges: 1,
   obsDelayMs: 5000,
+  obsBackground: "transparent",
 };
 
 // Ce que le canvas a déjà : `twitch` vient de Twitch, `here` de LivePlace.

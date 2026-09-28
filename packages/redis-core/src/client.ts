@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   type CanvasMeta,
   CELL_STRIDE,
+  OBS_BACKGROUND,
   PALETTE,
   refillGauge,
   type Timestamp,
@@ -346,6 +347,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         refillMs: metaNumber(fields, "refillMs"),
         refillCharges: metaNumber(fields, "refillCharges"),
         obsDelayMs: metaNumber(fields, "obsDelayMs"),
+        // Écart CDC v3 §1 (JOURNAL 2026-09-29) : absent sur un canvas d'avant, donc transparent.
+        obsBackground: fields.obsBackground === "white" ? "white" : OBS_BACKGROUND,
       };
     },
 
@@ -763,6 +766,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       await redis
         .multi()
         .hset(keys.meta, "obsDelayMs", obsDelayMs)
+        .publish(keys.live, JSON.stringify(control))
+        .exec();
+    },
+
+    // Écart CDC v3 §1 (JOURNAL 2026-09-29) : comme le délai, `meta` et le `ctl` ensemble, sans version.
+    async setObsBackground(canvasId, obsBackground) {
+      const keys = buildCanvasKeys(canvasId);
+      const control: LiveMessage = { ctl: { t: "obsBackground", obsBackground } };
+      await redis
+        .multi()
+        .hset(keys.meta, "obsBackground", obsBackground)
         .publish(keys.live, JSON.stringify(control))
         .exec();
     },

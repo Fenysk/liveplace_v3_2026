@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Écart CDC v3 §1 et §4.3 : protocole 9, le fond de la vue OBS
+
+**Contexte.** Plan du jour, H : un interrupteur « Fond transparent », activé par défaut, blanc sinon. Le délai OBS a déjà ce chemin (JOURNAL 2026-09-25).
+**Décision.** `meta` gagne `obsBackground` (`transparent` ou `white`), absent sur un canvas d'avant : transparent. `setObsBackground`, pour le seul streamer, écrit `meta` et publie un `ctl` que chaque page reçoit en frame `obsBackground` ; le `welcome` le porte dans `params`. La vue OBS peint le cadre du canvas en blanc sous ses pixels.
+**Renoncement.** Pas de version ni d'entrée dans le stream : c'est un réglage, pas un pixel.
+
 ## 2026-09-29 — Écart §5.3 : la jauge pleine n'avance plus
 
 **Contexte.** Plan du jour, H (bilan, §7). Pleine, la jauge gardait l'heure de sa dernière recharge : après une longue pause, la première charge dépensée revenait en moins d'un intervalle.

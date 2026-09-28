@@ -2,7 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CanvasMeta, CanvasSize, Session, Timestamp, User } from "./index";
+import type { CanvasMeta, CanvasSize, ObsBackground, Session, Timestamp, User } from "./index";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
@@ -107,6 +107,7 @@ export type LiveControl =
   | { t: "banned" | "unbanned"; userId: string }
   | { t: "role"; userId: string } // ses droits de modération ont changé (JOURNAL 2026-09-27)
   | { t: "obsDelay"; obsDelayMs: number }
+  | { t: "obsBackground"; obsBackground: ObsBackground } // JOURNAL 2026-09-29
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   | { t: "resize" }; // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
@@ -162,6 +163,7 @@ export interface CanvasCore {
   listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]>;
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : `meta` et le `ctl` ensemble, sans version.
   setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
+  setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
   // Écart §5.1 (JOURNAL 2026-09-27) : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
   setModerator(
     canvasId: string,

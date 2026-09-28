@@ -1,6 +1,6 @@
 // Les pills du jeu, les vraies, avec des props d'exemple : chacune dans chacun de ses états.
 
-import { PALETTE } from "@liveplace/domain";
+import { type ObsBackground, PALETTE } from "@liveplace/domain";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
@@ -229,14 +229,17 @@ const CanvasSettingsSpecimen = () => {
 // Le vrai curseur : un cran choisi s'affiche, comme le ferait la confirmation du gateway.
 const ObsSettingsSpecimen = () => {
   const [obsDelayMs, setObsDelayMs] = useState(10_000);
+  const [obsBackground, setObsBackground] = useState<ObsBackground>("transparent");
   return (
-    <Specimen caption="L'adresse, la marche à suivre et le délai">
+    <Specimen caption="L'adresse, la marche à suivre, le délai et le fond">
       <div className="design-window-box">
         <ObsSettings
           address="liveplace.tv/kalyss"
           url="https://liveplace.tv/kalyss"
           obsDelayMs={obsDelayMs}
           onPickDelay={setObsDelayMs}
+          obsBackground={obsBackground}
+          onPickBackground={setObsBackground}
         />
       </div>
     </Specimen>

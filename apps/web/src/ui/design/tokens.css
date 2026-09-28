@@ -73,6 +73,9 @@
   --pill-opacity: 92%;
   --pill-blur: 16px;
 
+  /* Le fond blanc de la vue OBS, le même dans les deux thèmes : c'est celui du stream (JOURNAL 2026-09-29) */
+  --obs-white: #ffffff;
+
   /* Les couleurs de marque de Twitch, les mêmes dans les deux thèmes : Se connecter seulement */
   --twitch: #9146ff;
   --twitch-hover: #772ce8;

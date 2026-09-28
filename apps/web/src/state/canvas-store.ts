@@ -1,6 +1,6 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
-import { type Role, type Timestamp, toStateOffset } from "@liveplace/domain";
+import { type ObsBackground, type Role, type Timestamp, toStateOffset } from "@liveplace/domain";
 import type {
   AckFrame,
   AuthoredPixel,
@@ -97,6 +97,7 @@ export type CanvasStore = {
   listModerators(): Promise<RequestResult<ModeratorList>>; // JOURNAL 2026-09-27
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
+  setObsBackground(obsBackground: ObsBackground): void; // confirmé par la frame `obsBackground` (JOURNAL 2026-09-29)
   // JOURNAL 2026-09-28. `range` : ses poses voisines aussi (JOURNAL 2026-09-29).
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
   // Le streamer seul ; la nouvelle taille arrive par un `welcome` et un snapshot (JOURNAL 2026-09-29).
@@ -318,6 +319,20 @@ export function createCanvasStore(
     requests.delete(requestId);
   };
 
+  // Un réglage de la vue OBS, pris aussitôt : le délai (JOURNAL 2026-09-25), le fond (JOURNAL 2026-09-29).
+  const takeObsSetting = ({
+    t,
+    ...change
+  }: Extract<ServerFrame, { t: "obsDelay" | "obsBackground" }>): void => {
+    if (view.params) publish({ params: { ...view.params, ...change } });
+  };
+
+  const onInspected = (frame: Extract<ServerFrame, { t: "inspected" }>): void => {
+    if (frame.requestId !== inspectRequestId) return;
+    inspectRequestId = null;
+    publish({ inspection: toInspection(frame) });
+  };
+
   const onFrame = (frame: ServerFrame): void => {
     switch (frame.t) {
       case "welcome":
@@ -333,9 +348,7 @@ export function createCanvasStore(
         publish({ gauge: { charges: frame.charges, max: frame.max, nextRefillAt: frame.nextRefillAt } });
         break;
       case "inspected":
-        if (frame.requestId !== inspectRequestId) break;
-        inspectRequestId = null;
-        publish({ inspection: toInspection(frame) });
+        onInspected(frame);
         break;
       case "moderated":
       case "pixels":
@@ -359,7 +372,8 @@ export function createCanvasStore(
         publish({ role: frame.role });
         break;
       case "obsDelay":
-        if (view.params) publish({ params: { ...view.params, obsDelayMs: frame.obsDelayMs } });
+      case "obsBackground":
+        takeObsSetting(frame);
         break;
       case "error":
         if (frame.requestId) refuseRequest(frame.requestId, frame.code);
@@ -447,6 +461,8 @@ export function createCanvasStore(
       request({ t: "setModerator", requestId: crypto.randomUUID(), userId, isModerator }, toModeratorList),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
+    setObsBackground: (obsBackground) =>
+      transport.send({ t: "setObsBackground", requestId: crypto.randomUUID(), obsBackground }),
     report: (x, y, placementId, range) =>
       request(
         { t: "report", requestId: crypto.randomUUID(), x, y, placementId, ...(range ? { range } : {}) },

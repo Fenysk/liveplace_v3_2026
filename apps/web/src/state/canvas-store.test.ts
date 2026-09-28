@@ -12,7 +12,13 @@ const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000 };
 const welcome: ServerFrame = {
   t: "welcome",
   canvas: { canvasId: "canvas-1", width, height: 4, ownerId: "owner-1" },
-  params: { gaugeMax: 10, refillMs: 10_000, refillCharges: 1, obsDelayMs: 5000 },
+  params: {
+    gaugeMax: 10,
+    refillMs: 10_000,
+    refillCharges: 1,
+    obsDelayMs: 5000,
+    obsBackground: "transparent",
+  },
   palette: [...PALETTE],
   version: 7,
   you: { userId: "user-1", login: "user1", displayName: "User 1", role: "viewer" },
@@ -535,6 +541,21 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
 
     expect(store.getView().params?.obsDelayMs).toBe(60_000);
     expect(sent.at(-1)).toEqual({ t: "setObsDelay", requestId: expect.any(String), obsDelayMs: 300_000 });
+  });
+
+  // Prend un nouveau fond OBS, et envoie celui que le streamer choisit (JOURNAL 2026-09-29)
+  it("takes a new OBS background, and sends the one the owner picks", () => {
+    const { store, sent, receive } = setup();
+
+    receive({ t: "obsBackground", obsBackground: "white" });
+    store.setObsBackground("transparent");
+
+    expect(store.getView().params?.obsBackground).toBe("white");
+    expect(sent.at(-1)).toEqual({
+      t: "setObsBackground",
+      requestId: expect.any(String),
+      obsBackground: "transparent",
+    });
   });
 
   // Transmet chaque arrivée à ses écouteurs : le snapshot avec son recent, puis les cases

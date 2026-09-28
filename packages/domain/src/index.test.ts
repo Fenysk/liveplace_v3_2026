@@ -247,6 +247,7 @@ describe("defaultCanvasMeta (CDC §1)", () => {
       refillMs: REFILL_MS,
       refillCharges: REFILL_CHARGES,
       obsDelayMs: OBS_DELAY_MS,
+      obsBackground: "transparent",
     });
   });
 });

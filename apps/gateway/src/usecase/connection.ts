@@ -45,6 +45,7 @@ type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
 type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
 type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
+type SetObsBackgroundFrame = Extract<ClientFrame, { t: "setObsBackground" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
@@ -52,7 +53,10 @@ type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
 // attente pour qui modère (JOURNAL 2026-09-28).
-type ControlFrame = Extract<ServerFrame, { t: "banned" | "unbanned" | "obsDelay" | "reportCount" }>;
+type ControlFrame = Extract<
+  ServerFrame,
+  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "reportCount" }
+>;
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
 // `version` part dans le `welcome` ; `coveredVersion` est la dernière version déjà envoyée, pour dédupliquer (§6.1).
@@ -136,6 +140,7 @@ const buildWelcome = (
     refillMs: meta.refillMs,
     refillCharges: meta.refillCharges,
     obsDelayMs: meta.obsDelayMs,
+    obsBackground: meta.obsBackground,
   },
   palette: [...PALETTE],
   version,
@@ -151,6 +156,7 @@ const controlFrameOf = (
   role: Role,
 ): ControlFrame | null => {
   if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
+  if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
   if (control.t === "reports") return canModerate(role) ? { t: "reportCount", count: control.count } : null;
   return control.userId === session?.userId ? { t: control.t } : null;
 };
@@ -262,8 +268,7 @@ export function createConnection(
   const sendHeldControls = (held: ControlFrame[], wasBanned: boolean): void => {
     const lastBan = held.filter((frame) => frame.t === "banned" || frame.t === "unbanned").at(-1);
     if (lastBan ? lastBan.t === "banned" : wasBanned) socket.sendFrame({ t: "banned" });
-    for (const frame of held)
-      if (frame.t === "obsDelay" || frame.t === "reportCount") socket.sendFrame(frame);
+    for (const frame of held) if (frame.t !== "banned" && frame.t !== "unbanned") socket.sendFrame(frame);
   };
 
   // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban et le délai aussi.
@@ -504,6 +509,12 @@ export function createConnection(
     await deps.core.setObsDelay(ready.canvasId, obsDelayMs);
   };
 
+  // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le streamer seul, comme le délai.
+  const setObsBackground = async ({ obsBackground }: SetObsBackgroundFrame, ready: ReadyState) => {
+    if (ready.role !== "owner") return forbid();
+    await deps.core.setObsBackground(ready.canvasId, obsBackground);
+  };
+
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     switch (frame.t) {
@@ -521,6 +532,8 @@ export function createConnection(
         return listModerators(frame.requestId, ready);
       case "setObsDelay":
         return setObsDelay(frame, ready);
+      case "setObsBackground":
+        return setObsBackground(frame, ready);
       case "setModerator":
         return setModerator(frame, ready);
       case "report":
