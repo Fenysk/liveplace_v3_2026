@@ -3,6 +3,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
+import { useToast } from "../design/toast";
 import { CanvasSettings, type ResizeStatus, ResizeWindow } from "./canvas-settings";
 import { listOutsidePixels, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
 
@@ -19,12 +20,15 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const chosen = toCanvasSize(choice);
+  const toast = useToast();
 
   const confirm = () => {
     setStatus("running");
     void canvas.resizeCanvas(chosen.width, chosen.height).then((result) => {
       setStatus(result.ok ? "idle" : "failed");
-      if (result.ok) setIsConfirming(false);
+      if (!result.ok) return;
+      setIsConfirming(false);
+      toast("success", `Taille changée : ${chosen.width} × ${chosen.height} cases`);
     });
   };
 

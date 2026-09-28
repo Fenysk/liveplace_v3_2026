@@ -152,6 +152,13 @@
   transform: translateY(-50%);
 }
 
+/* Le toast (CDC 2026, Toasts) : en bas à gauche, par-dessus les autres pills */
+.lp-floating[data-dock="toast"] {
+  z-index: 3;
+  bottom: var(--space-4);
+  left: var(--space-4);
+}
+
 /* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
 html[data-panning] .lp-floating {
   opacity: 0;
@@ -273,6 +280,15 @@ html[data-panning] .lp-floating > .lp-pill,
 
   .lp-floating[data-dock="br"] {
     right: var(--space-2);
+  }
+
+  /* En haut au centre, sous les pills Canvas et Compte */
+  .lp-floating[data-dock="toast"] {
+    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size-touch) + var(--space-4));
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 2 * var(--space-2));
   }
 
   .lp-pill.is-hidden {

@@ -17,6 +17,7 @@
 @import "./copy-button.css";
 @import "./slider.css";
 @import "./checkbox.css";
+@import "./toast.css";
 
 html,
 body {

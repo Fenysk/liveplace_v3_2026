@@ -15,6 +15,7 @@ import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
 import { Slider } from "../design/slider";
 import { ThemeButton, ThemePicker } from "../design/theme-controls";
+import { Toast, ToastProvider, useToast } from "../design/toast";
 import { SignInButton, SignInNote, TwitchGlyph } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { SmallWindow, Window, WindowRow } from "../design/window";
@@ -283,6 +284,17 @@ const CheckboxSpecimen = () => {
   );
 };
 
+// Les vrais toasts, ancrés comme dans le jeu : en bas à gauche, en haut au centre sur mobile.
+const ToastButtons = () => {
+  const toast = useToast();
+  return (
+    <div className="design-demo-buttons">
+      <Button label="Succès" onPress={() => toast("success", "Délai enregistré : 10 s")} />
+      <Button label="Erreur" onPress={() => toast("error", "Connexion perdue : la page se reconnecte.")} />
+    </div>
+  );
+};
+
 const PREVIEWS = [
   { caption: "Un petit dessin : cadré de près, la gomme en croix", pixels: SAMPLE_DRAWING },
   { caption: "Des pixels dispersés : tout le canvas", pixels: SAMPLE_SPREAD },
@@ -368,6 +380,26 @@ export const ComponentsSection = () => {
 
       <SpecimenSection title="Palette" note="Les couleurs arrivent par props : la palette de `domain`.">
         <PaletteSpecimens />
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Toast"
+        note="Une icône et une phrase, 3 s, un seul à la fois. Il entre et sort comme les pills."
+      >
+        <Specimen caption="Succès">
+          <Toast message={{ id: 1, tone: "success", text: "Signalement envoyé" }} isDocked={false} />
+        </Specimen>
+        <Specimen caption="Erreur">
+          <Toast
+            message={{ id: 2, tone: "error", text: "3 pixels refusés : ils restent dans le brouillon." }}
+            isDocked={false}
+          />
+        </Specimen>
+        <Specimen caption="En vrai, ancré au bord de l'écran">
+          <ToastProvider>
+            <ToastButtons />
+          </ToastProvider>
+        </Specimen>
       </SpecimenSection>
 
       <SpecimenSection

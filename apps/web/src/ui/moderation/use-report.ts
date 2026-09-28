@@ -5,6 +5,7 @@
 import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
+import { useToast } from "../design/toast";
 import type { ReportControl } from "../inspection/inspection-pill";
 import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toPlacementRange } from "./cleared-pixels";
 import type { ModerationStatus, ModerationWindowProps, ReportTarget } from "./moderation-window";
@@ -16,6 +17,7 @@ export function useReport(canvas: CanvasStore): {
   window: ModerationWindowProps;
 } {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
+  const toast = useToast();
   const [sent, setSent] = useState<ReadonlyMap<string, SentReport>>(new Map());
   const [target, setTarget] = useState<ReportTarget | null>(null);
   const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
@@ -63,7 +65,9 @@ export function useReport(canvas: CanvasStore): {
     const result = await canvas.report(active.x, active.y, active.placementId, rangeOf(active));
     mark(active.placementId, result.ok ? "reported" : null);
     if (current.current !== active) return;
-    if (!result.ok) return setStatus("failed");
+    if (result.ok) toast("success", "Signalement envoyé");
+    else if (result.error === "closed") return setStatus("failed");
+    else toast("error", "Signalement refusé : la case a changé, ou la pose ne se signale plus.");
     close();
   };
 

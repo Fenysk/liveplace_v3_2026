@@ -11,7 +11,9 @@ import { useSigningIn } from "../ui/account/use-signing-in";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import type { ProfileUser } from "../ui/design/profile";
+import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftKeys } from "../ui/draft/use-draft-keys";
@@ -64,6 +66,7 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
   const draft = useDraftPillProps(stores, login, signingIn);
   const moderation = useModeration(stores.canvas);
   const reporting = useReport(stores.canvas);
+  useCanvasToasts(stores);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
   const getRole = () => stores.canvas.getView().role;
@@ -144,7 +147,10 @@ const GamePage = () => {
       <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
       {stores && <PixelCanvas store={stores.canvas} draftStore={stores.draft} canvasId={canvasId} />}
       {stores ? (
-        <LivePills stores={stores} login={login} owner={owner} isCompact={isCompact} />
+        // CDC 2026, Toasts : un seul à la fois, pour toute la page.
+        <ToastProvider>
+          <LivePills stores={stores} login={login} owner={owner} isCompact={isCompact} />
+        </ToastProvider>
       ) : (
         <>
           <CanvasPill owner={owner} isCompact={isCompact} />

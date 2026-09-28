@@ -8,6 +8,7 @@ import type { ReportedPlacement } from "@liveplace/domain/ports";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
+import { useToast } from "../design/toast";
 import { type BannedList, BannedUsers, type BanPreview } from "./banned-users";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
 import { ReportedPlacements, type ReportList } from "./reported-placements";
@@ -37,6 +38,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
     sync: { status: "loading" },
   });
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     void canvas.listModerators().then((result) => setViews(viewsOf(result)));
@@ -48,6 +50,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
     void canvas.setModerator(userId, false).then((result) => {
       setRemovingUserId(null);
       setViews(viewsOf(result));
+      if (result.ok) toast("success", "Modérateur·rice retiré·e");
     });
   };
 
@@ -73,6 +76,7 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
   const { width, height, palette } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const [list, setList] = useState<ReportList>({ status: "loading" });
   const [approvingPlacementId, setApprovingPlacementId] = useState<string | null>(null);
+  const toast = useToast();
 
   const relist = useCallback(() => {
     void canvas.listReports().then((result) => {
@@ -85,7 +89,8 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
     setApprovingPlacementId(placementId);
     void canvas.moderate({ action: "approvePlacement", target: userId, placementId }).then((result) => {
       setApprovingPlacementId(null);
-      if (!result.ok) setList({ status: "failed" });
+      if (!result.ok) return setList({ status: "failed" });
+      toast("success", "Pose rétablie : elle revient sur le stream");
     });
   };
 
@@ -105,6 +110,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   const [list, setList] = useState<BannedList>({ status: "loading" });
   const [preview, setPreview] = useState<BanPreview | null>(null);
   const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
+  const toast = useToast();
 
   const relist = useCallback(() => {
     void canvas.listBans().then((result) => {
@@ -129,6 +135,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
     void canvas.moderate({ action: "unban", target: userId }).then((result) => {
       setUnbanningUserId(null);
       if (!result.ok) return setList({ status: "failed" });
+      toast("success", "Débanni·e : ce compte peut de nouveau poser");
       setList((shown) =>
         shown.status === "ready"
           ? { status: "ready", users: shown.users.filter((user) => user.userId !== userId) }

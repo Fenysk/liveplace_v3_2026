@@ -1,0 +1,25 @@
+/* Le toast (CDC 2026, Toasts) : une icône à la couleur de son ton, une phrase qui peut passer à la ligne */
+
+.lp-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 320px;
+  min-height: var(--control-size);
+  padding-inline: var(--space-2);
+  white-space: normal;
+}
+
+.lp-toast svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.lp-toast--success svg {
+  color: var(--gauge-charge);
+}
+
+.lp-toast--error svg {
+  color: var(--danger);
+}
