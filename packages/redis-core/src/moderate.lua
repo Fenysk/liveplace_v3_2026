@@ -7,6 +7,8 @@ local bansTwitchKey = KEYS[11]
 -- Écart §5.1 (JOURNAL 2026-09-28) : les pierres tombales d'une pose et d'une plage, et les poses signalées.
 local clearedPlacementsKey, clearedRangesKey, offStreamKey, reportedKey, approvedKey =
   KEYS[12], KEYS[13], KEYS[14], KEYS[15], KEYS[16]
+-- Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient d'ôter à la cible, la preuve d'un ban qui suivrait.
+local recentlyClearedKey = KEYS[17]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), ARGV[11]
@@ -14,7 +16,7 @@ local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(
 local source = ARGV[12]
 -- Écart §5.4 (JOURNAL 2026-09-28) : la pose visée et la plage d'heures qui l'étend, vides sinon.
 local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(ARGV[15])
-local clearingPrefix, reportsPrefix = ARGV[16], ARGV[17]
+local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
 local placement = target .. ":" .. placementId
 
 -- 0. Canvas prêt. Écart §5.5 (JOURNAL 2026-09-15), comme place.lua.
@@ -104,8 +106,14 @@ end
 -- 2. ban : ne touche à aucun pixel, l'interface enchaîne ensuite clearUser (§5.4).
 if action == "ban" then
   -- Écart §5.1 (JOURNAL 2026-09-25) : la preuve, ses pixels visibles, avant que clearUser ne les retire.
-  -- Seulement au premier ban : un second la viderait.
+  -- Seulement au premier ban : un second la viderait. Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient de
+  -- lui ôter d'abord, ses pixels visibles par-dessus.
   if redis.call("SADD", bansKey, target) == 1 then
+    local recentlyCleared = redis.call("HGETALL", recentlyClearedKey)
+    for index = 1, #recentlyCleared, 2 do
+      redis.call("HSET", banKey, recentlyCleared[index], recentlyCleared[index + 1])
+    end
+    redis.call("DEL", recentlyClearedKey)
     for _, cellKey in ipairs(redis.call("SUNION", targetCellsKey, clearingKey)) do
       local stateOffset = stateOffsetOf(tonumber(cellKey))
       redis.call("HSET", banKey, cellKey, string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset)))
@@ -201,7 +209,11 @@ local function unstack(cellKey)
 
   local stateOffset = stateOffsetOf(tonumber(cellKey))
   local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
-  redis.call("SREM", cellsPrefix .. parseEntry(entries[1]).author, cellKey)
+  local previousAuthor = parseEntry(entries[1]).author
+  redis.call("SREM", cellsPrefix .. previousAuthor, cellKey)
+  if previousAuthor == target then
+    redis.call("HSET", recentlyClearedKey, cellKey, previousColorIndex)
+  end
   -- Une pile vidée : la case devient transparente, à l'heure de l'action.
   local colorIndex, placedAt = 0, nowMs
   if kept[1] then
@@ -238,6 +250,9 @@ if slice == "first" then
   end
 end
 publish(version, cells, "clear")
+if redis.call("EXISTS", recentlyClearedKey) == 1 then
+  redis.call("EXPIRE", recentlyClearedKey, recentlyClearedTtl)
+end
 
 -- 5c. La dernière tranche : ses poses signalées sont tranchées.
 local isDone = redis.call("EXISTS", clearingKey) == 0

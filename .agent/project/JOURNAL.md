@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Écart §5.4 : la preuve d'un ban qui suit un retrait
+
+**Contexte.** Après Retirer, la fenêtre propose de bannir l'auteur (demande de l'humain). La preuve d'un ban, ce sont ses pixels visibles au moment du ban : ceux qu'on vient de retirer n'y seraient plus.
+**Décision.** Le dépilage garde chaque pixel qu'il ôte à la cible dans `cleared:recent:<userId>` (`cellKey` → `colorIndex`), une heure à partir du dernier retrait. `ban` les ajoute à sa preuve, sous ses pixels visibles, puis efface la clé.
+**Renoncement.** Pas de preuve envoyée par la page : c'est le serveur qui sait ce qui a été retiré.
+
 ## 2026-09-28 — Écart §4.2, §4.3 et §9.5 : protocole 6, la case telle que le stream la voit
 
 **Contexte.** Une pose signalée quitte la vue OBS, pas la page (A3). La vue OBS ne connaît ni les piles ni les poses : le serveur doit lui dire quoi montrer.

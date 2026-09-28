@@ -9,6 +9,7 @@ export const GAUGE_TTL_SECONDS = 30 * 24 * 3600; // glissant, jauge expirée = p
 export const REQ_TTL_SECONDS = 120;
 export const RECENT_MAX_EVENTS = 2000; // §5.6 : le `recent` de la vue OBS, borné même avec un délai de 10 min
 export const CLEAR_SLICE_CELLS = 4096; // §5.4 : la latence Redis pire cas d'une tranche, connue d'avance
+export const RECENTLY_CLEARED_TTL_SECONDS = 3600; // JOURNAL 2026-09-29 : le temps de décider d'un ban après un retrait
 
 // Écart §2 (JOURNAL 2026-09-27) : les actions venues de Twitch, déposées par le web, lues par le seul gateway.
 export const TWITCH_COMMANDS_KEY = "twitch:commands";
@@ -65,6 +66,8 @@ export function buildCanvasKeys(canvasId: string) {
     reports: (placementKey: string) => `${reportsPrefix}${placementKey}`, // qui a signalé cette pose
     // Écart §5.1 (JOURNAL 2026-09-25) : la preuve d'un ban, `cellKey` → `colorIndex`. Écrite par ban, supprimée par unban.
     ban: (userId: string) => `${prefix}ban:${userId}`,
+    // Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient de lui ôter, `cellKey` → `colorIndex`, pour la preuve d'un ban.
+    recentlyCleared: (userId: string) => `${prefix}cleared:recent:${userId}`,
     gauge: (userId: string) => `${prefix}gauge:${userId}`,
     req: (userId: string, requestId: string) => `${prefix}req:${userId}:${requestId}`,
   };

@@ -74,10 +74,11 @@ const WINDOW_DEMOS: readonly WindowDemo[] = [
   { caption: "Plage de 15 min", kind: "clear", scope: { isAll: false, spanMs: 15 * MINUTE } },
   { caption: "Tous ses pixels", kind: "clear", scope: { isAll: true, spanMs: 0 } },
   { caption: "Bannir", kind: "ban" },
+  { caption: "Bannir, après un retrait", kind: "banAfterClear" },
   { caption: "L'aperçu se charge", kind: "clear", isLoading: true },
 ];
 
-// Confirmer montre le verrou, puis la fenêtre se ferme. « Échec » la garde ouverte avec son message. La case et le
+// Confirmer montre le verrou, puis la fenêtre se ferme ; après Retirer, elle propose de bannir. « Échec » la garde ouverte avec son message. La case et le
 // curseur marchent : l'aperçu les suit, comme dans le jeu.
 const ModerationWindowSpecimen = ({ nowMs }: { nowMs: number }) => {
   const [request, setRequest] = useState<ModerationRequest | null>(null);
@@ -94,7 +95,7 @@ const ModerationWindowSpecimen = ({ nowMs }: { nowMs: number }) => {
   const confirm = () => {
     setStatus("running");
     setTimeout(() => {
-      setRequest(null);
+      setRequest(request?.kind === "clear" ? { kind: "banAfterClear", author: TROLL } : null);
       setStatus("idle");
     }, LOCKED_MS);
   };

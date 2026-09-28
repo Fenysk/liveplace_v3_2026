@@ -42,6 +42,7 @@ import {
   GAUGE_TTL_SECONDS,
   HIST_DEPTH,
   RECENT_MAX_EVENTS,
+  RECENTLY_CLEARED_TTL_SECONDS,
   REQ_TTL_SECONDS,
   TWITCH_COMMANDS_CONSUMER,
   TWITCH_COMMANDS_KEY,
@@ -264,7 +265,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const pile = scriptOf("pile.lua");
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
   redis.defineCommand("place", { numberOfKeys: 11, lua: withPile("place.lua") });
-  redis.defineCommand("moderate", { numberOfKeys: 16, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 17, lua: withPile("moderate.lua") });
   redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
   redis.defineCommand("streamView", { numberOfKeys: 4, lua: withPile("stream-view.lua") });
@@ -453,6 +454,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.offStream,
         keys.reported,
         keys.approved,
+        keys.recentlyCleared(target),
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -470,6 +472,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         rangeTo,
         keys.clearingPrefix,
         keys.reportsPrefix,
+        RECENTLY_CLEARED_TTL_SECONDS,
       );
       if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)

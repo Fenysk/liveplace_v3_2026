@@ -1,6 +1,7 @@
 // La confirmation d'une modération (CDC 2026, JOURNAL 2026-09-25) : une petite fenêtre, l'aperçu des pixels qui
 // partent, leur nombre, puis Annuler ou l'action. Retirer ses pixels vise d'abord la pose inspectée, et s'étend par
-// une plage d'heures ou à tous ses pixels (JOURNAL 2026-09-28). L'affichage seul, nourri par `useModeration`.
+// une plage d'heures ou à tous ses pixels (JOURNAL 2026-09-28), puis propose de bannir l'auteur (JOURNAL 2026-09-29).
+// L'affichage seul, nourri par `useModeration`.
 
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
@@ -11,8 +12,8 @@ import { SmallWindow, useShownWhileClosing } from "../design/window";
 import { CLEAR_SPAN_STEPS, type ClearScope } from "./cleared-pixels";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 
-// Ce que la pill Inspection propose : retirer ses pixels, ou le bannir (qui les retire aussi).
-export type ModerationKind = "clear" | "ban";
+// Retirer ses pixels, bannir (qui les retire aussi), ou bannir juste après un retrait.
+export type ModerationKind = "clear" | "ban" | "banAfterClear";
 
 // Écart §4.3 (JOURNAL 2026-09-27) : l'identifiant de l'auteur n'arrive qu'à qui modère.
 export type ModeratedAuthor = InspectEntry & { userId: string };
@@ -30,7 +31,7 @@ export type CanvasPreviewProps = { width: number; height: number; palette: reado
 
 export type ModerationWindowProps = {
   request: ModerationRequest | null; // `null` : fermée
-  pixels: readonly AuthoredPixel[] | null; // ceux qui partent ; `null` : l'aperçu se charge
+  pixels: readonly AuthoredPixel[] | null; // ceux que vise l'action ; `null` : l'aperçu se charge
   scope: ClearScope; // Retirer ses pixels seulement
   status: ModerationStatus;
   canvas: CanvasPreviewProps;
@@ -40,42 +41,55 @@ export type ModerationWindowProps = {
 };
 
 const titleOf = ({ kind, author }: ModerationRequest, { isAll, spanMs }: ClearScope): string => {
-  if (kind === "ban") return `Bannir ${author.displayName} ?`;
-  if (isAll) return `Retirer tous les pixels de ${author.displayName} ?`;
-  return spanMs === 0
-    ? `Retirer cette pose de ${author.displayName} ?`
-    : `Retirer ces poses de ${author.displayName} ?`;
+  const name = author.displayName;
+  if (kind === "ban") return `Bannir ${name} ?`;
+  if (kind === "banAfterClear") return `C'est retiré. Bannir aussi ${name} ?`;
+  if (isAll) return `Retirer tous les pixels de ${name} ?`;
+  return spanMs === 0 ? `Retirer cette pose de ${name} ?` : `Retirer ces poses de ${name} ?`;
 };
 
-const TEXTS: Record<ModerationKind, { consequence: string; confirm: string }> = {
-  clear: { consequence: "Ceux du dessous reviendront.", confirm: "Retirer" },
-  ban: {
-    consequence: "Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.",
-    confirm: "Bannir",
+const BAN_CONSEQUENCE = "Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.";
+
+const TEXTS: Record<
+  ModerationKind,
+  { consequence: string; confirm: string; cancel: string; variant: "danger" }
+> = {
+  clear: {
+    consequence: "Ceux du dessous reviendront.",
+    confirm: "Retirer",
+    cancel: "Annuler",
+    variant: "danger",
   },
+  ban: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Annuler", variant: "danger" },
+  banAfterClear: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Non", variant: "danger" },
 };
 
-type PreviewProps = Pick<ModerationWindowProps, "pixels" | "canvas"> & { author: ModerationTarget };
+type PreviewProps = Pick<ModerationWindowProps, "pixels" | "canvas"> & { name: string };
 
-const Preview = ({ pixels, canvas, author }: PreviewProps) => {
+const Preview = ({ pixels, canvas, name }: PreviewProps) => {
   if (!pixels) return <span className="lp-type-caption lp-muted">Chargement de l'aperçu…</span>;
   if (pixels.length === 0) return null;
-  return <PixelPreview {...canvas} pixels={pixels} label={`Les pixels de ${author.displayName}`} />;
+  return <PixelPreview {...canvas} pixels={pixels} label={`Les pixels de ${name}`} />;
 };
 
-type ScopeControlsProps = Pick<ModerationWindowProps, "scope" | "onScope"> & { isDisabled: boolean };
+type ScopeControlsProps = Pick<ModerationWindowProps, "scope" | "onScope"> & {
+  isDisabled: boolean;
+  hasAll: boolean; // la case « Retirer tous ses pixels » : pour qui modère seulement
+};
 
 // Cochée, la plage disparaît et tous ses pixels partent (CDC 2026, Inspection).
-const ScopeControls = ({ scope, onScope, isDisabled }: ScopeControlsProps) => {
+const ScopeControls = ({ scope, onScope, isDisabled, hasAll }: ScopeControlsProps) => {
   const pickSpan = (spanMs: number) => onScope({ ...scope, spanMs });
   return (
     <>
-      <Checkbox
-        label="Retirer tous ses pixels"
-        isChecked={scope.isAll}
-        isDisabled={isDisabled}
-        onToggle={(isAll) => onScope({ ...scope, isAll })}
-      />
+      {hasAll && (
+        <Checkbox
+          label="Retirer tous ses pixels"
+          isChecked={scope.isAll}
+          isDisabled={isDisabled}
+          onToggle={(isAll) => onScope({ ...scope, isAll })}
+        />
+      )}
       {!scope.isAll && (
         <Slider
           label="Plage de temps"
@@ -103,6 +117,7 @@ export const ModerationWindow = ({
   const shown = useShownWhileClosing(request);
   if (!shown) return null;
   const texts = TEXTS[shown.kind];
+  const hasScope = shown.kind === "clear";
   return (
     <SmallWindow
       isOpen={request !== null}
@@ -111,15 +126,20 @@ export const ModerationWindow = ({
       isLocked={status === "running"}
       actions={
         <>
-          <Button label="Annuler" kbd="Échap" onPress={onClose} />
-          <Button label={texts.confirm} variant="danger" isDisabled={!pixels} onPress={onConfirm} />
+          <Button label={texts.cancel} kbd="Échap" onPress={onClose} />
+          <Button label={texts.confirm} variant={texts.variant} isDisabled={!pixels} onPress={onConfirm} />
         </>
       }
     >
-      {shown.kind === "clear" && (
-        <ScopeControls scope={scope} onScope={onScope} isDisabled={status === "running"} />
+      {hasScope && (
+        <ScopeControls
+          scope={scope}
+          onScope={onScope}
+          isDisabled={status === "running"}
+          hasAll={shown.kind === "clear"}
+        />
       )}
-      <Preview pixels={pixels} canvas={canvas} author={shown.author} />
+      <Preview pixels={pixels} canvas={canvas} name={shown.author.displayName} />
       {pixels && (
         <p className="lp-type-body lp-prompt">
           {pixelCountLabel(pixels.length)}. {texts.consequence}

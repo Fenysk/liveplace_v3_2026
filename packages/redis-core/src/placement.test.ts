@@ -374,3 +374,28 @@ describe("approvePlacement and the reports list (JOURNAL 2026-09-28)", () => {
     expect(await core.getReportCount(canvasId)).toBe(0);
   });
 });
+
+describe("the proof of a ban after a clear (JOURNAL 2026-09-29)", () => {
+  // Un ban qui suit un retrait garde en preuve la pose retirée, sous ses pixels encore visibles
+  it("a ban after a clear keeps the cleared placement as proof, under the pixels still visible", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pkept0001", [{ x: 3, y: 0, colorIndex: 9 }], now - 60_000);
+    await placeAs(canvasId, "troll", "ptroll001", [
+      { x: 0, y: 0, colorIndex: 4 },
+      { x: 1, y: 0, colorIndex: 4 },
+    ]);
+    await moderateAll(canvasId, { action: "clearPlacement", target: "troll", placementId: "ptroll001" });
+    expect(await redis.ttl(keys.recentlyCleared("troll"))).toBeGreaterThan(3000);
+
+    await moderateAll(canvasId, { action: "ban", target: "troll" });
+
+    expect(await core.listPixels(canvasId, "troll")).toEqual(
+      expect.arrayContaining([
+        { x: 0, y: 0, colorIndex: 4 },
+        { x: 1, y: 0, colorIndex: 4 },
+        { x: 3, y: 0, colorIndex: 9 },
+      ]),
+    );
+    expect(await redis.exists(keys.recentlyCleared("troll"))).toBe(0);
+  });
+});
