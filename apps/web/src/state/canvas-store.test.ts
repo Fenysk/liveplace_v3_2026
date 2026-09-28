@@ -612,4 +612,20 @@ describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
     receive({ t: "reports", requestId: listFrame.requestId, reports: [] });
     expect(await listing).toEqual({ ok: true, value: [] });
   });
+
+  // Signale une plage, et lit les pixels de l'auteur pour la choisir (JOURNAL 2026-09-29)
+  it("reports a range, and lists the author's pixels to choose it", async () => {
+    const { store, sent, receive } = setup();
+    const range = { from: now - 60_000, to: now };
+
+    void store.report(1, 2, "puser2001", range);
+    expect(sent.at(-1)).toMatchObject({ t: "report", placementId: "puser2001", range });
+
+    const listing = store.listAuthorPixels(1, 2, "puser2001");
+    const listFrame = sent.at(-1);
+    if (listFrame?.t !== "listAuthorPixels") throw new Error("aucune frame listAuthorPixels envoyée");
+    const pixels = [{ x: 1, y: 2, colorIndex: 5, placedAt: now, placementId: "puser2001" }];
+    receive({ t: "authorPixels", requestId: listFrame.requestId, pixels });
+    expect(await listing).toEqual({ ok: true, value: pixels });
+  });
 });

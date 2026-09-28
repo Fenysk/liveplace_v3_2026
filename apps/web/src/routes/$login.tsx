@@ -22,6 +22,7 @@ import { ModerationTab } from "../ui/moderation/moderation-tab";
 import { ModerationWindow } from "../ui/moderation/moderation-window";
 import { useBannedWindowProps } from "../ui/moderation/use-banned-window";
 import { useModeration } from "../ui/moderation/use-moderation";
+import { useReport } from "../ui/moderation/use-report";
 import { ObsPage } from "../ui/obs/obs-page";
 import { ObsTab } from "../ui/obs/obs-tab";
 import { isObsView, useIsObsView } from "../ui/obs/obs-view";
@@ -61,7 +62,8 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
   const signingIn = useSigningIn();
   const draft = useDraftPillProps(stores, login, signingIn);
   const moderation = useModeration(stores.canvas);
-  const inspection = useInspectionPillProps(stores, moderation.controls);
+  const reporting = useReport(stores.canvas);
+  const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
   const getRole = () => stores.canvas.getView().role;
   const isOwner = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole) === "owner";
@@ -105,6 +107,7 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
       <InspectionPill {...inspection} />
       <DraftPill {...draft} isCompact={isCompact} />
       <ModerationWindow {...moderation.window} />
+      <ModerationWindow {...reporting.window} />
       <BannedWindow {...banned} />
     </>
   );

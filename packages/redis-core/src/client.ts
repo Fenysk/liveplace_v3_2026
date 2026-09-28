@@ -513,7 +513,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     },
 
     // L'ordre des arguments est celui que lit report.lua.
-    async report(canvasId, { reporterId, x, y, placementId, threshold, nowMs }) {
+    async report(canvasId, { reporterId, x, y, placementId, range, threshold, nowMs }) {
       const keys = buildCanvasKeys(canvasId);
       const status = await redis.report(
         keys.meta,
@@ -538,6 +538,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         nowMs,
         CELL_STRIDE,
         EVENTS_MAXLEN,
+        range?.from ?? "",
+        range?.to ?? "",
       );
       if (status === "reported") return { ok: true, value: undefined };
       if (status === "canvas_not_found" || status === "changed" || status === "forbidden")
@@ -592,6 +594,15 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         placementKeys.filter((_, index) => reports[index] === null),
       );
       return reports.filter((report) => report !== null);
+    },
+
+    // La pose se relit à la tête de la case : l'identifiant de l'auteur ne quitte jamais le serveur (JOURNAL 2026-09-29).
+    async listAuthorPixels(canvasId, x, y, placementId) {
+      const keys = buildCanvasKeys(canvasId);
+      const head = await redis.lindex(keys.hist(toCellKey(x, y)), 0);
+      if (head === null) return null;
+      const entry = parseEntry(head);
+      return entry.placementId === placementId ? listVisiblePixels(keys, entry.authorId) : null;
     },
 
     async getReportCount(canvasId: string): Promise<number> {

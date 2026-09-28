@@ -75,6 +75,8 @@ const reportedPlacements: ReportedPlacement[] = [
   },
 ];
 
+const authoredPixels = [{ x: 1, y: 2, colorIndex: 3, placedAt: now, placementId: "puser2001" }];
+
 const ack: AckFrame = {
   t: "ack",
   requestId: "request-1",
@@ -223,6 +225,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listOffStreamCells() {
       return options.offStream ?? [];
+    },
+    async listAuthorPixels(_asked: string, x: number, y: number) {
+      return x === 1 && y === 2 ? authoredPixels : null;
     },
     async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
       publishTo = onMessage;
@@ -883,6 +888,40 @@ describe("reports in the connection (JOURNAL 2026-09-28)", () => {
       nowMs: now,
     });
     expect(context.sent.at(-1)).toEqual({ t: "reported", requestId: "report-1" });
+  });
+
+  // Transmet la plage signalée au noyau (JOURNAL 2026-09-29)
+  it("forwards the reported range to the core", async () => {
+    const context = setup();
+    await context.connection.receive(hello());
+    const range = { from: now - 60_000, to: now + 60_000 };
+
+    await context.connection.receive(
+      JSON.stringify({ t: "report", requestId: "report-1", x: 1, y: 2, placementId: "puser2001", range }),
+    );
+
+    expect(context.reports[0]?.range).toEqual(range);
+  });
+
+  // Donne les pixels de l'auteur à un compte connecté seulement, et refuse une case qui a changé (JOURNAL 2026-09-29)
+  it("gives the author's pixels to a signed-in account only, and refuses a cell that has changed", async () => {
+    const bySession = setup();
+    const byGuest = setup({ session: null });
+    const listAuthorPixels = (x: number) =>
+      JSON.stringify({ t: "listAuthorPixels", requestId: "author-1", x, y: 2, placementId: "puser2001" });
+    for (const { connection } of [bySession, byGuest]) {
+      await connection.receive(hello());
+      await connection.receive(listAuthorPixels(1));
+    }
+    await bySession.connection.receive(listAuthorPixels(3));
+
+    expect(bySession.sent.at(-2)).toEqual({
+      t: "authorPixels",
+      requestId: "author-1",
+      pixels: authoredPixels,
+    });
+    expect(bySession.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "author-1" });
+    expect(byGuest.sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: "author-1" });
   });
 
   // Refuse un invité et une pose qui ne se signale pas, en nommant la requête, sans fermer

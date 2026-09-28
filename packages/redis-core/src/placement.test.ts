@@ -375,7 +375,57 @@ describe("approvePlacement and the reports list (JOURNAL 2026-09-28)", () => {
   });
 });
 
-describe("the proof of a ban after a clear (JOURNAL 2026-09-29)", () => {
+describe("reporting a time range, and the proof of a ban after a clear (JOURNAL 2026-09-29)", () => {
+  // Une plage signale chaque pose de l'auteur qui y tombe, et chacune quitte le stream à son seuil
+  it("a range reports each of the author's placements inside it, and each leaves the stream at its threshold", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pbefore01", [{ x: 1, y: 0, colorIndex: 4 }], now - 3 * 60_000);
+    await placeAs(canvasId, "troll", "pafter001", [{ x: 2, y: 0, colorIndex: 4 }], now + 20 * 60_000);
+    await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 4 }]);
+
+    await report(canvasId, {
+      reporterId: "viewer-1",
+      range: { from: now - 5 * 60_000, to: now + 5 * 60_000 },
+    });
+
+    const placementKey = (placementId: string) => toPlacementKey({ authorId: "troll", placementId });
+    expect(await redis.zrange(keys.reported, "0", "-1")).toEqual(
+      [placementKey("pbefore01"), placementKey("ptroll001")].sort(),
+    );
+    expect((await core.listOffStreamCells(canvasId)).map(({ x }) => x).sort()).toEqual([0, 1]);
+    expect(await core.canReport(canvasId, { authorId: "troll", placementId: "pafter001" }, "viewer-1")).toBe(
+      true,
+    );
+  });
+
+  // Une pose rétablie reste hors de la plage signalée
+  it("an approved placement stays out of a reported range", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pbefore01", [{ x: 1, y: 0, colorIndex: 4 }], now - 60_000);
+    await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 4 }]);
+    await moderateAll(canvasId, { action: "approvePlacement", target: "troll", placementId: "pbefore01" });
+
+    await report(canvasId, { reporterId: "viewer-1", range: { from: now - 5 * 60_000, to: now } });
+
+    expect((await core.listOffStreamCells(canvasId)).map(({ x }) => x)).toEqual([0]);
+  });
+
+  // Donne les pixels de l'auteur d'une pose sans son identifiant, et rien quand la case a changé
+  it("gives the pixels of a placement's author without their id, and nothing once the cell has changed", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pbefore01", [{ x: 1, y: 0, colorIndex: 4 }], now - 60_000);
+    await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 5 }]);
+
+    expect(await core.listAuthorPixels(canvasId, 0, 0, "ptroll001")).toEqual(
+      expect.arrayContaining([
+        { x: 0, y: 0, colorIndex: 5, placedAt: now, placementId: "ptroll001" },
+        { x: 1, y: 0, colorIndex: 4, placedAt: now - 60_000, placementId: "pbefore01" },
+      ]),
+    );
+    expect(await core.listAuthorPixels(canvasId, 0, 0, "pother001")).toBeNull();
+    expect(await core.listAuthorPixels(canvasId, 5, 5, "ptroll001")).toBeNull();
+  });
+
   // Un ban qui suit un retrait garde en preuve la pose retirée, sous ses pixels encore visibles
   it("a ban after a clear keeps the cleared placement as proof, under the pixels still visible", async () => {
     const { canvasId, keys } = await readyCanvas();

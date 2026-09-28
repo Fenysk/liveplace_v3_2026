@@ -148,4 +148,31 @@ describe("protocol frames", () => {
 
     expect(decodeServerFrame(cells)).toEqual({ ok: true, value: cells });
   });
+
+  // Protocole 7 (JOURNAL 2026-09-29) : un signalement porte sa plage, et les pixels de l'auteur arrivent sans son identifiant
+  it("carries a range on a report, and the author's pixels without their id", () => {
+    const range = { from: 10, to: 20 };
+    expect(decodeClientFrame({ t: "report", requestId: "r", x: 0, y: 0, placementId: "42", range }).ok).toBe(
+      true,
+    );
+    expect(
+      decodeClientFrame({
+        t: "report",
+        requestId: "r",
+        x: 0,
+        y: 0,
+        placementId: "42",
+        range: { from: 20, to: 10 },
+      }).ok,
+    ).toBe(false);
+    expect(
+      decodeClientFrame({ t: "listAuthorPixels", requestId: "r", x: 0, y: 0, placementId: "42" }).ok,
+    ).toBe(true);
+    const authorPixels = {
+      t: "authorPixels",
+      requestId: "r",
+      pixels: [{ x: 0, y: 0, colorIndex: 4, placedAt: 1, placementId: "42" }],
+    };
+    expect(decodeServerFrame(authorPixels)).toEqual({ ok: true, value: authorPixels });
+  });
 });

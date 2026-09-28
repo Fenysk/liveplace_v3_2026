@@ -10,7 +10,8 @@ import { z } from "zod";
 // 4 : l'identifiant de l'auteur inspecté devient optionnel, et une `error` peut nommer sa requête (JOURNAL 2026-09-27).
 // 5 : le rôle se relit en direct (frame `role`), et les modérateurs se listent (JOURNAL 2026-09-27).
 // 6 : la pose, le signalement et la case vue par le stream (JOURNAL 2026-09-28).
-export const PROTOCOL_VERSION = 6;
+// 7 : signaler une plage d'heures, et les pixels de l'auteur d'une pose pour la choisir (JOURNAL 2026-09-29).
+export const PROTOCOL_VERSION = 7;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -164,18 +165,19 @@ const InspectFrameSchema = z.object({
   y: CoordinateSchema,
 });
 
+// Écart §5.4 (JOURNAL 2026-09-28) : les autres pixels de l'auteur posés entre `from` et `to`, autour d'une pose.
+const RangeSchema = z
+  .object({ from: TimestampSchema, to: TimestampSchema })
+  .refine(({ from, to }) => from <= to, "plage à l'envers");
+
 // Écart §5.4 et §4.2 (JOURNAL 2026-09-25) : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
-// Écart §5.4 (JOURNAL 2026-09-28) : une pose de l'auteur, et ses autres pixels posés entre `from` et `to`.
 const ModerateActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.enum(["clearUser", "ban", "unban"]), target: UserIdSchema }),
   z.object({
     action: z.literal("clearPlacement"),
     target: UserIdSchema,
     placementId: PlacementIdSchema,
-    range: z
-      .object({ from: TimestampSchema, to: TimestampSchema })
-      .refine(({ from, to }) => from <= to, "plage à l'envers")
-      .optional(),
+    range: RangeSchema.optional(),
   }),
   z.object({ action: z.literal("approvePlacement"), target: UserIdSchema, placementId: PlacementIdSchema }),
 ]);
@@ -218,8 +220,19 @@ const SetObsDelayFrameSchema = z.object({
 });
 
 // Écart §4.2 (JOURNAL 2026-09-28) : la pose de la case, vérifiée par le serveur au moment du signalement.
+// Écart §4.2 (JOURNAL 2026-09-29) : `range` étend le signalement aux poses voisines de l'auteur.
 const ReportFrameSchema = z.object({
   t: z.literal("report"),
+  requestId: RequestIdSchema,
+  x: CoordinateSchema,
+  y: CoordinateSchema,
+  placementId: PlacementIdSchema,
+  range: RangeSchema.optional(),
+});
+
+// Écart §4.2 (JOURNAL 2026-09-29) : les pixels de l'auteur de la pose en (x, y), pour choisir la plage à signaler.
+const ListAuthorPixelsFrameSchema = z.object({
+  t: z.literal("listAuthorPixels"),
   requestId: RequestIdSchema,
   x: CoordinateSchema,
   y: CoordinateSchema,
@@ -241,6 +254,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetModeratorFrameSchema,
   SetObsDelayFrameSchema,
   ReportFrameSchema,
+  ListAuthorPixelsFrameSchema,
   ListReportsFrameSchema,
   PingFrameSchema,
 ]);
@@ -313,6 +327,13 @@ const BannedFrameSchema = z.object({ t: z.literal("banned") });
 const AuthoredPixelSchema = PixelSchema.extend({
   placedAt: TimestampSchema.optional(),
   placementId: PlacementIdSchema.optional(),
+});
+
+// Écart §4.3 (JOURNAL 2026-09-29) : la réponse à `listAuthorPixels`, sans l'identifiant de l'auteur.
+const AuthorPixelsFrameSchema = z.object({
+  t: z.literal("authorPixels"),
+  requestId: RequestIdSchema,
+  pixels: z.array(AuthoredPixelSchema),
 });
 
 // Écart §4.3 (JOURNAL 2026-09-25) : la réponse à `listPixels` et à `listBans`, et le débannissement en direct.
@@ -420,6 +441,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ReportedFrameSchema,
+  AuthorPixelsFrameSchema,
   ReportsFrameSchema,
   ReportCountFrameSchema,
   ErrorFrameSchema,

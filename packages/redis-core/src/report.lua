@@ -1,5 +1,5 @@
--- Signalement d'une pose (JOURNAL 2026-09-28). Ordre des KEYS et ARGV : client.ts. `openPile` et `parseEntry`
--- viennent de pile.lua.
+-- Signalement d'une pose (JOURNAL 2026-09-28), et de ses voisines dans une plage d'heures (JOURNAL 2026-09-29).
+-- Ordre des KEYS et ARGV : client.ts. `openPile` et `parseEntry` viennent de pile.lua.
 
 local metaKey, versionKey, eventsKey, bansKey, offStreamKey, reportedKey, approvedKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -7,6 +7,8 @@ local histPrefix, cellsPrefix, clearingPrefix, reportsPrefix, liveChannel =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5]
 local reporterId, cellKey, placementId = ARGV[6], ARGV[7], ARGV[8]
 local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[9]), tonumber(ARGV[10]), tonumber(ARGV[11]), ARGV[12]
+-- Vides sans plage : la pose seule.
+local rangeFrom, rangeTo = tonumber(ARGV[13]), tonumber(ARGV[14])
 
 -- 0. Canvas prêt, comme place.lua.
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId")
@@ -33,15 +35,39 @@ if isRefused then
   return "forbidden"
 end
 
--- 3. Une fois par compte : un second signalement ne change rien.
-local reportsKey = reportsPrefix .. entry.placement
-if redis.call("SADD", reportsKey, reporterId) == 0 then
-  return "reported"
+-- 3. Les poses visées : celle-ci, et avec une plage, chaque pose de l'auteur dont un pixel visible y tombe.
+local placements, seen = { entry.placement }, { [entry.placement] = true }
+if rangeFrom then
+  local author = entry.author
+  for _, visibleCellKey in ipairs(redis.call("SUNION", cellsPrefix .. author, clearingPrefix .. author)) do
+    local raw = redis.call("LINDEX", histPrefix .. visibleCellKey, 0)
+    local visible = raw and parseEntry(raw)
+    local isNeighbour = visible
+      and visible.author == author
+      and not seen[visible.placement]
+      and visible.placedAt >= rangeFrom
+      and visible.placedAt <= rangeTo
+    if isNeighbour and redis.call("SISMEMBER", approvedKey, visible.placement) == 0 then
+      seen[visible.placement] = true
+      placements[#placements + 1] = visible.placement
+    end
+  end
 end
-redis.call("ZADD", reportedKey, "NX", nowMs, entry.placement)
 
--- 4. Au seuil, la pose quitte le stream : chaque case où elle est visible montre ce qu'il y a dessous.
-if redis.call("SCARD", reportsKey) >= threshold and redis.call("SADD", offStreamKey, entry.placement) == 1 then
+-- 4. Une fois par compte et par pose : un second signalement ne change rien. Chacune se cache à son seuil.
+local hidden = 0
+for _, placement in ipairs(placements) do
+  local reportsKey = reportsPrefix .. placement
+  if redis.call("SADD", reportsKey, reporterId) == 1 then
+    redis.call("ZADD", reportedKey, "NX", nowMs, placement)
+    if redis.call("SCARD", reportsKey) >= threshold then
+      hidden = hidden + redis.call("SADD", offStreamKey, placement)
+    end
+  end
+end
+
+-- 5. Une pose de plus hors du stream : chaque case où une pose cachée est visible montre ce qu'il y a dessous.
+if hidden > 0 then
   local pile = openPile({
     cleared = KEYS[8],
     clearedPlacements = KEYS[9],

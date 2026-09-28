@@ -68,34 +68,43 @@ type WindowDemo = {
   scope?: ClearScope;
 };
 
-// Retirer ses pixels : décochée, cette pose seule, puis le curseur à 15 min ; cochée, tous ses pixels.
+// Retirer ses pixels : décochée, cette pose seule, puis le curseur à 15 min ; cochée, tous ses pixels. Puis la
+// question qui suit un retrait, et Signaler, avec la même plage mais sans la case (JOURNAL 2026-09-29).
 const WINDOW_DEMOS: readonly WindowDemo[] = [
   { caption: "Retirer ses pixels", kind: "clear" },
   { caption: "Plage de 15 min", kind: "clear", scope: { isAll: false, spanMs: 15 * MINUTE } },
   { caption: "Tous ses pixels", kind: "clear", scope: { isAll: true, spanMs: 0 } },
   { caption: "Bannir", kind: "ban" },
   { caption: "Bannir, après un retrait", kind: "banAfterClear" },
+  { caption: "Signaler", kind: "report" },
+  { caption: "Signaler, plage de 5 min", kind: "report", scope: { isAll: false, spanMs: 5 * MINUTE } },
   { caption: "L'aperçu se charge", kind: "clear", isLoading: true },
 ];
 
-// Confirmer montre le verrou, puis la fenêtre se ferme ; après Retirer, elle propose de bannir. « Échec » la garde ouverte avec son message. La case et le
-// curseur marchent : l'aperçu les suit, comme dans le jeu.
+const REPORTED_CELL = { x: 122, y: 82, displayName: TROLL.displayName, placementId: TROLL.placementId };
+
+const requestOf = (kind: WindowDemo["kind"]): ModerationRequest =>
+  kind === "report" ? { kind, author: REPORTED_CELL } : { kind, author: TROLL };
+
+// Confirmer montre le verrou, puis la fenêtre se ferme ; après Retirer, elle propose de bannir. « Échec » la garde
+// ouverte avec son message. La case et le curseur marchent : l'aperçu les suit, comme dans le jeu.
 const ModerationWindowSpecimen = ({ nowMs }: { nowMs: number }) => {
   const [request, setRequest] = useState<ModerationRequest | null>(null);
   const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
   const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
   const [status, setStatus] = useState<ModerationStatus>("idle");
   const show = (demo: WindowDemo, shownStatus: ModerationStatus = "idle") => {
-    setRequest({ kind: demo.kind, author: TROLL });
+    setRequest(requestOf(demo.kind));
     setPixels(demo.isLoading ? null : samplePlacements(nowMs));
     setScope(demo.scope ?? PLACEMENT_ONLY);
     setStatus(shownStatus);
   };
-  const shown = pixels && request?.kind === "clear" ? listClearedPixels(pixels, TROLL, scope) : pixels;
+  const hasScope = request?.kind === "clear" || request?.kind === "report";
+  const shown = pixels && hasScope ? listClearedPixels(pixels, TROLL, scope) : pixels;
   const confirm = () => {
     setStatus("running");
     setTimeout(() => {
-      setRequest(request?.kind === "clear" ? { kind: "banAfterClear", author: TROLL } : null);
+      setRequest(request?.kind === "clear" ? requestOf("banAfterClear") : null);
       setStatus("idle");
     }, LOCKED_MS);
   };

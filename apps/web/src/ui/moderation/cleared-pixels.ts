@@ -1,5 +1,6 @@
 // Retirer ses pixels (CDC 2026, Inspection ; JOURNAL 2026-09-28) : une pose seule, ses voisines dans une plage
-// d'heures, ou tous ses pixels. L'aperçu et l'action se calculent ici, sur les mêmes pixels : ils ne se contredisent pas.
+// d'heures, ou tous ses pixels. Signaler prend la même plage (JOURNAL 2026-09-29). L'aperçu et l'action se calculent
+// ici, sur les mêmes pixels : ils ne se contredisent pas.
 
 import type { AuthoredPixel } from "@liveplace/domain/ports";
 import type { ModerationAction } from "../../state/canvas-store";
@@ -26,7 +27,11 @@ export type ClearTarget = { userId: string; placementId: string };
 type Range = { from: number; to: number };
 
 // De la première à la dernière heure visible de la pose, élargie du cran. Sans pixel visible de la pose : aucune.
-const rangeOf = (pixels: readonly AuthoredPixel[], placementId: string, spanMs: number): Range | null => {
+export function toPlacementRange(
+  pixels: readonly AuthoredPixel[],
+  placementId: string,
+  spanMs: number,
+): Range | null {
   let from = Number.POSITIVE_INFINITY;
   let to = Number.NEGATIVE_INFINITY;
   for (const pixel of pixels) {
@@ -35,18 +40,18 @@ const rangeOf = (pixels: readonly AuthoredPixel[], placementId: string, spanMs: 
     to = Math.max(to, pixel.placedAt);
   }
   return from <= to ? { from: from - spanMs, to: to + spanMs } : null;
-};
+}
 
 const isInRange = ({ placedAt }: AuthoredPixel, range: Range | null): boolean =>
   range !== null && placedAt !== undefined && placedAt >= range.from && placedAt <= range.to;
 
 export function listClearedPixels(
   pixels: readonly AuthoredPixel[],
-  { placementId }: ClearTarget,
+  { placementId }: Pick<ClearTarget, "placementId">,
   { isAll, spanMs }: ClearScope,
 ): readonly AuthoredPixel[] {
   if (isAll) return pixels;
-  const range = spanMs > 0 ? rangeOf(pixels, placementId, spanMs) : null;
+  const range = spanMs > 0 ? toPlacementRange(pixels, placementId, spanMs) : null;
   return pixels.filter((pixel) => pixel.placementId === placementId || isInRange(pixel, range));
 }
 
@@ -56,6 +61,6 @@ export function toClearAction(
   { isAll, spanMs }: ClearScope,
 ): ModerationAction {
   if (isAll) return { action: "clearUser", target: userId };
-  const range = spanMs > 0 ? rangeOf(pixels, placementId, spanMs) : null;
+  const range = spanMs > 0 ? toPlacementRange(pixels, placementId, spanMs) : null;
   return { action: "clearPlacement", target: userId, placementId, ...(range ? { range } : {}) };
 }

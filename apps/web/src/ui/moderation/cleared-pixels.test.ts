@@ -1,6 +1,6 @@
 import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
-import { listClearedPixels, PLACEMENT_ONLY, toClearAction } from "./cleared-pixels";
+import { listClearedPixels, PLACEMENT_ONLY, toClearAction, toPlacementRange } from "./cleared-pixels";
 
 const now = 1_700_000_000_000;
 const MINUTE = 60_000;
@@ -54,5 +54,14 @@ describe("clearing a placement (JOURNAL 2026-09-28)", () => {
 
     expect(listClearedPixels(pixels, target, all)).toBe(pixels);
     expect(toClearAction(target, pixels, all)).toEqual({ action: "clearUser", target: "troll" });
+  });
+
+  // Signaler prend la même plage ; sans pixel visible de la pose, aucune plage (JOURNAL 2026-09-29)
+  it("reporting takes the same range; with no visible pixel of the placement, no range", () => {
+    expect(toPlacementRange(pixels, "ptroll001", MINUTE)).toEqual({
+      from: now - MINUTE,
+      to: now + 500 + MINUTE,
+    });
+    expect(toPlacementRange(pixels, "pgone0001", MINUTE)).toBeNull();
   });
 });

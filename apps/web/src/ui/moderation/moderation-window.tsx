@@ -1,7 +1,8 @@
 // La confirmation d'une modération (CDC 2026, JOURNAL 2026-09-25) : une petite fenêtre, l'aperçu des pixels qui
 // partent, leur nombre, puis Annuler ou l'action. Retirer ses pixels vise d'abord la pose inspectée, et s'étend par
-// une plage d'heures ou à tous ses pixels (JOURNAL 2026-09-28), puis propose de bannir l'auteur (JOURNAL 2026-09-29).
-// L'affichage seul, nourri par `useModeration`.
+// une plage d'heures ou à tous ses pixels (JOURNAL 2026-09-28), puis propose de bannir l'auteur. Signaler une pose
+// passe par la même fenêtre, avec la même plage (JOURNAL 2026-09-29). L'affichage seul, nourri par `useModeration`
+// et `useReport`.
 
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
@@ -12,8 +13,8 @@ import { SmallWindow, useShownWhileClosing } from "../design/window";
 import { CLEAR_SPAN_STEPS, type ClearScope } from "./cleared-pixels";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 
-// Retirer ses pixels, bannir (qui les retire aussi), ou bannir juste après un retrait.
-export type ModerationKind = "clear" | "ban" | "banAfterClear";
+// Retirer ses pixels, bannir (qui les retire aussi), bannir juste après un retrait, ou signaler.
+export type ModerationKind = "clear" | "ban" | "banAfterClear" | "report";
 
 // Écart §4.3 (JOURNAL 2026-09-27) : l'identifiant de l'auteur n'arrive qu'à qui modère.
 export type ModeratedAuthor = InspectEntry & { userId: string };
@@ -22,7 +23,12 @@ export type ModeratedAuthor = InspectEntry & { userId: string };
 // qu'on hésite. Une pose signalée la donne aussi (JOURNAL 2026-09-28).
 export type ModerationTarget = Pick<ModeratedAuthor, "userId" | "displayName" | "placementId">;
 
-export type ModerationRequest = { kind: ModerationKind; author: ModerationTarget };
+// Qui signale n'a pas l'identifiant de l'auteur : la case inspectée et sa pose le désignent (JOURNAL 2026-09-29).
+export type ReportTarget = Pick<InspectEntry, "displayName" | "placementId"> & { x: number; y: number };
+
+export type ModerationRequest =
+  | { kind: Exclude<ModerationKind, "report">; author: ModerationTarget }
+  | { kind: "report"; author: ReportTarget };
 
 // `running` : verrouillée jusqu'à la dernière tranche. `failed` : la fenêtre reste ouverte et le dit.
 export type ModerationStatus = "idle" | "running" | "failed";
@@ -32,7 +38,7 @@ export type CanvasPreviewProps = { width: number; height: number; palette: reado
 export type ModerationWindowProps = {
   request: ModerationRequest | null; // `null` : fermée
   pixels: readonly AuthoredPixel[] | null; // ceux que vise l'action ; `null` : l'aperçu se charge
-  scope: ClearScope; // Retirer ses pixels seulement
+  scope: ClearScope; // Retirer ses pixels et Signaler
   status: ModerationStatus;
   canvas: CanvasPreviewProps;
   onScope: (scope: ClearScope) => void;
@@ -44,6 +50,8 @@ const titleOf = ({ kind, author }: ModerationRequest, { isAll, spanMs }: ClearSc
   const name = author.displayName;
   if (kind === "ban") return `Bannir ${name} ?`;
   if (kind === "banAfterClear") return `C'est retiré. Bannir aussi ${name} ?`;
+  if (kind === "report")
+    return spanMs === 0 ? `Signaler cette pose de ${name} ?` : `Signaler ces poses de ${name} ?`;
   if (isAll) return `Retirer tous les pixels de ${name} ?`;
   return spanMs === 0 ? `Retirer cette pose de ${name} ?` : `Retirer ces poses de ${name} ?`;
 };
@@ -52,7 +60,7 @@ const BAN_CONSEQUENCE = "Ce compte ne pourra plus poser sur ce canvas, et ses pi
 
 const TEXTS: Record<
   ModerationKind,
-  { consequence: string; confirm: string; cancel: string; variant: "danger" }
+  { consequence: string; confirm: string; cancel: string; variant: "danger" | "primary" }
 > = {
   clear: {
     consequence: "Ceux du dessous reviendront.",
@@ -62,6 +70,12 @@ const TEXTS: Record<
   },
   ban: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Annuler", variant: "danger" },
   banAfterClear: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Non", variant: "danger" },
+  report: {
+    consequence: "Assez de signalements, et la pose quitte le stream jusqu'à la décision d'un modérateur.",
+    confirm: "Signaler",
+    cancel: "Annuler",
+    variant: "primary",
+  },
 };
 
 type PreviewProps = Pick<ModerationWindowProps, "pixels" | "canvas"> & { name: string };
@@ -117,7 +131,7 @@ export const ModerationWindow = ({
   const shown = useShownWhileClosing(request);
   if (!shown) return null;
   const texts = TEXTS[shown.kind];
-  const hasScope = shown.kind === "clear";
+  const hasScope = shown.kind === "clear" || shown.kind === "report";
   return (
     <SmallWindow
       isOpen={request !== null}

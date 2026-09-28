@@ -47,6 +47,7 @@ type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
+type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
 // attente pour qui modère (JOURNAL 2026-09-28).
@@ -405,7 +406,7 @@ export function createConnection(
   };
 
   // Écart §4.2 (JOURNAL 2026-09-28) : tout compte connecté signale ; le seuil suit les comptes connectés au canvas.
-  const reportPlacement = async ({ requestId, x, y, placementId }: ReportFrame, ready: ReadyState) => {
+  const reportPlacement = async ({ requestId, x, y, placementId, range }: ReportFrame, ready: ReadyState) => {
     if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
     if (x >= ready.width || y >= ready.height)
       return socket.sendFrame({ t: "error", code: "forbidden", requestId });
@@ -414,12 +415,27 @@ export function createConnection(
       x,
       y,
       placementId,
+      range,
       threshold: reportThreshold(deps.broadcast.countAccounts(ready.canvasId)),
       nowMs: deps.now(),
     });
     if (result.ok) return socket.sendFrame({ t: "reported", requestId });
     if (result.error === "canvas_not_found") return refuse("canvas_not_found");
     socket.sendFrame({ t: "error", code: "forbidden", requestId });
+  };
+
+  // Écart §4.2 (JOURNAL 2026-09-29) : pour choisir la plage à signaler. Sans identifiant, au débit d'`inspect`.
+  const listAuthorPixels = async (
+    { requestId, x, y, placementId }: ListAuthorPixelsFrame,
+    ready: ReadyState,
+  ) => {
+    if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
+    if (!isInspectAllowed(deps.now()))
+      return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
+    const isInside = x < ready.width && y < ready.height;
+    const pixels = isInside ? await deps.core.listAuthorPixels(ready.canvasId, x, y, placementId) : null;
+    if (!pixels) return socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
   const listReports = async (requestId: string, ready: ReadyState): Promise<void> => {
@@ -454,6 +470,8 @@ export function createConnection(
         return setModerator(frame, ready);
       case "report":
         return reportPlacement(frame, ready);
+      case "listAuthorPixels":
+        return listAuthorPixels(frame, ready);
       case "listReports":
         return listReports(frame.requestId, ready);
       case "ping":

@@ -23,12 +23,17 @@ export type AuthoredPixel = Extract<ServerFrame, { t: "pixels" }>["pixels"][numb
 // La pose d'un auteur : `placementId` n'est unique que pour lui (JOURNAL 2026-09-28).
 export type PlacementRef = { authorId: string; placementId: string };
 
-// Un signalement de la pose visible en (x, y), et le seuil calculé par le gateway sur les comptes connectés.
+// Écart §5.4 (JOURNAL 2026-09-28) : les autres pixels d'un auteur posés entre `from` et `to`, autour d'une pose.
+export type PlacementRange = NonNullable<Extract<ClientFrame, { t: "report" }>["range"]>;
+
+// Un signalement de la pose visible en (x, y), et de ses voisines dans `range` (JOURNAL 2026-09-29), avec le seuil
+// calculé par le gateway sur les comptes connectés.
 export type Report = {
   reporterId: string;
   x: number;
   y: number;
   placementId: string;
+  range?: PlacementRange | undefined;
   threshold: number;
   nowMs: Timestamp;
 };
@@ -136,6 +141,13 @@ export interface CanvasCore {
   ): Promise<Result<void, "canvas_not_found" | "changed" | "forbidden">>;
   canReport(canvasId: string, placement: PlacementRef, reporterId: string): Promise<boolean>; // ni signalée par lui, ni rétablie, ni lui banni
   listReports(canvasId: string): Promise<ReportedPlacement[]>; // du plus ancien signalement au plus récent
+  // Écart §4.3 (JOURNAL 2026-09-29) : les pixels de l'auteur de la pose en (x, y). `null` : la case a changé.
+  listAuthorPixels(
+    canvasId: string,
+    x: number,
+    y: number,
+    placementId: string,
+  ): Promise<AuthoredPixel[] | null>;
   getReportCount(canvasId: string): Promise<number>;
   listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.

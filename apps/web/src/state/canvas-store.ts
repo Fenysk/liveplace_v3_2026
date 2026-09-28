@@ -9,6 +9,7 @@ import type {
   Moderation,
   Moderator,
   Placement,
+  PlacementRange,
   ReportedPlacement,
   Transport,
   TwitchSync,
@@ -96,7 +97,10 @@ export type CanvasStore = {
   listModerators(): Promise<RequestResult<ModeratorList>>; // JOURNAL 2026-09-27
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
-  report(x: number, y: number, placementId: string): Promise<RequestResult<true>>; // JOURNAL 2026-09-28
+  // JOURNAL 2026-09-28. `range` : ses poses voisines aussi (JOURNAL 2026-09-29).
+  report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
+  // Les pixels de l'auteur de cette pose, pour choisir la plage à signaler (JOURNAL 2026-09-29).
+  listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
   listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
@@ -117,7 +121,7 @@ type PendingBatch = {
 
 type ReplyFrame = Extract<
   ServerFrame,
-  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" }
+  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" | "authorPixels" }
 >;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
@@ -335,6 +339,7 @@ export function createCanvasStore(
       case "moderators":
       case "reported":
       case "reports":
+      case "authorPixels":
         answer(frame);
         break;
       case "reportCount":
@@ -437,9 +442,14 @@ export function createCanvasStore(
       request({ t: "setModerator", requestId: crypto.randomUUID(), userId, isModerator }, toModeratorList),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
-    report: (x, y, placementId) =>
-      request({ t: "report", requestId: crypto.randomUUID(), x, y, placementId }, (reply) =>
-        reply.t === "reported" ? true : undefined,
+    report: (x, y, placementId, range) =>
+      request(
+        { t: "report", requestId: crypto.randomUUID(), x, y, placementId, ...(range ? { range } : {}) },
+        (reply) => (reply.t === "reported" ? true : undefined),
+      ),
+    listAuthorPixels: (x, y, placementId) =>
+      request({ t: "listAuthorPixels", requestId: crypto.randomUUID(), x, y, placementId }, (reply) =>
+        reply.t === "authorPixels" ? reply.pixels : undefined,
       ),
     listReports: () =>
       request({ t: "listReports", requestId: crypto.randomUUID() }, (reply) =>

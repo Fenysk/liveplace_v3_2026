@@ -63,6 +63,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     setModerator: async () => ({ ok: true as const, value: { users: [] } }),
     report: async () => ({ ok: true as const, value: true as const }),
     listReports: async () => ({ ok: true as const, value: [] }),
+    listAuthorPixels: async () => ({ ok: true as const, value: [] }),
     setObsDelay: () => undefined,
     listenArrivals: () => () => undefined,
     close: () => undefined,

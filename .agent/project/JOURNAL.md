@@ -19,6 +19,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 **Décision.** Le dépilage garde chaque pixel qu'il ôte à la cible dans `cleared:recent:<userId>` (`cellKey` → `colorIndex`), une heure à partir du dernier retrait. `ban` les ajoute à sa preuve, sous ses pixels visibles, puis efface la clé.
 **Renoncement.** Pas de preuve envoyée par la page : c'est le serveur qui sait ce qui a été retiré.
 
+## 2026-09-29 — Écart §4.2 et §4.3 : protocole 7, signaler une plage d'heures
+
+**Contexte.** Un spectateur doit pouvoir signaler une pose et ses voisines, comme un modérateur les retire (demande de l'humain). Il n'a pas l'identifiant de l'auteur (JOURNAL 2026-09-27), donc pas `listPixels`.
+**Décision.** `listAuthorPixels` (x, y, `placementId`) → `authorPixels` : les pixels visibles de l'auteur de cette pose, avec leur heure et leur pose, sans identifiant, pour un compte connecté, au débit d'`inspect`. `report` gagne `range` : chaque pose de l'auteur dont un pixel visible y tombe reçoit le signalement, et chacune se cache à son seuil.
+**Renoncement.** Pas de signalement groupé : la liste des modérateurs garde une ligne par pose, et Bannir les tranche toutes.
+
 ## 2026-09-28 — Écart §4.2, §4.3 et §9.5 : protocole 6, la case telle que le stream la voit
 
 **Contexte.** Une pose signalée quitte la vue OBS, pas la page (A3). La vue OBS ne connaît ni les piles ni les poses : le serveur doit lui dire quoi montrer.
