@@ -8,6 +8,7 @@ import {
   type DraftContext,
   type DraftEdit,
   EMPTY_DRAFT,
+  fitDraft,
   settleBatch,
   toBatches,
   toggleDraftCell,
@@ -96,9 +97,15 @@ export function createDraftStore(
   const leaveIfBanned = (): void => {
     if (canvas.getView().isBanned && view.mode === "draft") leaveDraftMode();
   };
+  // Écart §5.3 (JOURNAL 2026-09-29) : le canvas a rétréci, ce qui sort du cadre quitte le brouillon.
+  const fitToCanvas = (): void => {
+    const { width, height } = canvas.getView();
+    if (width > 0 && loadedUserId) setDraft(fitDraft(view.draft, { width, height }));
+  };
   const unsubscribe = canvas.subscribe(() => {
     applySavedDraft();
     leaveIfBanned();
+    fitToCanvas();
   });
   applySavedDraft();
 

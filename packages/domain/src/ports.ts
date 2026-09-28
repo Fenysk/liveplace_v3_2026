@@ -2,7 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CanvasMeta, Session, Timestamp, User } from "./index";
+import type { CanvasMeta, CanvasSize, Session, Timestamp, User } from "./index";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
@@ -107,7 +107,8 @@ export type LiveControl =
   | { t: "banned" | "unbanned"; userId: string }
   | { t: "role"; userId: string } // ses droits de modération ont changé (JOURNAL 2026-09-27)
   | { t: "obsDelay"; obsDelayMs: number }
-  | { t: "reports"; count: number }; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
+  | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
+  | { t: "resize" }; // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
@@ -150,6 +151,11 @@ export interface CanvasCore {
   ): Promise<AuthoredPixel[] | null>;
   getReportCount(canvasId: string): Promise<number>;
   listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
+  // Écart §5.3 (JOURNAL 2026-09-29) : le streamer seul. Publie le `ctl` `resize`.
+  resizeCanvas(
+    canvasId: string,
+    resize: CanvasSize & { by: string },
+  ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
   listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;
   // Le `recent` de la vue OBS (§9.5) : les événements depuis `sinceMs`, du plus ancien au plus récent, 2000 au plus.

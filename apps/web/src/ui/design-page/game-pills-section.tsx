@@ -5,6 +5,8 @@ import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { CanvasPill } from "../canvas/canvas-pill";
+import { CanvasSettings, type ResizeStatus, ResizeWindow } from "../canvas/canvas-settings";
+import { type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
 import type { GaugeProps } from "../design/gauge";
@@ -14,7 +16,7 @@ import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
 import { ObsSettings } from "../obs/obs-settings";
-import { noop, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
+import { noop, SAMPLE_CANVAS, SAMPLE_DRAWING, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
 const HOUR = 3_600_000;
@@ -183,6 +185,44 @@ const VIEWPORT_SPECIMENS: readonly { caption: string; framing: Framing; isCompac
   { caption: "Mobile, la vue a bougé", framing: { zoomPercent: 180, isArrival: false }, isCompact: true },
 ];
 
+// La section Canvas : le format et la taille se choisissent ; Changer la taille ouvre la confirmation, qui montre ce
+// qui sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256).
+const CanvasSettingsSpecimen = () => {
+  const [choice, setChoice] = useState<SizeChoice>({ format: "1:1", sizeIndex: 1 });
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [status, setStatus] = useState<ResizeStatus>("idle");
+  const current = { width: 256, height: 256 };
+  const chosen = toCanvasSize(choice);
+  const outside = SAMPLE_DRAWING.filter(({ x, y }) => x >= chosen.width || y >= chosen.height);
+  return (
+    <Specimen caption="Un format, puis Petit, Moyen ou Grand ; la confirmation montre ce qui sort du cadre">
+      <div className="design-window-box">
+        <CanvasSettings
+          current={current}
+          choice={choice}
+          chosen={chosen}
+          onChoose={setChoice}
+          onApply={() => {
+            setStatus("idle");
+            setIsConfirming(true);
+          }}
+        />
+      </div>
+      <ResizeWindow
+        next={isConfirming ? chosen : null}
+        outside={outside}
+        status={status}
+        canvas={SAMPLE_CANVAS}
+        onConfirm={() => {
+          setStatus("running");
+          setTimeout(() => setIsConfirming(false), 1500);
+        }}
+        onClose={() => setIsConfirming(false)}
+      />
+    </Specimen>
+  );
+};
+
 // Le vrai curseur : un cran choisi s'affiche, comme le ferait la confirmation du gateway.
 const ObsSettingsSpecimen = () => {
   const [obsDelayMs, setObsDelayMs] = useState(10_000);
@@ -283,6 +323,13 @@ export const GamePillsSection = () => {
             />
           </Specimen>
         ))}
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Fenêtre, section Canvas"
+        note="Pour le streamer : la taille du canvas, sans rien perdre."
+      >
+        <CanvasSettingsSpecimen />
       </SpecimenSection>
 
       <SpecimenSection

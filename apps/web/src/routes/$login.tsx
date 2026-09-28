@@ -9,6 +9,7 @@ import { type AccountSection, AccountWindow } from "../ui/account/account-window
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
+import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import type { ProfileUser } from "../ui/design/profile";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
@@ -102,6 +103,7 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
             )
           }
           obsTab={isOwner ? <ObsTab canvas={stores.canvas} login={login} /> : undefined}
+          canvasTab={isOwner ? <CanvasTab canvas={stores.canvas} /> : undefined}
         />
       )}
       <InspectionPill {...inspection} />

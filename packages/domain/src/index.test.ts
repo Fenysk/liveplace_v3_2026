@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  CANVAS_FORMATS,
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   CELL_STRIDE,
@@ -8,6 +9,7 @@ import {
   defaultCanvasMeta,
   GAUGE_MAX,
   type GaugeParams,
+  isCanvasSize,
   isObsDelayStep,
   OBS_DELAY_MS,
   OBS_DELAY_STEPS_MS,
@@ -231,13 +233,25 @@ describe("defaultCanvasMeta (CDC §1)", () => {
   it("gives the owner's new canvas the game defaults", () => {
     expect(defaultCanvasMeta("owner-1")).toEqual({
       ownerId: "owner-1",
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
+      width: 50,
+      height: 50,
       gaugeMax: GAUGE_MAX,
       refillMs: REFILL_MS,
       refillCharges: REFILL_CHARGES,
       obsDelayMs: OBS_DELAY_MS,
     });
+  });
+});
+
+describe("the canvas sizes (CDC 2026 §1)", () => {
+  // Accepte chaque taille du tableau, et rien d'autre, ni la taille des canvas d'avant les formats
+  it("accepts each size of the table, and nothing else, not even the size of canvases born before formats", () => {
+    const sizes = CANVAS_FORMATS.flatMap((format) => format.sizes);
+    expect(sizes).toHaveLength(15);
+    expect(sizes.every(isCanvasSize)).toBe(true);
+    expect(isCanvasSize({ width: 100, height: 50 })).toBe(false);
+    expect(isCanvasSize({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT })).toBe(false);
+    expect(Math.max(...sizes.flatMap(({ width, height }) => [width, height]))).toBe(256);
   });
 });
 

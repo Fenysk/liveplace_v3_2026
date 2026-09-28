@@ -11,7 +11,7 @@ local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[9]), tonumber(A
 local rangeFrom, rangeTo = tonumber(ARGV[13]), tonumber(ARGV[14])
 
 -- 0. Canvas prêt, comme place.lua.
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId")
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height")
 if meta[1] ~= "1" then
   return "canvas_not_found"
 end
@@ -77,6 +77,8 @@ if hidden > 0 then
     cellsPrefix = cellsPrefix,
     clearingPrefix = clearingPrefix,
     cellStride = cellStride,
+    width = tonumber(meta[3]),
+    height = tonumber(meta[4]),
   })
   local version = redis.call("INCR", versionKey)
   local event = cjson.encode({

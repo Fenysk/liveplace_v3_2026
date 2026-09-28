@@ -1,6 +1,6 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
-import { isObsDelayStep, ROLES, type Timestamp } from "@liveplace/domain";
+import { isCanvasSize, isObsDelayStep, ROLES, type Timestamp } from "@liveplace/domain";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
@@ -11,7 +11,8 @@ import { z } from "zod";
 // 5 : le rôle se relit en direct (frame `role`), et les modérateurs se listent (JOURNAL 2026-09-27).
 // 6 : la pose, le signalement et la case vue par le stream (JOURNAL 2026-09-28).
 // 7 : signaler une plage d'heures, et les pixels de l'auteur d'une pose pour la choisir (JOURNAL 2026-09-29).
-export const PROTOCOL_VERSION = 7;
+// 8 : le streamer change la taille de son canvas (JOURNAL 2026-09-29).
+export const PROTOCOL_VERSION = 8;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -241,6 +242,16 @@ const ListAuthorPixelsFrameSchema = z.object({
 
 const ListReportsFrameSchema = z.object({ t: z.literal("listReports"), requestId: RequestIdSchema });
 
+// Écart §4.2 (JOURNAL 2026-09-29) : le streamer seul, et seulement une taille du CDC 2026 §1.
+const ResizeCanvasFrameSchema = z
+  .object({
+    t: z.literal("resizeCanvas"),
+    requestId: RequestIdSchema,
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .refine(isCanvasSize, "pas une taille du cahier des charges");
+
 const PingFrameSchema = z.object({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -256,6 +267,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ReportFrameSchema,
   ListAuthorPixelsFrameSchema,
   ListReportsFrameSchema,
+  ResizeCanvasFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -399,6 +411,9 @@ const ReportedPlacementSchema = z.object({
 
 const ReportedFrameSchema = z.object({ t: z.literal("reported"), requestId: RequestIdSchema });
 
+// La nouvelle taille arrive ensuite par un `welcome` et un snapshot, à toutes les pages du canvas (JOURNAL 2026-09-29).
+const ResizedFrameSchema = z.object({ t: z.literal("resized"), requestId: RequestIdSchema });
+
 const ReportsFrameSchema = z.object({
   t: z.literal("reports"),
   requestId: RequestIdSchema,
@@ -441,6 +456,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ReportedFrameSchema,
+  ResizedFrameSchema,
   AuthorPixelsFrameSchema,
   ReportsFrameSchema,
   ReportCountFrameSchema,

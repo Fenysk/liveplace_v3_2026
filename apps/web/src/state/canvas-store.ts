@@ -99,6 +99,8 @@ export type CanvasStore = {
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   // JOURNAL 2026-09-28. `range` : ses poses voisines aussi (JOURNAL 2026-09-29).
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
+  // Le streamer seul ; la nouvelle taille arrive par un `welcome` et un snapshot (JOURNAL 2026-09-29).
+  resizeCanvas(width: number, height: number): Promise<RequestResult<true>>;
   // Les pixels de l'auteur de cette pose, pour choisir la plage à signaler (JOURNAL 2026-09-29).
   listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
   listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
@@ -121,7 +123,7 @@ type PendingBatch = {
 
 type ReplyFrame = Extract<
   ServerFrame,
-  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" | "authorPixels" }
+  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" | "authorPixels" | "resized" }
 >;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
@@ -173,7 +175,9 @@ export function createCanvasStore(
     for (const listener of listeners) listener();
   };
 
+  // Écart §5.3 (JOURNAL 2026-09-29) : une case d'avant une nouvelle taille peut tomber hors du cadre.
   const writeCell = ({ x, y, colorIndex }: BroadcastCell): void => {
+    if (x >= view.width || y >= view.height) return;
     const offset = toStateOffset(x, y, view.width);
     view.pixels[offset] = colorIndex;
     for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
@@ -340,6 +344,7 @@ export function createCanvasStore(
       case "reported":
       case "reports":
       case "authorPixels":
+      case "resized":
         answer(frame);
         break;
       case "reportCount":
@@ -446,6 +451,10 @@ export function createCanvasStore(
       request(
         { t: "report", requestId: crypto.randomUUID(), x, y, placementId, ...(range ? { range } : {}) },
         (reply) => (reply.t === "reported" ? true : undefined),
+      ),
+    resizeCanvas: (width, height) =>
+      request({ t: "resizeCanvas", requestId: crypto.randomUUID(), width, height }, (reply) =>
+        reply.t === "resized" ? true : undefined,
       ),
     listAuthorPixels: (x, y, placementId) =>
       request({ t: "listAuthorPixels", requestId: crypto.randomUUID(), x, y, placementId }, (reply) =>

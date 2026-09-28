@@ -1,7 +1,7 @@
-// La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte) ou la pill Canvas (Vue OBS) : Vue OBS pour le
-// streamer, Modération pour qui modère, Mon compte et Préférences. La section Canvas attend le bloc 2.
+// La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte) ou la pill Canvas (Vue OBS) : Canvas et Vue
+// OBS pour le streamer, Modération pour qui modère, Mon compte et Préférences.
 
-import { LogOut, MonitorPlay, Settings, Shield, User } from "lucide-react";
+import { LogOut, MonitorPlay, Scaling, Settings, Shield, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../design/button";
 import { Profile, type ProfileUser } from "../design/profile";
@@ -9,9 +9,10 @@ import type { ThemeChoice } from "../design/theme";
 import { ThemePicker } from "../design/theme-controls";
 import { Window, WindowRow } from "../design/window";
 
-export type AccountSection = "obs" | "moderation" | "account" | "preferences";
+export type AccountSection = "canvas" | "obs" | "moderation" | "account" | "preferences";
 
-// Dans l'ordre du CDC 2026 : Vue OBS, Modération, Mon compte, Préférences.
+// Dans l'ordre du CDC 2026 : Canvas, Vue OBS, Modération, Mon compte, Préférences.
+const CANVAS_SECTION = { id: "canvas", label: "Canvas", icon: Scaling } as const;
 const OBS_SECTION = { id: "obs", label: "Vue OBS", icon: MonitorPlay } as const;
 const MODERATION_SECTION = { id: "moderation", label: "Modération", icon: Shield } as const;
 const ACCOUNT_SECTIONS = [
@@ -30,6 +31,7 @@ type AccountWindowProps = {
   onPickTheme: (choice: ThemeChoice) => void;
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
+  canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
 };
 
 export const AccountWindow = ({
@@ -43,10 +45,12 @@ export const AccountWindow = ({
   onPickTheme,
   moderationTab,
   obsTab,
+  canvasTab,
 }: AccountWindowProps) => (
   <Window
     isOpen={isOpen}
     sections={[
+      ...(canvasTab ? [CANVAS_SECTION] : []),
       ...(obsTab ? [OBS_SECTION] : []),
       ...(moderationTab ? [MODERATION_SECTION] : []),
       ...ACCOUNT_SECTIONS,
@@ -55,6 +59,7 @@ export const AccountWindow = ({
     onSelect={onSelect}
     onClose={onClose}
   >
+    {sectionId === "canvas" && canvasTab}
     {sectionId === "obs" && obsTab}
     {sectionId === "moderation" && moderationTab}
     {sectionId === "account" && (

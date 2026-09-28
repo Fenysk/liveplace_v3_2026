@@ -20,11 +20,11 @@ local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], AR
 local placement = target .. ":" .. placementId
 
 -- 0. Canvas prêt. Écart §5.5 (JOURNAL 2026-09-15), comme place.lua.
-local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId")
+local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
-local width, ownerId = tonumber(meta[2]), meta[3]
+local width, ownerId, height = tonumber(meta[2]), meta[3], tonumber(meta[4])
 
 -- 1. Les droits : le propriétaire ou un modérateur, et jamais contre le propriétaire. Le gateway vérifie aussi.
 if (by ~= ownerId and redis.call("SISMEMBER", modsKey, by) == 0) or target == ownerId then
@@ -70,6 +70,8 @@ local function openCanvasPile()
     cellsPrefix = cellsPrefix,
     clearingPrefix = clearingPrefix,
     cellStride = cellStride,
+    width = width,
+    height = height,
   })
 end
 
@@ -115,8 +117,10 @@ if action == "ban" then
     end
     redis.call("DEL", recentlyClearedKey)
     for _, cellKey in ipairs(redis.call("SUNION", targetCellsKey, clearingKey)) do
-      local stateOffset = stateOffsetOf(tonumber(cellKey))
-      redis.call("HSET", banKey, cellKey, string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset)))
+      if isInside(cellKey, cellStride, width, height) then
+        local stateOffset = stateOffsetOf(tonumber(cellKey))
+        redis.call("HSET", banKey, cellKey, string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset)))
+      end
     end
     -- Un ban déjà posé ici reste à LivePlace : Twitch ne pourra pas le lever.
     if source == "twitch" then
@@ -207,19 +211,23 @@ local function unstack(cellKey)
     return nil
   end
 
-  local stateOffset = stateOffsetOf(tonumber(cellKey))
-  local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
   local previousAuthor = parseEntry(entries[1]).author
   redis.call("SREM", cellsPrefix .. previousAuthor, cellKey)
-  if previousAuthor == target then
-    redis.call("HSET", recentlyClearedKey, cellKey, previousColorIndex)
-  end
   -- Une pile vidée : la case devient transparente, à l'heure de l'action.
   local colorIndex, placedAt = 0, nowMs
   if kept[1] then
     local head = parseEntry(kept[1])
     colorIndex, placedAt = head.colorIndex, head.placedAt
     redis.call("SADD", cellsPrefix .. head.author, cellKey)
+  end
+  -- Écart §5.3 (JOURNAL 2026-09-29) : hors du cadre, la pile change, la case ne s'écrit ni ne s'émet.
+  if not isInside(cellKey, cellStride, width, height) then
+    return nil
+  end
+  local stateOffset = stateOffsetOf(tonumber(cellKey))
+  local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
+  if previousAuthor == target then
+    redis.call("HSET", recentlyClearedKey, cellKey, previousColorIndex)
   end
   redis.call("SETRANGE", stateKey, stateOffset, string.char(colorIndex))
   local key = tonumber(cellKey)

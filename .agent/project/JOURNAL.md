@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Écart §5.1, §5.3 et §6.1 : changer la taille d'un canvas en direct (`resize.lua`)
+
+**Contexte.** Plan du jour, F (A5). `state` est rangé par largeur, les piles par `cellKey` (D-15) : seul `state` est à refaire.
+**Décision.** `resize.lua`, pour le seul streamer : garde de l'ancien `state` ce qui reste dans le cadre, lit la tête des piles pour le reste, écrit `width`, `height` et `resizedAtVersion` dans `meta`, monte la version sans événement (le trou force un snapshot à toute reprise d'avant), publie un `ctl` `resize`. Le gateway renvoie alors `welcome` et snapshot à chaque page et vue OBS, sans les fermer. Une case hors du cadre reste dans sa pile et dans `cells:`, mais aucun script ne l'écrit, ne l'émet ni ne la liste.
+**Renoncement.** Convex ne suit pas (plan du jour, F) : rien n'y lit la taille, et les paramètres du canvas y entrent avec le worker (CDC §3). Protocole 8 : `resizeCanvas` → `resized`.
+
 ## 2026-09-29 — Écart §5.4 : la preuve d'un ban qui suit un retrait
 
 **Contexte.** Après Retirer, la fenêtre propose de bannir l'auteur (demande de l'humain). La preuve d'un ban, ce sont ses pixels visibles au moment du ban : ceux qu'on vient de retirer n'y seraient plus.

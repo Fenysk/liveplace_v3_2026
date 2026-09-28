@@ -60,9 +60,36 @@ export function reportThreshold(connectedAccounts: number): number {
 export type CellKey = number & { readonly __brand: "CellKey" };
 export type StateOffset = number & { readonly __brand: "StateOffset" };
 
+// La taille des canvas nés avant les formats (JOURNAL 2026-09-29) : ils la gardent, sans qu'on puisse y revenir.
 export const CANVAS_WIDTH = 256;
 export const CANVAS_HEIGHT = 256;
 export const CELL_STRIDE = 65536;
+
+export type CanvasSize = { width: number; height: number };
+
+// CDC 2026 §1, Paramétrage : chaque format en trois tailles, Petit, Moyen, Grand. Aucun côté ne dépasse 256.
+export const CANVAS_FORMATS = [
+  { format: "1:1", sizes: [size(50, 50), size(100, 100), size(200, 200)] },
+  { format: "16:9", sizes: [size(64, 36), size(128, 72), size(256, 144)] },
+  { format: "9:16", sizes: [size(36, 64), size(72, 128), size(144, 256)] },
+  { format: "4:3", sizes: [size(60, 45), size(120, 90), size(240, 180)] },
+  { format: "3:4", sizes: [size(45, 60), size(90, 120), size(180, 240)] },
+] as const;
+
+export type CanvasFormat = (typeof CANVAS_FORMATS)[number]["format"];
+
+function size(width: number, height: number): CanvasSize {
+  return { width, height };
+}
+
+// CDC 2026 §1 : un nouveau canvas naît en 50×50, le petit carré.
+export const BIRTH_CANVAS_SIZE: CanvasSize = size(50, 50);
+
+export function isCanvasSize({ width, height }: CanvasSize): boolean {
+  return CANVAS_FORMATS.some(({ sizes }) =>
+    sizes.some((each) => each.width === width && each.height === height),
+  );
+}
 
 export function toStateOffset(x: number, y: number, width: number): StateOffset {
   return (y * width + x) as StateOffset;
@@ -108,12 +135,11 @@ export function isObsDelayStep(obsDelayMs: number): boolean {
   return OBS_DELAY_STEPS_MS.some((step) => step === obsDelayMs);
 }
 
-// Un canvas neuf aux valeurs par défaut du jeu (CDC §1) : aucune interface ne les change en bloc 1.
+// Un canvas neuf aux valeurs par défaut du jeu (CDC §1). Seuls sa taille et le délai OBS changent ensuite.
 export function defaultCanvasMeta(ownerId: string): CanvasMeta {
   return {
     ownerId,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
+    ...BIRTH_CANVAS_SIZE,
     gaugeMax: GAUGE_MAX,
     refillMs: REFILL_MS,
     refillCharges: REFILL_CHARGES,

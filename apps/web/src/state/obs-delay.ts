@@ -45,8 +45,13 @@ const clearCell = (
 };
 
 // Règles 1 et 2, pour le flux live comme pour le resync : une pose attend son heure, le reste est immédiat.
+// Écart §5.3 (JOURNAL 2026-09-29) : une case d'avant une nouvelle taille peut tomber hors du cadre.
+const isInside = (queue: ObsQueue, cell: BroadcastCell): boolean =>
+  cell.x < queue.width && offsetOf(queue, cell) < queue.shown.length;
+
 export function queueCells(queue: ObsQueue, frame: CellsFrame, nowMs: Timestamp, delayMs: number): void {
   for (const cell of frame.cells) {
+    if (!isInside(queue, cell)) continue;
     const offset = offsetOf(queue, cell);
     if (cell.kind === "place") queue.waiting.push(toWaiting(cell, offset));
     else clearCell(queue, cell, offset, nowMs, delayMs);
@@ -57,7 +62,7 @@ export function queueCells(queue: ObsQueue, frame: CellsFrame, nowMs: Timestamp,
 // on rejoue ses cases par les règles 1 et 2 : comme si la page n'avait jamais été rechargée.
 export function queueRecent(queue: ObsQueue, recent: CellsFrame, nowMs: Timestamp, delayMs: number): void {
   for (const cell of [...recent.cells].reverse())
-    queue.shown[offsetOf(queue, cell)] = streamOf(cell).previousColorIndex;
+    if (isInside(queue, cell)) queue.shown[offsetOf(queue, cell)] = streamOf(cell).previousColorIndex;
   queueCells(queue, recent, nowMs, delayMs);
 }
 

@@ -62,6 +62,7 @@ declare module "ioredis" {
     moderators(...args: (string | number)[]): RedisResult<string, Context>;
     report(...args: (string | number)[]): RedisResult<string, Context>;
     streamView(...args: (string | number)[]): RedisResult<number[], Context>;
+    resize(...args: (string | number)[]): RedisResult<[status: string, version?: number], Context>;
   }
 }
 
@@ -268,7 +269,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   redis.defineCommand("moderate", { numberOfKeys: 17, lua: withPile("moderate.lua") });
   redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
-  redis.defineCommand("streamView", { numberOfKeys: 4, lua: withPile("stream-view.lua") });
+  redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
+  redis.defineCommand("resize", { numberOfKeys: 3, lua: withPile("resize.lua") });
 
   // Un seul rappel par canal, sur la seule connexion abonnée du process (§6.3).
   const listeners = new Map<string, (message: LiveMessage) => void>();
@@ -298,10 +300,16 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     };
   };
 
-  // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile.
+  // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. Écart §5.3
+  // (JOURNAL 2026-09-29) : dans le cadre seulement.
   const listVisiblePixels = async (keys: CanvasKeys, userId: string): Promise<VisiblePixel[]> => {
-    const cellKeys = await redis.sunion(keys.cells(userId), keys.clearing(userId));
-    const cells = cellKeys.map((cellKey) => toCell(Number(cellKey)));
+    const [cellKeys, [width, height]] = await Promise.all([
+      redis.sunion(keys.cells(userId), keys.clearing(userId)),
+      redis.hmget(keys.meta, "width", "height"),
+    ]);
+    const cells = cellKeys
+      .map((cellKey) => toCell(Number(cellKey)))
+      .filter(({ x, y }) => x < Number(width) && y < Number(height));
     const pipeline = redis.pipeline();
     for (const { x, y } of cells) pipeline.lindex(keys.hist(toCellKey(x, y)), 0);
     const heads = cells.length > 0 ? ((await pipeline.exec()) ?? []) : [];
@@ -605,6 +613,25 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return entry.placementId === placementId ? listVisiblePixels(keys, entry.authorId) : null;
     },
 
+    // L'ordre des arguments est celui que lit resize.lua.
+    async resizeCanvas(canvasId, { by, width, height }) {
+      const keys = buildCanvasKeys(canvasId);
+      const [status] = await redis.resize(
+        keys.meta,
+        keys.state,
+        keys.version,
+        keys.histPrefix,
+        keys.live,
+        by,
+        width,
+        height,
+        CELL_STRIDE,
+      );
+      if (status === "resized") return { ok: true, value: undefined };
+      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      throw new Error(`resize.lua a renvoyé une réponse invalide : ${status}`);
+    },
+
     async getReportCount(canvasId: string): Promise<number> {
       return redis.zcard(buildCanvasKeys(canvasId).reported);
     },
@@ -617,6 +644,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.clearedPlacements,
         keys.clearedRanges,
         keys.offStream,
+        keys.meta,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.clearingPrefix,
@@ -712,18 +740,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     },
 
     // Seul accès par le temps (§5.6) : à l'envers depuis la fin, jusqu'au premier événement trop ancien.
+    // Écart §5.3 (JOURNAL 2026-09-29) : rien d'avant une nouvelle taille, ses cases n'ont plus la même place.
     async listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]> {
-      const entries = await redis.xrevrange(
-        buildCanvasKeys(canvasId).events,
-        "+",
-        "-",
-        "COUNT",
-        RECENT_MAX_EVENTS,
-      );
+      const keys = buildCanvasKeys(canvasId);
+      const [entries, resizedAtVersion] = await Promise.all([
+        redis.xrevrange(keys.events, "+", "-", "COUNT", RECENT_MAX_EVENTS),
+        redis.hget(keys.meta, "resizedAtVersion"),
+      ]);
       const recent: Event[] = [];
       for (const [, fields] of entries) {
         const event = eventOf(fields);
-        if (event.occurredAt < sinceMs) break;
+        if (event.occurredAt < sinceMs || event.version <= Number(resizedAtVersion ?? 0)) break;
         recent.push(event);
       }
       return recent.reverse();

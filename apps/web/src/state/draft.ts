@@ -1,7 +1,7 @@
 // Le brouillon (CDC 2026, écart §9.3, JOURNAL 2026-09-24) : les cases choisies, pas encore posées, et ses règles.
 // Pur : ni navigateur, ni réseau. Un brouillon ne se modifie jamais, chaque règle en rend un nouveau.
 
-import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
+import { type CanvasSize, type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
 import type { AckFrame } from "@liveplace/domain/ports";
 import type { Pixel } from "./canvas-store";
 
@@ -57,6 +57,12 @@ export function toBatches(draft: Draft): Pixel[][] {
   for (let start = 0; start < pixels.length; start += BATCH_MAX)
     batches.push(pixels.slice(start, start + BATCH_MAX));
   return batches;
+}
+
+// Écart §5.3 (JOURNAL 2026-09-29) : une nouvelle taille fait sortir du brouillon les cases hors du cadre.
+export function fitDraft(draft: Draft, { width, height }: CanvasSize): Draft {
+  const inside = [...draft].filter(([, { x, y }]) => x < width && y < height);
+  return inside.length === draft.size ? draft : new Map(inside);
 }
 
 // L'`index` d'un refus est la place du pixel dans son lot, jamais dans le brouillon.

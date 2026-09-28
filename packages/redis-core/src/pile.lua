@@ -20,6 +20,12 @@ local function parseEntry(entry)
   }
 end
 
+-- Écart §5.3 (JOURNAL 2026-09-29) : une case hors du cadre garde sa pile, mais ne s'écrit, ne s'émet ni ne se liste.
+local function isInside(cellKey, cellStride, width, height)
+  local key = tonumber(cellKey)
+  return key % cellStride < width and math.floor(key / cellStride) < height
+end
+
 local function toSet(members)
   local set = {}
   for _, member in ipairs(members) do
@@ -28,7 +34,8 @@ local function toSet(members)
   return set
 end
 
--- `keys` : cleared, clearedPlacements, clearedRanges, offStream, histPrefix, cellsPrefix, clearingPrefix, cellStride.
+-- `keys` : cleared, clearedPlacements, clearedRanges, offStream, histPrefix, cellsPrefix, clearingPrefix, cellStride,
+-- et la taille du canvas (width, height) pour qui liste des cases visibles.
 -- Chaque lecture est gardée le temps du script : l'ouvrir après avoir écrit une pierre tombale ou `offstream`.
 local function openPile(keys)
   local clearedVersions, clearedRanges = {}, {}
@@ -111,7 +118,8 @@ local function openPile(keys)
       local histKey = keys.histPrefix .. cellKey
       local raw = redis.call("LINDEX", histKey, 0)
       local head = raw and parseEntry(raw)
-      if head and head.author == author and not seen[cellKey] and matches(head) then
+      local isListed = head and head.author == author and not seen[cellKey]
+      if isListed and isInside(cellKey, keys.cellStride, keys.width, keys.height) and matches(head) then
         seen[cellKey] = true
         found[#found + 1] = { cell = toCell(cellKey, head), histKey = histKey }
       end

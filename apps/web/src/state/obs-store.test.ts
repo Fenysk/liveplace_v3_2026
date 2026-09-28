@@ -52,6 +52,7 @@ const setup = () => {
     report: unused,
     listReports: unused,
     listAuthorPixels: unused,
+    resizeCanvas: unused,
     close: () => undefined,
   };
   // Une horloge qu'on avance à la main : les minuteurs partent quand on y arrive.

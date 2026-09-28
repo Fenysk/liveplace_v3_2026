@@ -47,6 +47,7 @@ type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
+type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
@@ -65,21 +66,25 @@ type Arrival = { version: number; coveredVersion: number } & (
 type ReadyState = {
   status: "ready";
   canvasId: string;
+  mode: HelloFrame["mode"]; // Écart §6.1 (JOURNAL 2026-09-29) : pour reprendre un snapshot à une nouvelle taille
   ownerId: string;
   width: number;
   height: number;
   role: Role;
 };
 // `isRoleStale` : un `ctl` `role` est tombé pendant l'arrivée, le rôle lu au `hello` a pu vieillir.
+// `isSizeStale` : un `ctl` `resize` aussi, la taille lue au `hello` a pu changer (JOURNAL 2026-09-29).
 type State =
   | { status: "awaitingHello" }
   | {
       status: "joining";
       canvasId: string;
+      mode: HelloFrame["mode"];
       role: Role;
       pendingFrames: CellsFrame[];
       pendingControls: ControlFrame[];
       isRoleStale: boolean;
+      isSizeStale: boolean;
     }
   | ReadyState;
 
@@ -141,7 +146,7 @@ const buildWelcome = (
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
 const controlFrameOf = (
-  control: Exclude<LiveControl, { t: "role" }>,
+  control: Exclude<LiveControl, { t: "role" | "resize" }>,
   session: Session | null,
   role: Role,
 ): ControlFrame | null => {
@@ -194,6 +199,7 @@ export function createConnection(
   // Écart §10.2 et CDC v3 §1 (JOURNAL 2026-09-25) : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
     if (control.t === "role") return onRoleControl(control.userId);
+    if (control.t === "resize") return onResizeControl();
     if (state.status === "awaitingHello") return;
     const frame = controlFrameOf(control, session, state.role);
     if (!frame) return;
@@ -261,17 +267,36 @@ export function createConnection(
   };
 
   // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban et le délai aussi.
+  // Ce qui arrive pendant la lecture de l'état est gardé, puis envoyé après le snapshot.
+  const startJoining = (canvasId: string, mode: HelloFrame["mode"], role: Role): void => {
+    state = {
+      status: "joining",
+      canvasId,
+      mode,
+      role,
+      pendingFrames: [],
+      pendingControls: [],
+      isRoleStale: false,
+      isSizeStale: false,
+    };
+  };
+
   const joinCanvas = async (
     frame: HelloFrame,
     meta: CanvasMeta,
     role: Role,
     gauge: AckFrame["gauge"] | null,
   ) => {
-    const { canvasId } = frame;
-    state = { status: "joining", canvasId, role, pendingFrames: [], pendingControls: [], isRoleStale: false };
+    startJoining(frame.canvasId, frame.mode, role);
     // Écart §8 (JOURNAL 2026-09-28) : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
-    await deps.broadcast.join(canvasId, listener, onControl, accountId);
+    await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
+    await arrive(frame, meta, role, gauge);
+  };
+
+  // Le `welcome`, le snapshot (ou le resync), puis ce qui est tombé entre-temps.
+  const arrive = async (frame: HelloFrame, meta: CanvasMeta, role: Role, gauge: AckFrame["gauge"] | null) => {
+    const { canvasId } = frame;
     const [arrival, wasBanned, reportCount] = await Promise.all([
       getArrival(frame, meta),
       session ? deps.core.isBanned(canvasId, session.userId) : false,
@@ -282,10 +307,13 @@ export function createConnection(
     if (reportCount !== null) socket.sendFrame({ t: "reportCount", count: reportCount });
 
     const held =
-      state.status === "joining" ? state : { pendingFrames: [], pendingControls: [], isRoleStale: false };
+      state.status === "joining"
+        ? state
+        : { pendingFrames: [], pendingControls: [], isRoleStale: false, isSizeStale: false };
     state = {
       status: "ready",
       canvasId,
+      mode: frame.mode,
       ownerId: meta.ownerId,
       width: meta.width,
       height: meta.height,
@@ -294,6 +322,23 @@ export function createConnection(
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
     if (held.isRoleStale) await refreshRole();
+    if (held.isSizeStale) await rearrive();
+  };
+
+  // Écart §6.1 (JOURNAL 2026-09-29) : la taille a changé, la page reprend un snapshot sans se reconnecter.
+  const rearrive = async (): Promise<void> => {
+    if (state.status !== "ready") return;
+    const { canvasId, mode, role } = state;
+    startJoining(canvasId, mode, role);
+    const meta = await deps.core.getCanvas(canvasId);
+    if (!meta) return refuse("canvas_not_found");
+    const gauge = session ? await deps.core.getGauge(canvasId, session.userId, deps.now()) : null;
+    await arrive({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode }, meta, role, gauge);
+  };
+
+  const onResizeControl = (): void => {
+    if (state.status === "joining") state.isSizeStale = true;
+    else void rearrive().catch((error: unknown) => console.error("nouvelle taille non reprise", error));
   };
 
   const greet = async (frame: HelloFrame): Promise<void> => {
@@ -438,6 +483,16 @@ export function createConnection(
     socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
+  // Écart §4.2 (JOURNAL 2026-09-29) : le streamer seul ; les pages l'apprennent par le `ctl` `resize`.
+  const resizeCanvas = async ({ requestId, width, height }: ResizeCanvasFrame, ready: ReadyState) => {
+    const result =
+      ready.role === "owner" && session
+        ? await deps.core.resizeCanvas(ready.canvasId, { by: session.userId, width, height })
+        : null;
+    if (!result?.ok) return socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    socket.sendFrame({ t: "resized", requestId });
+  };
+
   const listReports = async (requestId: string, ready: ReadyState): Promise<void> => {
     if (!canModerate(ready.role)) return forbid();
     socket.sendFrame({ t: "reports", requestId, reports: await deps.core.listReports(ready.canvasId) });
@@ -472,6 +527,8 @@ export function createConnection(
         return reportPlacement(frame, ready);
       case "listAuthorPixels":
         return listAuthorPixels(frame, ready);
+      case "resizeCanvas":
+        return resizeCanvas(frame, ready);
       case "listReports":
         return listReports(frame.requestId, ready);
       case "ping":

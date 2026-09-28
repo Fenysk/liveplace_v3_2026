@@ -150,16 +150,20 @@ const setup = (options: SetupOptions = {}) => {
   const reports: Report[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
+  let currentMeta = meta; // `resizeCanvas` la change, comme resize.lua
   const core = {
     async getCanvas(asked: string) {
-      return asked === canvasId ? meta : null;
+      return asked === canvasId ? currentMeta : null;
     },
     async isModerator() {
       return roles.isModerator;
     },
     async getSnapshot() {
       options.duringSnapshot?.();
-      return { state: new Uint8Array(meta.width * meta.height), version: options.version ?? 0 };
+      return {
+        state: new Uint8Array(currentMeta.width * currentMeta.height),
+        version: options.version ?? 0,
+      };
     },
     async getGauge(_asked: string, _userId: string, nowMs: number) {
       return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs };
@@ -225,6 +229,10 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listOffStreamCells() {
       return options.offStream ?? [];
+    },
+    async resizeCanvas(_asked: string, { width, height }: { width: number; height: number }) {
+      currentMeta = { ...currentMeta, width, height };
+      return { ok: true as const, value: undefined };
     },
     async listAuthorPixels(_asked: string, x: number, y: number) {
       return x === 1 && y === 2 ? authoredPixels : null;
@@ -988,5 +996,44 @@ describe("reports in the connection (JOURNAL 2026-09-28)", () => {
     shown[2 * meta.width + 1] = 9;
     expect(byObs.sent.at(-1)).toEqual({ snapshot: shown });
     expect(byPage.sent.at(-1)).toEqual({ snapshot: new Uint8Array(meta.width * meta.height) });
+  });
+});
+
+describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
+  const resize = (width: number, height: number) =>
+    JSON.stringify({ t: "resizeCanvas", requestId: "resize-1", width, height });
+
+  // Change la taille pour le seul streamer
+  it("resizes for the owner only", async () => {
+    const byOwner = setup({ session: owner });
+    const byViewer = setup();
+    for (const { connection } of [byOwner, byViewer]) {
+      await connection.receive(hello());
+      await connection.receive(resize(64, 36));
+    }
+
+    expect(byOwner.sent.at(-1)).toEqual({ t: "resized", requestId: "resize-1" });
+    expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "resize-1" });
+  });
+
+  // À une nouvelle taille, chaque page reprend un welcome et un snapshot, sans se reconnecter
+  it("at a new size, each page gets a new welcome and snapshot, without reconnecting", async () => {
+    const context = setup({ session: owner });
+    const other = context.open(session);
+    for (const opened of [context, other]) await opened.connection.receive(hello());
+
+    await context.connection.receive(resize(64, 36));
+    context.control({ t: "resize" });
+    await flush();
+
+    for (const opened of [context, other]) {
+      const welcomes = opened.sent.filter((frame) => "t" in frame && frame.t === "welcome");
+      const snapshots = opened.sent.filter((frame) => "snapshot" in frame);
+      expect(welcomes.at(-1)).toMatchObject({ canvas: { width: 64, height: 36 } });
+      expect(snapshots.at(-1)).toEqual({ snapshot: new Uint8Array(64 * 36) });
+      expect(opened.closed).toEqual([]);
+    }
+    await other.connection.receive(inspect(63, 35));
+    expect(context.inspected).toEqual([{ x: 63, y: 35 }]);
   });
 });
