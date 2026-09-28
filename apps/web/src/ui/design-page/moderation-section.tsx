@@ -1,14 +1,16 @@
 // La modération (JOURNAL 2026-09-25) : la pill Inspection de qui modère, la confirmation, la fenêtre du banni et
-// l'onglet Modération. Les vrais composants du jeu, avec des props d'exemple.
+// l'onglet Modération, signalements compris (JOURNAL 2026-09-28). Les vrais composants du jeu, avec des props
+// d'exemple.
 
 import { PALETTE } from "@liveplace/domain";
-import type { InspectEntry, Pixel } from "@liveplace/domain/ports";
+import type { AuthoredPixel, InspectEntry, Pixel } from "@liveplace/domain/ports";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Button } from "../design/button";
 import { InspectionPill } from "../inspection/inspection-pill";
 import { BannedUsers, type BannedUsersProps, type BanPreview } from "../moderation/banned-users";
 import { BannedWindow } from "../moderation/banned-window";
+import { type ClearScope, listClearedPixels, PLACEMENT_ONLY } from "../moderation/cleared-pixels";
 import {
   type ModerationRequest,
   type ModerationStatus,
@@ -24,7 +26,9 @@ import {
   SAMPLE_DRAWING,
   SAMPLE_MODERATORS,
   SAMPLE_OWNER,
+  SAMPLE_PLACEMENT_ID,
   SAMPLE_VIEWER,
+  samplePlacements,
 } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
@@ -36,7 +40,7 @@ const TROLL = {
   login: "troll42",
   displayName: "Troll42",
   colorIndex: 5,
-  placementId: "pheart001",
+  placementId: SAMPLE_PLACEMENT_ID,
 };
 
 const MODERATING: ModerationControls = { isProtected: () => false, onModerate: noop };
@@ -55,24 +59,36 @@ const inspectionOf = <Author extends Omit<InspectEntry, "colorIndex" | "placedAt
     entry: { colorIndex: 5, ...author, placedAt: nowMs - 3 * MINUTE },
   }) satisfies Inspection;
 
-type WindowDemo = { caption: string; kind: ModerationRequest["kind"]; pixels: readonly Pixel[] | null };
+type WindowDemo = {
+  caption: string;
+  kind: ModerationRequest["kind"];
+  isLoading?: boolean;
+  scope?: ClearScope;
+};
 
+// Retirer ses pixels : décochée, cette pose seule, puis le curseur à 15 min ; cochée, tous ses pixels.
 const WINDOW_DEMOS: readonly WindowDemo[] = [
-  { caption: "Retirer ses pixels", kind: "clearUser", pixels: SAMPLE_DRAWING },
-  { caption: "Bannir", kind: "ban", pixels: SAMPLE_DRAWING },
-  { caption: "L'aperçu se charge", kind: "clearUser", pixels: null },
+  { caption: "Retirer ses pixels", kind: "clear" },
+  { caption: "Plage de 15 min", kind: "clear", scope: { isAll: false, spanMs: 15 * MINUTE } },
+  { caption: "Tous ses pixels", kind: "clear", scope: { isAll: true, spanMs: 0 } },
+  { caption: "Bannir", kind: "ban" },
+  { caption: "L'aperçu se charge", kind: "clear", isLoading: true },
 ];
 
-// Confirmer montre le verrou, puis la fenêtre se ferme. « Échec » la garde ouverte avec son message.
+// Confirmer montre le verrou, puis la fenêtre se ferme. « Échec » la garde ouverte avec son message. La case et le
+// curseur marchent : l'aperçu les suit, comme dans le jeu.
 const ModerationWindowSpecimen = ({ nowMs }: { nowMs: number }) => {
   const [request, setRequest] = useState<ModerationRequest | null>(null);
-  const [pixels, setPixels] = useState<readonly Pixel[] | null>(null);
+  const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
+  const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
   const [status, setStatus] = useState<ModerationStatus>("idle");
   const show = (demo: WindowDemo, shownStatus: ModerationStatus = "idle") => {
-    setRequest({ kind: demo.kind, author: inspectionOf(nowMs, TROLL).entry });
-    setPixels(demo.pixels);
+    setRequest({ kind: demo.kind, author: TROLL });
+    setPixels(demo.isLoading ? null : samplePlacements(nowMs));
+    setScope(demo.scope ?? PLACEMENT_ONLY);
     setStatus(shownStatus);
   };
+  const shown = pixels && request?.kind === "clear" ? listClearedPixels(pixels, TROLL, scope) : pixels;
   const confirm = () => {
     setStatus("running");
     setTimeout(() => {
@@ -86,16 +102,15 @@ const ModerationWindowSpecimen = ({ nowMs }: { nowMs: number }) => {
         {WINDOW_DEMOS.map((demo) => (
           <Button key={demo.caption} label={demo.caption} onPress={() => show(demo)} />
         ))}
-        <Button
-          label="Échec"
-          onPress={() => show({ caption: "", kind: "ban", pixels: SAMPLE_DRAWING }, "failed")}
-        />
+        <Button label="Échec" onPress={() => show({ caption: "", kind: "ban" }, "failed")} />
       </div>
       <ModerationWindow
         request={request}
-        pixels={pixels}
+        pixels={shown}
+        scope={scope}
         status={status}
         canvas={SAMPLE_CANVAS}
+        onScope={setScope}
         onConfirm={confirm}
         onClose={() => setRequest(null)}
       />

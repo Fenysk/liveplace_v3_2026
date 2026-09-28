@@ -11,10 +11,11 @@ type SliderProps = {
   steps: readonly SliderStep[];
   value: number;
   onPick: (value: number) => void; // au relâchement, ou à chaque flèche du clavier
+  onMove?: (value: number) => void; // à chaque cran franchi, pour un aperçu qui suit (JOURNAL 2026-09-28)
   isDisabled?: boolean;
 };
 
-export const Slider = ({ label, steps, value, onPick, isDisabled = false }: SliderProps) => {
+export const Slider = ({ label, steps, value, onPick, onMove, isDisabled = false }: SliderProps) => {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   // La position pendant qu'on fait glisser : affichée, pas encore envoyée.
@@ -55,7 +56,12 @@ export const Slider = ({ label, steps, value, onPick, isDisabled = false }: Slid
         value={shownIndex}
         aria-valuetext={steps[shownIndex]?.label}
         disabled={isDisabled}
-        onChange={(event) => setDraggedIndex(Number(event.target.value))}
+        onChange={(event) => {
+          const moved = Number(event.target.value);
+          setDraggedIndex(moved);
+          const step = steps[moved];
+          if (step) onMove?.(step.value);
+        }}
       />
       <div className="lp-slider-row lp-type-caption lp-muted" aria-hidden="true">
         <span>{steps[0]?.label}</span>

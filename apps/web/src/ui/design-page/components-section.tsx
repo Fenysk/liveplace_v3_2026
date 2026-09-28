@@ -6,6 +6,7 @@ import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
+import { Checkbox } from "../design/checkbox";
 import { CopyButton } from "../design/copy-button";
 import { Grabber } from "../design/grabber";
 import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
@@ -271,6 +272,17 @@ const SliderSpecimen = () => {
   );
 };
 
+const CheckboxSpecimen = () => {
+  const [isChecked, setIsChecked] = useState(false);
+  return (
+    <Specimen caption="Une case à cocher : le libellé la coche aussi">
+      <div className="design-preview-box">
+        <Checkbox label="Retirer tous ses pixels" isChecked={isChecked} onToggle={setIsChecked} />
+      </div>
+    </Specimen>
+  );
+};
+
 const PREVIEWS = [
   { caption: "Un petit dessin : cadré de près, la gomme en croix", pixels: SAMPLE_DRAWING },
   { caption: "Des pixels dispersés : tout le canvas", pixels: SAMPLE_SPREAD },
@@ -359,10 +371,11 @@ export const ComponentsSection = () => {
       </SpecimenSection>
 
       <SpecimenSection
-        title="Slider et CopyButton"
-        note="Un curseur à crans fixes, et une valeur à copier : tout le champ est le bouton."
+        title="Slider, Checkbox et CopyButton"
+        note="Un curseur à crans fixes, une case à cocher, et une valeur à copier : tout le champ est le bouton."
       >
         <SliderSpecimen />
+        <CheckboxSpecimen />
         <Specimen caption="Copier, puis « Copié » un instant">
           <div className="design-preview-box">
             <CopyButton value="liveplace.tv/kalyss" copyText="https://liveplace.tv/kalyss" />
@@ -371,6 +384,11 @@ export const ComponentsSection = () => {
         <Specimen caption="Désactivé">
           <div className="design-preview-box">
             <Slider label="Réglage" steps={SLIDER_STEPS} value={2} onPick={noop} isDisabled />
+          </div>
+        </Specimen>
+        <Specimen caption="Case désactivée, cochée">
+          <div className="design-preview-box">
+            <Checkbox label="Retirer tous ses pixels" isChecked onToggle={noop} isDisabled />
           </div>
         </Specimen>
       </SpecimenSection>

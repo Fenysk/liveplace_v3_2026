@@ -1,7 +1,7 @@
 // Les exemples de /design : des utilisateurs de démonstration, et rien d'autre. Aucune connexion, aucun store.
 
 import { PALETTE } from "@liveplace/domain";
-import type { BannedUser, Moderator, Pixel } from "@liveplace/domain/ports";
+import type { AuthoredPixel, BannedUser, Moderator, Pixel } from "@liveplace/domain/ports";
 import type { ProfileUser } from "../design/profile";
 import sampleAvatarUrl from "./sample-avatar.svg?url";
 
@@ -31,6 +31,27 @@ export const SAMPLE_DRAWING: readonly Pixel[] = [
     [...row].flatMap((mark, x) => (mark === "X" ? [{ x: 120 + x, y: 80 + y, colorIndex: 5 }] : [])),
   ),
   { x: 128, y: 86, colorIndex: 0 },
+];
+
+// Les pixels d'un auteur, avec leur heure et leur pose (JOURNAL 2026-09-28) : le cœur est la pose inspectée, un
+// sourire est posé 4 min avant, une ligne 40 min après. Le curseur de Retirer ses pixels les ajoute un à un.
+export const SAMPLE_PLACEMENT_ID = "pheart001";
+export const samplePlacements = (nowMs: number): readonly AuthoredPixel[] => [
+  ...SAMPLE_DRAWING.map((pixel) => ({ ...pixel, placedAt: nowMs, placementId: SAMPLE_PLACEMENT_ID })),
+  ...[0, 2, 4].map((dx) => ({
+    x: 131 + dx,
+    y: 81 + (dx === 2 ? 2 : 0),
+    colorIndex: 9,
+    placedAt: nowMs - 4 * 60_000,
+    placementId: "psmile001",
+  })),
+  ...Array.from({ length: 6 }, (_, index) => ({
+    x: 118 + index,
+    y: 90,
+    colorIndex: 28,
+    placedAt: nowMs + 40 * 60_000,
+    placementId: "pline0001",
+  })),
 ];
 
 // Des pixels d'un bout à l'autre du canvas : l'aperçu le montre en entier.

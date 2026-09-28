@@ -16,6 +16,7 @@
 @import "./pixel-preview.css";
 @import "./copy-button.css";
 @import "./slider.css";
+@import "./checkbox.css";
 
 html,
 body {

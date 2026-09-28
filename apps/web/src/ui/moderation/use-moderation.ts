@@ -1,22 +1,26 @@
-// Retirer ou bannir depuis la pill Inspection (CDC 2026, JOURNAL 2026-09-25) : la demande, l'aperçu de ses pixels,
-// puis l'action. Bannir enchaîne `ban` puis `clearUser`, jamais l'inverse (§5.4).
+// Retirer ou bannir depuis la pill Inspection (CDC 2026, JOURNAL 2026-09-25), ou depuis un signalement (JOURNAL
+// 2026-09-28) : la demande, l'aperçu de ses pixels, puis l'action. Bannir enchaîne `ban` puis `clearUser`, jamais
+// l'inverse (§5.4).
 
 import { canModerate } from "@liveplace/domain";
-import type { Pixel } from "@liveplace/domain/ports";
+import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
+import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
+import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toClearAction } from "./cleared-pixels";
 import type {
   ModeratedAuthor,
   ModerationKind,
   ModerationRequest,
   ModerationStatus,
+  ModerationTarget,
   ModerationWindowProps,
 } from "./moderation-window";
 
-// Ce que la pill Inspection reçoit quand on peut modérer. Le web affiche, le gateway décide (§10.3).
+// Ce que la pill Inspection et la liste des signalements reçoivent quand on peut modérer. Le web affiche, le gateway
+// décide (§10.3).
 export type ModerationControls = {
   isProtected: (userId: string) => boolean; // le streamer et soi-même : aucun bouton
-  onModerate: (kind: ModerationKind, author: ModeratedAuthor) => void;
+  onModerate: (kind: ModerationKind, author: ModerationTarget) => void;
   // JOURNAL 2026-09-27 : le streamer seul nomme ou retire un modérateur. Absent pour un modérateur.
   onSetModerator?: ((author: ModeratedAuthor, isModerator: boolean) => void) | undefined;
 };
@@ -27,16 +31,18 @@ export function useModeration(canvas: CanvasStore): {
 } {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const [request, setRequest] = useState<ModerationRequest | null>(null);
-  const [pixels, setPixels] = useState<readonly Pixel[] | null>(null);
+  const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
+  const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
   const [status, setStatus] = useState<ModerationStatus>("idle");
   // La demande en cours : une réponse arrivée pour une demande abandonnée n'y touche plus.
   const current = useRef<ModerationRequest | null>(null);
 
-  const open = (kind: ModerationKind, author: ModeratedAuthor): void => {
+  const open = (kind: ModerationKind, author: ModerationTarget): void => {
     const next = { kind, author };
     current.current = next;
     setRequest(next);
     setPixels(null);
+    setScope(PLACEMENT_ONLY);
     setStatus("idle");
     void canvas.listPixels(author.userId).then((result) => {
       if (current.current !== next) return;
@@ -50,13 +56,23 @@ export function useModeration(canvas: CanvasStore): {
     setRequest(null);
   };
 
+  // Bannir retire tous ses pixels ; Retirer ses pixels suit la case et le curseur.
+  const clearActionOf = ({ kind, author }: ModerationRequest): ModerationAction =>
+    kind === "ban"
+      ? { action: "clearUser", target: author.userId }
+      : toClearAction(author, pixels ?? [], scope);
+
+  const run = async (active: ModerationRequest) => {
+    const banned =
+      active.kind === "ban" ? await canvas.moderate({ action: "ban", target: active.author.userId }) : null;
+    return banned?.ok === false ? banned : canvas.moderate(clearActionOf(active));
+  };
+
   const confirm = async (): Promise<void> => {
     const active = current.current;
     if (!active || status === "running") return;
     setStatus("running");
-    const target = active.author.userId;
-    const banned = active.kind === "ban" ? await canvas.moderate({ action: "ban", target }) : null;
-    const cleared = banned?.ok === false ? banned : await canvas.moderate({ action: "clearUser", target });
+    const cleared = await run(active);
     if (current.current !== active) return;
     if (!cleared.ok) return setStatus("failed");
     // Pas d'étape « après » : la fenêtre et l'inspection se ferment, les pixels partent par le flux.
@@ -82,13 +98,19 @@ export function useModeration(canvas: CanvasStore): {
         }
       : undefined;
 
+  // L'aperçu suit la case et le curseur ; bannir montre toujours tous ses pixels.
+  const shownPixels =
+    pixels && request?.kind === "clear" ? listClearedPixels(pixels, request.author, scope) : pixels;
+
   return {
     controls,
     window: {
       request,
-      pixels,
+      pixels: shownPixels,
+      scope,
       status,
       canvas: { width: view.width, height: view.height, palette: view.palette },
+      onScope: setScope,
       onConfirm: () => void confirm(),
       onClose: () => {
         if (status !== "running") close();

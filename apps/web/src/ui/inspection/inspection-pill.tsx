@@ -70,7 +70,7 @@ const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   return (
     <>
       <div className="lp-row lp-row--ruled">
-        <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clearUser", moderated)} />
+        <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clear", moderated)} />
         <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
       </div>
       {moderation.onSetModerator && <RoleRow author={moderated} onSetModerator={moderation.onSetModerator} />}
