@@ -2,6 +2,7 @@ import type { CanvasMeta, Session } from "@liveplace/domain";
 import type {
   AckFrame,
   BannedUser,
+  CanvasCore,
   ClientSocket,
   InspectEntry,
   LiveControl,
@@ -10,8 +11,11 @@ import type {
   ModerationSlice,
   Moderator,
   ModeratorRole,
+  OffStreamCell,
   Pixel,
   Placement,
+  Report,
+  ReportedPlacement,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -57,6 +61,20 @@ const moderators: Moderator[] = [
   },
 ];
 
+const reportedPlacements: ReportedPlacement[] = [
+  {
+    userId: "user-2",
+    login: "user2",
+    displayName: "User 2",
+    hasAccount: true,
+    placementId: "puser2001",
+    reportCount: 2,
+    reportedAt: now,
+    isOffStream: true,
+    pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+  },
+];
+
 const ack: AckFrame = {
   t: "ack",
   requestId: "request-1",
@@ -67,7 +85,13 @@ const ack: AckFrame = {
 };
 
 // Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (écart §4.3, JOURNAL 2026-09-27).
-const publicEntry: InspectEntry = { login: "user2", displayName: "User 2", colorIndex: 3, placedAt: now };
+const publicEntry: InspectEntry = {
+  login: "user2",
+  displayName: "User 2",
+  colorIndex: 3,
+  placedAt: now,
+  placementId: "puser2001",
+};
 const entry: InspectEntry = { userId: "user-2", ...publicEntry };
 
 // Laisse finir ce qu'un message de contrôle a lancé : la relecture d'un rôle est asynchrone.
@@ -79,7 +103,12 @@ const hello = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui", ...overrides });
 
 const place = () =>
-  JSON.stringify({ t: "place", requestId: ack.requestId, pixels: [{ x: 1, y: 2, colorIndex: 3 }] });
+  JSON.stringify({
+    t: "place",
+    requestId: ack.requestId,
+    placementId: "puser1001",
+    pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+  });
 
 const event = (version: number, x: number, colorIndex: number): Event => ({
   version,
@@ -102,6 +131,10 @@ type SetupOptions = {
   slices?: ModerationSlice[];
   resync?: Event[] | null; // ce que rend `listEvents` ; absent : le stream ne peut pas resynchroniser
   recent?: Event[]; // ce que rend `listRecentEvents`
+  offStream?: OffStreamCell[]; // ce que rend `listOffStreamCells`
+  reportCount?: number; // ce que rend `getReportCount`
+  canReport?: boolean; // ce que rend `canReport`
+  report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
 };
 
 const setup = (options: SetupOptions = {}) => {
@@ -112,6 +145,7 @@ const setup = (options: SetupOptions = {}) => {
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
   const namedModerators: ModeratorRole[] = [];
+  const reports: Report[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   const core = {
@@ -174,6 +208,22 @@ const setup = (options: SetupOptions = {}) => {
     async getModeratorOrigin() {
       return roles.isModerator ? { isFromTwitch: true, isNamedHere: false } : null;
     },
+    async report(_asked: string, sent: Report) {
+      reports.push(sent);
+      return options.report ?? { ok: true as const, value: undefined };
+    },
+    async canReport() {
+      return options.canReport ?? true;
+    },
+    async listReports() {
+      return reportedPlacements;
+    },
+    async getReportCount() {
+      return options.reportCount ?? 0;
+    },
+    async listOffStreamCells() {
+      return options.offStream ?? [];
+    },
     async subscribe(_asked: string, onMessage: (message: LiveMessage) => void) {
       publishTo = onMessage;
       return async () => {
@@ -219,6 +269,7 @@ const setup = (options: SetupOptions = {}) => {
     recentSince,
     obsDelays,
     namedModerators,
+    reports,
     clock,
     roles,
     open,
@@ -324,6 +375,7 @@ describe("createConnection (§6.1)", () => {
       {
         userId: session.userId,
         requestId: ack.requestId,
+        placementId: "puser1001",
         nowMs: now,
         pixels: [{ x: 1, y: 2, colorIndex: 3 }],
       },
@@ -382,9 +434,9 @@ describe("createConnection (§6.1)", () => {
     }
 
     const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
-    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: publicEntry });
-    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry });
-    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry });
+    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
+    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
+    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
   });
 
   // Dit au propriétaire, en inspectant, que l'auteur est modérateur et d'où il vient, et à lui seul (JOURNAL 2026-09-27)
@@ -399,8 +451,11 @@ describe("createConnection (§6.1)", () => {
 
     const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
     const moderatorOrigin = { isFromTwitch: true, isNamedHere: false };
-    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, moderatorOrigin } });
-    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry });
+    expect(byOwner.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...entry, canReport: true, moderatorOrigin },
+    });
+    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
   });
 
   // Refuse la 11e inspection d'une même seconde sans fermer, en nommant la requête, puis accepte une seconde plus tard
@@ -670,7 +725,10 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     context.roles.isModerator = true;
     context.control({ t: "role", userId: session.userId });
     await flush();
-    expect(context.sent.at(-1)).toEqual({ t: "role", role: "moderator" });
+    expect(context.sent.slice(-2)).toEqual([
+      { t: "role", role: "moderator" },
+      { t: "reportCount", count: 0 },
+    ]);
     await context.connection.receive(moderate("clearUser"));
     expect(context.moderations).toHaveLength(1);
 
@@ -792,5 +850,104 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
       "snapshot",
       "obsDelay",
     ]);
+  });
+});
+
+describe("reports in the connection (JOURNAL 2026-09-28)", () => {
+  const report = () =>
+    JSON.stringify({ t: "report", requestId: "report-1", x: 1, y: 2, placementId: "puser2001" });
+
+  // Compte chaque compte connecté une fois pour le seuil, jamais un invité ni la vue OBS
+  it("counts each connected account once for the threshold, never a guest nor the OBS view", async () => {
+    const context = setup();
+    const others = ["user-3", "user-4", "user-5", "user-6"].map((userId) =>
+      context.open({ ...session, userId }),
+    );
+    const pages = [context, context.open(session), context.open(null), ...others];
+    for (const { connection } of pages) await connection.receive(hello());
+    const obs = context.open({ ...session, userId: "user-8" });
+    await obs.connection.receive(hello({ mode: "obs" }));
+
+    await context.connection.receive(report());
+    const sixth = context.open({ ...session, userId: "user-7" });
+    await sixth.connection.receive(hello());
+    await context.connection.receive(report());
+
+    expect(context.reports.map(({ threshold }) => threshold)).toEqual([1, 2]);
+    expect(context.reports[0]).toEqual({
+      reporterId: session.userId,
+      x: 1,
+      y: 2,
+      placementId: "puser2001",
+      threshold: 1,
+      nowMs: now,
+    });
+    expect(context.sent.at(-1)).toEqual({ t: "reported", requestId: "report-1" });
+  });
+
+  // Refuse un invité et une pose qui ne se signale pas, en nommant la requête, sans fermer
+  it("refuses a guest and a placement that cannot be reported, naming the request, without closing", async () => {
+    const byGuest = setup({ session: null });
+    const refused = setup({ report: { ok: false, error: "forbidden" } });
+    for (const { connection } of [byGuest, refused]) {
+      await connection.receive(hello());
+      await connection.receive(report());
+    }
+
+    expect(byGuest.reports).toEqual([]);
+    expect(byGuest.sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: "report-1" });
+    expect(refused.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "report-1" });
+    expect([...byGuest.closed, ...refused.closed]).toEqual([]);
+  });
+
+  // Ne propose pas de signaler sa propre pose, et rien à un invité
+  it("does not offer to report one's own placement, and nothing to a guest", async () => {
+    const byAuthor = setup({ session: { ...session, userId: "user-2" } });
+    const byGuest = setup({ session: null });
+    for (const { connection } of [byAuthor, byGuest]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    expect(byAuthor.sent.at(-1)).toMatchObject({ entry: { canReport: false } });
+    expect(byGuest.sent.at(-1)).toMatchObject({ entry: publicEntry });
+    expect(byGuest.sent.at(-1)).not.toHaveProperty("entry.canReport");
+  });
+
+  // Donne la liste et le nombre des signalements à qui modère seulement, à l'arrivée puis en direct
+  it("gives the reports and their count to moderators only, on arrival then live", async () => {
+    const byModerator = setup({ isModerator: true, reportCount: 3 });
+    const byViewer = setup({ reportCount: 3 });
+    for (const context of [byModerator, byViewer]) {
+      await context.connection.receive(hello());
+      context.control({ t: "reports", count: 4 });
+      await context.connection.receive(JSON.stringify({ t: "listReports", requestId: "reports-1" }));
+    }
+
+    expect(byModerator.sent[2]).toEqual({ t: "reportCount", count: 3 });
+
+    expect(byModerator.sent.slice(-2)).toEqual([
+      { t: "reportCount", count: 4 },
+      { t: "reports", requestId: "reports-1", reports: reportedPlacements },
+    ]);
+    expect(byViewer.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "error",
+    ]);
+  });
+
+  // Donne à une vue OBS qui arrive l'image du stream, sans les poses cachées ; la page garde l'état réel
+  it("gives an arriving OBS view the stream's image, without the hidden placements; the page keeps the real state", async () => {
+    const offStream = [{ x: 1, y: 2, colorIndex: 9 }];
+    const byObs = setup({ session: null, offStream });
+    const byPage = setup({ session: null, offStream });
+    await byObs.connection.receive(hello({ mode: "obs" }));
+    await byPage.connection.receive(hello());
+
+    const shown = new Uint8Array(meta.width * meta.height);
+    shown[2 * meta.width + 1] = 9;
+    expect(byObs.sent.at(-1)).toEqual({ snapshot: shown });
+    expect(byPage.sent.at(-1)).toEqual({ snapshot: new Uint8Array(meta.width * meta.height) });
   });
 });

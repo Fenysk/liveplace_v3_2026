@@ -6,6 +6,7 @@ import { type Arrival, type CanvasStoreOptions, createCanvasStore } from "./canv
 
 const width = 4;
 const now = 1_700_000_000_000;
+const PLACEMENT_ID = "ptest0001";
 const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000 };
 
 const welcome: ServerFrame = {
@@ -139,10 +140,13 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("writes the pixels at once, before the answer, and sends them in one frame", () => {
     const { store, lastPlace, pixelAt } = setup();
 
-    void store.placeBatch([
-      { x: 1, y: 2, colorIndex: 5 },
-      { x: 2, y: 2, colorIndex: 6 },
-    ]);
+    void store.placeBatch(
+      [
+        { x: 1, y: 2, colorIndex: 5 },
+        { x: 2, y: 2, colorIndex: 6 },
+      ],
+      PLACEMENT_ID,
+    );
 
     expect(pixelAt(1, 2)).toBe(5);
     expect(pixelAt(2, 2)).toBe(6);
@@ -153,7 +157,7 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("resolves on the ack of the same requestId, never on another one", async () => {
     const { store, receive, lastPlace, ackOf } = setup();
     let settled = false;
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]).then((result) => {
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID).then((result) => {
       settled = true;
       return result;
     });
@@ -172,10 +176,13 @@ describe("placeBatch (§9.2, §9.3)", () => {
     const { store, receive, lastPlace, ackOf, pixelAt } = setup();
     receive(cellsFrame(2, 2, 9));
 
-    const placing = store.placeBatch([
-      { x: 1, y: 2, colorIndex: 5 },
-      { x: 2, y: 2, colorIndex: 6 },
-    ]);
+    const placing = store.placeBatch(
+      [
+        { x: 1, y: 2, colorIndex: 5 },
+        { x: 2, y: 2, colorIndex: 6 },
+      ],
+      PLACEMENT_ID,
+    );
     receive(ackOf(lastPlace(), [1]));
     await placing;
 
@@ -187,7 +194,7 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("lets a cells frame that came in between have the last word on a rejected pixel", async () => {
     const { store, receive, lastPlace, ackOf, pixelAt } = setup();
 
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
     receive(cellsFrame(1, 2, 12));
     receive(ackOf(lastPlace(), [0]));
     await placing;
@@ -199,7 +206,7 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("keeps an accepted pixel when the ack comes before its cells frame, then takes the frame", async () => {
     const { store, receive, lastPlace, ackOf, pixelAt } = setup();
 
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
     receive(ackOf(lastPlace()));
     await placing;
     expect(pixelAt(1, 2)).toBe(5);
@@ -213,7 +220,7 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("resolves with the error code the gateway sends instead of an ack, and restores the colors", async () => {
     const { store, receive, pixelAt } = setup();
 
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
     receive({ t: "error", code: "unauthenticated" });
 
     expect(await placing).toEqual({ ok: false, error: "unauthenticated" });
@@ -225,7 +232,7 @@ describe("placeBatch (§9.2, §9.3)", () => {
   it("keeps a batch sent before a drop, colors included, and sends it again with its requestId after the welcome", async () => {
     const { store, close, open, receive, lastPlace, ackOf, pixelAt } = setup();
 
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
     const first = lastPlace();
     close();
 
@@ -241,7 +248,14 @@ describe("placeBatch (§9.2, §9.3)", () => {
 });
 
 describe("inspect (CDC 2026, la pill Inspection)", () => {
-  const entry = { userId: "user-2", login: "user2", displayName: "User 2", colorIndex: 5, placedAt: now };
+  const entry = {
+    userId: "user-2",
+    login: "user2",
+    displayName: "User 2",
+    colorIndex: 5,
+    placedAt: now,
+    placementId: "puser2001",
+  };
 
   const lastInspect = (sent: ClientFrame[]) => {
     const frame = sent.at(-1);
@@ -299,7 +313,7 @@ describe("inspect (CDC 2026, la pill Inspection)", () => {
     store.inspect(1, 2);
     receive({ t: "inspected", requestId: lastInspect(sent).requestId, x: 1, y: 2, entry });
     let isSettled = false;
-    void store.placeBatch([{ x: 0, y: 0, colorIndex: 5 }]).then(() => {
+    void store.placeBatch([{ x: 0, y: 0, colorIndex: 5 }], PLACEMENT_ID).then(() => {
       isSettled = true;
     });
 
@@ -477,7 +491,7 @@ describe("the reconnection (§4.5, JOURNAL 2026-09-25)", () => {
   it("fails a batch sent more than 100 s before the welcome, without sending it again", async () => {
     const { store, sent, close, open, receive, clock, pixelAt } = setup();
 
-    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }]);
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
     close();
     clock.nowMs += 101_000;
     open();
@@ -547,5 +561,55 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
         },
       },
     ]);
+  });
+});
+
+describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
+  // Chaque lot porte sa pose
+  it("sends each batch with its placement", () => {
+    const { store, lastPlace } = setup();
+
+    void store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+
+    expect(lastPlace().placementId).toBe(PLACEMENT_ID);
+  });
+
+  // `hide` et `unhide` avancent la version et partent vers la vue OBS, sans toucher aux pixels de la page
+  it("hide and unhide move the version on and reach the OBS view, without touching the page's pixels", () => {
+    const { store, receive, pixelAt } = setup();
+    const arrivals: Arrival[] = [];
+    store.listenArrivals((arrival) => arrivals.push(arrival));
+    receive(cellsFrame(1, 2, 5));
+
+    const obs = { colorIndex: 3, previousColorIndex: 5, placedAt: now - 60_000 };
+    const hide = { x: 1, y: 2, colorIndex: 5, previousColorIndex: 5, placedAt: now, obs, version: 9 };
+    receive({ t: "cells", toVersion: 9, cells: [{ ...hide, kind: "hide" }] });
+
+    expect(pixelAt(1, 2)).toBe(5);
+    expect(store.getView().version).toBe(9);
+    expect(arrivals.at(-1)).toEqual({
+      kind: "cells",
+      frame: { toVersion: 9, cells: [{ ...hide, kind: "hide" }] },
+    });
+  });
+
+  // Prend le nombre de signalements en attente, et règle un signalement et la liste sur leur réponse
+  it("takes the pending report count, and settles a report and the list on their answer", async () => {
+    const { store, sent, receive } = setup();
+    receive({ t: "reportCount", count: 2 });
+    expect(store.getView().reportCount).toBe(2);
+
+    const reporting = store.report(1, 2, "puser2001");
+    const reportFrame = sent.at(-1);
+    if (reportFrame?.t !== "report") throw new Error("aucune frame report envoyée");
+    expect(reportFrame).toMatchObject({ x: 1, y: 2, placementId: "puser2001" });
+    receive({ t: "reported", requestId: reportFrame.requestId });
+    expect(await reporting).toEqual({ ok: true, value: true });
+
+    const listing = store.listReports();
+    const listFrame = sent.at(-1);
+    if (listFrame?.t !== "listReports") throw new Error("aucune frame listReports envoyée");
+    receive({ t: "reports", requestId: listFrame.requestId, reports: [] });
+    expect(await listing).toEqual({ ok: true, value: [] });
   });
 });

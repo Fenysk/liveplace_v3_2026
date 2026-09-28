@@ -168,3 +168,93 @@ describe("the OBS queue (§9.5, JOURNAL 2026-09-25)", () => {
     expect(queue.shown[OFFSET + 1]).toBe(6);
   });
 });
+
+describe("a hidden placement in the OBS queue (JOURNAL 2026-09-28)", () => {
+  const offStreamCell = (options: CellOptions & { shownColorIndex: number; shownPlacedAt: number }) => ({
+    ...place(options),
+    obs: {
+      colorIndex: options.shownColorIndex,
+      previousColorIndex: options.previousColorIndex ?? 0,
+      placedAt: options.shownPlacedAt,
+    },
+  });
+
+  // Signalée pendant son délai, la pose n'atteint jamais le stream : `hide` annule ce qui attendait, aussitôt
+  it("reported during its delay, the placement never reaches the stream: hide cancels what was waiting, at once", () => {
+    const queue = queueOnThree();
+    queueCells(
+      queue,
+      frameOf(place({ colorIndex: 5, previousColorIndex: 3, placedAt: t0, version: 10 })),
+      t0,
+      DELAY,
+    );
+
+    const hide = offStreamCell({
+      colorIndex: 5,
+      placedAt: t0,
+      version: 11,
+      shownColorIndex: 3,
+      shownPlacedAt: t0 - 60_000,
+    });
+    queueCells(queue, frameOf({ ...hide, kind: "hide" }), t0 + 2000, DELAY);
+    showDueCells(queue, t0 + DELAY, DELAY);
+
+    expect(queue.shown[OFFSET]).toBe(3);
+    expect(queue.waiting).toEqual([]);
+  });
+
+  // Rétablie, la pose paraît aussitôt si son délai est écoulé
+  it("approved, the placement shows at once when its delay is over", () => {
+    const queue = queueOnThree();
+
+    queueCells(
+      queue,
+      frameOf({ ...place({ colorIndex: 5, placedAt: t0, version: 12 }), kind: "unhide" }),
+      t0 + 60_000,
+      DELAY,
+    );
+
+    expect(queue.shown[OFFSET]).toBe(5);
+  });
+
+  // Un lot d'une pose déjà cachée attend son heure avec la couleur du dessous : le stream ne le voit jamais
+  it("a batch of an already hidden placement waits with the color below: the stream never sees it", () => {
+    const queue = queueOnThree();
+    const batch = offStreamCell({
+      colorIndex: 5,
+      previousColorIndex: 3,
+      placedAt: t0,
+      version: 10,
+      shownColorIndex: 3,
+      shownPlacedAt: t0 - 60_000,
+    });
+
+    queueCells(queue, frameOf(batch), t0, DELAY);
+    for (const nowMs of [t0, t0 + DELAY]) {
+      showDueCells(queue, nowMs, DELAY);
+      expect(queue.shown[OFFSET]).toBe(3);
+    }
+  });
+
+  // Rechargée, la source revient à ce que le stream montrait sous un pixel posé sur une pose cachée, jamais à la pose (piège 1)
+  it("reloaded, the source goes back to what the stream showed under a pixel placed over a hidden placement, never to the placement", () => {
+    const shown = new Uint8Array(WIDTH * 4);
+    shown[OFFSET] = 8; // le snapshot : le pixel posé par-dessus
+    const queue = createObsQueue(WIDTH, shown);
+    const cover = offStreamCell({
+      colorIndex: 8,
+      previousColorIndex: 5,
+      placedAt: t0,
+      version: 13,
+      shownColorIndex: 8,
+      shownPlacedAt: t0,
+    });
+    cover.obs.previousColorIndex = 3;
+
+    queueRecent(queue, frameOf(cover), t0 + 1000, DELAY);
+
+    expect(queue.shown[OFFSET]).toBe(3);
+    showDueCells(queue, t0 + DELAY, DELAY);
+    expect(queue.shown[OFFSET]).toBe(8);
+  });
+});

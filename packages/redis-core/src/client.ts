@@ -9,10 +9,10 @@ import {
   type Timestamp,
   toCell,
   toCellKey,
-  toStateOffset,
 } from "@liveplace/domain";
 import type {
   AckFrame,
+  AuthoredPixel,
   BannedUser,
   CanvasCore,
   InspectEntry,
@@ -21,8 +21,9 @@ import type {
   ModerationSlice,
   Moderator,
   ModeratorOrigin,
-  Pixel,
+  OffStreamCell,
   Placement,
+  ReportedPlacement,
   SignInWrites,
   Snapshot,
   TwitchCommand,
@@ -46,6 +47,8 @@ import {
   TWITCH_COMMANDS_KEY,
   TWITCH_COMMANDS_MAXLEN,
   TWITCH_COMMANDS_READER,
+  toPlacementKey,
+  toPlacementRef,
   userKey,
 } from "./keys";
 
@@ -56,8 +59,40 @@ declare module "ioredis" {
       ...args: (string | number)[]
     ): RedisResult<[status: string, version?: number, cells?: number, isDone?: number], Context>;
     moderators(...args: (string | number)[]): RedisResult<string, Context>;
+    report(...args: (string | number)[]): RedisResult<string, Context>;
+    streamView(...args: (string | number)[]): RedisResult<number[], Context>;
   }
 }
+
+type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
+
+// Écart §5.1 (JOURNAL 2026-09-28) : une entrée de pile, lue par la fin comme dans pile.lua.
+// Un pixel d'avant le protocole 6 a pour pose sa version.
+const PILE_ENTRY = /^(.*):(\d+):(\d+):(\d+)(?::([A-Za-z][A-Za-z0-9]*))?$/;
+
+type PileEntry = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
+
+const parseEntry = (entry: string): PileEntry => {
+  const [, authorId, colorIndex, placedAt, version, placementId] = PILE_ENTRY.exec(entry) ?? [];
+  if (authorId === undefined || colorIndex === undefined || placedAt === undefined || version === undefined)
+    throw new Error(`entrée d'historique illisible (${entry})`);
+  return {
+    authorId,
+    colorIndex: Number(colorIndex),
+    placedAt: Number(placedAt),
+    placementId: placementId ?? version,
+  };
+};
+
+// Un pixel visible d'un auteur : son heure et sa pose sont connues.
+type VisiblePixel = Required<AuthoredPixel>;
+
+// Écart §5.4 (JOURNAL 2026-09-28) : la pose visée et sa plage, vides pour les autres actions (moderate.lua).
+const placementArgsOf = (action: Moderation["action"]): [string, number | "", number | ""] => {
+  if (action.action === "approvePlacement") return [action.placementId, "", ""];
+  if (action.action !== "clearPlacement") return ["", "", ""];
+  return [action.placementId, action.range?.from ?? "", action.range?.to ?? ""];
+};
 
 const metaText = (fields: Record<string, string>, field: string): string => {
   const value = fields[field];
@@ -222,19 +257,17 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   };
 }
 
+const scriptOf = (name: string): string => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
+
 export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCore {
-  redis.defineCommand("place", {
-    numberOfKeys: 7,
-    lua: readFileSync(new URL("./place.lua", import.meta.url), "utf8"),
-  });
-  redis.defineCommand("moderate", {
-    numberOfKeys: 11,
-    lua: readFileSync(new URL("./moderate.lua", import.meta.url), "utf8"),
-  });
-  redis.defineCommand("moderators", {
-    numberOfKeys: 4,
-    lua: readFileSync(new URL("./moderators.lua", import.meta.url), "utf8"),
-  });
+  // Écart §5.4 (JOURNAL 2026-09-28) : pile.lua, collé devant chaque script qui lit une pile.
+  const pile = scriptOf("pile.lua");
+  const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
+  redis.defineCommand("place", { numberOfKeys: 11, lua: withPile("place.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 16, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
+  redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
+  redis.defineCommand("streamView", { numberOfKeys: 4, lua: withPile("stream-view.lua") });
 
   // Un seul rappel par canal, sur la seule connexion abonnée du process (§6.3).
   const listeners = new Map<string, (message: LiveMessage) => void>();
@@ -246,6 +279,48 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
   const isBanned = async (canvasId: string, userId: string): Promise<boolean> =>
     (await redis.sismember(buildCanvasKeys(canvasId).bans, userId)) === 1;
+
+  // Le nom d'une personne : le miroir de son compte, sinon le nom venu de Twitch, sinon l'identifiant, comme `inspect`.
+  const getProfile = async (keys: CanvasKeys, userId: string) => {
+    const [user, twitchUser] = await Promise.all([
+      redis.hgetall(userKey(userId)),
+      redis.hget(keys.twitchUsers, userId),
+    ]);
+    const hasAccount = user.login !== undefined;
+    const named = hasAccount ? user : twitchNameOf(twitchUser);
+    return {
+      userId,
+      login: named.login ?? userId,
+      displayName: named.displayName ?? userId,
+      ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      hasAccount,
+    };
+  };
+
+  // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile.
+  const listVisiblePixels = async (keys: CanvasKeys, userId: string): Promise<VisiblePixel[]> => {
+    const cellKeys = await redis.sunion(keys.cells(userId), keys.clearing(userId));
+    const cells = cellKeys.map((cellKey) => toCell(Number(cellKey)));
+    const pipeline = redis.pipeline();
+    for (const { x, y } of cells) pipeline.lindex(keys.hist(toCellKey(x, y)), 0);
+    const heads = cells.length > 0 ? ((await pipeline.exec()) ?? []) : [];
+    return cells.flatMap((cell, index) => {
+      const head = unwrap(heads[index]);
+      if (typeof head !== "string") return [];
+      const { authorId, colorIndex, placedAt, placementId } = parseEntry(head);
+      return authorId === userId ? [{ ...cell, colorIndex, placedAt, placementId }] : [];
+    });
+  };
+
+  // Les signalements d'une pose disparue partent, et les modérateurs l'apprennent (JOURNAL 2026-09-28).
+  const settleReports = async (keys: CanvasKeys, placementKeys: string[]): Promise<void> => {
+    if (placementKeys.length === 0) return;
+    const transaction = redis.multi().zrem(keys.reported, ...placementKeys);
+    for (const placementKey of placementKeys) transaction.del(keys.reports(placementKey));
+    await transaction.exec();
+    const control: LiveMessage = { ctl: { t: "reports", count: await redis.zcard(keys.reported) } };
+    await redis.publish(keys.live, JSON.stringify(control));
+  };
 
   return {
     ...createSignInWrites(redis),
@@ -300,7 +375,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
     // L'ordre des arguments est celui que lit place.lua.
     async place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">> {
-      const { userId, requestId, nowMs, pixels } = placement;
+      const { userId, requestId, placementId, nowMs, pixels } = placement;
       const keys = buildCanvasKeys(canvasId);
       const [status, ack] = await redis.place(
         keys.meta,
@@ -310,6 +385,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.bans,
         keys.gauge(userId),
         keys.req(userId, requestId),
+        keys.cleared,
+        keys.clearedPlacements,
+        keys.clearedRanges,
+        keys.offStream,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -322,6 +401,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         EVENTS_MAXLEN,
         GAUGE_TTL_SECONDS,
         REQ_TTL_SECONDS,
+        placementId,
         ...pixels.flatMap(({ x, y, colorIndex }) => [x, y, colorIndex]),
       );
       if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
@@ -330,13 +410,11 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       throw new Error(`place.lua a renvoyé un ack invalide : ${ack}`);
     },
 
-    // La tête de `hist:` est le pixel visible (§5.1). L'entrée se lit par la fin, comme dans place.lua.
+    // La tête de `hist:` est le pixel visible (§5.1).
     async inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null> {
       const head = await redis.lindex(buildCanvasKeys(canvasId).hist(toCellKey(x, y)), 0);
       if (head === null) return null;
-      const [, userId, colorIndex, placedAt] = /^(.*):(\d+):(\d+):\d+$/.exec(head) ?? [];
-      if (userId === undefined || colorIndex === undefined || placedAt === undefined)
-        throw new Error(`inspect ${canvasId} : entrée d'historique illisible (${head})`);
+      const { authorId: userId, colorIndex, placedAt, placementId } = parseEntry(head);
       // Sans miroir, l'auteur garde au moins son identifiant : le miroir n'expire jamais, c'est un filet.
       const user = await redis.hgetall(userKey(userId));
       return {
@@ -344,17 +422,20 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         login: user.login ?? userId,
         displayName: user.displayName ?? userId,
         ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
-        colorIndex: Number(colorIndex),
-        placedAt: Number(placedAt),
+        colorIndex,
+        placedAt,
+        placementId,
       };
     },
 
     // L'ordre des arguments est celui que lit moderate.lua.
     async moderate(
       canvasId: string,
-      { by, nowMs, action: { action, target }, slice, source = "liveplace" }: Moderation,
+      { by, nowMs, action: moderation, slice, source = "liveplace" }: Moderation,
     ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">> {
       const keys = buildCanvasKeys(canvasId);
+      const { action, target } = moderation;
+      const [placementId, rangeFrom, rangeTo] = placementArgsOf(moderation);
       const [status, version, cells, isDone] = await redis.moderate(
         keys.meta,
         keys.state,
@@ -367,6 +448,11 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.cells(target),
         keys.ban(target),
         keys.bansTwitch,
+        keys.clearedPlacements,
+        keys.clearedRanges,
+        keys.offStream,
+        keys.reported,
+        keys.approved,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -379,6 +465,11 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         CLEAR_SLICE_CELLS,
         EVENTS_MAXLEN,
         source,
+        placementId,
+        rangeFrom,
+        rangeTo,
+        keys.clearingPrefix,
+        keys.reportsPrefix,
       );
       if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)
@@ -388,8 +479,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
     isBanned,
 
-    // Un banni : sa preuve, figée au ban (§5.1). Sinon : les cases dont il est l'auteur visible, retrait interrompu compris.
-    async listPixels(canvasId: string, userId: string): Promise<Pixel[]> {
+    // Un banni : sa preuve, figée au ban (§5.1). Sinon : ses pixels visibles, avec leur heure et leur pose.
+    async listPixels(canvasId: string, userId: string): Promise<AuthoredPixel[]> {
       const keys = buildCanvasKeys(canvasId);
       if (await isBanned(canvasId, userId)) {
         const proof = await redis.hgetall(keys.ban(userId));
@@ -398,20 +489,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
           colorIndex: Number(colorIndex),
         }));
       }
-      const results = await redis
-        .multi()
-        .sunion(keys.cells(userId), keys.clearing(userId))
-        .getBuffer(keys.state)
-        .hget(keys.meta, "width")
-        .exec();
-      if (!results) throw new Error(`listPixels ${canvasId} : transaction annulée`);
-      const [cellKeys, state, width] = results.map(unwrap);
-      if (!Array.isArray(cellKeys) || !Buffer.isBuffer(state) || typeof width !== "string")
-        throw new Error(`listPixels ${canvasId} : cases, état ou largeur illisibles`);
-      return cellKeys.map((cellKey) => {
-        const cell = toCell(Number(cellKey));
-        return { ...cell, colorIndex: state[toStateOffset(cell.x, cell.y, Number(width))] ?? 0 };
-      });
+      return listVisiblePixels(keys, userId);
     },
 
     // Triés par nom d'affichage. Sans miroir, le nom Twitch, sinon l'identifiant, comme pour `inspect`.
@@ -420,26 +498,122 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const userIds = await redis.smembers(keys.bans);
       const users = await Promise.all(
         userIds.map(async (userId): Promise<BannedUser> => {
-          const [user, twitchUser, pixelCount, isFromTwitch] = await Promise.all([
-            redis.hgetall(userKey(userId)),
-            redis.hget(keys.twitchUsers, userId),
+          const [profile, pixelCount, isFromTwitch] = await Promise.all([
+            getProfile(keys, userId),
             redis.hlen(keys.ban(userId)),
             redis.sismember(keys.bansTwitch, userId),
           ]);
-          const hasAccount = user.login !== undefined;
-          const named = hasAccount ? user : twitchNameOf(twitchUser);
-          return {
-            userId,
-            login: named.login ?? userId,
-            displayName: named.displayName ?? userId,
-            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
-            pixelCount,
-            isFromTwitch: isFromTwitch === 1,
-            hasAccount,
-          };
+          return { ...profile, pixelCount, isFromTwitch: isFromTwitch === 1 };
         }),
       );
       return users.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    },
+
+    // L'ordre des arguments est celui que lit report.lua.
+    async report(canvasId, { reporterId, x, y, placementId, threshold, nowMs }) {
+      const keys = buildCanvasKeys(canvasId);
+      const status = await redis.report(
+        keys.meta,
+        keys.version,
+        keys.events,
+        keys.bans,
+        keys.offStream,
+        keys.reported,
+        keys.approved,
+        keys.cleared,
+        keys.clearedPlacements,
+        keys.clearedRanges,
+        keys.histPrefix,
+        keys.cellsPrefix,
+        keys.clearingPrefix,
+        keys.reportsPrefix,
+        keys.live,
+        reporterId,
+        toCellKey(x, y),
+        placementId,
+        threshold,
+        nowMs,
+        CELL_STRIDE,
+        EVENTS_MAXLEN,
+      );
+      if (status === "reported") return { ok: true, value: undefined };
+      if (status === "canvas_not_found" || status === "changed" || status === "forbidden")
+        return { ok: false, error: status };
+      throw new Error(`report.lua a renvoyé une réponse invalide : ${status}`);
+    },
+
+    async canReport(canvasId, placement, reporterId) {
+      const keys = buildCanvasKeys(canvasId);
+      const placementKey = toPlacementKey(placement);
+      const results = await redis
+        .multi()
+        .sismember(keys.reports(placementKey), reporterId)
+        .sismember(keys.approved, placementKey)
+        .sismember(keys.bans, reporterId)
+        .exec();
+      if (!results) throw new Error(`canReport ${canvasId} : transaction annulée`);
+      return results.every((entry) => unwrap(entry) === 0);
+    },
+
+    // Du premier signalement au plus récent. Une pose qui n'a plus de pixel visible est élaguée (JOURNAL 2026-09-28).
+    async listReports(canvasId: string): Promise<ReportedPlacement[]> {
+      const keys = buildCanvasKeys(canvasId);
+      const flat = await redis.zrange(keys.reported, "0", "-1", "WITHSCORES");
+      const pixelsByAuthor = new Map<string, Promise<VisiblePixel[]>>();
+      const pixelsOf = (authorId: string): Promise<VisiblePixel[]> => {
+        const known = pixelsByAuthor.get(authorId);
+        if (known) return known;
+        const listed = listVisiblePixels(keys, authorId);
+        pixelsByAuthor.set(authorId, listed);
+        return listed;
+      };
+      const placementKeys = flat.filter((_, index) => index % 2 === 0);
+      const reports = await Promise.all(
+        placementKeys.map(async (placementKey, index): Promise<ReportedPlacement | null> => {
+          const { authorId, placementId } = toPlacementRef(placementKey);
+          const pixels = (await pixelsOf(authorId))
+            .filter((pixel) => pixel.placementId === placementId)
+            .map(({ x, y, colorIndex }) => ({ x, y, colorIndex }));
+          if (pixels.length === 0) return null;
+          const [profile, reportCount, isOffStream] = await Promise.all([
+            getProfile(keys, authorId),
+            redis.scard(keys.reports(placementKey)),
+            redis.sismember(keys.offStream, placementKey),
+          ]);
+          const reportedAt = Number(flat[index * 2 + 1]);
+          return { ...profile, placementId, reportCount, reportedAt, isOffStream: isOffStream === 1, pixels };
+        }),
+      );
+      await settleReports(
+        keys,
+        placementKeys.filter((_, index) => reports[index] === null),
+      );
+      return reports.filter((report) => report !== null);
+    },
+
+    async getReportCount(canvasId: string): Promise<number> {
+      return redis.zcard(buildCanvasKeys(canvasId).reported);
+    },
+
+    // L'ordre des arguments est celui que lit stream-view.lua.
+    async listOffStreamCells(canvasId: string): Promise<OffStreamCell[]> {
+      const keys = buildCanvasKeys(canvasId);
+      const flat = await redis.streamView(
+        keys.cleared,
+        keys.clearedPlacements,
+        keys.clearedRanges,
+        keys.offStream,
+        keys.histPrefix,
+        keys.cellsPrefix,
+        keys.clearingPrefix,
+        CELL_STRIDE,
+      );
+      const cells: OffStreamCell[] = [];
+      for (let index = 0; index + 2 < flat.length; index += 3) {
+        const [x, y, colorIndex] = flat.slice(index, index + 3);
+        if (x !== undefined && y !== undefined && colorIndex !== undefined) cells.push({ x, y, colorIndex });
+      }
+      return cells;
     },
 
     // L'ordre des arguments est celui que lit moderators.lua.
@@ -466,23 +640,12 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const userIds = await redis.smembers(keys.mods);
       const moderators = await Promise.all(
         userIds.map(async (userId): Promise<Moderator> => {
-          const [user, twitchUser, isFromTwitch, isNamedHere] = await Promise.all([
-            redis.hgetall(userKey(userId)),
-            redis.hget(keys.twitchUsers, userId),
+          const [profile, isFromTwitch, isNamedHere] = await Promise.all([
+            getProfile(keys, userId),
             redis.sismember(keys.modsTwitch, userId),
             redis.sismember(keys.modsLiveplace, userId),
           ]);
-          const hasAccount = user.login !== undefined;
-          const named = hasAccount ? user : twitchNameOf(twitchUser);
-          return {
-            userId,
-            login: named.login ?? userId,
-            displayName: named.displayName ?? userId,
-            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
-            isFromTwitch: isFromTwitch === 1,
-            isNamedHere: isNamedHere === 1,
-            hasAccount,
-          };
+          return { ...profile, isFromTwitch: isFromTwitch === 1, isNamedHere: isNamedHere === 1 };
         }),
       );
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));

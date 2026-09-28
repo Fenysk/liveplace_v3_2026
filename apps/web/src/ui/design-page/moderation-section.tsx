@@ -31,7 +31,13 @@ import { Specimen, SpecimenSection } from "./specimen-section";
 const MINUTE = 60_000;
 const LOCKED_MS = 1500; // la démonstration du verrou : l'action, puis la fermeture
 
-const TROLL = { userId: "3", login: "troll42", displayName: "Troll42", colorIndex: 5 };
+const TROLL = {
+  userId: "3",
+  login: "troll42",
+  displayName: "Troll42",
+  colorIndex: 5,
+  placementId: "pheart001",
+};
 
 const MODERATING: ModerationControls = { isProtected: () => false, onModerate: noop };
 const PROTECTING: ModerationControls = { isProtected: () => true, onModerate: noop };
@@ -188,7 +194,7 @@ export const ModerationSection = () => {
         </Specimen>
         <Specimen caption="Le pixel du streamer, ou le sien">
           <InspectionPill
-            inspection={inspectionOf(nowMs, { userId: "1", ...SAMPLE_OWNER })}
+            inspection={inspectionOf(nowMs, { userId: "1", ...SAMPLE_OWNER, placementId: "pdemo0001" })}
             palette={PALETTE}
             nowMs={nowMs}
             onClose={noop}
@@ -221,7 +227,7 @@ export const ModerationSection = () => {
         </Specimen>
         <Specimen caption="Sans photo">
           <InspectionPill
-            inspection={inspectionOf(nowMs, { userId: "2", ...SAMPLE_VIEWER })}
+            inspection={inspectionOf(nowMs, { userId: "2", ...SAMPLE_VIEWER, placementId: "pdemo0002" })}
             palette={PALETTE}
             nowMs={nowMs}
             onClose={noop}

@@ -70,7 +70,13 @@ const readyCanvas = async () => {
 const placeAs = async (canvasId: string, userId: string, pixels: readonly Pixel[], nowMs = now) => {
   for (let start = 0; start < pixels.length; start += 64) {
     const batch = pixels.slice(start, start + 64);
-    const result = await core.place(canvasId, { userId, requestId: randomUUID(), nowMs, pixels: batch });
+    const result = await core.place(canvasId, {
+      userId,
+      requestId: randomUUID(),
+      placementId: "ptest0001",
+      nowMs,
+      pixels: batch,
+    });
     if (!result.ok || result.value.accepted !== batch.length) throw new Error(`pose refusée pour ${userId}`);
   }
 };
@@ -165,7 +171,9 @@ describe("clearUser (§5.4)", () => {
 
     expect(await colorAt(canvasId, cell.x, cell.y)).toBe(2);
     expect(await core.inspect(canvasId, cell.x, cell.y)).toMatchObject({ userId: "author-a" });
-    expect(await redis.lrange(keys.hist(toCellKey(cell.x, cell.y)), 0, -1)).toEqual([`author-a:2:${now}:1`]);
+    expect(await redis.lrange(keys.hist(toCellKey(cell.x, cell.y)), 0, -1)).toEqual([
+      `author-a:2:${now}:1:ptest0001`,
+    ]);
   });
 
   // Fait revenir le pixel qu'un coup de gomme retiré avait effacé
@@ -275,6 +283,7 @@ describe("ban and unban (§5.4, JOURNAL 2026-09-25)", () => {
     const refused = await core.place(canvasId, {
       userId: "troll",
       requestId: randomUUID(),
+      placementId: "ptest0001",
       nowMs: later,
       pixels: [{ x: 0, y: 0, colorIndex: 1 }],
     });
@@ -295,7 +304,8 @@ describe("ban and unban (§5.4, JOURNAL 2026-09-25)", () => {
       { x: 2, y: 1, colorIndex: 5 },
     ];
 
-    expect(await core.listPixels(canvasId, "troll")).toEqual(expect.arrayContaining(proof));
+    const visible = proof.map((pixel) => ({ ...pixel, placedAt: now, placementId: "ptest0001" }));
+    expect(await core.listPixels(canvasId, "troll")).toEqual(expect.arrayContaining(visible));
     await moderateAll(canvasId, OWNER, ban("troll"));
     await moderateAll(canvasId, OWNER, clearUser("troll"));
     await moderateAll(canvasId, OWNER, ban("troll"));
@@ -324,7 +334,9 @@ describe("ban and unban (§5.4, JOURNAL 2026-09-25)", () => {
     expect(await core.isBanned(canvasId, "troll")).toBe(false);
     expect(await redis.exists(keys.ban("troll"))).toBe(0);
     expect(await colorAt(canvasId, 5, 5)).toBe(TRANSPARENT_COLOR_INDEX);
-    expect(await core.listPixels(canvasId, "troll")).toEqual([{ x: 6, y: 5, colorIndex: 7 }]);
+    expect(await core.listPixels(canvasId, "troll")).toEqual([
+      { x: 6, y: 5, colorIndex: 7, placedAt: later + 1, placementId: "ptest0001" },
+    ]);
   });
 
   // Liste les bannis avec leur miroir et le nombre de pixels de leur preuve

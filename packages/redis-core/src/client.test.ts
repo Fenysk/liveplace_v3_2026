@@ -153,6 +153,7 @@ describe("place (§5.3)", () => {
   const placement = (overrides: Partial<Placement> = {}): Placement => ({
     userId: "user-1",
     requestId: randomUUID(),
+    placementId: "ptest0001",
     nowMs: now,
     pixels: [{ x: 3, y: 2, colorIndex: 5 }],
     ...overrides,
@@ -190,7 +191,9 @@ describe("place (§5.3)", () => {
     expect((await redis.getBuffer(keys.state))?.[toStateOffset(pixel.x, pixel.y, meta.width)]).toBe(
       pixel.colorIndex,
     );
-    expect(await redis.lindex(keys.hist(cellKey), 0)).toBe(`${request.userId}:${pixel.colorIndex}:${now}:1`);
+    expect(await redis.lindex(keys.hist(cellKey), 0)).toBe(
+      `${request.userId}:${pixel.colorIndex}:${now}:1:${request.placementId}`,
+    );
     expect(await redis.smembers(keys.cells(request.userId))).toEqual([String(cellKey)]);
     expect(await redis.get(keys.version)).toBe("1");
     const event: Event = {
@@ -356,8 +359,8 @@ describe("place (§5.3)", () => {
       cells: [{ colorIndex: above.colorIndex, previousColorIndex: below.colorIndex }],
     });
     expect(await redis.lrange(keys.hist(cellKey), 0, -1)).toEqual([
-      `author-b:${above.colorIndex}:${now}:2`,
-      `author-a:${below.colorIndex}:${now}:1`,
+      `author-b:${above.colorIndex}:${now}:2:ptest0001`,
+      `author-a:${below.colorIndex}:${now}:1:ptest0001`,
     ]);
     expect(await redis.sismember(keys.cells("author-a"), String(cellKey))).toBe(0);
     expect(await redis.sismember(keys.cells("author-b"), String(cellKey))).toBe(1);
@@ -462,7 +465,13 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
     const keys = buildCanvasKeys(canvasId);
     await core.createCanvas(canvasId, meta);
     const pixels = Array.from({ length: meta.gaugeMax }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
-    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels });
+    await core.place(canvasId, {
+      userId: "user-1",
+      requestId: randomUUID(),
+      placementId: "ptest0001",
+      nowMs: now,
+      pixels,
+    });
     const later = now + meta.refillMs * 1.5;
     const expected = refillGauge({ charges: 0, at: now }, later, meta);
 
@@ -485,7 +494,13 @@ describe("getSnapshot (§6.1)", () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
     const pixel = { x: 3, y: 2, colorIndex: 5 };
-    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels: [pixel] });
+    await core.place(canvasId, {
+      userId: "user-1",
+      requestId: randomUUID(),
+      placementId: "ptest0001",
+      nowMs: now,
+      pixels: [pixel],
+    });
 
     const snapshot = await core.getSnapshot(canvasId);
 
@@ -506,7 +521,13 @@ describe("subscribe (§6.3)", () => {
     const received: LiveMessage[] = [];
 
     const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
-    await core.place(canvasId, { userId: "user-1", requestId: randomUUID(), nowMs: now, pixels: [pixel] });
+    await core.place(canvasId, {
+      userId: "user-1",
+      requestId: randomUUID(),
+      placementId: "ptest0001",
+      nowMs: now,
+      pixels: [pixel],
+    });
     await delay(100);
 
     expect(received).toEqual([
@@ -525,6 +546,7 @@ describe("subscribe (§6.3)", () => {
     await core.place(canvasId, {
       userId: "user-1",
       requestId: randomUUID(),
+      placementId: "ptest0001",
       nowMs: now,
       pixels: [{ x: 4, y: 2, colorIndex: 5 }],
     });
@@ -594,7 +616,13 @@ describe("inspect (§5.6, JOURNAL 2026-09-24)", () => {
     const avatarUrl = "https://static-cdn.jtvnw.net/second.png";
     await writes.setUser({ userId: second, login: "second", displayName: "Second", avatarUrl });
     const placeAs = (userId: string, colorIndex: number, nowMs: number) =>
-      core.place(canvasId, { userId, requestId: randomUUID(), nowMs, pixels: [{ x: 3, y: 2, colorIndex }] });
+      core.place(canvasId, {
+        userId,
+        requestId: randomUUID(),
+        placementId: "ptest0001",
+        nowMs,
+        pixels: [{ x: 3, y: 2, colorIndex }],
+      });
     await placeAs(first, 5, now);
     await placeAs(second, 7, now + 1000);
 
@@ -605,6 +633,7 @@ describe("inspect (§5.6, JOURNAL 2026-09-24)", () => {
       avatarUrl,
       colorIndex: 7,
       placedAt: now + 1000,
+      placementId: "ptest0001",
     });
     await redis.del(userKey(second));
   });
@@ -618,6 +647,7 @@ describe("inspect (§5.6, JOURNAL 2026-09-24)", () => {
     await core.place(canvasId, {
       userId,
       requestId: randomUUID(),
+      placementId: "ptest0001",
       nowMs: now,
       pixels: [{ x: 1, y: 1, colorIndex: 4 }],
     });
@@ -640,6 +670,7 @@ describe("listEvents, the resync (§4.5)", () => {
       await core.place(canvasId, {
         userId: "user-1",
         requestId: randomUUID(),
+        placementId: "ptest0001",
         nowMs: now,
         pixels: [{ x, y: 0, colorIndex: 1 }],
       });
@@ -681,6 +712,7 @@ describe("listRecentEvents, the recent of the OBS view (§5.6, §9.5)", () => {
       await core.place(canvasId, {
         userId: "user-1",
         requestId: randomUUID(),
+        placementId: "ptest0001",
         nowMs: now - age,
         pixels: [{ x, y: 0, colorIndex: 1 }],
       });

@@ -88,6 +88,42 @@ describe("conflate (§6.2)", () => {
     expect(frame?.cells.map((changed) => changed.version)).toEqual([2, 3]);
   });
 
+  // Fusionne la case vue par le stream : celle de la dernière, et ce qu'il montrait avant la première (JOURNAL 2026-09-28)
+  it("conflates the cell seen by the stream: the last one's, and what it showed before the first", () => {
+    const visible = event(1, [cell(3, 2, 5, { previousColorIndex: 1 })]);
+    const offStream = event(2, [
+      cell(3, 2, 6, {
+        previousColorIndex: 5,
+        obs: { colorIndex: 5, previousColorIndex: 5, placedAt: occurredAt },
+      }),
+    ]);
+
+    expect(conflate([visible, offStream])?.cells).toEqual([
+      {
+        x: 3,
+        y: 2,
+        colorIndex: 6,
+        previousColorIndex: 1,
+        placedAt: occurredAt,
+        obs: { colorIndex: 5, previousColorIndex: 1, placedAt: occurredAt },
+        version: 2,
+        kind: "place",
+      },
+    ]);
+    expect(conflate([offStream, event(3, [cell(3, 2, 7, { previousColorIndex: 6 })])])?.cells).toEqual([
+      {
+        x: 3,
+        y: 2,
+        colorIndex: 7,
+        previousColorIndex: 5,
+        placedAt: occurredAt,
+        obs: { colorIndex: 7, previousColorIndex: 5, placedAt: occurredAt },
+        version: 3,
+        kind: "place",
+      },
+    ]);
+  });
+
   // Avance toVersion sur un événement sans case, pour que le client ne croie pas avoir manqué une version
   it("moves toVersion forward on an event without cells", () => {
     expect(conflate([event(4, [])])).toEqual({ toVersion: 4, cells: [] });

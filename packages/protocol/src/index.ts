@@ -9,24 +9,36 @@ import { z } from "zod";
 // 2 : cinq frames de modération, `cursor` et `clearArea` retirés. 3 : le délai OBS à chaud (JOURNAL 2026-09-25).
 // 4 : l'identifiant de l'auteur inspecté devient optionnel, et une `error` peut nommer sa requête (JOURNAL 2026-09-27).
 // 5 : le rôle se relit en direct (frame `role`), et les modérateurs se listent (JOURNAL 2026-09-27).
-export const PROTOCOL_VERSION = 5;
+// 6 : la pose, le signalement et la case vue par le stream (JOURNAL 2026-09-28).
+export const PROTOCOL_VERSION = 6;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
 // la seule forme que le client connaît : le worker/gateway traduit l'un
 // vers l'autre, sans jamais laisser `authorId` ni `moderation` franchir le fil.
 
+// Écart §4.3 (JOURNAL 2026-09-28) : `hide` et `unhide` ne changent que ce que montre le stream.
+export type EventKind = "place" | "clear" | "hide" | "unhide";
+
 export type Event = {
   version: number;
-  kind: "place" | "clear";
+  kind: EventKind;
   authorId: string | null; // null = système
   occurredAt: Timestamp;
   cells: EventCell[];
   // Écart §4.4 (JOURNAL 2026-09-25) : plus de `clearArea`, donc plus d'`area`.
   moderation?: {
-    action: "clearUser" | "ban" | "unban";
+    action: ModerateAction["action"];
     target: string;
+    placementId?: string; // `clearPlacement` et `approvePlacement` (JOURNAL 2026-09-28)
   };
+};
+
+// Écart §9.5 (JOURNAL 2026-09-28) : la case vue par le stream, quand une pose cachée est en jeu.
+export type StreamCell = {
+  colorIndex: number;
+  previousColorIndex: number;
+  placedAt: Timestamp;
 };
 
 export type EventCell = {
@@ -35,6 +47,7 @@ export type EventCell = {
   colorIndex: number; // la couleur désormais visible
   previousColorIndex: number; // celle qui était visible avant
   placedAt: Timestamp; // date de pose du pixel désormais visible
+  obs?: StreamCell | undefined; // absente : le stream voit la même chose que la page (Zod la type ainsi)
 };
 
 export type CellsFrame = {
@@ -44,7 +57,7 @@ export type CellsFrame = {
 
 export type BroadcastCell = EventCell & {
   version: number; // la version de CETTE case
-  kind: "place" | "clear"; // le genre de CETTE case
+  kind: EventKind; // le genre de CETTE case
 };
 
 // --- Fragments Zod partagés ---------------------------------------------
@@ -62,6 +75,9 @@ const VersionSchema = z.number().int().nonnegative();
 const CoordinateSchema = z.number().int().nonnegative();
 const ColorIndexSchema = z.number().int().min(0).max(255);
 const RoleSchema = z.enum(ROLES);
+// Écart §5.1 (JOURNAL 2026-09-28) : tirée par la page, elle commence par une lettre ; un pixel plus ancien a sa version.
+const ClientPlacementIdSchema = z.string().regex(/^[a-z][a-z0-9]{7,31}$/);
+const PlacementIdSchema = z.union([ClientPlacementIdSchema, z.string().regex(/^\d{1,16}$/)]);
 
 const PixelSchema = z.object({
   x: CoordinateSchema,
@@ -75,14 +91,18 @@ const GaugeSchema = z.object({
   nextRefillAt: TimestampSchema,
 });
 
-const BroadcastCellSchema = z.object({
-  x: CoordinateSchema,
-  y: CoordinateSchema,
+const StreamCellSchema = z.object({
   colorIndex: ColorIndexSchema,
   previousColorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
+});
+
+const BroadcastCellSchema = StreamCellSchema.extend({
+  x: CoordinateSchema,
+  y: CoordinateSchema,
+  obs: StreamCellSchema.optional(),
   version: VersionSchema,
-  kind: z.enum(["place", "clear"]),
+  kind: z.enum(["place", "clear", "hide", "unhide"]),
 });
 
 const CellsPayloadSchema = z.object({
@@ -106,6 +126,8 @@ const InspectEntrySchema = z.object({
   avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
+  placementId: PlacementIdSchema, // Écart §4.3 (JOURNAL 2026-09-28) : la pose, pour la signaler ou la retirer
+  canReport: z.boolean().optional(), // absent : ne peut pas la signaler
 });
 
 const ErrorCodeSchema = z.enum([
@@ -131,6 +153,7 @@ const HelloFrameSchema = z.object({
 const PlaceFrameSchema = z.object({
   t: z.literal("place"),
   requestId: RequestIdSchema,
+  placementId: ClientPlacementIdSchema, // le même pour chaque lot d'un brouillon validé (JOURNAL 2026-09-28)
   pixels: z.array(PixelSchema).min(1).max(64),
 });
 
@@ -142,10 +165,22 @@ const InspectFrameSchema = z.object({
 });
 
 // Écart §5.4 et §4.2 (JOURNAL 2026-09-25) : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
-const ModerateActionSchema = z.object({
-  action: z.enum(["clearUser", "ban", "unban"]),
-  target: UserIdSchema,
-});
+// Écart §5.4 (JOURNAL 2026-09-28) : une pose de l'auteur, et ses autres pixels posés entre `from` et `to`.
+const ModerateActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.enum(["clearUser", "ban", "unban"]), target: UserIdSchema }),
+  z.object({
+    action: z.literal("clearPlacement"),
+    target: UserIdSchema,
+    placementId: PlacementIdSchema,
+    range: z
+      .object({ from: TimestampSchema, to: TimestampSchema })
+      .refine(({ from, to }) => from <= to, "plage à l'envers")
+      .optional(),
+  }),
+  z.object({ action: z.literal("approvePlacement"), target: UserIdSchema, placementId: PlacementIdSchema }),
+]);
+
+export type ModerateAction = z.infer<typeof ModerateActionSchema>;
 
 const ModerateFrameSchema = z.object({
   t: z.literal("moderate"),
@@ -182,6 +217,17 @@ const SetObsDelayFrameSchema = z.object({
   obsDelayMs: ObsDelaySchema,
 });
 
+// Écart §4.2 (JOURNAL 2026-09-28) : la pose de la case, vérifiée par le serveur au moment du signalement.
+const ReportFrameSchema = z.object({
+  t: z.literal("report"),
+  requestId: RequestIdSchema,
+  x: CoordinateSchema,
+  y: CoordinateSchema,
+  placementId: PlacementIdSchema,
+});
+
+const ListReportsFrameSchema = z.object({ t: z.literal("listReports"), requestId: RequestIdSchema });
+
 const PingFrameSchema = z.object({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -194,6 +240,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListModeratorsFrameSchema,
   SetModeratorFrameSchema,
   SetObsDelayFrameSchema,
+  ReportFrameSchema,
+  ListReportsFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -261,12 +309,18 @@ const ModeratedFrameSchema = z.object({
 
 const BannedFrameSchema = z.object({ t: z.literal("banned") });
 
+// Écart §4.3 (JOURNAL 2026-09-28) : l'heure et la pose de chaque pixel, absentes de la preuve d'un ban.
+const AuthoredPixelSchema = PixelSchema.extend({
+  placedAt: TimestampSchema.optional(),
+  placementId: PlacementIdSchema.optional(),
+});
+
 // Écart §4.3 (JOURNAL 2026-09-25) : la réponse à `listPixels` et à `listBans`, et le débannissement en direct.
 const PixelsFrameSchema = z.object({
   t: z.literal("pixels"),
   requestId: RequestIdSchema,
   userId: UserIdSchema,
-  pixels: z.array(PixelSchema),
+  pixels: z.array(AuthoredPixelSchema),
 });
 
 const BannedUserSchema = z.object({
@@ -308,6 +362,34 @@ const ModeratorsFrameSchema = z.object({
   twitchSync: TwitchSyncSchema.optional(),
 });
 
+// Écart §4.3 (JOURNAL 2026-09-28) : une pose signalée, en attente d'un modérateur, avec ses pixels visibles.
+const ReportedPlacementSchema = z.object({
+  userId: UserIdSchema,
+  login: TwitchLoginSchema,
+  displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(),
+  hasAccount: z.boolean(),
+  placementId: PlacementIdSchema,
+  reportCount: z.number().int().positive(),
+  reportedAt: TimestampSchema, // le premier signalement
+  isOffStream: z.boolean(), // cachée du stream : le seuil est atteint
+  pixels: z.array(PixelSchema),
+});
+
+const ReportedFrameSchema = z.object({ t: z.literal("reported"), requestId: RequestIdSchema });
+
+const ReportsFrameSchema = z.object({
+  t: z.literal("reports"),
+  requestId: RequestIdSchema,
+  reports: z.array(ReportedPlacementSchema),
+});
+
+// Pour qui modère : à l'arrivée, puis à chaque signalement ou décision.
+const ReportCountFrameSchema = z.object({
+  t: z.literal("reportCount"),
+  count: z.number().int().nonnegative(),
+});
+
 // Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé pendant la session.
 const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 
@@ -337,6 +419,9 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   UnbannedFrameSchema,
   RoleFrameSchema,
   ObsDelayFrameSchema,
+  ReportedFrameSchema,
+  ReportsFrameSchema,
+  ReportCountFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);

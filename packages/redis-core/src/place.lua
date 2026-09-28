@@ -1,4 +1,4 @@
--- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts.
+-- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua.
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, gaugeKey, reqKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -6,7 +6,9 @@ local histPrefix, cellsPrefix, liveChannel, userId, requestId = ARGV[1], ARGV[2]
 local nowMs, paletteSize, cellStride, histDepth =
   tonumber(ARGV[6]), tonumber(ARGV[7]), tonumber(ARGV[8]), tonumber(ARGV[9])
 local eventsMaxlen, gaugeTtlSeconds, reqTtlSeconds = ARGV[10], ARGV[11], ARGV[12]
-local firstPixelArg = 13
+-- Écart §5.1 (JOURNAL 2026-09-28) : la pose dont ce lot fait partie.
+local placementId = ARGV[13]
+local firstPixelArg = 14
 local pixelCount = (#ARGV - firstPixelArg + 1) / 3
 
 -- cjson encode une table vide en `{}`, or `rejected` est un tableau.
@@ -68,6 +70,14 @@ local version
 if #accepted > 0 then
   -- 6. Version.
   version = redis.call("INCR", versionKey)
+  -- Écart §9.5 (JOURNAL 2026-09-28) : sans pose cachée, aucune pile n'est relue en entier.
+  local pile = openPile({
+    cleared = KEYS[8],
+    clearedPlacements = KEYS[9],
+    clearedRanges = KEYS[10],
+    offStream = KEYS[11],
+    cellStride = cellStride,
+  })
 
   -- 7. Écriture (D-15 : stateOffset pour `state`, cellKey pour tout le reste).
   local cells = {}
@@ -76,13 +86,14 @@ if #accepted > 0 then
     local cellKey = pixel.y * cellStride + pixel.x
     local histKey = histPrefix .. cellKey
     local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
+    local before = pile.hasOffStream and redis.call("LRANGE", histKey, 0, -1) or nil
     local head = redis.call("LINDEX", histKey, 0)
+    local entry = userId .. ":" .. pixel.colorIndex .. ":" .. nowMs .. ":" .. version .. ":" .. placementId
     redis.call("SETRANGE", stateKey, stateOffset, string.char(pixel.colorIndex))
-    redis.call("LPUSH", histKey, userId .. ":" .. pixel.colorIndex .. ":" .. nowMs .. ":" .. version)
+    redis.call("LPUSH", histKey, entry)
     redis.call("LTRIM", histKey, 0, histDepth - 1)
     if head then
-      -- Entrée `<userId>:<colorIndex>:<placedAt>:<version>`.
-      local previousAuthor = string.match(head, "^(.*):[^:]*:[^:]*:[^:]*$")
+      local previousAuthor = parseEntry(head).author
       if previousAuthor ~= userId then
         redis.call("SREM", cellsPrefix .. previousAuthor, cellKey)
       end
@@ -95,6 +106,10 @@ if #accepted > 0 then
       previousColorIndex = previousColorIndex,
       placedAt = nowMs,
     }
+    if before then
+      -- Une pose cachée en jeu : ce pixel en fait partie (signalée avant son dernier envoi), ou il en recouvre une.
+      cells[i].obs = pile.streamCell({ entry, unpack(before) }, cells[i], before)
+    end
   end
   charges = charges - #accepted
 

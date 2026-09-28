@@ -48,6 +48,14 @@ export function canModerate(role: Role): boolean {
   return role === "owner" || role === "moderator";
 }
 
+// CDC 2026, Signalement : 20 % des comptes connectés au canvas, arrondi au-dessus, au moins un.
+// En entiers : 0,2 × 15 vaut 3,0000000000000004 en flottants, qu'un arrondi au-dessus porterait à 4.
+const REPORT_PERCENT = 20;
+
+export function reportThreshold(connectedAccounts: number): number {
+  return Math.max(1, Math.ceil((connectedAccounts * REPORT_PERCENT) / 100));
+}
+
 // D-15 : deux index d'une même case, jamais interchangeables.
 export type CellKey = number & { readonly __brand: "CellKey" };
 export type StateOffset = number & { readonly __brand: "StateOffset" };

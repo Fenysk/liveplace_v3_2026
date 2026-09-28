@@ -33,6 +33,7 @@ describe("protocol frames", () => {
     const raw = {
       t: "place",
       requestId: "req-1",
+      placementId: "p1a2b3c4d5e6f7a8",
       pixels: [
         { x: 0, y: 0, colorIndex: 5 },
         { x: 10, y: 20, colorIndex: 0 },
@@ -92,11 +93,59 @@ describe("protocol frames", () => {
       requestId: "inspect-1",
       x: 1,
       y: 2,
-      entry: { login: "fenysk", displayName: "Fenysk", colorIndex: 3, placedAt: 1 },
+      entry: { login: "fenysk", displayName: "Fenysk", colorIndex: 3, placedAt: 1, placementId: "42" },
     };
     const refused = { t: "error", code: "rate_limited", requestId: "inspect-2" };
 
     expect(decodeServerFrame(inspected)).toEqual({ ok: true, value: inspected });
     expect(decodeServerFrame(refused)).toEqual({ ok: true, value: refused });
+  });
+
+  // Protocole 6 (JOURNAL 2026-09-28) : une pose tirée par la page commence par une lettre ; une version sert de pose
+  // à un pixel plus ancien, qu'on signale ou retire, mais jamais qu'on pose
+  it("takes a page-drawn placement to place, and a version as placement only to report or clear", () => {
+    const place = (placementId: string) =>
+      decodeClientFrame({ t: "place", requestId: "r", placementId, pixels: [{ x: 0, y: 0, colorIndex: 1 }] });
+    const report = (placementId: string) =>
+      decodeClientFrame({ t: "report", requestId: "r", x: 0, y: 0, placementId });
+
+    expect(place("p1a2b3c4d5e6f7a8").ok).toBe(true);
+    expect(place("42").ok).toBe(false);
+    expect(place("p1:2").ok).toBe(false);
+    expect(report("42").ok).toBe(true);
+    expect(report("p1a2b3c4d5e6f7a8").ok).toBe(true);
+  });
+
+  // Refuse une plage à l'envers, et accepte Rétablir
+  it("refuses a range the wrong way round, and accepts approvePlacement", () => {
+    const moderate = (action: Record<string, unknown>) =>
+      decodeClientFrame({ t: "moderate", requestId: "r", action });
+    const clearPlacement = { action: "clearPlacement", target: "troll", placementId: "42" };
+
+    expect(moderate({ ...clearPlacement, range: { from: 10, to: 20 } }).ok).toBe(true);
+    expect(moderate({ ...clearPlacement, range: { from: 20, to: 10 } }).ok).toBe(false);
+    expect(moderate({ action: "approvePlacement", target: "troll", placementId: "42" }).ok).toBe(true);
+  });
+
+  // Une case peut dire ce que voit le stream, et `hide` est un genre de case
+  it("lets a cell say what the stream sees, and hide is a kind of cell", () => {
+    const cells = {
+      t: "cells",
+      toVersion: 9,
+      cells: [
+        {
+          x: 1,
+          y: 2,
+          colorIndex: 5,
+          previousColorIndex: 5,
+          placedAt: 1,
+          obs: { colorIndex: 3, previousColorIndex: 5, placedAt: 0 },
+          version: 9,
+          kind: "hide",
+        },
+      ],
+    };
+
+    expect(decodeServerFrame(cells)).toEqual({ ok: true, value: cells });
   });
 });

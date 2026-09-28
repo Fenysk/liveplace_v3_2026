@@ -13,6 +13,24 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-28 — Écart §4.2, §4.3 et §9.5 : protocole 6, la case telle que le stream la voit
+
+**Contexte.** Une pose signalée quitte la vue OBS, pas la page (A3). La vue OBS ne connaît ni les piles ni les poses : le serveur doit lui dire quoi montrer.
+**Décision.** Une case (`EventCell`, `BroadcastCell`) peut porter `obs` : sa couleur, sa couleur d'avant et sa date vues par le stream, seulement quand une pose cachée est en jeu. Genres `hide` et `unhide` : immédiats dans la vue OBS, ignorés par la page. `place` porte `placementId` ; `inspected`, `placementId` et `canReport` ; `pixels`, l'heure et la pose. Frames `report` → `reported`, `listReports` → `reports`, `reportCount` pour qui modère. À son arrivée, la vue OBS reçoit un snapshot corrigé par les cases des poses cachées.
+**Renoncement.** Pas `obsColorIndex` seul (plan du jour, B) : un pixel posé sur une pose cachée pendant le délai referait paraître la pose au rechargement de la source, dont le `recent` revient à `previousColorIndex`.
+
+## 2026-09-28 — Écart §5.4 : `clearPlacement`, `approvePlacement` et `report.lua`
+
+**Contexte.** Plan du jour, B : retirer une pose ou une plage, Rétablir, signaler. Les quatre scripts lisent les piles et les pierres tombales de la même façon.
+**Décision.** `moderate.lua` apprend `clearPlacement` (une pose, et une plage d'heures si demandée, en tranches comme `clearUser`, sans vider `cells:`) et `approvePlacement` (en une fois). `report.lua` compte un signalement ; au seuil reçu du gateway, la pose entre dans `offstream` et un `hide` part. `pile.lua`, collé devant chaque script par `client.ts`, lit une entrée, les pierres tombales et la couleur vue par le stream.
+**Renoncement.** Un banni ne signale pas. Un modérateur, si : tout compte connecté signale (A0).
+
+## 2026-09-28 — Écart §5.1 et §5.3 : la pose entre dans la pile, et ses clés ont une rétention
+
+**Contexte.** Un brouillon validé peut partir en plusieurs envois (A1). Le plan du jour (B) prévoyait `pose-of` et `pose:<id>` : une entrée et une clé de plus à chaque pose, sans rétention possible (CDC §6). `hidden` est banni du lexique (synonyme de `cleared`).
+**Décision.** L'entrée de pile gagne un cinquième champ, `placementId` (tiré par la page, il commence par une lettre) ; une entrée plus ancienne a pour pose sa version. Une pose se nomme `<userId>:<placementId>`. Clés : `cleared:placements`, `cleared:ranges`, `approved` (vivent avec le canvas, comme `cleared`), `reports:<pose>` et `reported` (jusqu'à la décision d'un modérateur, ou élagués par `listReports` quand la pose n'a plus de pixel visible), `offstream` (jusqu'au retrait ou à Rétablir).
+**Renoncement.** Pas d'index pose → cases : ses cases se retrouvent par la tête des cases visibles de l'auteur (au plus width × height lectures), au signalement, au Rétablir et à l'arrivée d'une vue OBS seulement.
+
 ## 2026-09-27 — Écart CDC 2026 §2 et §4.2 : le streamer nomme un modérateur depuis la pill Inspection
 
 **Contexte.** Le CDC 2026 met « délégation à des modérateurs » hors du MVP. L'humain veut pouvoir nommer quelqu'un qui n'est pas modérateur sur sa chaîne Twitch (A4). La pill Inspection connaît l'identifiant de l'auteur, le streamer l'y reçoit.

@@ -10,13 +10,22 @@ export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => voi
 export type ControlListener = (control: LiveControl) => void;
 
 export interface Broadcast {
-  join(canvasId: string, listener: CellsListener, onControl: ControlListener): Promise<void>;
+  // `accountId` : le compte de la page, absent pour un invité et pour la vue OBS (JOURNAL 2026-09-28).
+  join(
+    canvasId: string,
+    listener: CellsListener,
+    onControl: ControlListener,
+    accountId?: string,
+  ): Promise<void>;
   leave(canvasId: string, listener: CellsListener): Promise<void>;
   tick(): void;
+  countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
 }
 
+type Member = { onControl: ControlListener; accountId: string | undefined };
+
 type CanvasBroadcast = {
-  listeners: Map<CellsListener, ControlListener>;
+  listeners: Map<CellsListener, Member>;
   pendingEvents: Event[];
   ticksWaited: number;
   subscription: Promise<Unsubscribe>;
@@ -39,7 +48,7 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
       ticksWaited: 0,
       subscription: core.subscribe(canvasId, (message) => {
         if ("e" in message) canvas.pendingEvents.push(message.e);
-        else for (const onControl of canvas.listeners.values()) onControl(message.ctl);
+        else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
       }),
     };
     canvases.set(canvasId, canvas);
@@ -48,9 +57,9 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
 
   return {
     // S'abonner avant que l'appelant lise l'état : le pub/sub n'a aucune mémoire (§6.1).
-    async join(canvasId, listener, onControl) {
+    async join(canvasId, listener, onControl, accountId) {
       const canvas = canvases.get(canvasId) ?? start(canvasId);
-      canvas.listeners.set(listener, onControl);
+      canvas.listeners.set(listener, { onControl, accountId });
       await canvas.subscription;
     },
 
@@ -76,6 +85,13 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
         const frame = { t: "cells" as const, ...conflated };
         for (const listener of canvas.listeners.keys()) listener(frame);
       }
+    },
+
+    countAccounts(canvasId) {
+      const accountIds = new Set<string>();
+      for (const { accountId } of canvases.get(canvasId)?.listeners.values() ?? [])
+        if (accountId) accountIds.add(accountId);
+      return accountIds.size;
     },
   };
 }

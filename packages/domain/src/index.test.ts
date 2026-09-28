@@ -15,6 +15,7 @@ import {
   REFILL_CHARGES,
   REFILL_MS,
   refillGauge,
+  reportThreshold,
   roleFor,
   type Session,
   type StateOffset,
@@ -60,6 +61,18 @@ describe("canModerate (§5.4)", () => {
     expect(canModerate("moderator")).toBe(true);
     expect(canModerate("viewer")).toBe(false);
     expect(canModerate("guest")).toBe(false);
+  });
+});
+
+describe("reportThreshold (CDC 2026, Signalement)", () => {
+  // 20 % des comptes connectés, arrondi au-dessus, au moins un, sans erreur de flottant
+  it("is 20 % of the connected accounts, rounded up, at least one, with no floating-point error", () => {
+    expect(reportThreshold(0)).toBe(1);
+    expect(reportThreshold(1)).toBe(1);
+    expect(reportThreshold(5)).toBe(1);
+    expect(reportThreshold(6)).toBe(2);
+    expect(reportThreshold(15)).toBe(3);
+    expect(reportThreshold(1000)).toBe(200);
   });
 });
 

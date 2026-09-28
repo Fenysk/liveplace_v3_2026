@@ -16,6 +16,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   role: "guest",
   params: { gaugeMax: 200, refillMs, refillCharges: 1, obsDelayMs: 5000 },
   gauge: null,
+  reportCount: 0,
   lastError: null,
   inspection: null,
   isBanned: false,
@@ -39,14 +40,16 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
   let canvasView = view;
   const canvasListeners = new Set<() => void>();
   const sentBatches: Pixel[][] = [];
+  const sentPlacementIds: string[] = [];
   const canvas: CanvasStore = {
     subscribe: (listener) => {
       canvasListeners.add(listener);
       return () => canvasListeners.delete(listener);
     },
     getView: () => canvasView,
-    placeBatch: async (pixels) => {
+    placeBatch: async (pixels, placementId) => {
       sentBatches.push([...pixels]);
+      sentPlacementIds.push(placementId);
       onPlace?.();
       const accepted = { ok: true as const, value: acceptAll(pixels) };
       return results.shift() ?? accepted;
@@ -58,6 +61,8 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     listBans: async () => ({ ok: true as const, value: [] }),
     listModerators: async () => ({ ok: true as const, value: { users: [] } }),
     setModerator: async () => ({ ok: true as const, value: { users: [] } }),
+    report: async () => ({ ok: true as const, value: true as const }),
+    listReports: async () => ({ ok: true as const, value: [] }),
     setObsDelay: () => undefined,
     listenArrivals: () => () => undefined,
     close: () => undefined,
@@ -84,7 +89,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     for (const listener of canvasListeners) listener();
   };
   const cells = () => [...store.getView().draft.values()];
-  return { store, sentBatches, entries, clock, setCanvasView, cells };
+  return { store, sentBatches, sentPlacementIds, entries, clock, setCanvasView, cells };
 };
 
 const acceptAll = (pixels: readonly Pixel[]) => ({
@@ -304,6 +309,20 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
     expect(clock.waits).toEqual([125, 125]);
     expect(cells()).toEqual([]);
     expect(store.getView().isSending).toBe(false);
+  });
+
+  // Tous les lots d'une validation portent la même pose ; la validation suivante en tire une autre (JOURNAL 2026-09-28)
+  it("gives every batch of one validation the same placement, and the next validation another one", async () => {
+    const { store, sentPlacementIds } = setup();
+    fill(store, 130);
+    await store.submit();
+    fill(store, 1);
+    await store.submit();
+
+    const [first, second, third, next] = sentPlacementIds;
+    expect([second, third]).toEqual([first, first]);
+    expect(next).not.toBe(first);
+    for (const placementId of sentPlacementIds) expect(placementId).toMatch(/^[a-z][a-z0-9]{7,31}$/);
   });
 
   // Garde les refusés dans le brouillon

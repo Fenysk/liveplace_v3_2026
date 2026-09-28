@@ -53,6 +53,9 @@ export type DraftClock = { now(): Timestamp; wait(ms: number): Promise<void> };
 const FIRST_COLOR_INDEX = TRANSPARENT_COLOR_INDEX + 1;
 const SEND_INTERVAL_MS = 1000 / 8; // 8 frames `place` par seconde au plus (§6.3)
 
+// Écart §5.1 (JOURNAL 2026-09-28) : une pose par validation ; une lettre d'abord, jamais confondue avec une version.
+const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", "").slice(0, 15)}`;
+
 export function createDraftStore(
   canvasId: string,
   canvas: CanvasStore,
@@ -119,14 +122,15 @@ export function createDraftStore(
     if (edit.isCapped && canShake) publish({ shakeCount: view.shakeCount + 1 });
   };
 
-  // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde.
+  // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde. Tous portent la pose de la validation.
   const sendBatches = async (): Promise<void> => {
+    const placementId = randomPlacementId();
     let lastSentAt = Number.NEGATIVE_INFINITY;
     for (const batch of toBatches(view.draft)) {
       const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
       if (delay > 0) await clock.wait(delay);
       lastSentAt = clock.now();
-      const result = await canvas.placeBatch(batch);
+      const result = await canvas.placeBatch(batch, placementId);
       // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
       if (!result.ok) return;
       setDraft(settleBatch(view.draft, batch, result.value));

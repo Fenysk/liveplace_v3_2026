@@ -4,9 +4,11 @@ import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { CanvasMeta, Session, Timestamp, User } from "./index";
 
+// Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
   userId: string;
   requestId: string;
+  placementId: string;
   nowMs: Timestamp;
   pixels: Extract<ClientFrame, { t: "place" }>["pixels"];
 };
@@ -14,6 +16,27 @@ export type Placement = {
 export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
 
 export type Pixel = Placement["pixels"][number];
+
+// Écart §4.3 (JOURNAL 2026-09-28) : un pixel visible de l'auteur, avec son heure et sa pose (absentes de la preuve d'un ban).
+export type AuthoredPixel = Extract<ServerFrame, { t: "pixels" }>["pixels"][number];
+
+// La pose d'un auteur : `placementId` n'est unique que pour lui (JOURNAL 2026-09-28).
+export type PlacementRef = { authorId: string; placementId: string };
+
+// Un signalement de la pose visible en (x, y), et le seuil calculé par le gateway sur les comptes connectés.
+export type Report = {
+  reporterId: string;
+  x: number;
+  y: number;
+  placementId: string;
+  threshold: number;
+  nowMs: Timestamp;
+};
+
+export type ReportedPlacement = Extract<ServerFrame, { t: "reports" }>["reports"][number];
+
+// Une case où la vue OBS montre autre chose que la page : une pose cachée du stream y est visible (JOURNAL 2026-09-28).
+export type OffStreamCell = { x: number; y: number; colorIndex: number };
 
 // D'où vient une action ou un rôle : LivePlace, ou la chaîne Twitch du streamer (JOURNAL 2026-09-27).
 export type ModerationSource = "liveplace" | "twitch";
@@ -78,7 +101,8 @@ export type Snapshot = { state: Uint8Array; version: number };
 export type LiveControl =
   | { t: "banned" | "unbanned"; userId: string }
   | { t: "role"; userId: string } // ses droits de modération ont changé (JOURNAL 2026-09-27)
-  | { t: "obsDelay"; obsDelayMs: number };
+  | { t: "obsDelay"; obsDelayMs: number }
+  | { t: "reports"; count: number }; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
@@ -103,8 +127,17 @@ export interface CanvasCore {
   ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">>;
   // Écart §5.6 (JOURNAL 2026-09-25) : l'état banni au `hello`, les pixels d'un auteur, et les bannis.
   isBanned(canvasId: string, userId: string): Promise<boolean>;
-  listPixels(canvasId: string, userId: string): Promise<Pixel[]>; // un banni : sa preuve (§5.1)
+  listPixels(canvasId: string, userId: string): Promise<AuthoredPixel[]>; // un banni : sa preuve (§5.1)
   listBans(canvasId: string): Promise<BannedUser[]>;
+  // Écart §5.4 (JOURNAL 2026-09-28) : `changed`, la case ne montre plus cette pose ; `forbidden`, elle ne se signale pas.
+  report(
+    canvasId: string,
+    report: Report,
+  ): Promise<Result<void, "canvas_not_found" | "changed" | "forbidden">>;
+  canReport(canvasId: string, placement: PlacementRef, reporterId: string): Promise<boolean>; // ni signalée par lui, ni rétablie, ni lui banni
+  listReports(canvasId: string): Promise<ReportedPlacement[]>; // du plus ancien signalement au plus récent
+  getReportCount(canvasId: string): Promise<number>;
+  listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
   listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;
   // Le `recent` de la vue OBS (§9.5) : les événements depuis `sinceMs`, du plus ancien au plus récent, 2000 au plus.

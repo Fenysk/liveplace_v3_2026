@@ -3,15 +3,23 @@
 import { type Role, type Timestamp, toStateOffset } from "@liveplace/domain";
 import type {
   AckFrame,
+  AuthoredPixel,
   BannedUser,
   InspectEntry,
   Moderation,
   Moderator,
   Placement,
+  ReportedPlacement,
   Transport,
   TwitchSync,
 } from "@liveplace/domain/ports";
-import { type CellsFrame, type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
+import {
+  type BroadcastCell,
+  type CellsFrame,
+  type ClientFrame,
+  PROTOCOL_VERSION,
+  type ServerFrame,
+} from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
@@ -67,6 +75,7 @@ export type CanvasView = {
   avatarUrl?: string; // absente pour un invité, ou d'une session d'avant la photo (JOURNAL 2026-09-24)
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
+  reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   lastError: ErrorCode | null;
   inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
@@ -76,16 +85,19 @@ export type CanvasStore = {
   subscribe(listener: () => void): () => void; // la forme qu'attend `useSyncExternalStore`
   getView(): CanvasView;
   // Pose optimiste (§9.3) : les pixels changent tout de suite, et la promesse se résout sur l'ack du même `requestId`.
-  placeBatch(pixels: readonly Pixel[]): Promise<PlaceResult>;
+  // `placementId` : la pose, le brouillon validé dont ce lot fait partie (JOURNAL 2026-09-28).
+  placeBatch(pixels: readonly Pixel[], placementId: string): Promise<PlaceResult>;
   inspect(x: number, y: number): void;
   closeInspection(): void;
   // Réglée à la dernière tranche, avec le total des cases retirées (§4.3).
   moderate(action: ModerationAction): Promise<RequestResult<{ cells: number }>>;
-  listPixels(userId: string): Promise<RequestResult<Pixel[]>>; // un banni : sa preuve
+  listPixels(userId: string): Promise<RequestResult<AuthoredPixel[]>>; // un banni : sa preuve
   listBans(): Promise<RequestResult<BannedUser[]>>;
   listModerators(): Promise<RequestResult<ModeratorList>>; // JOURNAL 2026-09-27
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
+  report(x: number, y: number, placementId: string): Promise<RequestResult<true>>; // JOURNAL 2026-09-28
+  listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   close(): void;
 };
@@ -103,7 +115,10 @@ type PendingBatch = {
   resolve(result: PlaceResult): void;
 };
 
-type ReplyFrame = Extract<ServerFrame, { t: "moderated" | "pixels" | "bans" | "moderators" }>;
+type ReplyFrame = Extract<
+  ServerFrame,
+  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" }
+>;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
 type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCode | "closed"): void };
@@ -129,6 +144,7 @@ export function createCanvasStore(
     palette: [],
     version: 0,
     gauge: null,
+    reportCount: 0,
     lastError: null,
     inspection: null,
     isBanned: false,
@@ -153,13 +169,16 @@ export function createCanvasStore(
     for (const listener of listeners) listener();
   };
 
+  const writeCell = ({ x, y, colorIndex }: BroadcastCell): void => {
+    const offset = toStateOffset(x, y, view.width);
+    view.pixels[offset] = colorIndex;
+    for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
+  };
+
   // Le seul chemin d'écriture des cases venues du serveur : flux live, et plus tard resync et vue OBS (§9.2).
+  // Écart §4.3 (JOURNAL 2026-09-28) : `hide` et `unhide` ne regardent que le stream, la page garde l'état réel.
   const apply = (frame: CellsFrame): void => {
-    for (const cell of frame.cells) {
-      const offset = toStateOffset(cell.x, cell.y, view.width);
-      view.pixels[offset] = cell.colorIndex;
-      for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
-    }
+    for (const cell of frame.cells) if (cell.kind === "place" || cell.kind === "clear") writeCell(cell);
     publish({ version: frame.toVersion });
     emit({ kind: "cells", frame: { toVersion: frame.toVersion, cells: frame.cells } });
   };
@@ -314,7 +333,12 @@ export function createCanvasStore(
       case "pixels":
       case "bans":
       case "moderators":
+      case "reported":
+      case "reports":
         answer(frame);
+        break;
+      case "reportCount":
+        publish({ reportCount: frame.count });
         break;
       case "banned":
       case "unbanned":
@@ -365,7 +389,7 @@ export function createCanvasStore(
       return () => listeners.delete(listener);
     },
     getView: () => view,
-    placeBatch(pixels) {
+    placeBatch(pixels, placementId) {
       const requestId = crypto.randomUUID();
       const offsets = pixels.map(({ x, y }) => toStateOffset(x, y, view.width));
       const previousColorIndexes = offsets.map((offset) => view.pixels[offset] ?? 0);
@@ -373,7 +397,7 @@ export function createCanvasStore(
         const offset = offsets[index];
         if (offset !== undefined) view.pixels[offset] = colorIndex;
       });
-      const frame: PlaceFrame = { t: "place", requestId, pixels: [...pixels] };
+      const frame: PlaceFrame = { t: "place", requestId, placementId, pixels: [...pixels] };
       const placed = new Promise<PlaceResult>((resolve) => {
         const sentAt = options.now();
         pending.set(requestId, { frame, sentAt, offsets, previousColorIndexes, touched: new Set(), resolve });
@@ -413,6 +437,14 @@ export function createCanvasStore(
       request({ t: "setModerator", requestId: crypto.randomUUID(), userId, isModerator }, toModeratorList),
     setObsDelay: (obsDelayMs) =>
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
+    report: (x, y, placementId) =>
+      request({ t: "report", requestId: crypto.randomUUID(), x, y, placementId }, (reply) =>
+        reply.t === "reported" ? true : undefined,
+      ),
+    listReports: () =>
+      request({ t: "listReports", requestId: crypto.randomUUID() }, (reply) =>
+        reply.t === "reports" ? reply.reports : undefined,
+      ),
     listenArrivals(listener) {
       arrivalListeners.add(listener);
       return () => arrivalListeners.delete(listener);

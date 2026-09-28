@@ -15,6 +15,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   role: "guest",
   params: { gaugeMax: 10, refillMs: 10_000, refillCharges: 1, obsDelayMs },
   gauge: null,
+  reportCount: 0,
   lastError: null,
   inspection: null,
   isBanned: false,
@@ -48,6 +49,8 @@ const setup = () => {
     listModerators: unused,
     setModerator: unused,
     setObsDelay: unused,
+    report: unused,
+    listReports: unused,
     close: () => undefined,
   };
   // Une horloge qu'on avance à la main : les minuteurs partent quand on y arrive.
