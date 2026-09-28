@@ -115,6 +115,14 @@ describe("refillGauge", () => {
     });
   });
 
+  // Pleine, elle n'avance plus : après une longue pause, la recharge repart de maintenant (JOURNAL 2026-09-29)
+  it("stops advancing once full: after a long pause, the refill starts again from now", () => {
+    const gauge = { charges: params.gaugeMax - 1, at: start };
+    const later = start + 60 * params.refillMs + params.refillMs / 2;
+
+    expect(refillGauge(gauge, later, params)).toEqual({ charges: params.gaugeMax, at: later });
+  });
+
   // Garde le reste d'une période incomplète
   it("keeps the remainder of an unfinished interval", () => {
     const gauge = { charges: 0, at: start };

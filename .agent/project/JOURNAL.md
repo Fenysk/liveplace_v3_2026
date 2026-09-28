@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Écart §5.3 : la jauge pleine n'avance plus
+
+**Contexte.** Plan du jour, H (bilan, §7). Pleine, la jauge gardait l'heure de sa dernière recharge : après une longue pause, la première charge dépensée revenait en moins d'un intervalle.
+**Décision.** Pleine après la recharge paresseuse, `at` prend l'heure de la requête, dans `place.lua` comme dans `refillGauge` : la recharge repart de la première charge dépensée.
+**Renoncement.** Pas de migration : chaque jauge pleine se recale à sa prochaine lecture.
+
 ## 2026-09-29 — Écart §5.1, §5.3 et §6.1 : changer la taille d'un canvas en direct (`resize.lua`)
 
 **Contexte.** Plan du jour, F (A5). `state` est rangé par largeur, les piles par `cellKey` (D-15) : seul `state` est à refaire.

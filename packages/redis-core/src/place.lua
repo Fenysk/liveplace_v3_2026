@@ -40,6 +40,10 @@ else
   local refills = math.max(0, math.floor((nowMs - at) / refillMs))
   charges = math.min(gaugeMax, charges + refills * refillCharges)
   at = at + refills * refillMs
+  -- Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
+  if charges >= gaugeMax then
+    at = nowMs
+  end
 end
 
 -- 2. Ban.

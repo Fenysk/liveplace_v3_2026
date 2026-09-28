@@ -119,10 +119,9 @@ export const REFILL_CHARGES = 1;
 export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: GaugeParams): Gauge {
   if (!gauge) return { charges: params.gaugeMax, at: nowMs };
   const refills = Math.max(0, Math.floor((nowMs - gauge.at) / params.refillMs));
-  return {
-    charges: Math.min(params.gaugeMax, gauge.charges + refills * params.refillCharges),
-    at: gauge.at + refills * params.refillMs,
-  };
+  const charges = Math.min(params.gaugeMax, gauge.charges + refills * params.refillCharges);
+  // Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
+  return { charges, at: charges >= params.gaugeMax ? nowMs : gauge.at + refills * params.refillMs };
 }
 
 // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai par crans, jusqu'à 10 min.

@@ -277,6 +277,21 @@ describe("place (§5.3)", () => {
   });
 
   // Ne vide pas la jauge et ne recule pas `at` quand l'horloge recule
+  // Pleine après une longue pause, la jauge repart de la première charge dépensée : 10 s pleines (JOURNAL 2026-09-29)
+  it("full after a long pause, the gauge starts again from the first spent charge: a full interval", async () => {
+    const { canvasId } = await readyCanvas();
+    await placed(canvasId, placement());
+    const later = now + 100 * meta.refillMs + meta.refillMs / 2;
+
+    const ack = await placed(canvasId, placement({ nowMs: later, pixels: [{ x: 0, y: 1, colorIndex: 1 }] }));
+
+    expect(ack.gauge).toEqual({
+      charges: meta.gaugeMax - 1,
+      max: meta.gaugeMax,
+      nextRefillAt: later + meta.refillMs,
+    });
+  });
+
   it("neither drains the gauge nor moves it back when the clock goes backwards", async () => {
     const { canvasId, keys } = await readyCanvas();
     const request = placement();
