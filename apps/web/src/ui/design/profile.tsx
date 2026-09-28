@@ -98,9 +98,10 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
 };
 
 // Dans la pill Compte, sa propre photo n'est pas un profil : c'est le bouton Mon compte.
-type AvatarButtonProps = { user: AvatarProps; title: string; onPress: () => void };
+// `hasDot` : quelque chose l'attend, un signalement pour qui modère (JOURNAL 2026-09-28) ; `title` le dit.
+type AvatarButtonProps = { user: AvatarProps; title: string; onPress: () => void; hasDot?: boolean };
 
-export const AvatarButton = ({ user, title, onPress }: AvatarButtonProps) => (
+export const AvatarButton = ({ user, title, onPress, hasDot = false }: AvatarButtonProps) => (
   <button
     type="button"
     className="lp-btn lp-avatar-btn"
@@ -109,5 +110,6 @@ export const AvatarButton = ({ user, title, onPress }: AvatarButtonProps) => (
     onClick={blurAfterClick(onPress)}
   >
     <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
+    {hasDot && <span className="lp-avatar-dot" aria-hidden="true" />}
   </button>
 );

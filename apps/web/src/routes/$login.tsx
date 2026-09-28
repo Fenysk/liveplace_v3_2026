@@ -77,7 +77,7 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
       <AccountPill
         {...account}
         isCompact={isCompact}
-        onOpenAccount={() => openWindow("account")}
+        onOpenAccount={() => openWindow(account.pendingReports ? "moderation" : "account")}
         onSignIn={signingIn.onSignIn}
       />
       {account.identity.kind === "signedIn" && (
@@ -91,7 +91,12 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
           onPickTheme={account.onPickTheme}
           moderationTab={
             moderation.controls && (
-              <ModerationTab canvas={stores.canvas} login={login} onSync={signingIn.onSignIn} />
+              <ModerationTab
+                canvas={stores.canvas}
+                login={login}
+                onSync={signingIn.onSignIn}
+                onModerate={moderation.controls.onModerate}
+              />
             )
           }
           obsTab={isOwner ? <ObsTab canvas={stores.canvas} login={login} /> : undefined}

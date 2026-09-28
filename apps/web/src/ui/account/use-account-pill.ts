@@ -1,5 +1,6 @@
 // Ce que montre la pill Compte : qui est connecté, d'après la réponse du gateway au `hello`, et le thème choisi.
 
+import { canModerate } from "@liveplace/domain";
 import { useSyncExternalStore } from "react";
 import type { CanvasStore, CanvasView } from "../../state/canvas-store";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
@@ -26,5 +27,6 @@ export function useAccountPillProps(canvas: CanvasStore, login: string): Account
     signOutHref: signOutHref(login),
     themeChoice,
     onPickTheme: pickTheme,
+    pendingReports: view.role && canModerate(view.role) ? view.reportCount : 0,
   };
 }

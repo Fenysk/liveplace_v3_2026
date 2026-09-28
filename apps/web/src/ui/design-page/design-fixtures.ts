@@ -1,7 +1,7 @@
 // Les exemples de /design : des utilisateurs de démonstration, et rien d'autre. Aucune connexion, aucun store.
 
 import { PALETTE } from "@liveplace/domain";
-import type { AuthoredPixel, BannedUser, Moderator, Pixel } from "@liveplace/domain/ports";
+import type { AuthoredPixel, BannedUser, Moderator, Pixel, ReportedPlacement } from "@liveplace/domain/ports";
 import type { ProfileUser } from "../design/profile";
 import sampleAvatarUrl from "./sample-avatar.svg?url";
 
@@ -52,6 +52,32 @@ export const samplePlacements = (nowMs: number): readonly AuthoredPixel[] => [
     placedAt: nowMs + 40 * 60_000,
     placementId: "pline0001",
   })),
+];
+
+// Deux poses signalées : l'une cachée du stream (le seuil est atteint), l'autre en attente.
+export const sampleReports = (nowMs: number): readonly ReportedPlacement[] => [
+  {
+    userId: "3",
+    login: "troll42",
+    displayName: "Troll42",
+    hasAccount: true,
+    placementId: SAMPLE_PLACEMENT_ID,
+    reportCount: 3,
+    reportedAt: nowMs - 2 * 60_000,
+    isOffStream: true,
+    pixels: [...SAMPLE_DRAWING],
+  },
+  {
+    userId: "2",
+    login: "pixelmoth",
+    displayName: "pixelmoth",
+    hasAccount: true,
+    placementId: "pline0001",
+    reportCount: 1,
+    reportedAt: nowMs - 30_000,
+    isOffStream: false,
+    pixels: SAMPLE_DRAWING.slice(0, 14).map((pixel) => ({ ...pixel, colorIndex: 28 })),
+  },
 ];
 
 // Des pixels d'un bout à l'autre du canvas : l'aperçu le montre en entier.

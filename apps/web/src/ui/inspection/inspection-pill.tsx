@@ -1,10 +1,10 @@
 // La pill Inspection (CDC 2026), au centre à droite : l'auteur du pixel inspecté, sa couleur, sa date de pose.
-// Pour qui modère, sous un filet : Retirer ses pixels et Bannir (maquette). L'affichage seul, nourri par
-// `useInspectionPillProps`.
+// Sous un filet, Signaler pour tout compte (JOURNAL 2026-09-28), puis pour qui modère Retirer ses pixels et Bannir
+// (maquette). L'affichage seul, nourri par `useInspectionPillProps`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { InspectEntry } from "@liveplace/domain/ports";
-import { X } from "lucide-react";
+import { Check, Flag, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Badge } from "../design/badge";
@@ -20,17 +20,36 @@ import { formatPlacedAgo } from "./placed-ago";
 const DOCK: PillDock = "cr";
 const PLACED_AT_FORMAT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
 
+// Signaler la pose inspectée (JOURNAL 2026-09-28). `reported` : c'est fait, le bouton le dit et se désactive.
+export type ReportControl = { status: "available" | "sending" | "reported"; onReport: () => void };
+
 export type InspectionPillProps = {
   inspection: Inspection | null;
   palette: readonly string[];
   nowMs: number; // pour la date relative
   onClose: () => void;
+  report?: ReportControl | undefined; // absent : cette pose ne se signale pas
   moderation?: ModerationControls | undefined; // absente : pas le droit de modérer
   isDocked?: boolean;
 };
 
 const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
   <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
+);
+
+const ReportRow = ({ report }: { report: ReportControl }) => (
+  <div className="lp-row lp-row--ruled">
+    {report.status === "reported" ? (
+      <Button icon={Check} label="Signalé" isDisabled onPress={report.onReport} />
+    ) : (
+      <Button
+        icon={Flag}
+        label="Signaler"
+        isDisabled={report.status === "sending"}
+        onPress={report.onReport}
+      />
+    )}
+  </div>
 );
 
 type ModerationRowProps = { moderation: ModerationControls; author: InspectEntry };
@@ -78,11 +97,14 @@ const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   );
 };
 
-type InspectedCellProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose" | "moderation"> & {
+type InspectedCellProps = Pick<
+  InspectionPillProps,
+  "palette" | "nowMs" | "onClose" | "report" | "moderation"
+> & {
   inspection: Exclude<Inspection, { status: "loading" }>;
 };
 
-const InspectedCell = ({ inspection, palette, nowMs, onClose, moderation }: InspectedCellProps) => {
+const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation }: InspectedCellProps) => {
   const coordinates = `(${inspection.x}, ${inspection.y})`;
   if (inspection.status === "empty")
     return (
@@ -117,6 +139,7 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose, moderation }: Insp
           {formatPlacedAgo(entry.placedAt, nowMs)}
         </span>
       </div>
+      {report && <ReportRow report={report} />}
       {moderation && <ModerationRow moderation={moderation} author={entry} />}
     </>
   );
@@ -146,6 +169,7 @@ export const InspectionPill = ({
   palette,
   nowMs,
   onClose,
+  report,
   moderation,
   isDocked = true,
 }: InspectionPillProps) => {
@@ -159,6 +183,7 @@ export const InspectionPill = ({
           palette={palette}
           nowMs={nowMs}
           onClose={onClose}
+          report={report}
           moderation={moderation}
         />
       )}

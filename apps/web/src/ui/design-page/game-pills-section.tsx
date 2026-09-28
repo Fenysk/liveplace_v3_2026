@@ -12,7 +12,7 @@ import { NoticePill } from "../design/pill";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
-import { InspectionPill } from "../inspection/inspection-pill";
+import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
 import { ObsSettings } from "../obs/obs-settings";
 import { noop, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
@@ -98,7 +98,9 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
   },
 ];
 
-const inspections = (nowMs: number): readonly { caption: string; inspection: Inspection }[] => [
+const inspections = (
+  nowMs: number,
+): readonly { caption: string; inspection: Inspection; report?: ReportControl }[] => [
   {
     caption: "Un pixel et son auteur",
     inspection: {
@@ -129,6 +131,32 @@ const inspections = (nowMs: number): readonly { caption: string; inspection: Ins
       },
     },
   },
+  {
+    caption: "La pose d'un autre : Signaler",
+    inspection: {
+      status: "found",
+      x: 122,
+      y: 82,
+      entry: {
+        ...SAMPLE_VIEWER,
+        colorIndex: 5,
+        placedAt: nowMs - 90_000,
+        placementId: "pdemo0003",
+        canReport: true,
+      },
+    },
+    report: { status: "available", onReport: noop },
+  },
+  {
+    caption: "Une fois signalée",
+    inspection: {
+      status: "found",
+      x: 122,
+      y: 82,
+      entry: { ...SAMPLE_VIEWER, colorIndex: 5, placedAt: nowMs - 90_000, placementId: "pdemo0003" },
+    },
+    report: { status: "reported", onReport: noop },
+  },
   { caption: "Une case jamais posée", inspection: { status: "empty", x: 200, y: 180 } },
 ];
 
@@ -136,11 +164,17 @@ const ACCOUNT_IDENTITIES: readonly {
   caption: string;
   identity: AccountPillProps["identity"];
   isCompact?: boolean;
+  pendingReports?: number;
 }[] = [
   { caption: "Avant la réponse du gateway", identity: { kind: "unknown" } },
   { caption: "Invité", identity: { kind: "guest" } },
   { caption: "Invité, sur mobile", identity: { kind: "guest" }, isCompact: true },
   { caption: "Connecté : sa photo ouvre Mon compte", identity: { kind: "signedIn", user: SAMPLE_OWNER } },
+  {
+    caption: "Qui modère, un signalement attend : sa photo ouvre Modération",
+    identity: { kind: "signedIn", user: SAMPLE_OWNER },
+    pendingReports: 2,
+  },
 ];
 
 const VIEWPORT_SPECIMENS: readonly { caption: string; framing: Framing; isCompact: boolean }[] = [
@@ -199,7 +233,7 @@ export const GamePillsSection = () => {
         <Specimen caption="Canvas, pour le streamer : Réglages ouvre la fenêtre sur Vue OBS">
           <CanvasPill owner={SAMPLE_OWNER} onOpenSettings={noop} isDocked={false} />
         </Specimen>
-        {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact }) => (
+        {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact, pendingReports }) => (
           <Specimen key={caption} caption={caption}>
             <AccountPill
               identity={identity}
@@ -207,6 +241,7 @@ export const GamePillsSection = () => {
               themeChoice={themeChoice}
               onPickTheme={pickTheme}
               onOpenAccount={noop}
+              pendingReports={pendingReports ?? 0}
               isCompact={isCompact ?? false}
               isDocked={false}
             />
@@ -218,13 +253,14 @@ export const GamePillsSection = () => {
         title="Inspection"
         note="Au centre à droite, seulement pendant une inspection, en mode Vue."
       >
-        {inspections(nowMs).map(({ caption, inspection }) => (
+        {inspections(nowMs).map(({ caption, inspection, report }) => (
           <Specimen key={caption} caption={caption}>
             <InspectionPill
               inspection={inspection}
               palette={PALETTE}
               nowMs={nowMs}
               onClose={noop}
+              report={report}
               isDocked={false}
             />
           </Specimen>

@@ -17,6 +17,7 @@ import {
   ModerationWindow,
 } from "../moderation/moderation-window";
 import { ModeratorUsers } from "../moderation/moderator-users";
+import { ReportedPlacements, type ReportedPlacementsProps } from "../moderation/reported-placements";
 import { TwitchSyncBlock, type TwitchSyncView } from "../moderation/twitch-sync";
 import type { ModerationControls } from "../moderation/use-moderation";
 import {
@@ -29,6 +30,7 @@ import {
   SAMPLE_PLACEMENT_ID,
   SAMPLE_VIEWER,
   samplePlacements,
+  sampleReports,
 } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
@@ -176,6 +178,31 @@ const TAB_STATES: readonly { caption: string; props: BannedUsersProps }[] = [
   { caption: "Connexion perdue", props: { ...TAB_BASE, list: { status: "failed" } } },
 ];
 
+const REPORTS_BASE = (nowMs: number): Omit<ReportedPlacementsProps, "list"> => ({
+  approvingPlacementId: null,
+  canvas: SAMPLE_CANVAS,
+  nowMs,
+  onClear: noop,
+  onBan: noop,
+  onApprove: noop,
+});
+
+const REPORT_STATES = (nowMs: number): readonly { caption: string; props: ReportedPlacementsProps }[] => [
+  {
+    caption: "Deux poses signalées : l'une cachée du stream, l'autre en attente du seuil",
+    props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: sampleReports(nowMs) } },
+  },
+  {
+    caption: "Rétablir attend sa réponse",
+    props: {
+      ...REPORTS_BASE(nowMs),
+      list: { status: "ready", reports: sampleReports(nowMs).slice(0, 1) },
+      approvingPlacementId: SAMPLE_PLACEMENT_ID,
+    },
+  },
+  { caption: "Aucun signalement", props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: [] } } },
+];
+
 const SYNC_STATES = (nowMs: number): readonly { caption: string; sync: TwitchSyncView }[] => [
   { caption: "Pour le streamer, jamais synchronisé", sync: { status: "never" } },
   { caption: "Pour le streamer, synchronisé", sync: { status: "ok", syncedAt: nowMs - 3 * MINUTE } },
@@ -264,6 +291,13 @@ export const ModerationSection = () => {
         title="L'onglet Modération"
         note="Dans la fenêtre, pour le streamer et ses modérateurs."
       >
+        {REPORT_STATES(nowMs).map(({ caption, props }) => (
+          <Specimen key={caption} caption={caption}>
+            <div className="design-window-box">
+              <ReportedPlacements {...props} />
+            </div>
+          </Specimen>
+        ))}
         {SYNC_STATES(nowMs).map(({ caption, sync }) => (
           <Specimen key={caption} caption={caption}>
             <div className="design-window-box">

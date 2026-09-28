@@ -128,6 +128,28 @@
   min-height: var(--control-size);
 }
 
+/* Un signalement (JOURNAL 2026-09-28) : l'aperçu de la pose à gauche, qui, combien et les décisions à droite */
+.lp-report {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.lp-report-preview {
+  flex: none;
+  width: 88px;
+}
+
+.lp-report-body {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-report-actions {
+  flex-wrap: wrap;
+}
+
 /* La petite fenêtre (JOURNAL 2026-09-25) : une question ou un avis, au centre, aussi haute que son contenu */
 .lp-window--small {
   width: min(400px, calc(100% - 2 * var(--space-4)));

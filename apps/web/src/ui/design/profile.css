@@ -83,7 +83,27 @@ button.lp-profile-main:hover .lp-profile-name {
 }
 
 .lp-avatar-btn {
+  position: relative;
   padding: 0;
   width: var(--control-size);
   background: none;
+}
+
+/* Quelque chose attend (JOURNAL 2026-09-28) : un point rouge, détouré de la couleur de la pill */
+.lp-avatar-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--pill-surface);
+  animation: lp-dot-in var(--lp-dur) var(--lp-ease);
+}
+
+@keyframes lp-dot-in {
+  from {
+    transform: scale(0);
+  }
 }

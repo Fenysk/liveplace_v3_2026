@@ -5,6 +5,7 @@ import { AvatarButton, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
 import { ThemeButton } from "../design/theme-controls";
 import { SignInButton } from "../design/twitch";
+import { reportCountLabel } from "../moderation/moderation-texts";
 
 const DOCK: PillDock = "tr";
 
@@ -19,7 +20,8 @@ export type AccountPillProps = {
   signInHref: string;
   themeChoice: ThemeChoice;
   onPickTheme: (choice: ThemeChoice) => void;
-  onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte
+  onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent
+  pendingReports?: number; // pour qui modère : un point sur sa photo tant qu'il y en a (JOURNAL 2026-09-28)
   onSignIn?: () => void; // la page part chez Twitch
   isCompact?: boolean;
   isDocked?: boolean;
@@ -31,6 +33,7 @@ export const AccountPill = ({
   themeChoice,
   onPickTheme,
   onOpenAccount,
+  pendingReports = 0,
   onSignIn,
   isCompact = false,
   isDocked = true,
@@ -45,7 +48,14 @@ export const AccountPill = ({
         <SignInButton href={signInHref} label="Se connecter" onPress={onSignIn} />
       ))}
     {identity.kind === "signedIn" && (
-      <AvatarButton user={identity.user} title="Mon compte" onPress={onOpenAccount} />
+      <AvatarButton
+        user={identity.user}
+        title={
+          pendingReports > 0 ? `Mon compte · ${reportCountLabel(pendingReports)} en attente` : "Mon compte"
+        }
+        hasDot={pendingReports > 0}
+        onPress={onOpenAccount}
+      />
     )}
   </Pill>
 );
