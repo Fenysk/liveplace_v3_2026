@@ -146,7 +146,14 @@ const GamePage = () => {
   return (
     <main className="lp-game">
       <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
-      {stores && <PixelCanvas store={stores.canvas} draftStore={stores.draft} canvasId={canvasId} />}
+      {stores && (
+        <PixelCanvas
+          store={stores.canvas}
+          draftStore={stores.draft}
+          canvasId={canvasId}
+          ownerName={owner.displayName}
+        />
+      )}
       {stores ? (
         // CDC 2026, Toasts : un seul à la fois, pour toute la page.
         <ToastProvider>

@@ -14,16 +14,16 @@ const ZOOM_STEP = 1.5;
 // Lu à chaque accès, dans un `try` : dans une fenêtre qui refuse le stockage, l'accès lui-même lève.
 const getBrowserStorage = () => window.localStorage;
 
-type PixelCanvasProps = { store: CanvasStore; draftStore: DraftStore; canvasId: string };
+type PixelCanvasProps = { store: CanvasStore; draftStore: DraftStore; canvasId: string; ownerName: string };
 
-export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) => {
+export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
   const checker = useRef<HTMLDivElement>(null);
   const checkerTiles = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<CanvasScene>();
   const [framing, setFraming] = useState<Framing | null>(null);
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
-  const { inspection } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
+  const { inspection, width, height } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
   const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
 
   // Le viewport sauvegardé se lit ici, jamais pendant le rendu : `localStorage` n'existe pas sur le serveur.
@@ -51,7 +51,13 @@ export const PixelCanvas = ({ store, draftStore, canvasId }: PixelCanvasProps) =
       <div ref={checker} className="lp-checker" aria-hidden="true">
         <div ref={checkerTiles} className="lp-checker-tiles" />
       </div>
-      <canvas ref={surface} className="lp-canvas" />
+      {/* Audit d'accessibilité, finding 1 : le même motif que l'aperçu de la modération (pixel-preview.tsx). */}
+      <canvas
+        ref={surface}
+        className="lp-canvas"
+        role="img"
+        aria-label={width > 0 ? `Canvas de ${ownerName}, ${width} × ${height}` : `Canvas de ${ownerName}`}
+      />
       {scene && (
         <ViewportPill
           framing={framing}
