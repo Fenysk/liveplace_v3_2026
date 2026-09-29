@@ -12,16 +12,18 @@ const serverDepsMiddleware = createMiddleware({ type: "request" }).server(async 
 // JOURNAL 2026-09-29 : les en-têtes de sécurité, et le nonce que le routeur pose sur ses scripts (`router.tsx`).
 const securityMiddleware = createMiddleware({ type: "request" })
   .middleware([serverDepsMiddleware])
-  .server(async ({ next, context }) => {
-    const { createNonce, securityHeaders } = await import("./security-headers");
+  .server(async ({ request, next, context }) => {
+    const { createNonce, refuseMethod, securityHeaders } = await import("./security-headers");
     const nonce = createNonce();
-    const result = await next({ context: { nonce } });
-    // Sur la réponse finale : une route serveur (`/auth/*`, `/twitch/eventsub`) ou une 404 rend la sienne.
     const headers = securityHeaders({
       nonce,
       publicUrl: context.deps.publicUrl,
       isProduction: import.meta.env.PROD,
     });
+    const refused = refuseMethod(request.method, headers);
+    if (refused) return refused;
+    const result = await next({ context: { nonce } });
+    // Sur la réponse finale : une route serveur (`/auth/*`, `/twitch/eventsub`) ou une 404 rend la sienne.
     for (const [name, value] of Object.entries(headers)) result.response.headers.set(name, value);
     return result;
   });

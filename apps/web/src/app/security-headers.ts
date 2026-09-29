@@ -28,6 +28,16 @@ const contentSecurityPolicy = (nonce: string, publicUrl: URL): string => {
   ].join("; ");
 };
 
+// Audit de sécurité §4 : ni TRACE, ni PUT, ni DELETE, ni OPTIONS. POST sert aux fonctions serveur et à `/twitch/eventsub`.
+const ALLOWED_METHODS = ["GET", "HEAD", "POST"];
+
+export function refuseMethod(method: string, headers: Record<string, string>): Response | null {
+  if (ALLOWED_METHODS.includes(method.toUpperCase())) return null;
+  const refusal = new Headers(headers);
+  refusal.set("Allow", ALLOWED_METHODS.join(", "));
+  return new Response(null, { status: 405, headers: refusal });
+}
+
 export function createNonce(): string {
   return randomBytes(16).toString("base64");
 }

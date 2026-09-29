@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createNonce, securityHeaders } from "./security-headers";
+import { createNonce, refuseMethod, securityHeaders } from "./security-headers";
 
 const production = { nonce: "abc123", publicUrl: "https://liveplace.tv", isProduction: true };
 const development = { nonce: "abc123", publicUrl: "http://localhost:3000", isProduction: false };
@@ -58,5 +58,23 @@ describe("createNonce", () => {
 
     expect(Buffer.from(first, "base64")).toHaveLength(16);
     expect(createNonce()).not.toBe(first);
+  });
+});
+
+describe("refuseMethod (audit de sécurité §4)", () => {
+  // GET, HEAD et POST passent : les pages, les fonctions serveur et `/twitch/eventsub`
+  it("lets GET, HEAD and POST through", () => {
+    for (const method of ["GET", "HEAD", "POST"]) expect(refuseMethod(method, {})).toBeNull();
+  });
+
+  // Toute autre méthode reçoit un 405 qui nomme celles permises, avec les en-têtes de sécurité
+  it("answers any other method with a 405 naming the allowed ones", () => {
+    for (const method of ["TRACE", "PUT", "DELETE", "OPTIONS", "PATCH", "patch"]) {
+      const refused = refuseMethod(method, { "X-Frame-Options": "DENY" });
+
+      expect(refused?.status).toBe(405);
+      expect(refused?.headers.get("Allow")).toBe("GET, HEAD, POST");
+      expect(refused?.headers.get("X-Frame-Options")).toBe("DENY");
+    }
   });
 });
