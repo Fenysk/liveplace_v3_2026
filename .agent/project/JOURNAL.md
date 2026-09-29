@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Les en-têtes de sécurité du web, et une CSP à nonce en production seulement
+
+**Contexte.** Audit de sécurité, §2 : aucune réponse du web ne porte d'en-tête de sécurité. La page rend ses propres scripts en ligne (thème, vue OBS, données du routeur) : `script-src 'self'` seul casserait l'hydratation.
+**Décision.** Un middleware de requête global (`app/start.ts`) pose `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, un HSTS d'un an si `PUBLIC_URL` est en https, et en production une CSP à nonce : un nonce par requête, passé au contexte, que le routeur pose sur ses scripts (`ssr.nonce`). Une image ou une connexion vers un nouvel hôte passe d'abord par `app/security-headers.ts`.
+**Renoncement.** Pas de `'unsafe-inline'`, qui annule l'essentiel de la CSP. Pas de CSP en dev : Vite injecte ses propres scripts et styles. Ni `preload` ni `includeSubDomains` : les sous-domaines ne sont pas inventoriés, et `preload` ne se défait pas.
+
 ## 2026-09-29 — Écart CDC v3 §1 et §4.3 : protocole 9, le fond de la vue OBS
 
 **Contexte.** Plan du jour, H : un interrupteur « Fond transparent », activé par défaut, blanc sinon. Le délai OBS a déjà ce chemin (JOURNAL 2026-09-25).

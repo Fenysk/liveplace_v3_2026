@@ -31,6 +31,7 @@ const buildServerDeps = () => {
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
     randomCanvasId: randomUUID,
+    publicUrl: config.publicUrl, // les en-têtes de sécurité en tirent HTTPS et l'hôte du WebSocket (JOURNAL 2026-09-29)
     // Derrière Traefik, la requête arrive en http : c'est l'URL publique qui dit si le site est en https.
     isSecure: config.publicUrl.startsWith("https://"),
   };
