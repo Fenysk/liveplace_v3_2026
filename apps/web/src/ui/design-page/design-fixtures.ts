@@ -87,7 +87,7 @@ export const SAMPLE_SPREAD: readonly Pixel[] = Array.from({ length: 48 }, (_, in
   colorIndex: 28,
 }));
 
-// Un modérateur de chaque origine, et un qui n'a pas encore de compte (JOURNAL 2026-09-27).
+// Un modérateur de chaque origine, un des deux, et un qui n'a pas encore de compte (JOURNAL 2026-09-27).
 export const SAMPLE_MODERATORS: readonly Moderator[] = [
   {
     userId: "6",
@@ -103,6 +103,14 @@ export const SAMPLE_MODERATORS: readonly Moderator[] = [
     login: "pixelmoth",
     displayName: "pixelmoth",
     isFromTwitch: false,
+    isNamedHere: true,
+    hasAccount: true,
+  },
+  {
+    userId: "9",
+    login: "bourguitv",
+    displayName: "BourguiTv",
+    isFromTwitch: true,
     isNamedHere: true,
     hasAccount: true,
   },
@@ -132,6 +140,14 @@ export const SAMPLE_BANNED_USERS: readonly BannedUser[] = [
     pixelCount: 412,
     isFromTwitch: true,
     hasAccount: true,
+  },
+  {
+    userId: "10",
+    login: "adventurouscastingfrmsqgc",
+    displayName: "adventurouscastingfrmsqgc",
+    pixelCount: 0,
+    isFromTwitch: true,
+    hasAccount: false,
   },
   {
     userId: "5",

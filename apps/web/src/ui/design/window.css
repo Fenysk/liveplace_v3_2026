@@ -128,6 +128,35 @@
   min-height: var(--control-size);
 }
 
+/* Le libellé est un profil (modérateurs, bannis) : il prend la place qui reste et son nom se coupe, les actions
+   gardent leur taille. Sur mobile, elles passent sous le profil, à droite. */
+.lp-window-row--profile {
+  flex-wrap: nowrap;
+}
+
+.lp-window-row--profile > :first-child {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.lp-window-row--profile > :not(:first-child) {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .lp-window-row--profile {
+    flex-wrap: wrap;
+  }
+
+  .lp-window-row--profile > :first-child {
+    flex-basis: 100%;
+  }
+
+  .lp-window-row--profile > :not(:first-child) {
+    margin-left: auto;
+  }
+}
+
 /* Un signalement (JOURNAL 2026-09-28) : l'aperçu de la pose à gauche, qui, combien et les décisions à droite */
 .lp-report {
   display: flex;

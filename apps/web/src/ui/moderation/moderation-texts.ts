@@ -9,6 +9,23 @@ export function reportCountLabel(count: number): string {
   return count === 1 ? "1 signalement" : `${count.toLocaleString("fr-FR")} signalements`;
 }
 
+// D'où vient le rôle d'un modérateur, sous son nom dans l'onglet Modération.
+export function moderatorMention({
+  isFromTwitch,
+  isNamedHere,
+}: {
+  isFromTwitch: boolean;
+  isNamedHere: boolean;
+}): string {
+  if (isFromTwitch && isNamedHere) return "Modérateur sur Twitch et LivePlace";
+  return isFromTwitch ? "Modérateur sur Twitch" : "Modérateur sur LivePlace";
+}
+
+// Un ban n'a qu'une origine (moderate.lua) : le premier posé la garde.
+export function banMention(isFromTwitch: boolean): string {
+  return isFromTwitch ? "Banni sur Twitch" : "Banni sur LivePlace";
+}
+
 export function pixelCountLabel(count: number): string {
   if (count === 0) return "Aucun pixel visible";
   return count === 1 ? "1 pixel" : `${count.toLocaleString("fr-FR")} pixels`;

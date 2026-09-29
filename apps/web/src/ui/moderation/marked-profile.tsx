@@ -1,29 +1,18 @@
-// Ce qu'on dit d'un modérateur ou d'un banni juste après son nom (JOURNAL 2026-09-27) : d'où il vient, et — par le
-// contour de son avatar plutôt qu'une étiquette — s'il n'a pas encore de compte LivePlace (`Profile` le porte).
-// Sans compte, le bouton Twitch de `Profile` dit déjà « Twitch » : l'étiquette serait redondante.
+// Un modérateur ou un banni, dans l'onglet Modération : son profil, et sous son nom une mention qui dit d'où vient son
+// rôle ou son ban (« Modérateur sur Twitch et LivePlace »…), plutôt que des étiquettes à décoder. Sans compte
+// LivePlace, `Profile` le dit par le contour de l'avatar et garde le bouton de sa chaîne Twitch (JOURNAL 2026-09-27).
 
-import { Badge } from "../design/badge";
 import { Profile, type ProfileUser } from "../design/profile";
-import { TwitchGlyph } from "../design/twitch";
 
 type MarkedProfileProps = {
   user: ProfileUser;
-  isFromTwitch: boolean;
-  isNamedHere?: boolean;
   hasAccount: boolean;
+  mention?: string | undefined;
 };
 
-export const MarkedProfile = ({
-  user,
-  isFromTwitch,
-  isNamedHere = false,
-  hasAccount,
-}: MarkedProfileProps) => (
-  <span className="lp-row">
+export const MarkedProfile = ({ user, hasAccount, mention }: MarkedProfileProps) => (
+  <span className="lp-marked">
     <Profile user={user} variant="name" hasAccount={hasAccount} />
-    {isFromTwitch && hasAccount && (
-      <Badge label="Twitch" icon={TwitchGlyph} title="Venu de ta chaîne Twitch" />
-    )}
-    {isNamedHere && <Badge label="Nommé ici" />}
+    {mention && <span className="lp-marked-mention lp-type-caption lp-muted">{mention}</span>}
   </span>
 );

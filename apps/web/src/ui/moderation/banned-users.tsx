@@ -8,7 +8,7 @@ import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
 import { SmallWindow, useShownWhileClosing, WindowRow } from "../design/window";
 import { MarkedProfile } from "./marked-profile";
-import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
+import { banMention, CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 
 export type BannedList =
@@ -31,7 +31,10 @@ export type BannedUsersProps = {
 type BannedRowProps = Omit<BannedUsersProps, "list" | "canvas"> & { user: BannedUser };
 
 const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: BannedRowProps) => (
-  <WindowRow label={<MarkedProfile {...user} user={user} />}>
+  <WindowRow
+    label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={banMention(user.isFromTwitch)} />}
+    hasProfile
+  >
     <div className="lp-row">
       <span className="lp-type-caption lp-muted">{pixelCountLabel(user.pixelCount)}</span>
       <Button

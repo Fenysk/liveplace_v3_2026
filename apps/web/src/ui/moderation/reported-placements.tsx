@@ -43,7 +43,7 @@ const ReportRow = ({
       <PixelPreview {...canvas} pixels={report.pixels} label={`La pose signalée de ${report.displayName}`} />
     </div>
     <div className="lp-report-body">
-      <MarkedProfile user={report} isFromTwitch={false} hasAccount={report.hasAccount} />
+      <MarkedProfile user={report} hasAccount={report.hasAccount} />
       <span className="lp-row lp-type-caption lp-muted">
         {reportCountLabel(report.reportCount)} · {formatPlacedAgo(report.reportedAt, nowMs)}
         {report.isOffStream && <Badge label="Cachée du stream" icon={EyeOff} />}

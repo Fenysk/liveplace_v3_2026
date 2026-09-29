@@ -82,6 +82,25 @@ button.lp-profile-main:hover .lp-profile-name {
   text-decoration: none;
 }
 
+/* Un profil et, sous son nom, une mention (onglet Modération) : alignée sur le nom, et coupée comme lui */
+.lp-marked {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.lp-marked > .lp-profile {
+  max-width: 100%;
+}
+
+.lp-marked-mention {
+  margin-top: calc(-1 * var(--space-2));
+  padding-left: calc(var(--control-size) + var(--space-3));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lp-avatar-btn {
   position: relative;
   padding: 0;
