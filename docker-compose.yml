@@ -28,6 +28,8 @@ services:
       REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET manquante}
       BROADCAST_HZ: ${BROADCAST_HZ:-10}
+      # JOURNAL 2026-09-29 : la seule origine d'où une page ouvre le WebSocket.
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL manquante}
     depends_on:
       redis:
         condition: service_healthy

@@ -38,6 +38,7 @@ consumeTwitchCommands(
 
 const server = startGatewayServer({
   port: GATEWAY_PORT,
+  publicOrigin: config.publicOrigin,
   verifier: createSessionVerifier(config.sessionSecret),
   openConnection: (socket, session) => createConnection({ core, broadcast, now: Date.now }, socket, session),
 });

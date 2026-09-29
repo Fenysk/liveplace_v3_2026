@@ -10,9 +10,14 @@ const MAX_PAYLOAD_BYTES = 8 * 1024;
 const HELLO_TIMEOUT_MS = 5000;
 const CLOSE_POLICY = 1008;
 const CLOSE_INTERNAL = 1011;
+// Une réponse HTTP brute : avant l'upgrade, la socket n'est encore qu'un flux TCP.
+const FORBIDDEN_HANDSHAKE = ["HTTP/1.1 403 Forbidden", "Connection: close", "Content-Length: 0", "", ""].join(
+  "\r\n",
+);
 
 export type GatewayServerDeps = {
   port: number;
+  publicOrigin: string;
   verifier: SessionVerifier;
   openConnection: (socket: ClientSocket, session: Session | null) => ClientConnection;
 };
@@ -33,6 +38,12 @@ const toClientSocket = (socket: WebSocket): ClientSocket => ({
   sendSnapshot: (state) => socket.send(state, { binary: true }),
   close: (code) => socket.close(code),
 });
+
+// JOURNAL 2026-09-29 : une page d'une autre origine n'ouvre pas le WebSocket au nom d'un viewer connecté.
+// Sans `Origin`, ce n'est pas un navigateur : les bots des preuves et le test de charge passent.
+export function isAllowedOrigin(origin: string | undefined, publicOrigin: string): boolean {
+  return origin === undefined || origin === publicOrigin;
+}
 
 export function startGatewayServer(deps: GatewayServerDeps) {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
@@ -68,6 +79,10 @@ export function startGatewayServer(deps: GatewayServerDeps) {
     // Le chemin exact : `/ws_pseudo` est la page d'un streamer, pas le socket.
     if (request.url !== "/ws") {
       socket.destroy();
+      return;
+    }
+    if (!isAllowedOrigin(request.headers.origin, deps.publicOrigin)) {
+      socket.end(FORBIDDEN_HANDSHAKE);
       return;
     }
     const session = await deps.verifier.verify(request.headers.cookie);

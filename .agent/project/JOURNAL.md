@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Écart §11.5 : le gateway lit `PUBLIC_URL`, et refuse une poignée de main venue d'une autre origine
+
+**Contexte.** Audit de sécurité, §4 : le gateway accepte un WebSocket ouvert depuis n'importe quelle origine. Seul le `SameSite` du cookie de session empêche une page étrangère de l'ouvrir au nom d'un viewer connecté.
+**Décision.** Le gateway lit `PUBLIC_URL`, que le Compose donne déjà au web, et répond `403` avant la session à une `Origin` présente et différente de celle de `PUBLIC_URL`. Sans `Origin`, il accepte : un navigateur l'envoie toujours.
+**Renoncement.** Pas de refus d'une poignée de main sans `Origin` : il ne protège d'aucun navigateur, et bloquerait les bots des preuves locales et le test de charge.
+
 ## 2026-09-29 — Les en-têtes de sécurité du web, et une CSP à nonce en production seulement
 
 **Contexte.** Audit de sécurité, §2 : aucune réponse du web ne porte d'en-tête de sécurité. La page rend ses propres scripts en ligne (thème, vue OBS, données du routeur) : `script-src 'self'` seul casserait l'hydratation.

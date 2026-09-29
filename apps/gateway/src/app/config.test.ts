@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { parseGatewayConfig } from "./config";
 
 const sessionSecret = "s".repeat(32);
-const env = { REDIS_URL: "redis://127.0.0.1:6379", SESSION_SECRET: sessionSecret };
+const env = {
+  REDIS_URL: "redis://127.0.0.1:6379",
+  SESSION_SECRET: sessionSecret,
+  PUBLIC_URL: "https://liveplace.tv",
+};
 
 // Le message de l'erreur levée, ou l'échec du test si rien n'est levé.
 const messageOf = (run: () => unknown): string => {
@@ -32,6 +36,21 @@ describe("parseGatewayConfig (§11.5)", () => {
 
   // Applique le défaut de BROADCAST_HZ quand la variable est absente (D-13)
   it("defaults BROADCAST_HZ to 10", () => {
-    expect(parseGatewayConfig(env)).toEqual({ redisUrl: env.REDIS_URL, sessionSecret, broadcastHz: 10 });
+    expect(parseGatewayConfig(env)).toEqual({
+      redisUrl: env.REDIS_URL,
+      sessionSecret,
+      broadcastHz: 10,
+      publicOrigin: "https://liveplace.tv",
+    });
+  });
+
+  // Nomme PUBLIC_URL absente, et n'en garde que l'origine : celle d'où une page ouvre le WebSocket (JOURNAL 2026-09-29)
+  it("requires PUBLIC_URL and keeps only its origin", () => {
+    const { PUBLIC_URL: _, ...withoutUrl } = env;
+
+    expect(messageOf(() => parseGatewayConfig(withoutUrl))).toContain("PUBLIC_URL");
+    expect(parseGatewayConfig({ ...env, PUBLIC_URL: "https://liveplace.tv/" }).publicOrigin).toBe(
+      "https://liveplace.tv",
+    );
   });
 });
