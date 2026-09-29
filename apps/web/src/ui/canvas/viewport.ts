@@ -7,6 +7,8 @@ export type Cell = { x: number; y: number };
 // `scale` : la taille d'une case à l'écran. `offsetX`, `offsetY` : le coin haut gauche du canvas.
 export type Viewport = { scale: number; offsetX: number; offsetY: number };
 export type ZoomLimits = { minScale: number; maxScale: number };
+// Les marges à garder aux bords de l'écran, en pixels CSS : les pills y flottent.
+export type Insets = { top: number; right: number; bottom: number; left: number };
 // Ce que la pill Pratique montre du cadrage : le pourcentage, et si la vue a bougé depuis l'arrivée.
 export type Framing = { zoomPercent: number; isArrival: boolean };
 
@@ -68,4 +70,27 @@ export function isArrivalView(viewport: Viewport, screen: Size, canvas: Size): b
     isNear(viewport.offsetX, arrival.offsetX) &&
     isNear(viewport.offsetY, arrival.offsetY)
   );
+}
+
+// La case la plus proche dans le canvas : la case visée au clavier n'en sort jamais.
+export function clampCell(cell: Cell, canvas: Size): Cell {
+  return {
+    x: Math.min(canvas.width - 1, Math.max(0, cell.x)),
+    y: Math.min(canvas.height - 1, Math.max(0, cell.y)),
+  };
+}
+
+// Le décalage qui ramène un segment [start, start + length] entre les deux marges, ou 0 s'il y est déjà.
+const shiftInto = (start: number, length: number, low: number, high: number): number => {
+  if (start < low) return low - start;
+  if (start + length > high) return high - (start + length);
+  return 0;
+};
+
+// La vue suit la case visée au clavier : elle glisse juste assez pour la garder entre les marges.
+export function panToShow(viewport: Viewport, cell: Cell, screen: Size, insets: Insets): Viewport {
+  const { scale, offsetX, offsetY } = viewport;
+  const dx = shiftInto(offsetX + cell.x * scale, scale, insets.left, screen.width - insets.right);
+  const dy = shiftInto(offsetY + cell.y * scale, scale, insets.top, screen.height - insets.bottom);
+  return dx === 0 && dy === 0 ? viewport : panBy(viewport, dx, dy);
 }

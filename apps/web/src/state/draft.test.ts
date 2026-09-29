@@ -5,6 +5,7 @@ import {
   BATCH_MAX,
   type Draft,
   type DraftContext,
+  discardDraftCell,
   EMPTY_DRAFT,
   settleBatch,
   toBatches,
@@ -136,5 +137,15 @@ describe("batches (§4.2, §6.3)", () => {
     expect(settled.has(toCellKey(65, 0))).toBe(true);
     expect(settled.has(toCellKey(64, 0))).toBe(false);
     expect(settled.has(toCellKey(1, 0))).toBe(true);
+  });
+});
+
+describe("discardDraftCell (CDC 2026, Retour arrière)", () => {
+  // La case sort du brouillon, quelle que soit sa couleur ; absente, le brouillon reste le même
+  it("takes the cell out of the draft whatever its color, and keeps the same draft when it is not there", () => {
+    const draft = draftOf({ x: 1, y: 2, colorIndex: 4 }, { x: 3, y: 4, colorIndex: ERASER });
+
+    expect(pixelsOf(discardDraftCell(draft, 3, 4))).toEqual([{ x: 1, y: 2, colorIndex: 4 }]);
+    expect(discardDraftCell(draft, 9, 9)).toBe(draft);
   });
 });

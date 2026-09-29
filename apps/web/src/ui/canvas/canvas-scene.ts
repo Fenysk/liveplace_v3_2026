@@ -4,6 +4,7 @@
 import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
+import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
@@ -11,10 +12,13 @@ import { renderScene } from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
+  clampCell,
   type Framing,
   fitViewport,
+  type Insets,
   isArrivalView,
   panBy,
+  panToShow,
   type ScreenPoint,
   type Size,
   type Viewport,
@@ -24,7 +28,14 @@ import {
   zoomPercent,
 } from "./viewport";
 
-export type CanvasScene = { zoomBy(factor: number): void; recenter(): void; dispose(): void };
+export type CanvasScene = {
+  zoomBy(factor: number): void;
+  recenter(): void;
+  moveTarget(dx: number, dy: number): void; // la première fois, la case visée paraît sans bouger
+  pickTarget(): void; // Espace, pipette armée
+  discardTarget(): void; // Retour arrière
+  dispose(): void;
+};
 
 // `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
 // `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
@@ -51,6 +62,8 @@ const isSameFraming = (a: Framing | null, b: Framing) =>
   a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
 
 const MIDDLE_BUTTON = 1;
+// Au clavier, la case visée garde ses distances avec les bords de l'écran et les pills qui y flottent (CDC 2026).
+const KEY_MARGIN = 48;
 // Pendant un glissement ou un pincement, les pills s'effacent en fondu (CDC 2026) : le CSS lit cet attribut.
 const PANNING_ATTRIBUTE = "data-panning";
 
@@ -187,6 +200,21 @@ export function createCanvasScene(
   };
 
   const cellAt = (current: Viewport, point: ScreenPoint) => viewportToCell(current, point, canvasSize());
+
+  // La barre du bas se mesure (pill.tsx) : la case visée au clavier reste au-dessus.
+  const keyInsets = (): Insets => {
+    const bottomBar = Number.parseFloat(getComputedStyle(root).getPropertyValue(BOTTOM_BAR_HEIGHT)) || 0;
+    return { top: KEY_MARGIN, right: KEY_MARGIN, bottom: KEY_MARGIN + bottomBar, left: KEY_MARGIN };
+  };
+
+  // La première flèche : la case inspectée, sinon celle du centre de l'écran, bornée au canvas (CDC 2026).
+  const firstKeyTarget = (current: Viewport, canvas: Size): Cell => {
+    const { inspection } = store.getView();
+    if (inspection) return { x: inspection.x, y: inspection.y };
+    const x = Math.floor((screen.width / 2 - current.offsetX) / current.scale);
+    const y = Math.floor((screen.height / 2 - current.offsetY) / current.scale);
+    return clampCell({ x, y }, canvas);
+  };
 
   // Un clic immobile ou un tap (A5 du plan du J10) : en Dessin, la case entre dans le brouillon ou en sort ;
   // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026).
@@ -343,6 +371,24 @@ export function createCanvasScene(
     // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui.
     recenter() {
       if (viewport && store.getView().width > 0) moveViewport(fitViewport(screen, canvasSize()));
+    },
+    // Au clavier (CDC 2026, raccourcis) : pendant un tracé, chaque case visée entre au brouillon, sans trou.
+    moveTarget(dx, dy) {
+      if (!viewport || store.getView().width === 0) return;
+      const canvas = canvasSize();
+      const next = targetCell
+        ? clampCell({ x: targetCell.x + dx, y: targetCell.y + dy }, canvas)
+        : firstKeyTarget(viewport, canvas);
+      setTargetCell(next);
+      if (draftStore.getView().isTracing) traceTo(next);
+      const shown = panToShow(viewport, next, screen, keyInsets());
+      if (shown !== viewport) moveViewport(shown);
+    },
+    pickTarget() {
+      if (targetCell && draftStore.getView().isPicking) draftStore.toggleCell(targetCell.x, targetCell.y);
+    },
+    discardTarget() {
+      if (targetCell) draftStore.discardCell(targetCell.x, targetCell.y);
     },
     dispose() {
       cancelAnimationFrame(frameRequest);

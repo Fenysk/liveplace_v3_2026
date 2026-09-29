@@ -1,9 +1,10 @@
 // Le canvas en plein écran, sous les pills (CDC 2026) : React le monte, la scène le fait vivre sans re-rendu.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import { useDraftKeys } from "../draft/use-draft-keys";
 import { type CanvasScene, createCanvasScene } from "./canvas-scene";
 import { createViewportSaver, getSavedViewport } from "./saved-viewport";
 import type { Framing } from "./viewport";
@@ -25,6 +26,10 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const { inspection, width, height } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
   const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
+  const keysHintId = useId();
+  // Un seul écouteur du clavier (use-draft-keys.ts) : il reçoit la scène, qui porte la case visée.
+  const keyStores = useMemo(() => ({ canvas: store, draft: draftStore }), [store, draftStore]);
+  useDraftKeys(keyStores, scene);
 
   // Le viewport sauvegardé se lit ici, jamais pendant le rendu : `localStorage` n'existe pas sur le serveur.
   useEffect(() => {
@@ -57,7 +62,14 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
         className="lp-canvas"
         role="img"
         aria-label={width > 0 ? `Canvas de ${ownerName}, ${width} × ${height}` : `Canvas de ${ownerName}`}
+        aria-describedby={keysHintId}
       />
+      {/* Les touches, pour un lecteur d'écran seulement : aucun raccourci ne s'affiche (CDC 2026). */}
+      <p id={keysHintId} className="lp-visually-hidden">
+        Au clavier : les flèches visent une case, Maj pour aller dix fois plus loin. D, Entrée ou Espace pour
+        dessiner. En Dessin : Espace ajoute la case visée, Retour arrière la retire, E prend la gomme, I la
+        pipette, Entrée valide, Échap annule.
+      </p>
       {scene && (
         <ViewportPill
           framing={framing}

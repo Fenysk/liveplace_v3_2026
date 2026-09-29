@@ -474,3 +474,34 @@ describe("createDraftStore — a banned user (§10.2, JOURNAL 2026-09-25)", () =
     expect(store.getView()).toMatchObject({ mode: "view", isSending: false });
   });
 });
+
+describe("createDraftStore — Retour arrière (CDC 2026, raccourcis)", () => {
+  // Retire la case du brouillon, même pipette armée, et le brouillon sauvegardé suit
+  it("takes the cell out of the draft, even with the picker armed, and the saved draft follows", () => {
+    const { store, cells, entries } = setup();
+    store.enterDraftMode();
+    store.toggleCell(1, 1);
+    store.toggleCell(2, 1);
+    store.togglePicker();
+
+    store.discardCell(1, 1);
+
+    expect(cells()).toEqual([{ x: 2, y: 1, colorIndex: 1 }]);
+    expect(store.getView().isPicking).toBe(true);
+    expect(entries.get("liveplace:draft:canvas-1:user-1")).toBe(
+      JSON.stringify([{ x: 2, y: 1, colorIndex: 1 }]),
+    );
+  });
+
+  // En Vue, le brouillon ne bouge pas
+  it("leaves the draft alone in view mode", () => {
+    const { store, cells } = setup();
+    store.enterDraftMode();
+    store.toggleCell(1, 1);
+    store.exitDraftMode();
+
+    store.discardCell(1, 1);
+
+    expect(cells()).toEqual([{ x: 1, y: 1, colorIndex: 1 }]);
+  });
+});

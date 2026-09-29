@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampCell,
   fitViewport,
   isArrivalView,
   panBy,
+  panToShow,
   viewportToCell,
   zoomAt,
   zoomLimits,
@@ -122,5 +124,46 @@ describe("zoomPercent et isArrivalView (CDC 2026, pill Pratique)", () => {
     expect(isArrivalView(panBy(arrival, 0.4, -0.4), PHONE, CANVAS)).toBe(true);
     expect(isArrivalView(panBy(arrival, 12, 0), PHONE, CANVAS)).toBe(false);
     expect(isArrivalView({ ...arrival, scale: arrival.scale * 1.5 }, PHONE, CANVAS)).toBe(false);
+  });
+});
+
+describe("clampCell (CDC 2026, la case visée au clavier)", () => {
+  // Une case hors du canvas revient au bord le plus proche ; une case dedans ne bouge pas
+  it("brings a cell outside the canvas back to the nearest edge, and leaves one inside alone", () => {
+    expect(clampCell({ x: -3, y: 70 }, { width: 60, height: 45 })).toEqual({ x: 0, y: 44 });
+    expect(clampCell({ x: 12, y: 7 }, { width: 60, height: 45 })).toEqual({ x: 12, y: 7 });
+  });
+});
+
+describe("panToShow (CDC 2026, la vue suit la case visée)", () => {
+  const insets = { top: 50, right: 50, bottom: 200, left: 50 };
+  const viewport = { scale: 10, offsetX: 0, offsetY: 0 };
+
+  // Une case bien dans l'écran ne bouge pas la vue
+  it("leaves the view alone while the cell is well inside the screen", () => {
+    expect(panToShow(viewport, { x: 50, y: 30 }, DESKTOP, insets)).toBe(viewport);
+  });
+
+  // Près d'un bord, la vue glisse juste assez pour garder la case à la marge
+  it("slides the view just enough to keep the cell at the margin", () => {
+    expect(panToShow(viewport, { x: 99, y: 30 }, DESKTOP, insets)).toEqual({
+      scale: 10,
+      offsetX: -50,
+      offsetY: 0,
+    });
+    expect(panToShow(viewport, { x: 2, y: 2 }, DESKTOP, insets)).toEqual({
+      scale: 10,
+      offsetX: 30,
+      offsetY: 30,
+    });
+  });
+
+  // En bas, la marge garde la case au-dessus de la barre du bas
+  it("keeps the cell above the bottom bar", () => {
+    expect(panToShow(viewport, { x: 50, y: 65 }, DESKTOP, insets)).toEqual({
+      scale: 10,
+      offsetX: 0,
+      offsetY: -60,
+    });
   });
 });

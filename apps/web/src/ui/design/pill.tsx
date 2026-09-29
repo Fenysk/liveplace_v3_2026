@@ -1,6 +1,7 @@
 // La seule bulle d'interface (CDC 2026) : la taille suit le contenu, ronde et concentrique à toute taille.
 
 import { type ReactNode, type RefObject, useEffect } from "react";
+import { BOTTOM_BAR_HEIGHT } from "./bottom-bar";
 import { classNames } from "./class-names";
 import { useMorph } from "./use-morph";
 
@@ -27,8 +28,6 @@ const LAYOUT_CLASSES: Record<PillLayout, { pill?: string; content?: string }> = 
   stack: { content: "lp-col" },
   rail: { pill: "lp-pill--v" },
 };
-
-const BOTTOM_BAR_HEIGHT = "--lp-bottom-bar";
 
 // Sur mobile, l'inspection et Recentrer se posent au-dessus de la barre du bas, à sa hauteur du moment (pill.css).
 const useBottomBarHeight = (content: RefObject<HTMLElement | null>, isBottomBar: boolean) => {

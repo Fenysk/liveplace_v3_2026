@@ -27,14 +27,18 @@ const isErasingNothing = (pixel: Pixel, context: DraftContext): boolean =>
 const withPixel = (draft: Draft, pixel: Pixel): Draft =>
   new Map(draft).set(toCellKey(pixel.x, pixel.y), pixel);
 
+// Retour arrière (CDC 2026, raccourcis) : la case sort du brouillon, quelle que soit sa couleur. Absente, rien ne change.
+export function discardDraftCell(draft: Draft, x: number, y: number): Draft {
+  const key = toCellKey(x, y);
+  if (!draft.has(key)) return draft;
+  const next = new Map(draft);
+  next.delete(key);
+  return next;
+}
+
 // Un clic ou un tap : une case du brouillon en sort, quelle que soit la couleur active ; sinon elle entre.
 export function toggleDraftCell(draft: Draft, pixel: Pixel, context: DraftContext): DraftEdit {
-  const key = toCellKey(pixel.x, pixel.y);
-  if (draft.has(key)) {
-    const next = new Map(draft);
-    next.delete(key);
-    return unchanged(next);
-  }
+  if (draft.has(toCellKey(pixel.x, pixel.y))) return unchanged(discardDraftCell(draft, pixel.x, pixel.y));
   if (isErasingNothing(pixel, context)) return unchanged(draft);
   if (draft.size >= context.charges) return { draft, isCapped: true };
   return unchanged(withPixel(draft, pixel));

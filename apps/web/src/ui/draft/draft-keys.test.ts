@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type KeyPress, keyCommand } from "./draft-keys";
+import { type KeyPress, keyCommand, targetStep } from "./draft-keys";
 
-const press = (key: string, code: string, hasModifier = false): KeyPress => ({ key, code, hasModifier });
+const press = (key: string, code: string, hasModifier = false, isShifted = false): KeyPress => ({
+  key,
+  code,
+  hasModifier,
+  isShifted,
+});
 
 describe("keyCommand (CDC 2026, raccourcis)", () => {
   // Entre en Dessin par D, Entrée ou Espace, en minuscule comme en majuscule
@@ -62,5 +67,44 @@ describe("keyCommand (CDC 2026, raccourcis)", () => {
     expect(keyCommand(press("x", "KeyX"), "view")).toBeNull();
     expect(keyCommand(press("x", "KeyX"), "draft")).toBeNull();
     expect(keyCommand(press("Tab", "Tab"), "inspecting")).toBeNull();
+  });
+
+  // En Dessin, Retour arrière ou Suppr retire la case visée du brouillon ; en Vue, rien
+  it("in draft mode, Backspace or Delete takes the target out of the draft, and does nothing in view mode", () => {
+    expect(keyCommand(press("Backspace", "Backspace"), "draft")).toBe("discardTarget");
+    expect(keyCommand(press("Delete", "Delete"), "draft")).toBe("discardTarget");
+    expect(keyCommand(press("Backspace", "Backspace"), "view")).toBeNull();
+    expect(keyCommand(press("Delete", "Delete"), "inspecting")).toBeNull();
+  });
+
+  // Pipette armée, Espace prend la couleur de la case visée ; les autres touches du Dessin restent
+  it("with the picker armed, Space picks the target's color and the other draft keys stay", () => {
+    expect(keyCommand(press(" ", "Space"), "picking")).toBe("pickTarget");
+    expect(keyCommand(press("i", "KeyI"), "picking")).toBe("togglePicker");
+    expect(keyCommand(press("Enter", "Enter"), "picking")).toBe("submit");
+    expect(keyCommand(press("Backspace", "Backspace"), "picking")).toBe("discardTarget");
+  });
+});
+
+describe("targetStep (CDC 2026, la case visée au clavier)", () => {
+  // Les flèches bougent la case visée d'une case
+  it("moves the target one cell with the arrow keys", () => {
+    expect(targetStep(press("ArrowUp", "ArrowUp"))).toEqual({ dx: 0, dy: -1 });
+    expect(targetStep(press("ArrowDown", "ArrowDown"))).toEqual({ dx: 0, dy: 1 });
+    expect(targetStep(press("ArrowLeft", "ArrowLeft"))).toEqual({ dx: -1, dy: 0 });
+    expect(targetStep(press("ArrowRight", "ArrowRight"))).toEqual({ dx: 1, dy: 0 });
+  });
+
+  // Maj + flèche : dix cases d'un coup
+  it("moves ten cells at once with Shift", () => {
+    expect(targetStep(press("ArrowRight", "ArrowRight", false, true))).toEqual({ dx: 10, dy: 0 });
+    expect(targetStep(press("ArrowUp", "ArrowUp", false, true))).toEqual({ dx: 0, dy: -10 });
+  });
+
+  // Ctrl, Alt ou Cmd + flèche restent au navigateur, et les autres touches ne bougent rien
+  it("leaves arrows held with Ctrl, Alt or Cmd to the browser, and ignores every other key", () => {
+    expect(targetStep(press("ArrowLeft", "ArrowLeft", true))).toBeNull();
+    expect(targetStep(press("d", "KeyD"))).toBeNull();
+    expect(targetStep(press(" ", "Space"))).toBeNull();
   });
 });

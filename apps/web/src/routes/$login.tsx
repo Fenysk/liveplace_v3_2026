@@ -16,7 +16,6 @@ import type { ProfileUser } from "../ui/design/profile";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
-import { useDraftKeys } from "../ui/draft/use-draft-keys";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
@@ -138,8 +137,6 @@ const GamePage = () => {
       canvas.close();
     };
   }, [canvasId, openCanvas]);
-
-  useDraftKeys(stores);
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   // `lp-game` : caché dès la première image en vue OBS (JOURNAL 2026-09-25).

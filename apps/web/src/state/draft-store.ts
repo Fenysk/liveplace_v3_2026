@@ -7,6 +7,7 @@ import {
   type Draft,
   type DraftContext,
   type DraftEdit,
+  discardDraftCell,
   EMPTY_DRAFT,
   fitDraft,
   settleBatch,
@@ -42,6 +43,7 @@ export type DraftStore = {
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
   togglePicker(): void; // `I` : la pipette, pour un seul clic
   toggleCell(x: number, y: number): void;
+  discardCell(x: number, y: number): void;
   startTrace(): void;
   traceCells(cells: readonly { x: number; y: number }[]): void;
   endTrace(): void;
@@ -207,6 +209,9 @@ export function createDraftStore(
       if (view.mode === "draft" && view.isPicking) return pickColorAt(x, y);
       if (isEditable())
         applyEdit(toggleDraftCell(view.draft, { x, y, colorIndex: view.colorIndex }, context()), true);
+    },
+    discardCell(x, y) {
+      if (isEditable()) setDraft(discardDraftCell(view.draft, x, y));
     },
     startTrace() {
       if (!isEditable() || view.isTracing || view.isPicking) return;

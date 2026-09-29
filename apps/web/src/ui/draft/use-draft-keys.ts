@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
-import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand } from "./draft-keys";
+import type { CanvasScene } from "../canvas/canvas-scene";
+import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand, targetStep } from "./draft-keys";
 import { submitDraft } from "./use-draft-pill";
 
 type KeyStores = { canvas: CanvasStore; draft: DraftStore };
@@ -23,14 +24,17 @@ const toKeyPress = (event: KeyboardEvent): KeyPress => ({
   key: event.key,
   code: event.code,
   hasModifier: event.ctrlKey || event.metaKey || event.altKey,
+  isShifted: event.shiftKey,
 });
 
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
-  const { mode } = draft.getView();
-  return mode === "view" && canvas.getView().inspection ? "inspecting" : mode;
+  const { mode, isPicking } = draft.getView();
+  if (mode === "draft") return isPicking ? "picking" : "draft";
+  return canvas.getView().inspection ? "inspecting" : "view";
 };
 
-const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores): void => {
+// `scene` : la case visée, absente tant que le canvas n'est pas monté.
+const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores, scene?: CanvasScene): void => {
   const commands: Record<DraftKeyCommand, () => void> = {
     enterDraftMode: () => draft.enterDraftMode(),
     submit: () => submitDraft(draft),
@@ -38,19 +42,29 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores): voi
     toggleEraser: () => draft.toggleEraser(),
     togglePicker: () => draft.togglePicker(),
     startTrace: () => draft.startTrace(),
+    pickTarget: () => scene?.pickTarget(),
+    discardTarget: () => scene?.discardTarget(),
     closeInspection: () => canvas.closeInspection(),
   };
   commands[command]();
 };
 
-const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState): void => {
+const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
   if (isTyping(event.target) || isWindowOpen()) return;
-  const command = keyCommand(toKeyPress(event), keyModeOf(stores));
+  const press = toKeyPress(event);
+  const step = targetStep(press);
+  // Une flèche tenue répète : la case visée file, comme un curseur de texte (CDC 2026).
+  if (step) {
+    event.preventDefault();
+    scene?.moveTarget(step.dx, step.dy);
+    return;
+  }
+  const command = keyCommand(press, keyModeOf(stores));
   // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
   if (command || event.code === "Space") event.preventDefault();
   if (!command || event.repeat || (command === "startTrace" && space.isEntering)) return;
   if (command === "enterDraftMode") space.isEntering = event.code === "Space";
-  runCommand(command, stores);
+  runCommand(command, stores, scene);
 };
 
 const releaseSpace = (stores: KeyStores, space: SpaceState): void => {
@@ -58,11 +72,11 @@ const releaseSpace = (stores: KeyStores, space: SpaceState): void => {
   stores.draft.endTrace();
 };
 
-export function useDraftKeys(stores: KeyStores | undefined): void {
+export function useDraftKeys(stores: KeyStores | undefined, scene?: CanvasScene): void {
   useEffect(() => {
     if (!stores) return;
     const space: SpaceState = { isEntering: false };
-    const onKeyDown = (event: KeyboardEvent) => pressKey(event, stores, space);
+    const onKeyDown = (event: KeyboardEvent) => pressKey(event, stores, space, scene);
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code === "Space") releaseSpace(stores, space);
     };
@@ -77,5 +91,5 @@ export function useDraftKeys(stores: KeyStores | undefined): void {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [stores]);
+  }, [stores, scene]);
 }
