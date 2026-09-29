@@ -144,8 +144,9 @@ const ErrorCodeSchema = z.enum([
 ]);
 
 // --- Frames client → serveur (§4.2) -------------------------------------
+// JOURNAL 2026-09-29 (audit de sécurité §4) : strictes, une clé inconnue rend la frame invalide.
 
-const HelloFrameSchema = z.object({
+const HelloFrameSchema = z.strictObject({
   t: z.literal("hello"),
   protocolVersion: z.literal(PROTOCOL_VERSION),
   canvasId: CanvasIdSchema,
@@ -153,14 +154,14 @@ const HelloFrameSchema = z.object({
   lastVersion: VersionSchema.optional(),
 });
 
-const PlaceFrameSchema = z.object({
+const PlaceFrameSchema = z.strictObject({
   t: z.literal("place"),
   requestId: RequestIdSchema,
   placementId: ClientPlacementIdSchema, // le même pour chaque lot d'un brouillon validé (JOURNAL 2026-09-28)
-  pixels: z.array(PixelSchema).min(1).max(64),
+  pixels: z.array(z.strictObject(PixelSchema.shape)).min(1).max(64), // strict ici seulement : `PixelSchema` sert aussi au serveur
 });
 
-const InspectFrameSchema = z.object({
+const InspectFrameSchema = z.strictObject({
   t: z.literal("inspect"),
   requestId: RequestIdSchema,
   x: CoordinateSchema,
@@ -169,43 +170,50 @@ const InspectFrameSchema = z.object({
 
 // Écart §5.4 (JOURNAL 2026-09-28) : les autres pixels de l'auteur posés entre `from` et `to`, autour d'une pose.
 const RangeSchema = z
-  .object({ from: TimestampSchema, to: TimestampSchema })
+  .strictObject({ from: TimestampSchema, to: TimestampSchema })
   .refine(({ from, to }) => from <= to, "plage à l'envers");
 
 // Écart §5.4 et §4.2 (JOURNAL 2026-09-25) : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
 const ModerateActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["clearUser", "ban", "unban"]), target: UserIdSchema }),
-  z.object({
+  z.strictObject({ action: z.enum(["clearUser", "ban", "unban"]), target: UserIdSchema }),
+  z.strictObject({
     action: z.literal("clearPlacement"),
     target: UserIdSchema,
     placementId: PlacementIdSchema,
     range: RangeSchema.optional(),
   }),
-  z.object({ action: z.literal("approvePlacement"), target: UserIdSchema, placementId: PlacementIdSchema }),
+  z.strictObject({
+    action: z.literal("approvePlacement"),
+    target: UserIdSchema,
+    placementId: PlacementIdSchema,
+  }),
 ]);
 
 export type ModerateAction = z.infer<typeof ModerateActionSchema>;
 
-const ModerateFrameSchema = z.object({
+const ModerateFrameSchema = z.strictObject({
   t: z.literal("moderate"),
   requestId: RequestIdSchema,
   action: ModerateActionSchema,
 });
 
 // Écart §4.2 (JOURNAL 2026-09-25) : les pixels d'un auteur (sa preuve s'il est banni), et la liste des bannis.
-const ListPixelsFrameSchema = z.object({
+const ListPixelsFrameSchema = z.strictObject({
   t: z.literal("listPixels"),
   requestId: RequestIdSchema,
   userId: UserIdSchema,
 });
 
-const ListBansFrameSchema = z.object({ t: z.literal("listBans"), requestId: RequestIdSchema });
+const ListBansFrameSchema = z.strictObject({ t: z.literal("listBans"), requestId: RequestIdSchema });
 
 // Écart §4.2 (JOURNAL 2026-09-27) : les modérateurs du canvas, et d'où ils viennent.
-const ListModeratorsFrameSchema = z.object({ t: z.literal("listModerators"), requestId: RequestIdSchema });
+const ListModeratorsFrameSchema = z.strictObject({
+  t: z.literal("listModerators"),
+  requestId: RequestIdSchema,
+});
 
 // JOURNAL 2026-09-27 : le streamer nomme ou retire un modérateur ici. Répond par `moderators`.
-const SetModeratorFrameSchema = z.object({
+const SetModeratorFrameSchema = z.strictObject({
   t: z.literal("setModerator"),
   requestId: RequestIdSchema,
   userId: UserIdSchema,
@@ -215,7 +223,7 @@ const SetModeratorFrameSchema = z.object({
 // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai de sa vue OBS, un cran à la fois.
 const ObsDelaySchema = z.number().int().refine(isObsDelayStep, "pas un cran du délai OBS");
 
-const SetObsDelayFrameSchema = z.object({
+const SetObsDelayFrameSchema = z.strictObject({
   t: z.literal("setObsDelay"),
   requestId: RequestIdSchema,
   obsDelayMs: ObsDelaySchema,
@@ -223,7 +231,7 @@ const SetObsDelayFrameSchema = z.object({
 
 // Écart §4.2 (JOURNAL 2026-09-28) : la pose de la case, vérifiée par le serveur au moment du signalement.
 // Écart §4.2 (JOURNAL 2026-09-29) : `range` étend le signalement aux poses voisines de l'auteur.
-const ReportFrameSchema = z.object({
+const ReportFrameSchema = z.strictObject({
   t: z.literal("report"),
   requestId: RequestIdSchema,
   x: CoordinateSchema,
@@ -233,7 +241,7 @@ const ReportFrameSchema = z.object({
 });
 
 // Écart §4.2 (JOURNAL 2026-09-29) : les pixels de l'auteur de la pose en (x, y), pour choisir la plage à signaler.
-const ListAuthorPixelsFrameSchema = z.object({
+const ListAuthorPixelsFrameSchema = z.strictObject({
   t: z.literal("listAuthorPixels"),
   requestId: RequestIdSchema,
   x: CoordinateSchema,
@@ -241,11 +249,11 @@ const ListAuthorPixelsFrameSchema = z.object({
   placementId: PlacementIdSchema,
 });
 
-const ListReportsFrameSchema = z.object({ t: z.literal("listReports"), requestId: RequestIdSchema });
+const ListReportsFrameSchema = z.strictObject({ t: z.literal("listReports"), requestId: RequestIdSchema });
 
 // Écart §4.2 (JOURNAL 2026-09-29) : le streamer seul, et seulement une taille du CDC 2026 §1.
 const ResizeCanvasFrameSchema = z
-  .object({
+  .strictObject({
     t: z.literal("resizeCanvas"),
     requestId: RequestIdSchema,
     width: z.number().int().positive(),
@@ -254,13 +262,13 @@ const ResizeCanvasFrameSchema = z
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
 // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
-const SetObsBackgroundFrameSchema = z.object({
+const SetObsBackgroundFrameSchema = z.strictObject({
   t: z.literal("setObsBackground"),
   requestId: RequestIdSchema,
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
 
-const PingFrameSchema = z.object({ t: z.literal("ping") });
+const PingFrameSchema = z.strictObject({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
   HelloFrameSchema,

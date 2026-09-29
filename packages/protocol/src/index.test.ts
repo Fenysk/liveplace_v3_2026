@@ -182,3 +182,68 @@ describe("protocol frames", () => {
     expect(decodeServerFrame(authorPixels)).toEqual({ ok: true, value: authorPixels });
   });
 });
+
+// JOURNAL 2026-09-29 (audit de sécurité §4) : une frame du client n'a que les clés de son schéma.
+describe("strict client frames", () => {
+  const hello = { t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId: "abc123", mode: "ui" };
+  const pixel = { x: 0, y: 0, colorIndex: 5 };
+  const place = { t: "place", requestId: "r", placementId: "p1a2b3c4d5e6f7a8", pixels: [pixel] };
+  const range = { from: 10, to: 20 };
+  const clear = { action: "clearPlacement", target: "u1", placementId: "42", range };
+  const report = { t: "report", requestId: "r", x: 0, y: 0, placementId: "42", range };
+
+  // Une clé en trop, à n'importe quel niveau, rend la frame invalide
+  it("refuses an unknown key at any depth", () => {
+    for (const frame of [
+      { ...hello, isAdmin: true },
+      { ...place, isFree: true },
+      { ...place, pixels: [{ ...pixel, owner: "u1" }] },
+      { t: "moderate", requestId: "r", action: { ...clear, force: true } },
+      { t: "moderate", requestId: "r", action: { ...clear, range: { ...range, all: true } } },
+      { ...report, range: { ...range, all: true } },
+      { t: "ping", extra: 1 },
+    ])
+      expect(decodeClientFrame(frame).ok).toBe(false);
+  });
+
+  // `__proto__` glissé dans le JSON est une clé comme une autre
+  it("refuses __proto__ smuggled in the JSON", () => {
+    expect(decodeClientFrame(JSON.parse('{"t":"ping","__proto__":{"isAdmin":true}}')).ok).toBe(false);
+    expect(
+      decodeClientFrame(
+        JSON.parse(
+          `{"t":"hello","protocolVersion":${PROTOCOL_VERSION},"canvasId":"c","mode":"ui","__proto__":{}}`,
+        ),
+      ).ok,
+    ).toBe(false);
+  });
+
+  // Chaque frame telle que la page l'envoie passe toujours
+  it("still accepts every frame the page sends", () => {
+    for (const frame of [
+      hello,
+      { ...hello, mode: "obs", lastVersion: 12 },
+      place,
+      { t: "inspect", requestId: "r", x: 1, y: 2 },
+      { t: "moderate", requestId: "r", action: clear },
+      { t: "moderate", requestId: "r", action: { action: "ban", target: "u1" } },
+      {
+        t: "moderate",
+        requestId: "r",
+        action: { action: "approvePlacement", target: "u1", placementId: "42" },
+      },
+      { t: "listPixels", requestId: "r", userId: "u1" },
+      { t: "listBans", requestId: "r" },
+      { t: "listModerators", requestId: "r" },
+      { t: "setModerator", requestId: "r", userId: "u1", isModerator: true },
+      { t: "setObsDelay", requestId: "r", obsDelayMs: 10_000 },
+      { t: "setObsBackground", requestId: "r", obsBackground: "white" },
+      report,
+      { t: "listAuthorPixels", requestId: "r", x: 0, y: 0, placementId: "42" },
+      { t: "listReports", requestId: "r" },
+      { t: "resizeCanvas", requestId: "r", width: 50, height: 50 },
+      { t: "ping" },
+    ])
+      expect(decodeClientFrame(frame)).toEqual({ ok: true, value: frame });
+  });
+});

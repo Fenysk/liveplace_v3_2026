@@ -13,6 +13,12 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-29 — Les frames du client sont strictes : une clé inconnue est refusée
+
+**Contexte.** Audit de sécurité, §4 : le gateway avale les clés inconnues d'une frame (`isAdmin: true` dans un `hello`, ou `__proto__`). Sans effet aujourd'hui, mais rien ne l'en empêcherait demain.
+**Décision.** Chaque frame du client, et ce qu'elle contient (pixel, plage, action de modération), est un `z.strictObject` : une clé en trop rend `invalid_frame` et ferme la connexion, comme toute frame invalide. Pas de nouveau `PROTOCOL_VERSION` : la page n'envoie aucune clé hors schéma.
+**Renoncement.** Les frames du serveur restent tolérantes : une page encore ouverte doit ignorer un champ ajouté, pas casser.
+
 ## 2026-09-29 — Écart §11.5 : le gateway lit `PUBLIC_URL`, et refuse une poignée de main venue d'une autre origine
 
 **Contexte.** Audit de sécurité, §4 : le gateway accepte un WebSocket ouvert depuis n'importe quelle origine. Seul le `SameSite` du cookie de session empêche une page étrangère de l'ouvrir au nom d'un viewer connecté.
