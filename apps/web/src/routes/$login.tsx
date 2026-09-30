@@ -43,6 +43,7 @@ type Stores = { canvas: CanvasStore; draft: DraftStore };
 const doNothing = (): void => undefined;
 const CONNECTING_ACTIONS: DraftPillActions = {
   onEnter: doNothing,
+  onClaim: doNothing,
   onExit: doNothing,
   onSubmit: doNothing,
   onDiscard: doNothing,

@@ -34,10 +34,14 @@ const useNowMs = (): number => {
 };
 
 // Le client prédit, le serveur tranche : la jauge affichée entre deux réponses (§9.4).
+// JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà.
+const rewardsText = (claimable: number): string =>
+  claimable === 0 ? "" : `, ${claimable} récompense${claimable > 1 ? "s" : ""} à réclamer`;
+
 const toGaugeProps = (canvas: CanvasView, draft: DraftView, nowMs: number): GaugeProps | null => {
   const { gauge, params } = canvas;
   if (!gauge || !params) return null;
-  const { charges, max, nextRefillAt } = predictGauge(gauge, params, nowMs);
+  const { charges, max, nextRefillAt, claimable } = predictGauge(gauge, params, nowMs);
   const reserved = draft.mode === "draft" ? draft.draft.size : 0;
   const refill = charges < max ? { endsAt: nextRefillAt, durationMs: params.refillMs } : null;
   const afterPlacement = reserved > 0 ? `${Math.max(0, charges - reserved)} après la pose, ` : "";
@@ -49,7 +53,7 @@ const toGaugeProps = (canvas: CanvasView, draft: DraftView, nowMs: number): Gaug
     max,
     draft: reserved,
     refill,
-    label: `${afterPlacement}${charges} / ${max} charges${nextCharge}`,
+    label: `${afterPlacement}${charges} / ${max} charges${nextCharge}${rewardsText(claimable)}`,
     shakeCount: draft.shakeCount,
   };
 };
@@ -92,8 +96,10 @@ const toShownState = (
   if (canvas.isBanned) return { kind: "banned" };
   // Un compte connecté reçoit sa jauge dans le `welcome` : sans elle, on attend encore.
   if (!gauge) return { kind: "connecting" };
-  if (draft.mode === "view")
-    return { kind: "view", gauge, ...(canvas.lastError ? { refusal: canvas.lastError } : {}) };
+  if (draft.mode === "view") {
+    const canClaim = (canvas.gauge?.claimable ?? 0) > 0;
+    return { kind: "view", gauge, canClaim, ...(canvas.lastError ? { refusal: canvas.lastError } : {}) };
+  }
   return draftModeState(canvas, draft, gauge, isTouchScreen);
 };
 
@@ -124,6 +130,7 @@ export function useDraftPillProps(
       : toDraftPillState(canvasView, draftView, gauge, login, isTouchScreen),
     actions: {
       onEnter: () => draft.enterDraftMode(),
+      onClaim: () => canvas.claimGauge(),
       onExit: () => draft.exitDraftMode(),
       onSubmit: () => submitDraft(draft),
       onDiscard: () => draft.discardDraft(),

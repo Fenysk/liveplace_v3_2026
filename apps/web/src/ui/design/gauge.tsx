@@ -3,6 +3,7 @@
 // Pas d'ondulation au repos : la seule boucle de l'interface est celle de « Reconnexion… » (design system).
 
 import { useEffect, useRef } from "react";
+import { blurAfterClick } from "./button";
 import { type CssVariables, classNames } from "./class-names";
 import { type GaugeRefill, gaugeLevels, refillProgress, tiltDirection } from "./gauge-levels";
 import { motionEasing, motionMs } from "./motion";
@@ -16,6 +17,7 @@ const VIBRATION_MS = 12;
 const TILT_DEGREES = 10;
 const SLOSH_DEGREES = [0, 12, -9, 6, -3, 0];
 const SLOSH_STRETCH = 1.5; // l'agitation dure un peu plus qu'un changement de niveau
+const GROW_KEYFRAMES = [{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }];
 
 export type GaugeProps = {
   charges: number;
@@ -89,6 +91,34 @@ const useFluidMotion = (level: number, orientation: Orientation, shakeCount: num
   return fluid;
 };
 
+// Une récompense réclamée : l'anneau grandit un instant, pendant que le niveau glisse vers le nouveau max.
+const useGrowth = (max: number) => {
+  const count = useRef<HTMLSpanElement>(null);
+  const previousMax = useRef(max);
+  useEffect(() => {
+    const element = count.current;
+    const hasGrown = max > previousMax.current;
+    previousMax.current = max;
+    if (!element || !hasGrown) return;
+    const duration = motionMs(element, "--lp-dur");
+    if (duration > 0) element.animate(GROW_KEYFRAMES, { duration, easing: motionEasing(element) });
+  }, [max]);
+  return count;
+};
+
+// JOURNAL 2026-09-30 : le +1 à réclamer, à la place de Dessiner en Vue. Un reflet le traverse à son arrivée.
+export const ClaimButton = ({ onClaim }: { onClaim: () => void }) => (
+  <button
+    type="button"
+    className="lp-btn lp-claim lp-type-body"
+    aria-label="Réclamer +1 de capacité"
+    title="Réclamer +1 de capacité"
+    onClick={blurAfterClick(onClaim)}
+  >
+    <span className="lp-type-numeric">+1</span>
+  </button>
+);
+
 const useShake = (shakeCount: number) => {
   const meter = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -110,6 +140,7 @@ export const Gauge = ({
   isFill = false,
 }: GaugeProps) => {
   const ring = useRingAnimation(refill);
+  const countRing = useGrowth(max);
   const meter = useShake(shakeCount);
   const { count, remainingLevel, chargesLevel } = gaugeLevels(charges, max, draft);
   const draftFluid = useFluidMotion(chargesLevel, orientation, shakeCount);
@@ -135,7 +166,7 @@ export const Gauge = ({
         aria-label="Charges"
         aria-valuetext={label}
       />
-      <span className="lp-gauge-count" aria-hidden="true">
+      <span ref={countRing} className="lp-gauge-count" aria-hidden="true">
         <svg viewBox="0 0 36 36" aria-hidden="true">
           <circle className="lp-gauge-track" cx="18" cy="18" r={RING_RADIUS} />
           {/* Sans recharge en cours, l'anneau est plein : pas d'animation, `strokeDashoffset` à 0. */}

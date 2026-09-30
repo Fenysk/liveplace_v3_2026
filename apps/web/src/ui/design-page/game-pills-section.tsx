@@ -24,6 +24,7 @@ const REFILL_MS = 10_000;
 
 const DRAFT_ACTIONS: DraftPillActions = {
   onEnter: noop,
+  onClaim: noop,
   onExit: noop,
   onSubmit: noop,
   onDiscard: noop,
@@ -74,10 +75,14 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
     caption: "Invité, parti chez Twitch : Connexion à Twitch",
     state: { kind: "signingIn", signInHref: "#" },
   },
-  { caption: "Vue : jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10) } },
+  { caption: "Vue : jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10), canClaim: false } },
+  {
+    caption: "Vue, une récompense attend : le +1 à la place de Dessiner",
+    state: { kind: "view", gauge: gaugeAt(nowMs, 7), canClaim: true },
+  },
   {
     caption: "Vue, après un refus",
-    state: { kind: "view", gauge: gaugeAt(nowMs, 2), refusal: "rate_limited" },
+    state: { kind: "view", gauge: gaugeAt(nowMs, 2), canClaim: false, refusal: "rate_limited" },
   },
   { caption: "Dessin : un brouillon de 3", state: draftState(nowMs) },
   {
@@ -92,7 +97,12 @@ const draftStates = (nowMs: number): readonly DraftSpecimen[] => [
   },
   {
     caption: "Mobile, Vue : la barre du bas",
-    state: { kind: "view", gauge: gaugeAt(nowMs, 6) },
+    state: { kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false },
+    isCompact: true,
+  },
+  {
+    caption: "Mobile, Vue : le +1 à la place de Dessiner",
+    state: { kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: true },
     isCompact: true,
   },
   { caption: "Mobile, Dessin : la feuille, palette repliée", state: draftState(nowMs), isCompact: true },

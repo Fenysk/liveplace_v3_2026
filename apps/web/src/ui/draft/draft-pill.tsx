@@ -1,12 +1,12 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
-// Vue : la jauge et Dessiner. Dessin : la palette, puis la jauge, Vider, Annuler, Valider. Invité : l'invitation.
+// Vue : la jauge et Dessiner, ou le +1 quand une récompense attend (JOURNAL 2026-09-30). Dessin : la palette, puis la jauge, Vider, Annuler, Valider. Invité : l'invitation.
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
-import { Gauge, type GaugeProps } from "../design/gauge";
+import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
@@ -19,7 +19,7 @@ export type DraftPillState =
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
-  | { kind: "view"; gauge: GaugeProps; refusal?: string }
+  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: string }
   | {
       kind: "draft";
       gauge: GaugeProps;
@@ -37,6 +37,7 @@ export type DraftPillState =
 
 export type DraftPillActions = {
   onEnter: () => void; // Dessiner
+  onClaim: () => void; // +1 de jauge max (JOURNAL 2026-09-30)
   onExit: () => void; // Annuler : sort du Dessin
   onSubmit: () => void;
   onDiscard: () => void;
@@ -263,7 +264,11 @@ const contentOf = (
         content: (
           <>
             <Gauge {...state.gauge} isFill={isCompact} />
-            <EnterButton onEnter={actions.onEnter} />
+            {state.canClaim ? (
+              <ClaimButton onClaim={actions.onClaim} />
+            ) : (
+              <EnterButton onEnter={actions.onEnter} />
+            )}
             <Refusal code={state.refusal} />
           </>
         ),

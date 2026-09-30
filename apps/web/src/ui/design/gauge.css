@@ -98,6 +98,63 @@
   transition: height var(--lp-dur) var(--lp-ease);
 }
 
+/* JOURNAL 2026-09-30 : le +1 à réclamer, à la place de Dessiner. Doré dans les deux thèmes : jamais la couleur de
+   l'action principale, qui s'inverse avec le thème. Un halo, et un reflet qui le traverse une fois à son arrivée, puis
+   au survol. Pas de boucle : la seule de l'interface reste « Reconnexion… ». */
+.lp-claim {
+  position: relative;
+  overflow: hidden;
+  min-width: 64px;
+  background: var(--claim);
+  color: var(--on-claim);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--claim) 45%, transparent);
+  animation: lp-claim-in var(--lp-dur) var(--lp-ease);
+}
+
+.lp-claim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    color-mix(in srgb, var(--claim-sheen) 80%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: lp-claim-sheen calc(var(--lp-dur) * 3) ease-in-out var(--lp-dur);
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .lp-claim:hover {
+    background: var(--claim-hover);
+  }
+
+  .lp-claim:hover::after {
+    animation: lp-claim-sheen-again calc(var(--lp-dur) * 3) ease-in-out;
+  }
+}
+
+@keyframes lp-claim-in {
+  from {
+    transform: scale(0);
+  }
+}
+
+/* Deux noms pour la même traversée : changer de nom relance l'animation au survol. */
+@keyframes lp-claim-sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes lp-claim-sheen-again {
+  to {
+    transform: translateX(120%);
+  }
+}
+
 @media (max-width: 640px) {
   .lp-fluid {
     height: 12px;

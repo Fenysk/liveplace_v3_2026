@@ -22,6 +22,10 @@
   --on-danger: #ffffff;
   --gauge-charge: #26854c;
   --gauge-draft: #f3a833;
+  --claim: #f3a833;
+  --claim-hover: #f7c35f;
+  --on-claim: #10121c;
+  --claim-sheen: #f7f3b7;
   --gauge-empty: #e4e2e7;
   --draft-outline-in: #ffffff;
   --draft-outline-out: #10121c;
@@ -50,6 +54,10 @@
   --on-danger: #10121c;
   --gauge-charge: #5ab552;
   --gauge-draft: #f7f3b7;
+  --claim: #f3a833;
+  --claim-hover: #f7c35f;
+  --on-claim: #10121c;
+  --claim-sheen: #f7f3b7;
   --gauge-empty: #2e3040;
   --draft-outline-in: #ffffff;
   --draft-outline-out: #10121c;
