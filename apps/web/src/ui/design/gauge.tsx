@@ -111,8 +111,8 @@ export const ClaimButton = ({ onClaim }: { onClaim: () => void }) => (
   <button
     type="button"
     className="lp-btn lp-claim lp-type-body"
-    aria-label="Réclamer +1 de capacité"
-    title="Réclamer +1 de capacité"
+    aria-label="Augmenter la jauge de +1 pixel"
+    title="Augmenter la jauge de +1 pixel"
     onClick={blurAfterClick(onClaim)}
   >
     <span className="lp-type-numeric">+1</span>

@@ -1,11 +1,23 @@
 // Les pills du jeu, les vraies, avec des props d'exemple : chacune dans chacun de ses états.
 
-import { type ObsBackground, PALETTE } from "@liveplace/domain";
+import {
+  GAUGE_MAX_CEILING,
+  GAUGE_MAX_START,
+  type GaugeLimits,
+  type ObsBackground,
+  PALETTE,
+} from "@liveplace/domain";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { CanvasPill } from "../canvas/canvas-pill";
-import { CanvasSettings, type ResizeStatus, ResizeWindow } from "../canvas/canvas-settings";
+import {
+  CanvasSettings,
+  CeilingWindow,
+  GaugeSettings,
+  type ResizeStatus,
+  ResizeWindow,
+} from "../canvas/canvas-settings";
 import { type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
@@ -236,6 +248,35 @@ const CanvasSettingsSpecimen = () => {
   );
 };
 
+// JOURNAL 2026-09-30 : la jauge de départ et la jauge maximale ; la baisser demande une confirmation.
+const GaugeSettingsSpecimen = () => {
+  const [limits, setLimits] = useState<GaugeLimits>({
+    gaugeMaxStart: GAUGE_MAX_START,
+    gaugeMaxCeiling: GAUGE_MAX_CEILING,
+  });
+  const [lowered, setLowered] = useState<GaugeLimits | null>(null);
+  return (
+    <Specimen caption="La jauge de départ et la jauge maximale ; la baisser demande une confirmation">
+      <div className="design-window-box">
+        <GaugeSettings
+          limits={limits}
+          onPick={(next) =>
+            next.gaugeMaxCeiling < limits.gaugeMaxCeiling ? setLowered(next) : setLimits(next)
+          }
+        />
+      </div>
+      <CeilingWindow
+        next={lowered}
+        onConfirm={() => {
+          if (lowered) setLimits(lowered);
+          setLowered(null);
+        }}
+        onClose={() => setLowered(null)}
+      />
+    </Specimen>
+  );
+};
+
 // Le vrai curseur : un cran choisi s'affiche, comme le ferait la confirmation du gateway.
 const ObsSettingsSpecimen = () => {
   const [obsDelayMs, setObsDelayMs] = useState(10_000);
@@ -343,9 +384,10 @@ export const GamePillsSection = () => {
 
       <SpecimenSection
         title="Fenêtre, section Canvas"
-        note="Pour le streamer : la taille du canvas, sans rien perdre."
+        note="Pour le streamer : la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
       >
         <CanvasSettingsSpecimen />
+        <GaugeSettingsSpecimen />
       </SpecimenSection>
 
       <SpecimenSection
