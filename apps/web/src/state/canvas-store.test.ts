@@ -7,13 +7,14 @@ import { type Arrival, type CanvasStoreOptions, createCanvasStore } from "./canv
 const width = 4;
 const now = 1_700_000_000_000;
 const PLACEMENT_ID = "ptest0001";
-const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000 };
+const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000, claimable: 0 };
 
 const welcome: ServerFrame = {
   t: "welcome",
   canvas: { canvasId: "canvas-1", width, height: 4, ownerId: "owner-1" },
   params: {
-    gaugeMax: 10,
+    gaugeMaxStart: 10,
+    gaugeMaxCeiling: 150,
     refillMs: 10_000,
     refillCharges: 1,
     obsDelayMs: 5000,
@@ -556,6 +557,24 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
       requestId: expect.any(String),
       obsBackground: "transparent",
     });
+  });
+
+  // Prend de nouvelles bornes et la jauge qui suit, et n'envoie que les deux bornes, jamais tout `params` (JOURNAL 2026-09-30)
+  it("takes new limits and the gauge that follows, and sends only the two limits, never the whole params", () => {
+    const { store, sent, receive } = setup();
+
+    receive({ t: "gaugeLimits", gaugeMaxStart: 20, gaugeMaxCeiling: 40 });
+    receive({ t: "gauge", charges: 5, max: 20, nextRefillAt: 1, claimable: 2 });
+    const params = store.getView().params;
+    if (params) store.setGaugeLimits({ ...params, gaugeMaxCeiling: 30 });
+    store.claimGauge();
+
+    expect(params).toMatchObject({ gaugeMaxStart: 20, gaugeMaxCeiling: 40 });
+    expect(store.getView().gauge).toEqual({ charges: 5, max: 20, nextRefillAt: 1, claimable: 2 });
+    expect(sent.slice(-2)).toEqual([
+      { t: "setGaugeLimits", requestId: expect.any(String), gaugeMaxStart: 20, gaugeMaxCeiling: 30 },
+      { t: "claimGauge", requestId: expect.any(String) },
+    ]);
   });
 
   // Transmet chaque arrivée à ses écouteurs : le snapshot avec son recent, puis les cases

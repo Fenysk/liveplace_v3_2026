@@ -6,14 +6,19 @@ import {
   CELL_STRIDE,
   type CellKey,
   canModerate,
+  claimableRewards,
   defaultCanvasMeta,
-  GAUGE_MAX,
+  earnedRewards,
+  GAUGE_MAX_CEILING,
+  GAUGE_MAX_START,
   type GaugeParams,
   isCanvasSize,
+  isGaugeLimits,
   isObsDelayStep,
   OBS_DELAY_MS,
   OBS_DELAY_STEPS_MS,
   PALETTE,
+  playerGaugeMax,
   REFILL_CHARGES,
   REFILL_MS,
   refillGauge,
@@ -24,6 +29,7 @@ import {
   TRANSPARENT_COLOR_INDEX,
   toCell,
   toCellKey,
+  toParisDay,
   toSession,
   toSessionClaims,
   toStateOffset,
@@ -243,12 +249,76 @@ describe("defaultCanvasMeta (CDC §1)", () => {
       ownerId: "owner-1",
       width: 50,
       height: 50,
-      gaugeMax: GAUGE_MAX,
+      gaugeMaxStart: GAUGE_MAX_START,
+      gaugeMaxCeiling: GAUGE_MAX_CEILING,
       refillMs: REFILL_MS,
       refillCharges: REFILL_CHARGES,
       obsDelayMs: OBS_DELAY_MS,
       obsBackground: "transparent",
     });
+  });
+});
+
+describe("the player's gauge max (JOURNAL 2026-09-30)", () => {
+  const limits = { gaugeMaxStart: 10, gaugeMaxCeiling: 150 };
+
+  // Donne le premier +1 au 12e pixel compté, puis suit la racine carrée
+  it("earns the first +1 at the 12th counted pixel, then follows the square root", () => {
+    expect(earnedRewards(0)).toBe(0);
+    expect(earnedRewards(11)).toBe(0);
+    expect(earnedRewards(12)).toBe(1);
+    expect(earnedRewards(100)).toBe(3);
+    expect(earnedRewards(400)).toBe(6);
+  });
+
+  // Ajoute les récompenses réclamées à la jauge de départ
+  it("adds the claimed rewards to the starting gauge", () => {
+    expect(playerGaugeMax(0, limits)).toBe(10);
+    expect(playerGaugeMax(4, limits)).toBe(14);
+  });
+
+  // Rend réclamables les récompenses gagnées et pas encore réclamées
+  it("makes claimable the earned rewards not claimed yet", () => {
+    expect(claimableRewards({ countedPixels: 100, claimed: 1 }, limits)).toBe(2);
+    expect(claimableRewards({ countedPixels: 100, claimed: 3 }, limits)).toBe(0);
+    expect(claimableRewards({ countedPixels: 11, claimed: 0 }, limits)).toBe(0);
+  });
+
+  // Ne laisse rien réclamer au-delà du plafond
+  it("lets nothing be claimed past the ceiling", () => {
+    const low = { gaugeMaxStart: 10, gaugeMaxCeiling: 12 };
+    expect(claimableRewards({ countedPixels: 400, claimed: 0 }, low)).toBe(2);
+    expect(claimableRewards({ countedPixels: 400, claimed: 2 }, low)).toBe(0);
+  });
+
+  // Rabote la jauge sous un plafond baissé, et la rend quand il remonte
+  it("trims the gauge under a lowered ceiling, and gives it back when the ceiling rises", () => {
+    const claimed = 6;
+    expect(playerGaugeMax(claimed, { gaugeMaxStart: 10, gaugeMaxCeiling: 12 })).toBe(12);
+    expect(
+      claimableRewards({ countedPixels: 900, claimed }, { gaugeMaxStart: 10, gaugeMaxCeiling: 12 }),
+    ).toBe(0);
+    expect(playerGaugeMax(claimed, limits)).toBe(16);
+    expect(claimableRewards({ countedPixels: 900, claimed }, limits)).toBe(3);
+  });
+
+  // Change de jour à minuit à Paris, pas à minuit UTC
+  it("changes day at midnight in Paris, not at midnight UTC", () => {
+    expect(toParisDay(Date.UTC(2026, 9, 4, 21, 59))).toBe("2026-10-04");
+    expect(toParisDay(Date.UTC(2026, 9, 4, 22, 0))).toBe("2026-10-05");
+    expect(toParisDay(Date.UTC(2026, 11, 31, 23, 0))).toBe("2027-01-01");
+  });
+
+  // Accepte un départ de 1 à 50 et un plafond du départ jusqu'à 500
+  it("accepts a start from 1 to 50 and a ceiling from the start up to 500", () => {
+    expect(isGaugeLimits(limits)).toBe(true);
+    expect(isGaugeLimits({ gaugeMaxStart: 1, gaugeMaxCeiling: 1 })).toBe(true);
+    expect(isGaugeLimits({ gaugeMaxStart: 50, gaugeMaxCeiling: 500 })).toBe(true);
+    expect(isGaugeLimits({ gaugeMaxStart: 0, gaugeMaxCeiling: 150 })).toBe(false);
+    expect(isGaugeLimits({ gaugeMaxStart: 51, gaugeMaxCeiling: 150 })).toBe(false);
+    expect(isGaugeLimits({ gaugeMaxStart: 20, gaugeMaxCeiling: 19 })).toBe(false);
+    expect(isGaugeLimits({ gaugeMaxStart: 10, gaugeMaxCeiling: 501 })).toBe(false);
+    expect(isGaugeLimits({ gaugeMaxStart: 10.5, gaugeMaxCeiling: 150 })).toBe(false);
   });
 });
 

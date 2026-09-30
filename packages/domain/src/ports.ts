@@ -2,7 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CanvasMeta, CanvasSize, ObsBackground, Session, Timestamp, User } from "./index";
+import type { CanvasMeta, CanvasSize, GaugeLimits, ObsBackground, Session, Timestamp, User } from "./index";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
@@ -14,6 +14,7 @@ export type Placement = {
 };
 
 export type AckFrame = Extract<ServerFrame, { t: "ack" }>;
+export type GaugeClaim = { userId: string; requestId: string; nowMs: Timestamp };
 
 export type Pixel = Placement["pixels"][number];
 
@@ -108,6 +109,7 @@ export type LiveControl =
   | { t: "role"; userId: string } // ses droits de modération ont changé (JOURNAL 2026-09-27)
   | { t: "obsDelay"; obsDelayMs: number }
   | { t: "obsBackground"; obsBackground: ObsBackground } // JOURNAL 2026-09-29
+  | ({ t: "gaugeLimits" } & GaugeLimits) // chaque page reçoit sa jauge recalculée (JOURNAL 2026-09-30)
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   | { t: "resize" }; // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
@@ -127,6 +129,8 @@ export interface CanvasCore {
   // Écart §5.6 (JOURNAL 2026-09-24) : lue sans être écrite, pour le `welcome`.
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
   place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
+  // JOURNAL 2026-09-30 : un +1 de jauge max, idempotent par `requestId` comme la pose.
+  claimGauge(canvasId: string, claim: GaugeClaim): Promise<Result<AckFrame, "canvas_not_found">>;
   inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null>; // `null` : personne n'a posé ici
   moderate(
     canvasId: string,
@@ -164,6 +168,7 @@ export interface CanvasCore {
   // Écart CDC v3 §1 (JOURNAL 2026-09-25) : `meta` et le `ctl` ensemble, sans version.
   setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
   setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
+  setGaugeLimits(canvasId: string, limits: GaugeLimits): Promise<void>; // JOURNAL 2026-09-30, comme le délai
   // Écart §5.1 (JOURNAL 2026-09-27) : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
   setModerator(
     canvasId: string,

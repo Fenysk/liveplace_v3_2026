@@ -4,12 +4,18 @@ import { readFileSync } from "node:fs";
 import {
   type CanvasMeta,
   CELL_STRIDE,
+  COUNTED_PIXELS_PER_DAY,
+  claimableRewards,
+  GAUGE_GROWTH_FACTOR,
+  type GaugeLimits,
   OBS_BACKGROUND,
   PALETTE,
+  playerGaugeMax,
   refillGauge,
   type Timestamp,
   toCell,
   toCellKey,
+  toParisDay,
 } from "@liveplace/domain";
 import type {
   AckFrame,
@@ -57,6 +63,7 @@ import {
 declare module "ioredis" {
   interface RedisCommander<Context> {
     place(...args: (string | number)[]): RedisResult<[status: string, ack?: string], Context>;
+    claim(...args: (string | number)[]): RedisResult<[status: string, ack?: string], Context>;
     moderate(
       ...args: (string | number)[]
     ): RedisResult<[status: string, version?: number, cells?: number, isDone?: number], Context>;
@@ -266,7 +273,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   // Écart §5.4 (JOURNAL 2026-09-28) : pile.lua, collé devant chaque script qui lit une pile.
   const pile = scriptOf("pile.lua");
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
-  redis.defineCommand("place", { numberOfKeys: 11, lua: withPile("place.lua") });
+  // Écart §5.3 (JOURNAL 2026-09-30) : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
+  const gauge = scriptOf("gauge.lua");
+  redis.defineCommand("place", { numberOfKeys: 12, lua: `${gauge}\n${withPile("place.lua")}` });
+  redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
   redis.defineCommand("moderate", { numberOfKeys: 17, lua: withPile("moderate.lua") });
   redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
@@ -343,7 +353,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         ownerId: metaText(fields, "ownerId"),
         width: metaNumber(fields, "width"),
         height: metaNumber(fields, "height"),
-        gaugeMax: metaNumber(fields, "gaugeMax"),
+        gaugeMaxStart: metaNumber(fields, "gaugeMaxStart"),
+        gaugeMaxCeiling: metaNumber(fields, "gaugeMaxCeiling"),
         refillMs: metaNumber(fields, "refillMs"),
         refillCharges: metaNumber(fields, "refillCharges"),
         obsDelayMs: metaNumber(fields, "obsDelayMs"),
@@ -368,21 +379,33 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return { state, version: Number(version) };
     },
 
-    // La formule de place.lua, sans jamais écrire : seul le script modifie une jauge.
+    // La formule de gauge.lua, sans jamais écrire : seuls les scripts modifient une jauge.
     async getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]> {
       const keys = buildCanvasKeys(canvasId);
-      const [fields, [charges, at]] = await Promise.all([
+      const [fields, [charges, at], [counted, claimed], isBannedUser] = await Promise.all([
         redis.hgetall(keys.meta),
         redis.hmget(keys.gauge(userId), "charges", "at"),
+        redis.hmget(keys.progress(userId), "counted", "claimed"),
+        isBanned(canvasId, userId),
       ]);
+      const limits: GaugeLimits = {
+        gaugeMaxStart: metaNumber(fields, "gaugeMaxStart"),
+        gaugeMaxCeiling: metaNumber(fields, "gaugeMaxCeiling"),
+      };
+      const progress = { countedPixels: Number(counted ?? 0), claimed: Number(claimed ?? 0) };
       const params = {
-        gaugeMax: metaNumber(fields, "gaugeMax"),
+        gaugeMax: playerGaugeMax(progress.claimed, limits),
         refillMs: metaNumber(fields, "refillMs"),
         refillCharges: metaNumber(fields, "refillCharges"),
       };
       const stored = charges && at ? { charges: Number(charges), at: Number(at) } : undefined;
       const gauge = refillGauge(stored, nowMs, params);
-      return { charges: gauge.charges, max: params.gaugeMax, nextRefillAt: gauge.at + params.refillMs };
+      return {
+        charges: gauge.charges,
+        max: params.gaugeMax,
+        nextRefillAt: gauge.at + params.refillMs,
+        claimable: isBannedUser ? 0 : claimableRewards(progress, limits), // A4 : un banni ne réclame rien
+      };
     },
 
     // L'ordre des arguments est celui que lit place.lua.
@@ -401,6 +424,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.clearedPlacements,
         keys.clearedRanges,
         keys.offStream,
+        keys.progress(userId),
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -414,12 +438,37 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         GAUGE_TTL_SECONDS,
         REQ_TTL_SECONDS,
         placementId,
+        toParisDay(nowMs), // A3 (JOURNAL 2026-09-30)
+        GAUGE_GROWTH_FACTOR,
+        COUNTED_PIXELS_PER_DAY,
         ...pixels.flatMap(({ x, y, colorIndex }) => [x, y, colorIndex]),
       );
       if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
       const frame = decodeServerFrame(JSON.parse(ack ?? "null"));
       if (frame.ok && frame.value.t === "ack") return { ok: true, value: frame.value };
       throw new Error(`place.lua a renvoyé un ack invalide : ${ack}`);
+    },
+
+    // L'ordre des arguments est celui que lit claim.lua.
+    async claimGauge(canvasId, { userId, requestId, nowMs }) {
+      const keys = buildCanvasKeys(canvasId);
+      const [status, ack] = await redis.claim(
+        keys.meta,
+        keys.bans,
+        keys.gauge(userId),
+        keys.progress(userId),
+        keys.req(userId, requestId),
+        userId,
+        requestId,
+        nowMs,
+        GAUGE_GROWTH_FACTOR,
+        GAUGE_TTL_SECONDS,
+        REQ_TTL_SECONDS,
+      );
+      if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
+      const frame = decodeServerFrame(JSON.parse(ack ?? "null"));
+      if (frame.ok && frame.value.t === "ack") return { ok: true, value: frame.value };
+      throw new Error(`claim.lua a renvoyé un ack invalide : ${ack}`);
     },
 
     // La tête de `hist:` est le pixel visible (§5.1).
@@ -779,6 +828,13 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         .hset(keys.meta, "obsBackground", obsBackground)
         .publish(keys.live, JSON.stringify(control))
         .exec();
+    },
+
+    // JOURNAL 2026-09-30 : comme le délai. Personne ne perd ce qu'il a réclamé : la jauge max se recalcule.
+    async setGaugeLimits(canvasId, limits) {
+      const keys = buildCanvasKeys(canvasId);
+      const control: LiveMessage = { ctl: { t: "gaugeLimits", ...limits } };
+      await redis.multi().hset(keys.meta, limits).publish(keys.live, JSON.stringify(control)).exec();
     },
 
     // Le comptage des abonnés appartient au gateway : premier client → abonnement, dernier → départ (§6.3).

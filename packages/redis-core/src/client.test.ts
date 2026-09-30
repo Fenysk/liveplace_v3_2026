@@ -32,12 +32,14 @@ const meta: CanvasMeta = {
   ownerId: "owner-1",
   width: CANVAS_WIDTH,
   height: CANVAS_HEIGHT,
-  gaugeMax: 3,
+  gaugeMaxStart: 3,
+  gaugeMaxCeiling: 150,
   refillMs: 1000,
   refillCharges: 2, // ≠ 1 : un oubli du `× refillCharges` ne passerait pas
   obsDelayMs: 5000,
   obsBackground: "transparent",
 };
+const gaugeParams = { ...meta, gaugeMax: meta.gaugeMaxStart }; // personne n'a rien réclamé
 
 beforeAll(async () => {
   await redis.connect().catch(() => {
@@ -133,11 +135,11 @@ describe("createCanvas (§5.6)", () => {
     await redis.setrange(keys.state, 0, "\x05");
     await redis.incr(keys.version);
 
-    await core.createCanvas(canvasId, { ...meta, gaugeMax: meta.gaugeMax + 1 });
+    await core.createCanvas(canvasId, { ...meta, gaugeMaxStart: meta.gaugeMaxStart + 1 });
 
     expect((await redis.getBuffer(keys.state))?.[0]).toBe(5);
     expect(await redis.get(keys.version)).toBe("1");
-    expect(await redis.hget(keys.meta, "gaugeMax")).toBe(String(meta.gaugeMax));
+    expect(await redis.hget(keys.meta, "gaugeMaxStart")).toBe(String(meta.gaugeMaxStart));
   });
 });
 
@@ -176,7 +178,7 @@ describe("place (§5.3)", () => {
     const { canvasId, keys } = await readyCanvas();
     const pixel = { x: 3, y: 2, colorIndex: 5 }; // y ≥ 1 : cellKey ≠ stateOffset
     const request = placement({ pixels: [pixel] });
-    const gauge = refillGauge(undefined, now, meta);
+    const gauge = refillGauge(undefined, now, gaugeParams);
 
     const ack = await placed(canvasId, request);
 
@@ -186,7 +188,12 @@ describe("place (§5.3)", () => {
       version: 1,
       accepted: 1,
       rejected: [],
-      gauge: { charges: gauge.charges - 1, max: meta.gaugeMax, nextRefillAt: gauge.at + meta.refillMs },
+      gauge: {
+        charges: gauge.charges - 1,
+        max: meta.gaugeMaxStart,
+        nextRefillAt: gauge.at + meta.refillMs,
+        claimable: 0,
+      },
     });
     const cellKey = toCellKey(pixel.x, pixel.y);
     expect((await redis.getBuffer(keys.state))?.[toStateOffset(pixel.x, pixel.y, meta.width)]).toBe(
@@ -228,21 +235,21 @@ describe("place (§5.3)", () => {
       { index: 1, reason: "invalid" },
       { index: 2, reason: "invalid" },
     ]);
-    expect(ack.gauge.charges).toBe(meta.gaugeMax - 1);
+    expect(ack.gauge.charges).toBe(meta.gaugeMaxStart - 1);
     expect(await redis.get(keys.version)).toBe("1");
   });
 
   // Accepte jusqu'aux charges, rejette le reste avec gauge, et ne crée ni version ni événement sans pixel accepté
   it("accepts up to the charges, rejects the rest with gauge, and bumps nothing when none is accepted", async () => {
     const { canvasId, keys } = await readyCanvas();
-    const pixels = Array.from({ length: meta.gaugeMax + 2 }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
+    const pixels = Array.from({ length: meta.gaugeMaxStart + 2 }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
 
     const first = await placed(canvasId, placement({ pixels }));
 
-    expect(first.accepted).toBe(meta.gaugeMax);
+    expect(first.accepted).toBe(meta.gaugeMaxStart);
     expect(first.rejected).toEqual([
-      { index: meta.gaugeMax, reason: "gauge" },
-      { index: meta.gaugeMax + 1, reason: "gauge" },
+      { index: meta.gaugeMaxStart, reason: "gauge" },
+      { index: meta.gaugeMaxStart + 1, reason: "gauge" },
     ]);
 
     const second = placement({ pixels: [{ x: 0, y: 1, colorIndex: 1 }] });
@@ -251,7 +258,7 @@ describe("place (§5.3)", () => {
       requestId: second.requestId,
       accepted: 0,
       rejected: [{ index: 0, reason: "gauge" }],
-      gauge: { charges: 0, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs },
+      gauge: { charges: 0, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0 },
     });
     expect(await redis.get(keys.version)).toBe("1");
     expect(await redis.xlen(keys.events)).toBe(1);
@@ -260,7 +267,7 @@ describe("place (§5.3)", () => {
   // Recharge la jauge à l'intervalle exact, pas une milliseconde avant
   it("refills the gauge at the exact interval, not a millisecond before", async () => {
     const { canvasId } = await readyCanvas();
-    const pixels = Array.from({ length: meta.gaugeMax }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
+    const pixels = Array.from({ length: meta.gaugeMaxStart }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
     await placed(canvasId, placement({ pixels }));
     const pixel = [{ x: 0, y: 1, colorIndex: 1 }];
 
@@ -268,12 +275,13 @@ describe("place (§5.3)", () => {
     const onTime = await placed(canvasId, placement({ nowMs: now + meta.refillMs, pixels: pixel }));
 
     expect(early.accepted).toBe(0);
-    const gauge = refillGauge({ charges: 0, at: now }, now + meta.refillMs, meta);
+    const gauge = refillGauge({ charges: 0, at: now }, now + meta.refillMs, gaugeParams);
     expect(onTime.accepted).toBe(1);
     expect(onTime.gauge).toEqual({
       charges: gauge.charges - 1,
-      max: meta.gaugeMax,
+      max: meta.gaugeMaxStart,
       nextRefillAt: gauge.at + meta.refillMs,
+      claimable: 0,
     });
   });
 
@@ -287,9 +295,10 @@ describe("place (§5.3)", () => {
     const ack = await placed(canvasId, placement({ nowMs: later, pixels: [{ x: 0, y: 1, colorIndex: 1 }] }));
 
     expect(ack.gauge).toEqual({
-      charges: meta.gaugeMax - 1,
-      max: meta.gaugeMax,
+      charges: meta.gaugeMaxStart - 1,
+      max: meta.gaugeMaxStart,
       nextRefillAt: later + meta.refillMs,
+      claimable: 0,
     });
   });
 
@@ -304,12 +313,13 @@ describe("place (§5.3)", () => {
     );
 
     expect(ack.gauge).toEqual({
-      charges: meta.gaugeMax - 2,
-      max: meta.gaugeMax,
+      charges: meta.gaugeMaxStart - 2,
+      max: meta.gaugeMaxStart,
       nextRefillAt: now + meta.refillMs,
+      claimable: 0,
     });
     expect(await redis.hgetall(keys.gauge(request.userId))).toEqual({
-      charges: String(meta.gaugeMax - 2),
+      charges: String(meta.gaugeMaxStart - 2),
       at: String(now),
     });
   });
@@ -324,7 +334,7 @@ describe("place (§5.3)", () => {
 
     expect(retry).toEqual(first);
     expect(await redis.get(keys.version)).toBe("1");
-    expect(await redis.hget(keys.gauge(request.userId), "charges")).toBe(String(meta.gaugeMax - 1));
+    expect(await redis.hget(keys.gauge(request.userId), "charges")).toBe(String(meta.gaugeMaxStart - 1));
   });
 
   // Rejette tous les pixels d'un utilisateur banni avec banned, sans rien écrire
@@ -471,7 +481,12 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
 
     const gauge = await core.getGauge(canvasId, "user-1", now);
 
-    expect(gauge).toEqual({ charges: meta.gaugeMax, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs });
+    expect(gauge).toEqual({
+      charges: meta.gaugeMaxStart,
+      max: meta.gaugeMaxStart,
+      nextRefillAt: now + meta.refillMs,
+      claimable: 0,
+    });
     expect(await redis.exists(buildCanvasKeys(canvasId).gauge("user-1"))).toBe(0);
   });
 
@@ -480,7 +495,7 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
     const canvasId = uniqueCanvasId();
     const keys = buildCanvasKeys(canvasId);
     await core.createCanvas(canvasId, meta);
-    const pixels = Array.from({ length: meta.gaugeMax }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
+    const pixels = Array.from({ length: meta.gaugeMaxStart }, (_, x) => ({ x, y: 0, colorIndex: 1 }));
     await core.place(canvasId, {
       userId: "user-1",
       requestId: randomUUID(),
@@ -489,14 +504,15 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
       pixels,
     });
     const later = now + meta.refillMs * 1.5;
-    const expected = refillGauge({ charges: 0, at: now }, later, meta);
+    const expected = refillGauge({ charges: 0, at: now }, later, gaugeParams);
 
     const gauge = await core.getGauge(canvasId, "user-1", later);
 
     expect(gauge).toEqual({
       charges: expected.charges,
-      max: meta.gaugeMax,
+      max: meta.gaugeMaxStart,
       nextRefillAt: expected.at + meta.refillMs,
+      claimable: 0,
     });
     expect(await redis.hgetall(keys.gauge("user-1"))).toEqual({ charges: "0", at: String(now) });
   });

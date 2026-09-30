@@ -14,7 +14,14 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   palette: PALETTE,
   version: 1,
   role: "guest",
-  params: { gaugeMax: 200, refillMs, refillCharges: 1, obsDelayMs: 5000, obsBackground: "transparent" },
+  params: {
+    gaugeMaxStart: 200,
+    gaugeMaxCeiling: 150,
+    refillMs,
+    refillCharges: 1,
+    obsDelayMs: 5000,
+    obsBackground: "transparent",
+  },
   gauge: null,
   reportCount: 0,
   lastError: null,
@@ -29,7 +36,7 @@ const liveView = (overrides: Partial<CanvasView> = {}): CanvasView =>
     role: "viewer",
     userId: "user-1",
     displayName: "User 1",
-    gauge: { charges: 200, max: 200, nextRefillAt: now + refillMs },
+    gauge: { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0 },
     ...overrides,
   });
 
@@ -67,6 +74,8 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     resizeCanvas: async () => ({ ok: true as const, value: true as const }),
     setObsDelay: () => undefined,
     setObsBackground: () => undefined,
+    claimGauge: () => undefined,
+    setGaugeLimits: () => undefined,
     listenArrivals: () => () => undefined,
     close: () => undefined,
   };
@@ -100,7 +109,7 @@ const acceptAll = (pixels: readonly Pixel[]) => ({
   requestId: "request",
   accepted: pixels.length,
   rejected: [],
-  gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs },
+  gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0 },
 });
 
 describe("createDraftStore — the modes (CDC 2026)", () => {
@@ -269,7 +278,7 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
   // Plafonne aux charges prévues : une recharge arrivée depuis le dernier ack compte déjà
   it("caps at the predicted charges: a refill that came since the last ack already counts", () => {
     const { store, cells } = setup({
-      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now } }),
+      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now, claimable: 0 } }),
     });
     store.enterDraftMode();
 
@@ -283,7 +292,7 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
   // Ne fait vibrer la jauge qu'une fois par tracé, et de nouveau au tracé suivant
   it("shakes the gauge once per trace, and again on the next trace", () => {
     const { store, cells } = setup({
-      view: liveView({ gauge: { charges: 2, max: 200, nextRefillAt: now + refillMs } }),
+      view: liveView({ gauge: { charges: 2, max: 200, nextRefillAt: now + refillMs, claimable: 0 } }),
     });
     store.enterDraftMode();
 

@@ -13,6 +13,13 @@ Un écart visible dans le code y porte le marqueur `Écart §x.y (JOURNAL AAAA-M
 
 ---
 
+## 2026-09-30 — Écart §5.1 et §5.3 : la jauge max grandit par joueur, protocole 10
+
+**Contexte.** Plan du jour J16 (A0 à A4) : chaque pixel accepté compte, jusqu'à 600 par jour de Paris ; ⌊0,3 × √comptés⌋ récompenses, réclamées d'un clic. `meta.gaugeMax` devient `gaugeMaxStart` et `gaugeMaxCeiling`, réglés par le streamer.
+**Décision.** Un HASH `cv:<id>:progress:<userId>` sans TTL (`counted`, `day`, `dayCounted`, `claimed`), écrit par `place.lua` dans la pose et par `claim.lua` ; la recharge vit dans `gauge.lua`, collé devant les deux. Le gateway passe le jour. Frames client `claimGauge` (réponse `ack`, `accepted` = 1 ou 0) et `setGaugeLimits` (streamer seul, `ctl` `gaugeLimits` : chaque page reçoit les réglages et sa jauge). `GaugeSchema` gagne `claimable`.
+**Migration.** `gaugeMaxStart` reprend `gaugeMax`, `gaugeMaxCeiling` prend 150, avant le déploiement ; `gaugeMax` reste le temps du déploiement.
+**Renoncement.** Pas d'historique repris depuis l'archive, pas de progression tous canvas confondus. Sa demande, contre le plan D : le « +1 » prend la place de Dessiner en Vue, et n'est pas en Dessin ; ni compteur, ni raccourci pour réclamer. Les réglages du streamer sont masqués pour l'instant (10 et 150 pour tous), montrés dans `/design` seulement.
+
 ## 2026-09-29 — Les frames du client sont strictes : une clé inconnue est refusée
 
 **Contexte.** Audit de sécurité, §4 : le gateway avale les clés inconnues d'une frame (`isAdmin: true` dans un `hello`, ou `__proto__`). Sans effet aujourd'hui, mais rien ne l'en empêcherait demain.

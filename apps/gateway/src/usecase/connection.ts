@@ -46,6 +46,7 @@ type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
 type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetObsBackgroundFrame = Extract<ClientFrame, { t: "setObsBackground" }>;
+type SetGaugeLimitsFrame = Extract<ClientFrame, { t: "setGaugeLimits" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
@@ -55,7 +56,7 @@ type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // attente pour qui modère (JOURNAL 2026-09-28).
 type ControlFrame = Extract<
   ServerFrame,
-  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "reportCount" }
+  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "gaugeLimits" | "reportCount" }
 >;
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
@@ -136,7 +137,8 @@ const buildWelcome = (
   t: "welcome",
   canvas: { canvasId, width: meta.width, height: meta.height, ownerId: meta.ownerId },
   params: {
-    gaugeMax: meta.gaugeMax,
+    gaugeMaxStart: meta.gaugeMaxStart,
+    gaugeMaxCeiling: meta.gaugeMaxCeiling,
     refillMs: meta.refillMs,
     refillCharges: meta.refillCharges,
     obsDelayMs: meta.obsDelayMs,
@@ -151,7 +153,7 @@ const buildWelcome = (
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
 const controlFrameOf = (
-  control: Exclude<LiveControl, { t: "role" | "resize" }>,
+  control: Exclude<LiveControl, { t: "role" | "resize" | "gaugeLimits" }>,
   session: Session | null,
   role: Role,
 ): ControlFrame | null => {
@@ -206,11 +208,26 @@ export function createConnection(
   const onControl: ControlListener = (control) => {
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
+    if (control.t === "gaugeLimits") return onGaugeLimitsControl(control);
     if (state.status === "awaitingHello") return;
     const frame = controlFrameOf(control, session, state.role);
-    if (!frame) return;
+    if (frame) deliverControl(frame);
+  };
+
+  const deliverControl = (frame: ControlFrame): void => {
     if (state.status === "joining") state.pendingControls.push(frame);
     else if (state.status === "ready") socket.sendFrame(frame);
+  };
+
+  // JOURNAL 2026-09-30 : de nouvelles bornes changent la jauge max de chaque compte.
+  const onGaugeLimitsControl = (limits: Extract<LiveControl, { t: "gaugeLimits" }>): void => {
+    deliverControl(limits);
+    if (state.status !== "ready" || !session) return;
+    const { userId } = session;
+    void deps.core
+      .getGauge(state.canvasId, userId, deps.now())
+      .then((gauge) => socket.sendFrame({ t: "gauge", ...gauge }))
+      .catch((error: unknown) => console.error("jauge non relue", error));
   };
 
   const refuse = (code: ErrorCode): void => {
@@ -369,6 +386,18 @@ export function createConnection(
     socket.sendFrame(result.value);
   };
 
+  // JOURNAL 2026-09-30 : un +1 de jauge max, refusé par claim.lua s'il n'y a rien à réclamer.
+  const claimGauge = async (requestId: string, canvasId: string): Promise<void> => {
+    if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
+    const result = await deps.core.claimGauge(canvasId, {
+      userId: session.userId,
+      requestId,
+      nowMs: deps.now(),
+    });
+    if (!result.ok) return refuse("canvas_not_found");
+    socket.sendFrame(result.value);
+  };
+
   // Une fenêtre glissante d'une seconde : la plus ancienne des dernières inspections doit en être sortie.
   const isInspectAllowed = (nowMs: Timestamp): boolean => {
     const oldest = inspectedAt.length < INSPECT_MAX_PER_SECOND ? undefined : inspectedAt[0];
@@ -515,6 +544,15 @@ export function createConnection(
     await deps.core.setObsBackground(ready.canvasId, obsBackground);
   };
 
+  // JOURNAL 2026-09-30 : le streamer seul. Le schéma n'a laissé passer que des bornes valides.
+  const setGaugeLimits = async (
+    { gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
+    ready: ReadyState,
+  ) => {
+    if (ready.role !== "owner") return forbid();
+    await deps.core.setGaugeLimits(ready.canvasId, { gaugeMaxStart, gaugeMaxCeiling });
+  };
+
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     switch (frame.t) {
@@ -534,6 +572,10 @@ export function createConnection(
         return setObsDelay(frame, ready);
       case "setObsBackground":
         return setObsBackground(frame, ready);
+      case "claimGauge":
+        return claimGauge(frame.requestId, ready.canvasId);
+      case "setGaugeLimits":
+        return setGaugeLimits(frame, ready);
       case "setModerator":
         return setModerator(frame, ready);
       case "report":

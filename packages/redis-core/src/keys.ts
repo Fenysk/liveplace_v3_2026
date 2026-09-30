@@ -69,6 +69,8 @@ export function buildCanvasKeys(canvasId: string) {
     // Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient de lui ôter, `cellKey` → `colorIndex`, pour la preuve d'un ban.
     recentlyCleared: (userId: string) => `${prefix}cleared:recent:${userId}`,
     gauge: (userId: string) => `${prefix}gauge:${userId}`,
+    // Écart §5.1 (JOURNAL 2026-09-30) : sans EXPIRE, contrairement à la jauge : une progression ne se perd pas.
+    progress: (userId: string) => `${prefix}progress:${userId}`,
     req: (userId: string, requestId: string) => `${prefix}req:${userId}:${requestId}`,
   };
 }

@@ -1,4 +1,4 @@
--- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua.
+-- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua, la jauge de gauge.lua.
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, gaugeKey, reqKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -8,7 +8,10 @@ local nowMs, paletteSize, cellStride, histDepth =
 local eventsMaxlen, gaugeTtlSeconds, reqTtlSeconds = ARGV[10], ARGV[11], ARGV[12]
 -- Écart §5.1 (JOURNAL 2026-09-28) : la pose dont ce lot fait partie.
 local placementId = ARGV[13]
-local firstPixelArg = 14
+-- Écart §5.3 (JOURNAL 2026-09-30) : la progression, comptée au jour de Paris.
+local progressKey = KEYS[12]
+local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), tonumber(ARGV[16])
+local firstPixelArg = 17
 local pixelCount = (#ARGV - firstPixelArg + 1) / 3
 
 -- cjson encode une table vide en `{}`, or `rejected` est un tableau.
@@ -17,12 +20,23 @@ local function encodeAck(ack)
 end
 
 -- 0. Canvas prêt. Écart §5.5 (JOURNAL 2026-09-15) : le script ne se fie pas au seul gateway.
-local meta = redis.call("HMGET", metaKey, "ready", "width", "height", "gaugeMax", "refillMs", "refillCharges")
+local meta = redis.call(
+  "HMGET",
+  metaKey,
+  "ready",
+  "width",
+  "height",
+  "gaugeMaxStart",
+  "gaugeMaxCeiling",
+  "refillMs",
+  "refillCharges"
+)
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
 local width, height = tonumber(meta[2]), tonumber(meta[3])
-local gaugeMax, refillMs, refillCharges = tonumber(meta[4]), tonumber(meta[5]), tonumber(meta[6])
+local limits = { start = tonumber(meta[4]), ceiling = tonumber(meta[5]) }
+local refillMs, refillCharges = tonumber(meta[6]), tonumber(meta[7])
 
 -- 1. Idempotence.
 local stored = redis.call("GET", reqKey)
@@ -31,20 +45,9 @@ if stored then
 end
 
 -- 4. Recharge paresseuse, calculée avant le ban : l'ack d'un banni porte aussi la jauge.
-local gauge = redis.call("HMGET", gaugeKey, "charges", "at")
-local charges, at = tonumber(gauge[1]), tonumber(gauge[2])
-if not charges then
-  charges, at = gaugeMax, nowMs
-else
-  -- Écart §5.3 (JOURNAL 2026-09-15) : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
-  local refills = math.max(0, math.floor((nowMs - at) / refillMs))
-  charges = math.min(gaugeMax, charges + refills * refillCharges)
-  at = at + refills * refillMs
-  -- Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
-  if charges >= gaugeMax then
-    at = nowMs
-  end
-end
+local progress = readProgress(progressKey)
+local gaugeMax = playerGaugeMax(limits, progress.claimed)
+local charges, at = refillGauge(gaugeKey, gaugeMax, refillMs, refillCharges, nowMs)
 
 -- 2. Ban.
 if redis.call("SISMEMBER", bansKey, userId) == 1 then
@@ -52,7 +55,8 @@ if redis.call("SISMEMBER", bansKey, userId) == 1 then
   for index = 0, pixelCount - 1 do
     rejected[#rejected + 1] = { index = index, reason = "banned" }
   end
-  local gaugeFrame = { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs }
+  -- A4 : un banni ne réclame rien.
+  local gaugeFrame = { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs, claimable = 0 }
   return { "ack", encodeAck({ t = "ack", requestId = requestId, accepted = 0, rejected = rejected, gauge = gaugeFrame }) }
 end
 
@@ -117,6 +121,15 @@ if #accepted > 0 then
   end
   charges = charges - #accepted
 
+  -- Écart §5.3 (JOURNAL 2026-09-30) : chaque pixel accepté compte, au plus `countedPixelsPerDay` par jour.
+  if progress.day ~= day then
+    progress.day, progress.dayCounted = day, 0
+  end
+  local counted = math.min(#accepted, math.max(0, countedPixelsPerDay - progress.dayCounted))
+  progress.counted = progress.counted + counted
+  progress.dayCounted = progress.dayCounted + counted
+  redis.call("HSET", progressKey, "counted", progress.counted, "day", day, "dayCounted", progress.dayCounted)
+
   -- 9. Publication. MAXLEN se place avant l'ID.
   local event = cjson.encode({ version = version, kind = "place", authorId = userId, occurredAt = nowMs, cells = cells })
   redis.call("XADD", eventsKey, "MAXLEN", "~", eventsMaxlen, version .. "-0", "e", event)
@@ -134,7 +147,12 @@ local ack = encodeAck({
   version = version,
   accepted = #accepted,
   rejected = rejected,
-  gauge = { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs },
+  gauge = {
+    charges = charges,
+    max = gaugeMax,
+    nextRefillAt = at + refillMs,
+    claimable = claimableOf(limits, progress, growthFactor),
+  },
 })
 redis.call("SET", reqKey, ack, "EX", reqTtlSeconds)
 return { "ack", ack }

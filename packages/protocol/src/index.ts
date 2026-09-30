@@ -1,6 +1,13 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
-import { isCanvasSize, isObsDelayStep, OBS_BACKGROUNDS, ROLES, type Timestamp } from "@liveplace/domain";
+import {
+  isCanvasSize,
+  isGaugeLimits,
+  isObsDelayStep,
+  OBS_BACKGROUNDS,
+  ROLES,
+  type Timestamp,
+} from "@liveplace/domain";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
@@ -13,7 +20,7 @@ import { z } from "zod";
 // 7 : signaler une plage d'heures, et les pixels de l'auteur d'une pose pour la choisir (JOURNAL 2026-09-29).
 // 8 : le streamer change la taille de son canvas (JOURNAL 2026-09-29).
 // 9 : le fond de la vue OBS, transparent ou blanc (JOURNAL 2026-09-29).
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -92,6 +99,7 @@ const GaugeSchema = z.object({
   charges: z.number().int().nonnegative(),
   max: z.number().int().nonnegative(),
   nextRefillAt: TimestampSchema,
+  claimable: z.number().int().nonnegative(), // JOURNAL 2026-09-30 : les récompenses à réclamer
 });
 
 const StreamCellSchema = z.object({
@@ -268,6 +276,20 @@ const SetObsBackgroundFrameSchema = z.strictObject({
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
 
+// JOURNAL 2026-09-30 : un +1 de jauge max, répondu par un `ack` (`accepted` vaut 1 ou 0).
+const ClaimGaugeFrameSchema = z.strictObject({ t: z.literal("claimGauge"), requestId: RequestIdSchema });
+
+const GaugeLimitsSchema = z.strictObject({
+  gaugeMaxStart: z.number().int(),
+  gaugeMaxCeiling: z.number().int(),
+});
+
+// JOURNAL 2026-09-30 : le streamer seul, pris aussitôt par chaque page, comme le délai.
+const SetGaugeLimitsFrameSchema = GaugeLimitsSchema.extend({
+  t: z.literal("setGaugeLimits"),
+  requestId: RequestIdSchema,
+}).refine(isGaugeLimits, "hors des bornes de la jauge");
+
 const PingFrameSchema = z.strictObject({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -285,6 +307,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListReportsFrameSchema,
   ResizeCanvasFrameSchema,
   SetObsBackgroundFrameSchema,
+  ClaimGaugeFrameSchema,
+  SetGaugeLimitsFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -303,7 +327,8 @@ const WelcomeFrameSchema = z.object({
     ownerId: UserIdSchema,
   }),
   params: z.object({
-    gaugeMax: z.number().int().nonnegative(),
+    gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
+    gaugeMaxCeiling: z.number().int().positive(),
     refillMs: z.number().int().positive(),
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
@@ -456,6 +481,13 @@ const ObsBackgroundFrameSchema = z.object({
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
 
+// Les bornes viennent de changer : chaque page les prend, et reçoit ensuite sa jauge (JOURNAL 2026-09-30).
+const GaugeLimitsFrameSchema = z.object({
+  t: z.literal("gaugeLimits"),
+  gaugeMaxStart: z.number().int().positive(),
+  gaugeMaxCeiling: z.number().int().positive(),
+});
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -480,6 +512,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ObsBackgroundFrameSchema,
+  GaugeLimitsFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,
   AuthorPixelsFrameSchema,

@@ -1,6 +1,12 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
-import { type ObsBackground, type Role, type Timestamp, toStateOffset } from "@liveplace/domain";
+import {
+  type GaugeLimits,
+  type ObsBackground,
+  type Role,
+  type Timestamp,
+  toStateOffset,
+} from "@liveplace/domain";
 import type {
   AckFrame,
   AuthoredPixel,
@@ -98,6 +104,9 @@ export type CanvasStore = {
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   setObsBackground(obsBackground: ObsBackground): void; // confirmé par la frame `obsBackground` (JOURNAL 2026-09-29)
+  // JOURNAL 2026-09-30 : la jauge arrive par l'`ack` ; les bornes, le streamer seul, par la frame `gaugeLimits`.
+  claimGauge(): void;
+  setGaugeLimits(limits: GaugeLimits): void;
   // JOURNAL 2026-09-28. `range` : ses poses voisines aussi (JOURNAL 2026-09-29).
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
   // Le streamer seul ; la nouvelle taille arrive par un `welcome` et un snapshot (JOURNAL 2026-09-29).
@@ -319,11 +328,12 @@ export function createCanvasStore(
     requests.delete(requestId);
   };
 
-  // Un réglage de la vue OBS, pris aussitôt : le délai (JOURNAL 2026-09-25), le fond (JOURNAL 2026-09-29).
-  const takeObsSetting = ({
+  // Un réglage pris aussitôt : le délai (JOURNAL 2026-09-25), le fond (JOURNAL 2026-09-29), les bornes de la jauge
+  // (JOURNAL 2026-09-30).
+  const takeSetting = ({
     t,
     ...change
-  }: Extract<ServerFrame, { t: "obsDelay" | "obsBackground" }>): void => {
+  }: Extract<ServerFrame, { t: "obsDelay" | "obsBackground" | "gaugeLimits" }>): void => {
     if (view.params) publish({ params: { ...view.params, ...change } });
   };
 
@@ -344,9 +354,11 @@ export function createCanvasStore(
       case "ack":
         acknowledge(frame);
         break;
-      case "gauge":
-        publish({ gauge: { charges: frame.charges, max: frame.max, nextRefillAt: frame.nextRefillAt } });
+      case "gauge": {
+        const { t, ...gauge } = frame;
+        publish({ gauge });
         break;
+      }
       case "inspected":
         onInspected(frame);
         break;
@@ -373,7 +385,8 @@ export function createCanvasStore(
         break;
       case "obsDelay":
       case "obsBackground":
-        takeObsSetting(frame);
+      case "gaugeLimits":
+        takeSetting(frame);
         break;
       case "error":
         if (frame.requestId) refuseRequest(frame.requestId, frame.code);
@@ -463,6 +476,10 @@ export function createCanvasStore(
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
     setObsBackground: (obsBackground) =>
       transport.send({ t: "setObsBackground", requestId: crypto.randomUUID(), obsBackground }),
+    claimGauge: () => transport.send({ t: "claimGauge", requestId: crypto.randomUUID() }),
+    // Les deux bornes seules : la frame est stricte, et `params` porte bien d'autres réglages.
+    setGaugeLimits: ({ gaugeMaxStart, gaugeMaxCeiling }) =>
+      transport.send({ t: "setGaugeLimits", requestId: crypto.randomUUID(), gaugeMaxStart, gaugeMaxCeiling }),
     report: (x, y, placementId, range) =>
       request(
         { t: "report", requestId: crypto.randomUUID(), x, y, placementId, ...(range ? { range } : {}) },

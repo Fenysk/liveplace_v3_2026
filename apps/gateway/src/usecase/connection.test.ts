@@ -1,9 +1,10 @@
-import type { CanvasMeta, Session } from "@liveplace/domain";
+import type { CanvasMeta, GaugeLimits, Session } from "@liveplace/domain";
 import type {
   AckFrame,
   BannedUser,
   CanvasCore,
   ClientSocket,
+  GaugeClaim,
   InspectEntry,
   LiveControl,
   LiveMessage,
@@ -30,7 +31,8 @@ const meta: CanvasMeta = {
   ownerId: "owner-1",
   width: 4,
   height: 4,
-  gaugeMax: 3,
+  gaugeMaxStart: 3,
+  gaugeMaxCeiling: 150,
   refillMs: 1000,
   refillCharges: 1,
   obsDelayMs: 5000,
@@ -84,7 +86,7 @@ const ack: AckFrame = {
   version: 3,
   accepted: 1,
   rejected: [],
-  gauge: { charges: 2, max: meta.gaugeMax, nextRefillAt: now + meta.refillMs },
+  gauge: { charges: 2, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0 },
 };
 
 // Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (écart §4.3, JOURNAL 2026-09-27).
@@ -148,6 +150,8 @@ const setup = (options: SetupOptions = {}) => {
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
   const obsBackgrounds: string[] = [];
+  const claims: GaugeClaim[] = [];
+  const gaugeLimits: GaugeLimits[] = [];
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
@@ -168,7 +172,7 @@ const setup = (options: SetupOptions = {}) => {
       };
     },
     async getGauge(_asked: string, _userId: string, nowMs: number) {
-      return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs };
+      return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs, claimable: 0 };
     },
     async inspect(_asked: string, x: number, y: number) {
       inspected.push({ x, y });
@@ -211,6 +215,13 @@ const setup = (options: SetupOptions = {}) => {
     },
     async setObsBackground(_asked: string, obsBackground: "transparent" | "white") {
       obsBackgrounds.push(obsBackground);
+    },
+    async claimGauge(_asked: string, claim: GaugeClaim) {
+      claims.push(claim);
+      return { ok: true as const, value: { ...ack, requestId: claim.requestId } };
+    },
+    async setGaugeLimits(_asked: string, limits: GaugeLimits) {
+      gaugeLimits.push(limits);
     },
     async setModerator(_asked: string, role: ModeratorRole) {
       namedModerators.push(role);
@@ -287,6 +298,8 @@ const setup = (options: SetupOptions = {}) => {
     recentSince,
     obsDelays,
     obsBackgrounds,
+    claims,
+    gaugeLimits,
     namedModerators,
     reports,
     clock,
@@ -308,7 +321,7 @@ describe("createConnection (§6.1)", () => {
     expect(sent[0]).toMatchObject({
       t: "welcome",
       canvas: { canvasId, width: meta.width, height: meta.height, ownerId: meta.ownerId },
-      params: { gaugeMax: meta.gaugeMax, obsDelayMs: meta.obsDelayMs },
+      params: { gaugeMaxStart: meta.gaugeMaxStart, obsDelayMs: meta.obsDelayMs },
       version: 0,
       you: { userId: session.userId, login: session.login, role: "viewer" },
     });
@@ -323,7 +336,7 @@ describe("createConnection (§6.1)", () => {
 
     expect(sent[0]).toMatchObject({
       t: "welcome",
-      gauge: { ...ack.gauge, nextRefillAt: now + meta.refillMs },
+      gauge: { ...ack.gauge, nextRefillAt: now + meta.refillMs, claimable: 0 },
     });
   });
 
@@ -872,6 +885,45 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     expect(context.obsBackgrounds).toEqual(["white"]);
     for (const opened of [context, viewer])
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
+  });
+
+  // Ne laisse que le streamer régler les bornes de la jauge, et donne à chaque compte sa jauge recalculée (JOURNAL 2026-09-30)
+  it("lets only the owner set the gauge limits, and gives every account its recomputed gauge", async () => {
+    const context = setup({ session: owner });
+    const viewer = context.open(session);
+    const guest = context.open(null);
+    for (const opened of [context, viewer, guest]) await opened.connection.receive(hello());
+    const limits = { gaugeMaxStart: 20, gaugeMaxCeiling: 40 };
+    const setLimits = JSON.stringify({ t: "setGaugeLimits", requestId: "limits-1", ...limits });
+
+    await viewer.connection.receive(setLimits);
+    await context.connection.receive(setLimits);
+    context.control({ t: "gaugeLimits", ...limits });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(viewer.sent[0]).toMatchObject({ t: "welcome", params: { gaugeMaxStart: meta.gaugeMaxStart } });
+    expect(viewer.sent.at(-3)).toEqual({ t: "error", code: "forbidden" });
+    expect(context.gaugeLimits).toEqual([limits]);
+    for (const opened of [context, viewer]) {
+      expect(opened.sent.at(-2)).toEqual({ t: "gaugeLimits", ...limits });
+      expect(opened.sent.at(-1)).toMatchObject({ t: "gauge", max: ack.gauge.max });
+    }
+    expect(guest.sent.at(-1)).toEqual({ t: "gaugeLimits", ...limits });
+  });
+
+  // Refuse à un invité une réclamation, et répond à un compte par l'ack du noyau (JOURNAL 2026-09-30)
+  it("refuses a claim from a guest, and answers an account with the core's ack", async () => {
+    const context = setup();
+    const guest = context.open(null);
+    for (const opened of [context, guest]) await opened.connection.receive(hello());
+    const claim = JSON.stringify({ t: "claimGauge", requestId: "claim-1" });
+
+    await guest.connection.receive(claim);
+    await context.connection.receive(claim);
+
+    expect(guest.sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: "claim-1" });
+    expect(context.claims).toEqual([{ userId: session.userId, requestId: "claim-1", nowMs: now }]);
+    expect(context.sent.at(-1)).toEqual({ ...ack, requestId: "claim-1" });
   });
 
   // Garde un changement de délai tombé pendant l'arrivée, et l'envoie après le welcome

@@ -108,21 +108,30 @@ export function toCell(cellKey: number): { x: number; y: number } {
 export type Gauge = { charges: number; at: Timestamp };
 export type GaugeParams = { gaugeMax: number; refillMs: number; refillCharges: number };
 
+// Écart §5.1 (JOURNAL 2026-09-30) : la jauge max de chaque joueur se calcule entre ces deux réglages du streamer.
+export type GaugeLimits = { gaugeMaxStart: number; gaugeMaxCeiling: number };
+
 // `cv:<id>:meta` sans `ready` (§5.1).
-export type CanvasMeta = GaugeParams & {
-  ownerId: string;
-  width: number;
-  height: number;
-  obsDelayMs: number;
-  obsBackground: ObsBackground;
-};
+export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
+  GaugeLimits & {
+    ownerId: string;
+    width: number;
+    height: number;
+    obsDelayMs: number;
+    obsBackground: ObsBackground;
+  };
 
 // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le fond de la vue OBS. Transparent par défaut, et sur un canvas d'avant.
 export const OBS_BACKGROUNDS = ["transparent", "white"] as const;
 export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
 export const OBS_BACKGROUND: ObsBackground = "transparent";
 
-export const GAUGE_MAX = 10;
+export const GAUGE_MAX_START = 10;
+export const GAUGE_MAX_CEILING = 150;
+export const GAUGE_MAX_START_BOUNDS = { min: 1, max: 50 } as const;
+export const GAUGE_MAX_CEILING_BOUND = 500; // le plafond va du départ jusqu'ici
+export const GAUGE_GROWTH_FACTOR = 0.3; // le premier +1 au 12e pixel
+export const COUNTED_PIXELS_PER_DAY = 600;
 export const REFILL_MS = 10_000;
 export const REFILL_CHARGES = 1;
 
@@ -133,6 +142,47 @@ export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: 
   const charges = Math.min(params.gaugeMax, gauge.charges + refills * params.refillCharges);
   // Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
   return { charges, at: charges >= params.gaugeMax ? nowMs : gauge.at + refills * params.refillMs };
+}
+
+// La progression d'un joueur sur un canvas, sans le jour (§5.1, JOURNAL 2026-09-30).
+export type Progress = { countedPixels: number; claimed: number };
+
+export function isGaugeLimits({ gaugeMaxStart, gaugeMaxCeiling }: GaugeLimits): boolean {
+  return (
+    Number.isInteger(gaugeMaxStart) &&
+    Number.isInteger(gaugeMaxCeiling) &&
+    gaugeMaxStart >= GAUGE_MAX_START_BOUNDS.min &&
+    gaugeMaxStart <= GAUGE_MAX_START_BOUNDS.max &&
+    gaugeMaxCeiling >= gaugeMaxStart &&
+    gaugeMaxCeiling <= GAUGE_MAX_CEILING_BOUND
+  );
+}
+
+// La formule de gauge.lua : un plafond baissé rabote, mais ne reprend rien de ce qui a été réclamé.
+export function playerGaugeMax(claimed: number, limits: GaugeLimits): number {
+  return Math.min(limits.gaugeMaxStart + claimed, limits.gaugeMaxCeiling);
+}
+
+export function earnedRewards(countedPixels: number): number {
+  return Math.floor(GAUGE_GROWTH_FACTOR * Math.sqrt(countedPixels));
+}
+
+// A3 (JOURNAL 2026-09-30) : le jour de Paris, `2026-10-05`. Un stream du soir ne change pas de jour en plein milieu.
+const PARIS_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Paris",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function toParisDay(nowMs: Timestamp): string {
+  return PARIS_DAY.format(nowMs);
+}
+
+// Ce que le plafond laisse encore réclamer, parmi les récompenses gagnées.
+export function claimableRewards({ countedPixels, claimed }: Progress, limits: GaugeLimits): number {
+  const room = limits.gaugeMaxCeiling - limits.gaugeMaxStart - claimed;
+  return Math.max(0, Math.min(earnedRewards(countedPixels) - claimed, room));
 }
 
 // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai par crans, jusqu'à 10 min.
@@ -150,7 +200,8 @@ export function defaultCanvasMeta(ownerId: string): CanvasMeta {
   return {
     ownerId,
     ...BIRTH_CANVAS_SIZE,
-    gaugeMax: GAUGE_MAX,
+    gaugeMaxStart: GAUGE_MAX_START,
+    gaugeMaxCeiling: GAUGE_MAX_CEILING,
     refillMs: REFILL_MS,
     refillCharges: REFILL_CHARGES,
     obsDelayMs: OBS_DELAY_MS,
