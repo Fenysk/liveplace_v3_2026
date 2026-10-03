@@ -1,5 +1,5 @@
 // Le point d'entrée de Start : les dépendances du serveur, posées dans le contexte de chaque requête.
-// Écart §9.2 (JOURNAL 2026-09-22) : `routes/` (couche ui) les lit là, sans importer l'infra.
+// §9.2 : `routes/` (couche ui) les lit là, sans importer l'infra.
 
 import { createMiddleware, createStart } from "@tanstack/react-start";
 

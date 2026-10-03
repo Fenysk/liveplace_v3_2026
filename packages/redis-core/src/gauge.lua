@@ -1,7 +1,7 @@
--- La jauge d'un joueur (§5.3). Écart §5.3 (JOURNAL 2026-09-30) : collé devant place.lua et claim.lua, comme pile.lua.
+-- La jauge d'un joueur (§5.3). §5.3 : collé devant place.lua et claim.lua, comme pile.lua.
 -- Les formules de `refillGauge`, `playerGaugeMax` et `claimableRewards` (domain) : les deux côtés comptent pareil.
 
--- Écart §5.1 (JOURNAL 2026-09-30) : sans TTL, une progression ne se perd jamais.
+-- §5.1 : sans TTL, une progression ne se perd jamais.
 local function readProgress(progressKey)
   local fields = redis.call("HMGET", progressKey, "counted", "day", "dayCounted", "claimed")
   return {
@@ -30,11 +30,11 @@ local function refillGauge(gaugeKey, gaugeMax, refillMs, refillCharges, nowMs)
   if not charges then
     return gaugeMax, nowMs
   end
-  -- Écart §5.3 (JOURNAL 2026-09-15) : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
+  -- §5.3 : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
   local refills = math.max(0, math.floor((nowMs - at) / refillMs))
   charges = math.min(gaugeMax, charges + refills * refillCharges)
   at = at + refills * refillMs
-  -- Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
+  -- §5.3 : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
   if charges >= gaugeMax then
     at = nowMs
   end

@@ -76,7 +76,7 @@ declare module "ioredis" {
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
 
-// Écart §5.1 (JOURNAL 2026-09-28) : une entrée de pile, lue par la fin comme dans pile.lua.
+// §5.1 : une entrée de pile, lue par la fin comme dans pile.lua.
 // Un pixel d'avant le protocole 6 a pour pose sa version.
 const PILE_ENTRY = /^(.*):(\d+):(\d+):(\d+)(?::([A-Za-z][A-Za-z0-9]*))?$/;
 
@@ -97,7 +97,7 @@ const parseEntry = (entry: string): PileEntry => {
 // Un pixel visible d'un auteur : son heure et sa pose sont connues.
 type VisiblePixel = Required<AuthoredPixel>;
 
-// Écart §5.4 (JOURNAL 2026-09-28) : la pose visée et sa plage, vides pour les autres actions (moderate.lua).
+// §5.4 : la pose visée et sa plage, vides pour les autres actions (moderate.lua).
 const placementArgsOf = (action: Moderation["action"]): [string, number | "", number | ""] => {
   if (action.action === "approvePlacement") return [action.placementId, "", ""];
   if (action.action !== "clearPlacement") return ["", "", ""];
@@ -156,7 +156,7 @@ export function createSignInWrites(redis: Redis): SignInWrites {
   };
 }
 
-// Écart §2 (JOURNAL 2026-09-27) : des noms et des actions à appliquer, jamais un pixel ni un script.
+// §2 : des noms et des actions à appliquer, jamais un pixel ni un script.
 export function createTwitchWrites(redis: Redis): TwitchWrites {
   return {
     async setTwitchUsers(canvasId, users) {
@@ -270,10 +270,10 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
 const scriptOf = (name: string): string => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 
 export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCore {
-  // Écart §5.4 (JOURNAL 2026-09-28) : pile.lua, collé devant chaque script qui lit une pile.
+  // §5.4 : pile.lua, collé devant chaque script qui lit une pile.
   const pile = scriptOf("pile.lua");
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
-  // Écart §5.3 (JOURNAL 2026-09-30) : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
+  // §5.3 : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
   const gauge = scriptOf("gauge.lua");
   redis.defineCommand("place", { numberOfKeys: 12, lua: `${gauge}\n${withPile("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
@@ -311,8 +311,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     };
   };
 
-  // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. Écart §5.3
-  // (JOURNAL 2026-09-29) : dans le cadre seulement.
+  // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. §5.7 : dans le
+  // cadre seulement.
   const listVisiblePixels = async (keys: CanvasKeys, userId: string): Promise<VisiblePixel[]> => {
     const [cellKeys, [width, height]] = await Promise.all([
       redis.sunion(keys.cells(userId), keys.clearing(userId)),
@@ -358,7 +358,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         refillMs: metaNumber(fields, "refillMs"),
         refillCharges: metaNumber(fields, "refillCharges"),
         obsDelayMs: metaNumber(fields, "obsDelayMs"),
-        // Écart CDC v3 §1 (JOURNAL 2026-09-29) : absent sur un canvas d'avant, donc transparent.
+        // CDC 2026 §1 : absent sur un canvas d'avant, donc transparent.
         obsBackground: fields.obsBackground === "white" ? "white" : OBS_BACKGROUND,
       };
     },
@@ -431,7 +431,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         userId,
         requestId,
         nowMs,
-        PALETTE.length, // Écart §5.3 (JOURNAL 2026-09-15) : pas dans `meta`
+        PALETTE.length, // §5.3 : pas dans `meta`
         CELL_STRIDE,
         HIST_DEPTH,
         EVENTS_MAXLEN,
@@ -792,7 +792,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     },
 
     // Seul accès par le temps (§5.6) : à l'envers depuis la fin, jusqu'au premier événement trop ancien.
-    // Écart §5.3 (JOURNAL 2026-09-29) : rien d'avant une nouvelle taille, ses cases n'ont plus la même place.
+    // §5.3 : rien d'avant une nouvelle taille, ses cases n'ont plus la même place.
     async listRecentEvents(canvasId: string, sinceMs: Timestamp): Promise<Event[]> {
       const keys = buildCanvasKeys(canvasId);
       const [entries, resizedAtVersion] = await Promise.all([
@@ -808,7 +808,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return recent.reverse();
     },
 
-    // Écart CDC v3 §1 (JOURNAL 2026-09-25) : un réglage, pas un pixel. Ni version, ni entrée dans le stream.
+    // CDC 2026 §1 : un réglage, pas un pixel. Ni version, ni entrée dans le stream.
     async setObsDelay(canvasId: string, obsDelayMs: number): Promise<void> {
       const keys = buildCanvasKeys(canvasId);
       const control: LiveMessage = { ctl: { t: "obsDelay", obsDelayMs } };
@@ -819,7 +819,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         .exec();
     },
 
-    // Écart CDC v3 §1 (JOURNAL 2026-09-29) : comme le délai, `meta` et le `ctl` ensemble, sans version.
+    // CDC 2026 §1 : comme le délai, `meta` et le `ctl` ensemble, sans version.
     async setObsBackground(canvasId, obsBackground) {
       const keys = buildCanvasKeys(canvasId);
       const control: LiveMessage = { ctl: { t: "obsBackground", obsBackground } };

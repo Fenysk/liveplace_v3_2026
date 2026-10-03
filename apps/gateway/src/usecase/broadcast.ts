@@ -31,7 +31,7 @@ type CanvasBroadcast = {
   subscription: Promise<Unsubscribe>;
 };
 
-// Écart D-13 (JOURNAL 2026-09-26) : un canvas n'est vidé qu'un tick sur N, N = ⌈clients / 500⌉, au plus 3.
+// D-13 : un canvas n'est vidé qu'un tick sur N, N = ⌈clients / 500⌉, au plus 3.
 const CLIENTS_PER_TICK = 500;
 const MAX_TICKS_BETWEEN_FRAMES = 3;
 

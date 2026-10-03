@@ -5,7 +5,7 @@ import type { BroadcastCell, CellsFrame, Event, EventCell, StreamCell } from "@l
 
 const streamOf = (cell: EventCell): StreamCell => cell.obs ?? cell;
 
-// Écart §9.5 (JOURNAL 2026-09-28) : la case vue par le stream fusionne comme l'autre, si l'une des deux en a une.
+// §9.5 : la case vue par le stream fusionne comme l'autre, si l'une des deux en a une.
 const conflateStream = (open: EventCell, changed: EventCell): Pick<EventCell, "obs"> => {
   if (!open.obs && !changed.obs) return {};
   const { colorIndex, placedAt } = streamOf(changed);

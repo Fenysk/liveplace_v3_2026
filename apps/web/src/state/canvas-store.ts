@@ -42,7 +42,7 @@ export type CanvasMode = "ui" | "obs";
 export type CanvasStoreOptions = {
   mode: CanvasMode;
   now: () => Timestamp; // l'âge d'un lot au moment de le renvoyer
-  reload: () => void; // Écart §4.5 (JOURNAL 2026-09-25) : une reprise refusée pour la version du protocole
+  reload: () => void; // §4.5 : une reprise refusée pour la version du protocole
 };
 
 // Ce qui arrive du serveur, dans l'ordre : la vue OBS en tient son propre affichage (§9.5).
@@ -185,7 +185,7 @@ export function createCanvasStore(
     for (const listener of listeners) listener();
   };
 
-  // Écart §5.3 (JOURNAL 2026-09-29) : une case d'avant une nouvelle taille peut tomber hors du cadre.
+  // §5.3 : une case d'avant une nouvelle taille peut tomber hors du cadre.
   const writeCell = ({ x, y, colorIndex }: BroadcastCell): void => {
     if (x >= view.width || y >= view.height) return;
     const offset = toStateOffset(x, y, view.width);
@@ -194,7 +194,7 @@ export function createCanvasStore(
   };
 
   // Le seul chemin d'écriture des cases venues du serveur : flux live, et plus tard resync et vue OBS (§9.2).
-  // Écart §4.3 (JOURNAL 2026-09-28) : `hide` et `unhide` ne regardent que le stream, la page garde l'état réel.
+  // §4.3 : `hide` et `unhide` ne regardent que le stream, la page garde l'état réel.
   const apply = (frame: CellsFrame): void => {
     for (const cell of frame.cells) if (cell.kind === "place" || cell.kind === "clear") writeCell(cell);
     publish({ version: frame.toVersion });
@@ -303,7 +303,7 @@ export function createCanvasStore(
 
   // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
   const refuse = (code: ErrorCode): void => {
-    // Écart §4.5 (JOURNAL 2026-09-25) : le code a changé pendant la coupure, la page va le chercher.
+    // §4.5 : le code a changé pendant la coupure, la page va le chercher.
     if (code === "protocol_version" && hasWelcomed) {
       options.reload();
       return;
@@ -317,7 +317,7 @@ export function createCanvasStore(
     publish({ status: "closed" });
   };
 
-  // Écart §4.3 (JOURNAL 2026-09-27) : une `error` qui nomme sa requête ne concerne qu'elle.
+  // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle.
   const refuseRequest = (requestId: string, code: ErrorCode): void => {
     if (requestId === inspectRequestId) {
       inspectRequestId = null;
@@ -379,7 +379,7 @@ export function createCanvasStore(
       case "unbanned":
         publish({ isBanned: frame.t === "banned" });
         break;
-      // Écart §10.3 (JOURNAL 2026-09-27) : nommé ou retiré pendant la session, la modération apparaît ou part.
+      // §10.3 : nommé ou retiré pendant la session, la modération apparaît ou part.
       case "role":
         publish({ role: frame.role });
         break;

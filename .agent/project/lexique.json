@@ -37,7 +37,7 @@
 
   "verbs": [
     { "canonical": "place",   "meaning": "Poser des pixels sur le canvas.",                                          "banned": ["draw", "paint", "put"] },
-    { "canonical": "clear",   "meaning": "Retirer des pixels par modération : `clearUser`, `clearArea`. Restaure ce qu'il y avait dessous.", "banned": ["delete", "remove", "erase"] },
+    { "canonical": "clear",   "meaning": "Retirer des pixels par modération : `clearUser`, `clearPlacement`. Restaure ce qu'il y avait dessous.", "banned": ["delete", "remove", "erase"] },
     { "canonical": "restore", "meaning": "Remettre le pixel d'en dessous — et, pour `restore.lua`, réécrire un état complet.", "banned": [] },
     { "canonical": "ban",     "meaning": "Interdire de poser sur ce canvas. L'inverse est `unban`.",                  "banned": ["block"] },
     { "canonical": "conflate","meaning": "Fusionner plusieurs changements d'une même case dans un tick (D-13).",      "banned": ["merge", "dedupe"] },

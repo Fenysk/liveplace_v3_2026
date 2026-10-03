@@ -19,7 +19,7 @@ export type SignInDeps = {
 
 export type SignInResult = { signedSession: string; login: string };
 
-// Écart §8.1 (JOURNAL 2026-09-27) : le streamer dont la page a lancé la connexion. Jamais soi-même, rien depuis l'accueil.
+// §8.1 : le streamer dont la page a lancé la connexion. Jamais soi-même, rien depuis l'accueil.
 const getDiscoveredViaUserId = async (
   durable: DurableStore,
   user: User,
@@ -46,7 +46,7 @@ export async function signInTwitchUser(
   signedIn: SignedInUser,
   returnPath: string | null,
 ): Promise<SignInResult> {
-  // Écart §10.1 (JOURNAL 2026-09-27) : l'e-mail ne va qu'à Convex, jamais dans Redis ni dans la session.
+  // §10.1 : l'e-mail ne va qu'à Convex, jamais dans Redis ni dans la session.
   const { email, ...user } = signedIn;
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);

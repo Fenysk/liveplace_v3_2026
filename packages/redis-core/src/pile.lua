@@ -20,7 +20,7 @@ local function parseEntry(entry)
   }
 end
 
--- Écart §5.3 (JOURNAL 2026-09-29) : une case hors du cadre garde sa pile, mais ne s'écrit, ne s'émet ni ne se liste.
+-- §5.3 : une case hors du cadre garde sa pile, mais ne s'écrit, ne s'émet ni ne se liste.
 local function isInside(cellKey, cellStride, width, height)
   local key = tonumber(cellKey)
   return key % cellStride < width and math.floor(key / cellStride) < height

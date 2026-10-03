@@ -20,7 +20,7 @@ export const Route = createFileRoute("/auth/twitch")({
         const pending: PendingSignIn = {
           state: crypto.randomUUID(),
           returnPath: toReturnPath(query.get("returnTo")),
-          // Écart §10.1 (JOURNAL 2026-09-27) : `sync=1`, le streamer synchronise sa chaîne.
+          // §10.1 : `sync=1`, le streamer synchronise sa chaîne.
           purpose: query.get("sync") === "1" ? "sync" : "signIn",
         };
         const cookie = serializeCookie(

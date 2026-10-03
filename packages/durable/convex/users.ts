@@ -14,7 +14,7 @@ export const upsertFromTwitch = mutation({
     email: v.optional(v.string()),
     discoveredViaUserId: v.optional(v.string()),
   },
-  // Écart §8.1 (JOURNAL 2026-09-27) : l'e-mail à chaque connexion, le lien de découverte à la création seulement.
+  // §8.1 : l'e-mail à chaque connexion, le lien de découverte à la création seulement.
   handler: async (ctx, { serviceKey, email, discoveredViaUserId, ...user }) => {
     requireServiceKey(serviceKey);
     const now = Date.now();

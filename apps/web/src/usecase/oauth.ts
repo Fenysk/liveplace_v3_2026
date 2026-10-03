@@ -5,13 +5,13 @@ import type { TwitchPurpose } from "@liveplace/domain/ports";
 export const OAUTH_COOKIE = "lp_oauth";
 export const OAUTH_TTL_SECONDS = 10 * 60;
 
-// Écart §10.1 (JOURNAL 2026-09-27) : `sync`, le streamer synchronise sa chaîne ; sinon, une simple connexion.
+// §10.1 : `sync`, le streamer synchronise sa chaîne ; sinon, une simple connexion.
 export type PendingSignIn = { state: string; returnPath: string | null; purpose: TwitchPurpose };
 
 // Exactement `/<pseudo>` : un pseudo Twitch, en minuscules dans les URL.
 const CANVAS_PATH = /^\/[a-z0-9_]{1,25}$/;
 
-// Écart §10.1 (JOURNAL 2026-09-22) : on revient sur le canvas d'où l'on s'est connecté, jamais ailleurs.
+// §10.1 : on revient sur le canvas d'où l'on s'est connecté, jamais ailleurs.
 // Toute autre forme est refusée : une URL complète ferait une redirection ouverte.
 export function toReturnPath(candidate: string | null | undefined): string | null {
   const path = candidate?.toLowerCase();

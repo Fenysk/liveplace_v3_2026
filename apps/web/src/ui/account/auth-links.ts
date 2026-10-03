@@ -6,5 +6,5 @@ export const signInHref = (login: string): string => `/auth/twitch?returnTo=${re
 
 export const signOutHref = (login: string): string => `/auth/signout?returnTo=${returnTo(login)}`;
 
-// Écart §10.1 (JOURNAL 2026-09-27) : la connexion qui demande aussi le droit de lire ses modérateurs et ses bans.
+// §10.1 : la connexion qui demande aussi le droit de lire ses modérateurs et ses bans.
 export const syncHref = (login: string): string => `${signInHref(login)}&sync=1`;

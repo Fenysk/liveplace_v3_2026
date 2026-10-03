@@ -1,4 +1,4 @@
-// Écart §9 (JOURNAL 2026-09-27) : ce que Twitch poste sur /twitch/eventsub. Le web répond, et dépose pour le
+// §9 : ce que Twitch poste sur /twitch/eventsub. Le web répond, et dépose pour le
 // gateway ce qu'il faut appliquer (§2) : il ne touche à aucun pixel.
 
 import type { Timestamp } from "@liveplace/domain";

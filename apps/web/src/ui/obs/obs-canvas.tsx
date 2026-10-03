@@ -44,7 +44,7 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
       const { width, height } = sizeSurface(element);
       const { left, top, width: drawnWidth, height: drawnHeight } = fitRect({ width, height }, view);
       context.clearRect(0, 0, width, height);
-      // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le fond blanc, sous les pixels, dans le cadre du canvas seulement.
+      // CDC 2026 §1 : le fond blanc, sous les pixels, dans le cadre du canvas seulement.
       context.fillStyle =
         view.background === "white"
           ? getComputedStyle(element).getPropertyValue("--obs-white")

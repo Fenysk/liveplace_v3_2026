@@ -27,7 +27,7 @@ export const PROTOCOL_VERSION = 10;
 // la seule forme que le client connaît : le worker/gateway traduit l'un
 // vers l'autre, sans jamais laisser `authorId` ni `moderation` franchir le fil.
 
-// Écart §4.3 (JOURNAL 2026-09-28) : `hide` et `unhide` ne changent que ce que montre le stream.
+// §4.3 : `hide` et `unhide` ne changent que ce que montre le stream.
 export type EventKind = "place" | "clear" | "hide" | "unhide";
 
 export type Event = {
@@ -36,7 +36,7 @@ export type Event = {
   authorId: string | null; // null = système
   occurredAt: Timestamp;
   cells: EventCell[];
-  // Écart §4.4 (JOURNAL 2026-09-25) : plus de `clearArea`, donc plus d'`area`.
+  // §4.4 : plus de `clearArea`, donc plus d'`area`.
   moderation?: {
     action: ModerateAction["action"];
     target: string;
@@ -44,7 +44,7 @@ export type Event = {
   };
 };
 
-// Écart §9.5 (JOURNAL 2026-09-28) : la case vue par le stream, quand une pose cachée est en jeu.
+// §9.5 : la case vue par le stream, quand une pose cachée est en jeu.
 export type StreamCell = {
   colorIndex: number;
   previousColorIndex: number;
@@ -85,7 +85,7 @@ const VersionSchema = z.number().int().nonnegative();
 const CoordinateSchema = z.number().int().nonnegative();
 const ColorIndexSchema = z.number().int().min(0).max(255);
 const RoleSchema = z.enum(ROLES);
-// Écart §5.1 (JOURNAL 2026-09-28) : tirée par la page, elle commence par une lettre ; un pixel plus ancien a sa version.
+// §5.1 : tirée par la page, elle commence par une lettre ; un pixel plus ancien a sa version.
 const ClientPlacementIdSchema = z.string().regex(/^[a-z][a-z0-9]{7,31}$/);
 const PlacementIdSchema = z.union([ClientPlacementIdSchema, z.string().regex(/^\d{1,16}$/)]);
 
@@ -130,14 +130,14 @@ const RejectedPixelSchema = z.object({
 const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
 
 const InspectEntrySchema = z.object({
-  userId: UserIdSchema.optional(), // Écart §4.3 (JOURNAL 2026-09-27) : seulement pour qui modère
+  userId: UserIdSchema.optional(), // §4.3 : seulement pour qui modère
   moderatorOrigin: ModeratorOriginSchema.optional(), // pour le seul streamer, quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
-  avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
+  avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
-  placementId: PlacementIdSchema, // Écart §4.3 (JOURNAL 2026-09-28) : la pose, pour la signaler ou la retirer
+  placementId: PlacementIdSchema, // §4.3 : la pose, pour la signaler ou la retirer
   canReport: z.boolean().optional(), // absent : ne peut pas la signaler
 });
 
@@ -176,12 +176,12 @@ const InspectFrameSchema = z.strictObject({
   y: CoordinateSchema,
 });
 
-// Écart §5.4 (JOURNAL 2026-09-28) : les autres pixels de l'auteur posés entre `from` et `to`, autour d'une pose.
+// §5.4 : les autres pixels de l'auteur posés entre `from` et `to`, autour d'une pose.
 const RangeSchema = z
   .strictObject({ from: TimestampSchema, to: TimestampSchema })
   .refine(({ from, to }) => from <= to, "plage à l'envers");
 
-// Écart §5.4 et §4.2 (JOURNAL 2026-09-25) : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
+// §5.4 et §4.2 : pas de `cursor`, le gateway enchaîne les tranches ; plus de `clearArea`.
 const ModerateActionSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.enum(["clearUser", "ban", "unban"]), target: UserIdSchema }),
   z.strictObject({
@@ -205,7 +205,7 @@ const ModerateFrameSchema = z.strictObject({
   action: ModerateActionSchema,
 });
 
-// Écart §4.2 (JOURNAL 2026-09-25) : les pixels d'un auteur (sa preuve s'il est banni), et la liste des bannis.
+// §4.2 : les pixels d'un auteur (sa preuve s'il est banni), et la liste des bannis.
 const ListPixelsFrameSchema = z.strictObject({
   t: z.literal("listPixels"),
   requestId: RequestIdSchema,
@@ -214,7 +214,7 @@ const ListPixelsFrameSchema = z.strictObject({
 
 const ListBansFrameSchema = z.strictObject({ t: z.literal("listBans"), requestId: RequestIdSchema });
 
-// Écart §4.2 (JOURNAL 2026-09-27) : les modérateurs du canvas, et d'où ils viennent.
+// §4.2 : les modérateurs du canvas, et d'où ils viennent.
 const ListModeratorsFrameSchema = z.strictObject({
   t: z.literal("listModerators"),
   requestId: RequestIdSchema,
@@ -228,7 +228,7 @@ const SetModeratorFrameSchema = z.strictObject({
   isModerator: z.boolean(),
 });
 
-// Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai de sa vue OBS, un cran à la fois.
+// CDC 2026 §1 : le streamer règle le délai de sa vue OBS, un cran à la fois.
 const ObsDelaySchema = z.number().int().refine(isObsDelayStep, "pas un cran du délai OBS");
 
 const SetObsDelayFrameSchema = z.strictObject({
@@ -237,8 +237,8 @@ const SetObsDelayFrameSchema = z.strictObject({
   obsDelayMs: ObsDelaySchema,
 });
 
-// Écart §4.2 (JOURNAL 2026-09-28) : la pose de la case, vérifiée par le serveur au moment du signalement.
-// Écart §4.2 (JOURNAL 2026-09-29) : `range` étend le signalement aux poses voisines de l'auteur.
+// §4.2 : la pose de la case, vérifiée par le serveur au moment du signalement.
+// §4.2 : `range` étend le signalement aux poses voisines de l'auteur.
 const ReportFrameSchema = z.strictObject({
   t: z.literal("report"),
   requestId: RequestIdSchema,
@@ -248,7 +248,7 @@ const ReportFrameSchema = z.strictObject({
   range: RangeSchema.optional(),
 });
 
-// Écart §4.2 (JOURNAL 2026-09-29) : les pixels de l'auteur de la pose en (x, y), pour choisir la plage à signaler.
+// §4.2 : les pixels de l'auteur de la pose en (x, y), pour choisir la plage à signaler.
 const ListAuthorPixelsFrameSchema = z.strictObject({
   t: z.literal("listAuthorPixels"),
   requestId: RequestIdSchema,
@@ -259,7 +259,7 @@ const ListAuthorPixelsFrameSchema = z.strictObject({
 
 const ListReportsFrameSchema = z.strictObject({ t: z.literal("listReports"), requestId: RequestIdSchema });
 
-// Écart §4.2 (JOURNAL 2026-09-29) : le streamer seul, et seulement une taille du CDC 2026 §1.
+// §4.2 : le streamer seul, et seulement une taille du CDC 2026 §1.
 const ResizeCanvasFrameSchema = z
   .strictObject({
     t: z.literal("resizeCanvas"),
@@ -269,7 +269,7 @@ const ResizeCanvasFrameSchema = z
   })
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
-// Écart CDC v3 §1 (JOURNAL 2026-09-29) : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
+// CDC 2026 §1 : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
 const SetObsBackgroundFrameSchema = z.strictObject({
   t: z.literal("setObsBackground"),
   requestId: RequestIdSchema,
@@ -340,7 +340,7 @@ const WelcomeFrameSchema = z.object({
     userId: UserIdSchema.optional(),
     login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
-    avatarUrl: z.string().optional(), // Écart §4.3 (JOURNAL 2026-09-24) : un ancien client l'ignore
+    avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
     role: RoleSchema,
   }),
   gauge: GaugeSchema.optional(),
@@ -378,20 +378,20 @@ const ModeratedFrameSchema = z.object({
 
 const BannedFrameSchema = z.object({ t: z.literal("banned") });
 
-// Écart §4.3 (JOURNAL 2026-09-28) : l'heure et la pose de chaque pixel, absentes de la preuve d'un ban.
+// §4.3 : l'heure et la pose de chaque pixel, absentes de la preuve d'un ban.
 const AuthoredPixelSchema = PixelSchema.extend({
   placedAt: TimestampSchema.optional(),
   placementId: PlacementIdSchema.optional(),
 });
 
-// Écart §4.3 (JOURNAL 2026-09-29) : la réponse à `listAuthorPixels`, sans l'identifiant de l'auteur.
+// §4.3 : la réponse à `listAuthorPixels`, sans l'identifiant de l'auteur.
 const AuthorPixelsFrameSchema = z.object({
   t: z.literal("authorPixels"),
   requestId: RequestIdSchema,
   pixels: z.array(AuthoredPixelSchema),
 });
 
-// Écart §4.3 (JOURNAL 2026-09-25) : la réponse à `listPixels` et à `listBans`, et le débannissement en direct.
+// §4.3 : la réponse à `listPixels` et à `listBans`, et le débannissement en direct.
 const PixelsFrameSchema = z.object({
   t: z.literal("pixels"),
   requestId: RequestIdSchema,
@@ -405,7 +405,7 @@ const BannedUserSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   pixelCount: z.number().int().nonnegative(),
-  isFromTwitch: z.boolean(), // Écart §4.3 (JOURNAL 2026-09-27) : un déban Twitch le lèverait
+  isFromTwitch: z.boolean(), // §4.3 : un déban Twitch le lèverait
   hasAccount: z.boolean(), // sans compte LivePlace : son nom vient de Twitch
 });
 
@@ -417,7 +417,7 @@ const BansFrameSchema = z.object({
 
 const UnbannedFrameSchema = z.object({ t: z.literal("unbanned") });
 
-// Écart §4.3 (JOURNAL 2026-09-27) : un modérateur, nommé sur Twitch, ici, ou les deux.
+// §4.3 : un modérateur, nommé sur Twitch, ici, ou les deux.
 const ModeratorSchema = z.object({
   userId: UserIdSchema,
   login: TwitchLoginSchema,
@@ -438,7 +438,7 @@ const ModeratorsFrameSchema = z.object({
   twitchSync: TwitchSyncSchema.optional(),
 });
 
-// Écart §4.3 (JOURNAL 2026-09-28) : une pose signalée, en attente d'un modérateur, avec ses pixels visibles.
+// §4.3 : une pose signalée, en attente d'un modérateur, avec ses pixels visibles.
 const ReportedPlacementSchema = z.object({
   userId: UserIdSchema,
   login: TwitchLoginSchema,
@@ -469,7 +469,7 @@ const ReportCountFrameSchema = z.object({
   count: z.number().int().nonnegative(),
 });
 
-// Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé pendant la session.
+// §10.3 : ses droits ont changé pendant la session.
 const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 
 // Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
@@ -491,7 +491,7 @@ const GaugeLimitsFrameSchema = z.object({
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
-  requestId: RequestIdSchema.optional(), // Écart §4.3 (JOURNAL 2026-09-27) : le refus d'une seule requête
+  requestId: RequestIdSchema.optional(), // §4.3 : le refus d'une seule requête
   message: z.string().optional(),
 });
 

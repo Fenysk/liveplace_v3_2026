@@ -6,9 +6,9 @@ local histPrefix, cellsPrefix, liveChannel, userId, requestId = ARGV[1], ARGV[2]
 local nowMs, paletteSize, cellStride, histDepth =
   tonumber(ARGV[6]), tonumber(ARGV[7]), tonumber(ARGV[8]), tonumber(ARGV[9])
 local eventsMaxlen, gaugeTtlSeconds, reqTtlSeconds = ARGV[10], ARGV[11], ARGV[12]
--- Écart §5.1 (JOURNAL 2026-09-28) : la pose dont ce lot fait partie.
+-- §5.1 : la pose dont ce lot fait partie.
 local placementId = ARGV[13]
--- Écart §5.3 (JOURNAL 2026-09-30) : la progression, comptée au jour de Paris.
+-- §5.3 : la progression, comptée au jour de Paris.
 local progressKey = KEYS[12]
 local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), tonumber(ARGV[16])
 local firstPixelArg = 17
@@ -19,7 +19,7 @@ local function encodeAck(ack)
   return (string.gsub(cjson.encode(ack), '"rejected":{}', '"rejected":[]'))
 end
 
--- 0. Canvas prêt. Écart §5.5 (JOURNAL 2026-09-15) : le script ne se fie pas au seul gateway.
+-- 0. Canvas prêt. §5.5 : le script ne se fie pas au seul gateway.
 local meta = redis.call(
   "HMGET",
   metaKey,
@@ -78,7 +78,7 @@ local version
 if #accepted > 0 then
   -- 6. Version.
   version = redis.call("INCR", versionKey)
-  -- Écart §9.5 (JOURNAL 2026-09-28) : sans pose cachée, aucune pile n'est relue en entier.
+  -- §9.5 : sans pose cachée, aucune pile n'est relue en entier.
   local pile = openPile({
     cleared = KEYS[8],
     clearedPlacements = KEYS[9],
@@ -121,7 +121,7 @@ if #accepted > 0 then
   end
   charges = charges - #accepted
 
-  -- Écart §5.3 (JOURNAL 2026-09-30) : chaque pixel accepté compte, au plus `countedPixelsPerDay` par jour.
+  -- §5.3 : chaque pixel accepté compte, au plus `countedPixelsPerDay` par jour.
   if progress.day ~= day then
     progress.day, progress.dayCounted = day, 0
   end

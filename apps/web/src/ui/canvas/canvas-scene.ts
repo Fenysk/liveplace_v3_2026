@@ -285,7 +285,7 @@ export function createCanvasScene(
   });
   themeObserver.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
 
-  // Écart §5.3 (JOURNAL 2026-09-29) : une nouvelle taille ramène la vue à l'arrivée.
+  // §5.3 : une nouvelle taille ramène la vue à l'arrivée.
   let knownSize: Size | null = null;
   const unsubscribe = store.subscribe(() => {
     const { width, height } = store.getView();

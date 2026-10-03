@@ -16,7 +16,7 @@ import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 // Retirer ses pixels, bannir (qui les retire aussi), bannir juste après un retrait, ou signaler.
 export type ModerationKind = "clear" | "ban" | "banAfterClear" | "report";
 
-// Écart §4.3 (JOURNAL 2026-09-27) : l'identifiant de l'auteur n'arrive qu'à qui modère.
+// §4.3 : l'identifiant de l'auteur n'arrive qu'à qui modère.
 export type ModeratedAuthor = InspectEntry & { userId: string };
 
 // La cible est l'auteur et la pose affichés au moment du clic, jamais la case relue : elle peut changer pendant

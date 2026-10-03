@@ -19,7 +19,7 @@ const showAt = (cell: Pick<WaitingCell, "placedAt">, delayMs: number): Timestamp
 
 const offsetOf = (queue: ObsQueue, cell: BroadcastCell): number => toStateOffset(cell.x, cell.y, queue.width);
 
-// Écart §9.5 (JOURNAL 2026-09-28) : la case telle que le stream la voit, quand une pose cachée est en jeu.
+// §9.5 : la case telle que le stream la voit, quand une pose cachée est en jeu.
 const streamOf = (cell: BroadcastCell): StreamCell => cell.obs ?? cell;
 
 const toWaiting = (cell: BroadcastCell, offset: number): WaitingCell => {
@@ -45,7 +45,7 @@ const clearCell = (
 };
 
 // Règles 1 et 2, pour le flux live comme pour le resync : une pose attend son heure, le reste est immédiat.
-// Écart §5.3 (JOURNAL 2026-09-29) : une case d'avant une nouvelle taille peut tomber hors du cadre.
+// §5.3 : une case d'avant une nouvelle taille peut tomber hors du cadre.
 const isInside = (queue: ObsQueue, cell: BroadcastCell): boolean =>
   cell.x < queue.width && offsetOf(queue, cell) < queue.shown.length;
 

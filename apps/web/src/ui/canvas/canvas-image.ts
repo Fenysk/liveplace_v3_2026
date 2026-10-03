@@ -1,4 +1,4 @@
-// L'image hors écran du §9.3 : un pixel par case, repeinte en entier (Écart §9.3, JOURNAL 2026-09-23).
+// L'image hors écran du §9.3 : un pixel par case, repeinte en entier.
 
 import type { CanvasView } from "../../state/canvas-store";
 

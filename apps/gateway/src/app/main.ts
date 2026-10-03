@@ -24,7 +24,7 @@ const broadcast = createBroadcast(core);
 
 setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
 
-// Écart §2 (JOURNAL 2026-09-27) : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
+// §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
   { core, now: Date.now },

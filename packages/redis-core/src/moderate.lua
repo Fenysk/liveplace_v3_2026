@@ -4,22 +4,22 @@
 local metaKey, stateKey, versionKey, eventsKey, bansKey, modsKey, clearedKey, clearingKey, targetCellsKey, banKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8], KEYS[9], KEYS[10]
 local bansTwitchKey = KEYS[11]
--- Écart §5.1 (JOURNAL 2026-09-28) : les pierres tombales d'une pose et d'une plage, et les poses signalées.
+-- §5.1 : les pierres tombales d'une pose et d'une plage, et les poses signalées.
 local clearedPlacementsKey, clearedRangesKey, offStreamKey, reportedKey, approvedKey =
   KEYS[12], KEYS[13], KEYS[14], KEYS[15], KEYS[16]
--- Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient d'ôter à la cible, la preuve d'un ban qui suivrait.
+-- §5.4 : ce qu'un retrait vient d'ôter à la cible, la preuve d'un ban qui suivrait.
 local recentlyClearedKey = KEYS[17]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), ARGV[11]
--- Écart §5.4 (JOURNAL 2026-09-27) : `liveplace` ou `twitch`, l'origine d'un ban et d'un déban.
+-- §5.4 : `liveplace` ou `twitch`, l'origine d'un ban et d'un déban.
 local source = ARGV[12]
--- Écart §5.4 (JOURNAL 2026-09-28) : la pose visée et la plage d'heures qui l'étend, vides sinon.
+-- §5.4 : la pose visée et la plage d'heures qui l'étend, vides sinon.
 local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(ARGV[15])
 local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
 local placement = target .. ":" .. placementId
 
--- 0. Canvas prêt. Écart §5.5 (JOURNAL 2026-09-15), comme place.lua.
+-- 0. Canvas prêt. §5.5, comme place.lua.
 local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
@@ -36,7 +36,7 @@ local function stateOffsetOf(cellKey)
 end
 
 -- Chaque action est une version et entre dans le stream, ban et unban compris (§5.4).
--- cjson encode une table vide en `{}`, or `cells` est un tableau. Écart §5.4 (JOURNAL 2026-09-25) : pas de champ `r`.
+-- cjson encode une table vide en `{}`, or `cells` est un tableau. §5.4 : pas de champ `r`.
 local function publish(version, cells, kind)
   local moderation = { action = action, target = target }
   if placementId ~= "" then
@@ -75,7 +75,7 @@ local function openCanvasPile()
   })
 end
 
--- Écart §5.1 (JOURNAL 2026-09-28) : une pose tranchée quitte les signalements, et les modérateurs l'apprennent.
+-- §5.1 : une pose tranchée quitte les signalements, et les modérateurs l'apprennent.
 local function settleReports(placements)
   local settled = 0
   for _, settledPlacement in ipairs(placements) do
@@ -107,8 +107,8 @@ end
 
 -- 2. ban : ne touche à aucun pixel, l'interface enchaîne ensuite clearUser (§5.4).
 if action == "ban" then
-  -- Écart §5.1 (JOURNAL 2026-09-25) : la preuve, ses pixels visibles, avant que clearUser ne les retire.
-  -- Seulement au premier ban : un second la viderait. Écart §5.4 (JOURNAL 2026-09-29) : ce qu'un retrait vient de
+  -- §5.1 : la preuve, ses pixels visibles, avant que clearUser ne les retire.
+  -- Seulement au premier ban : un second la viderait. §5.4 : ce qu'un retrait vient de
   -- lui ôter d'abord, ses pixels visibles par-dessus.
   if redis.call("SADD", bansKey, target) == 1 then
     local recentlyCleared = redis.call("HGETALL", recentlyClearedKey)
@@ -172,13 +172,13 @@ end
 local version = redis.call("INCR", versionKey)
 
 -- 5a. Première tranche : la pierre tombale, puis ses cases versées dans l'ensemble de travail (avec ce qu'une
--- coupure y a laissé). Écart §5.4 (JOURNAL 2026-09-25) : pas de curseur, ce qu'il pose ensuite reste à lui.
+-- coupure y a laissé). §5.4 : pas de curseur, ce qu'il pose ensuite reste à lui.
 if slice == "first" and action == "clearUser" then
   redis.call("HSET", clearedKey, target, version)
   redis.call("SUNIONSTORE", clearingKey, clearingKey, targetCellsKey)
   redis.call("DEL", targetCellsKey)
 elseif slice == "first" then
-  -- Écart §5.4 (JOURNAL 2026-09-28) : la pose, et la plage qui l'étend. `cells:` garde ce qui reste à lui.
+  -- §5.4 : la pose, et la plage qui l'étend. `cells:` garde ce qui reste à lui.
   redis.call("SADD", clearedPlacementsKey, placement)
   if rangeFrom then
     local raw = redis.call("HGET", clearedRangesKey, target)
@@ -220,7 +220,7 @@ local function unstack(cellKey)
     colorIndex, placedAt = head.colorIndex, head.placedAt
     redis.call("SADD", cellsPrefix .. head.author, cellKey)
   end
-  -- Écart §5.3 (JOURNAL 2026-09-29) : hors du cadre, la pile change, la case ne s'écrit ni ne s'émet.
+  -- §5.3 : hors du cadre, la pile change, la case ne s'écrit ni ne s'émet.
   if not isInside(cellKey, cellStride, width, height) then
     return nil
   end
@@ -238,7 +238,7 @@ local function unstack(cellKey)
     previousColorIndex = previousColorIndex,
     placedAt = placedAt,
   }
-  -- Écart §9.5 (JOURNAL 2026-09-28) : le pixel revenu peut appartenir à une pose cachée (piège 2).
+  -- §9.5 : le pixel revenu peut appartenir à une pose cachée (piège 2).
   cell.obs = pile.streamCell(kept, cell)
   return cell
 end
@@ -251,7 +251,7 @@ for _, cellKey in ipairs(redis.call("SPOP", clearingKey, sliceCells)) do
     cells[#cells + 1] = cell
   end
 end
--- Écart §9.5 (JOURNAL 2026-09-28) : un pixel retiré sous une pose cachée, le stream le montrait.
+-- §9.5 : un pixel retiré sous une pose cachée, le stream le montrait.
 if slice == "first" then
   for _, cell in ipairs(pile.listOffStreamCells()) do
     cells[#cells + 1] = cell

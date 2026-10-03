@@ -1,4 +1,4 @@
-// Écart §2 (JOURNAL 2026-09-27) : les actions venues de Twitch. Le web les dépose, le gateway les applique avec ses
+// §2 : les actions venues de Twitch. Le web les dépose, le gateway les applique avec ses
 // scripts, au nom du streamer et avec l'origine Twitch.
 
 import type { Timestamp } from "@liveplace/domain";

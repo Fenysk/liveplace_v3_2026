@@ -63,7 +63,7 @@ export function toBatches(draft: Draft): Pixel[][] {
   return batches;
 }
 
-// Écart §5.3 (JOURNAL 2026-09-29) : une nouvelle taille fait sortir du brouillon les cases hors du cadre.
+// §5.3 : une nouvelle taille fait sortir du brouillon les cases hors du cadre.
 export function fitDraft(draft: Draft, { width, height }: CanvasSize): Draft {
   const inside = [...draft].filter(([, { x, y }]) => x < width && y < height);
   return inside.length === draft.size ? draft : new Map(inside);

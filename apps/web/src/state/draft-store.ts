@@ -58,7 +58,7 @@ export type DraftClock = { now(): Timestamp; wait(ms: number): Promise<void> };
 const FIRST_COLOR_INDEX = TRANSPARENT_COLOR_INDEX + 1;
 const SEND_INTERVAL_MS = 1000 / 8; // 8 frames `place` par seconde au plus (§6.3)
 
-// Écart §5.1 (JOURNAL 2026-09-28) : une pose par validation ; une lettre d'abord, jamais confondue avec une version.
+// §5.1 : une pose par validation ; une lettre d'abord, jamais confondue avec une version.
 const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", "").slice(0, 15)}`;
 
 export function createDraftStore(
@@ -99,11 +99,11 @@ export function createDraftStore(
     const bounds = { width, height, paletteSize: palette.length };
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
   };
-  // Écart §10.2 (JOURNAL 2026-09-25) : un banni sort du Dessin, son brouillon reste sauvegardé.
+  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé.
   const leaveIfBanned = (): void => {
     if (canvas.getView().isBanned && view.mode === "draft") leaveDraftMode();
   };
-  // Écart §5.3 (JOURNAL 2026-09-29) : le canvas a rétréci, ce qui sort du cadre quitte le brouillon.
+  // §5.3 : le canvas a rétréci, ce qui sort du cadre quitte le brouillon.
   const fitToCanvas = (): void => {
     const { width, height } = canvas.getView();
     if (width > 0 && loadedUserId) setDraft(fitDraft(view.draft, { width, height }));

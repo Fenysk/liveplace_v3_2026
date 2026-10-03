@@ -11,8 +11,8 @@ export default defineSchema({
     displayName: v.string(),
     avatarUrl: v.string(),
     createdAt: v.number(),
-    lastSignInAt: v.number(), // Écart §8.1 (JOURNAL 2026-09-22)
-    // Écart §8.1 (JOURNAL 2026-09-27) : jamais affiché, jamais hors de Convex ; aucun envoi avant un consentement.
+    lastSignInAt: v.number(), // §8.1
+    // §8.1 : jamais affiché, jamais hors de Convex ; aucun envoi avant un consentement.
     email: v.optional(v.string()),
     discoveredViaUserId: v.optional(v.string()), // le streamer d'où part la première connexion
   })

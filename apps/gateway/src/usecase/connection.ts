@@ -35,7 +35,7 @@ import { toCellsFrame } from "./cells-frame";
 const CLOSE_POLICY = 1008;
 // Au-delà, le snapshot est plus court à transmettre que le rattrapage (§4.5).
 const RESYNC_MAX_VERSIONS = 2000;
-// Écart §4.3 (JOURNAL 2026-09-27) : un humain n'y arrive jamais, un script ne balaie plus le canvas.
+// §4.3 : un humain n'y arrive jamais, un script ne balaie plus le canvas.
 const INSPECT_MAX_PER_SECOND = 10;
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
@@ -67,11 +67,11 @@ type Arrival = { version: number; coveredVersion: number } & (
 );
 
 // `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
-// Écart §10.3 (JOURNAL 2026-09-27) : le rôle se relit en direct, d'où `ownerId`.
+// §10.3 : le rôle se relit en direct, d'où `ownerId`.
 type ReadyState = {
   status: "ready";
   canvasId: string;
-  mode: HelloFrame["mode"]; // Écart §6.1 (JOURNAL 2026-09-29) : pour reprendre un snapshot à une nouvelle taille
+  mode: HelloFrame["mode"]; // §6.1 : pour reprendre un snapshot à une nouvelle taille
   ownerId: string;
   width: number;
   height: number;
@@ -116,7 +116,7 @@ const isOtherProtocolVersion = (raw: unknown): boolean =>
   "protocolVersion" in raw &&
   raw.protocolVersion !== PROTOCOL_VERSION;
 
-// Écart §4.3 (JOURNAL 2026-09-24) : la photo Twitch de la session, quand le cookie la porte.
+// §4.3 : la photo Twitch de la session, quand le cookie la porte.
 const youOf = ({ userId, login, displayName, avatarUrl }: Session) => ({
   userId,
   login,
@@ -163,7 +163,7 @@ const controlFrameOf = (
   return control.userId === session?.userId ? { t: control.t } : null;
 };
 
-// Écart §9.5 (JOURNAL 2026-09-28) : une vue OBS arrive sur l'image du stream, jamais sur une pose cachée (piège 1).
+// §9.5 : une vue OBS arrive sur l'image du stream, jamais sur une pose cachée (piège 1).
 const toStreamState = (state: Uint8Array, cells: OffStreamCell[], width: number): Uint8Array => {
   if (cells.length === 0) return state;
   const shown = state.slice();
@@ -185,7 +185,7 @@ export function createConnection(
     else if (state.status === "ready") socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
   };
 
-  // Écart §10.3 (JOURNAL 2026-09-27) : ses droits ont changé, le rôle se relit et la page l'apprend.
+  // §10.3 : ses droits ont changé, le rôle se relit et la page l'apprend.
   const refreshRole = async (): Promise<void> => {
     if (state.status !== "ready" || !session) return;
     const ready = state;
@@ -204,7 +204,7 @@ export function createConnection(
     else void refreshRole().catch((error: unknown) => console.error("rôle non relu", error));
   };
 
-  // Écart §10.2 et CDC v3 §1 (JOURNAL 2026-09-25) : le ban de cette personne, le délai OBS de ce canvas.
+  // §10.2 et CDC 2026 §1 : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
@@ -310,7 +310,7 @@ export function createConnection(
     gauge: AckFrame["gauge"] | null,
   ) => {
     startJoining(frame.canvasId, frame.mode, role);
-    // Écart §8 (JOURNAL 2026-09-28) : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
+    // §8 : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
     await arrive(frame, meta, role, gauge);
@@ -347,7 +347,7 @@ export function createConnection(
     if (held.isSizeStale) await rearrive();
   };
 
-  // Écart §6.1 (JOURNAL 2026-09-29) : la taille a changé, la page reprend un snapshot sans se reconnecter.
+  // §6.1 : la taille a changé, la page reprend un snapshot sans se reconnecter.
   const rearrive = async (): Promise<void> => {
     if (state.status !== "ready") return;
     const { canvasId, mode, role } = state;
@@ -367,7 +367,7 @@ export function createConnection(
     const meta = await deps.core.getCanvas(frame.canvasId);
     if (!meta) return refuse("canvas_not_found");
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
-    // Écart §5.6 (JOURNAL 2026-09-24) : la jauge dès l'arrivée. Un invité n'en a pas.
+    // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas.
     const gauge = session ? await deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null;
     await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge);
   };
@@ -408,8 +408,8 @@ export function createConnection(
   };
 
   // Ouverte à tous, invités compris : l'auteur d'un pixel est public (CDC 2026).
-  // Écart §4.3 (JOURNAL 2026-09-27) : son identifiant ne part qu'à qui modère, et le débit est plafonné.
-  // Écart §4.3 (JOURNAL 2026-09-28) : un compte signale la pose d'un autre que lui et que le streamer, une fois.
+  // §4.3 : son identifiant ne part qu'à qui modère, et le débit est plafonné.
+  // §4.3 : un compte signale la pose d'un autre que lui et que le streamer, une fois.
   const canReport = async ({ userId, placementId }: InspectEntry, ready: ReadyState): Promise<boolean> => {
     if (!session || !userId || userId === session.userId || userId === ready.ownerId) return false;
     return deps.core.canReport(ready.canvasId, { authorId: userId, placementId }, session.userId);
@@ -454,7 +454,7 @@ export function createConnection(
     await moderateSlices(ready.canvasId, requestId, { by: session.userId, action, slice: "first" });
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-25) : les pixels d'un auteur, pour qui modère ou pour l'auteur lui-même.
+  // §4.2 : les pixels d'un auteur, pour qui modère ou pour l'auteur lui-même.
   const listPixels = async ({ requestId, userId }: ListPixelsFrame, ready: ReadyState): Promise<void> => {
     if (!canModerate(ready.role) && userId !== session?.userId) return forbid();
     const pixels = await deps.core.listPixels(ready.canvasId, userId);
@@ -466,7 +466,7 @@ export function createConnection(
     socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-27) : pour qui modère, comme la liste des bannis, avec l'état de la synchro Twitch.
+  // §4.2 : pour qui modère, comme la liste des bannis, avec l'état de la synchro Twitch.
   const listModerators = async (requestId: string, ready: ReadyState): Promise<void> => {
     if (!canModerate(ready.role)) return forbid();
     const [users, twitchSync] = await Promise.all([
@@ -484,7 +484,7 @@ export function createConnection(
     await listModerators(requestId, ready);
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-28) : tout compte connecté signale ; le seuil suit les comptes connectés au canvas.
+  // §4.2 : tout compte connecté signale ; le seuil suit les comptes connectés au canvas.
   const reportPlacement = async ({ requestId, x, y, placementId, range }: ReportFrame, ready: ReadyState) => {
     if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
     if (x >= ready.width || y >= ready.height)
@@ -503,7 +503,7 @@ export function createConnection(
     socket.sendFrame({ t: "error", code: "forbidden", requestId });
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-29) : pour choisir la plage à signaler. Sans identifiant, au débit d'`inspect`.
+  // §4.2 : pour choisir la plage à signaler. Sans identifiant, au débit d'`inspect`.
   const listAuthorPixels = async (
     { requestId, x, y, placementId }: ListAuthorPixelsFrame,
     ready: ReadyState,
@@ -517,7 +517,7 @@ export function createConnection(
     socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
-  // Écart §4.2 (JOURNAL 2026-09-29) : le streamer seul ; les pages l'apprennent par le `ctl` `resize`.
+  // §4.2 : le streamer seul ; les pages l'apprennent par le `ctl` `resize`.
   const resizeCanvas = async ({ requestId, width, height }: ResizeCanvasFrame, ready: ReadyState) => {
     const result =
       ready.role === "owner" && session
@@ -532,13 +532,13 @@ export function createConnection(
     socket.sendFrame({ t: "reports", requestId, reports: await deps.core.listReports(ready.canvasId) });
   };
 
-  // Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer seul. Le schéma n'a laissé passer qu'un cran.
+  // CDC 2026 §1 : le streamer seul. Le schéma n'a laissé passer qu'un cran.
   const setObsDelay = async ({ obsDelayMs }: SetObsDelayFrame, ready: ReadyState): Promise<void> => {
     if (ready.role !== "owner") return forbid();
     await deps.core.setObsDelay(ready.canvasId, obsDelayMs);
   };
 
-  // Écart CDC v3 §1 (JOURNAL 2026-09-29) : le streamer seul, comme le délai.
+  // CDC 2026 §1 : le streamer seul, comme le délai.
   const setObsBackground = async ({ obsBackground }: SetObsBackgroundFrame, ready: ReadyState) => {
     if (ready.role !== "owner") return forbid();
     await deps.core.setObsBackground(ready.canvasId, obsBackground);

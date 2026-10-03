@@ -81,7 +81,7 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
   );
 };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette). Écart §4.3 (JOURNAL 2026-09-27) : ni sans identifiant.
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant.
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const { userId } = author;
   if (!userId || moderation.isProtected(userId)) return null;

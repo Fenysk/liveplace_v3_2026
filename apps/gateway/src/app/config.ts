@@ -7,7 +7,7 @@ const GatewayEnvSchema = z.object({
   REDIS_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(32), // §10.2 : 32 octets minimum
   BROADCAST_HZ: z.coerce.number().int().positive().default(10), // D-13, JOURNAL 2026-09-15
-  PUBLIC_URL: z.url(), // Écart §11.5 (JOURNAL 2026-09-29)
+  PUBLIC_URL: z.url(), // §11.5
 });
 
 export type GatewayConfig = {

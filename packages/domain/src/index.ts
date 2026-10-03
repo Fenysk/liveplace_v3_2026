@@ -5,7 +5,7 @@ export type Timestamp = number; // ms depuis epoch
 export const ROLES = ["owner", "moderator", "viewer", "guest"] as const;
 export type Role = (typeof ROLES)[number];
 
-// Cookie `lp_session` vérifié (§10.2). Écart §10.2 (JOURNAL 2026-09-24) : la photo Twitch, quand il y en a une.
+// Cookie `lp_session` vérifié (§10.2). §10.2 : la photo Twitch, quand il y en a une.
 export type Session = { userId: string; login: string; displayName: string; avatarUrl?: string };
 
 // Une personne, miroir de son compte Twitch (§8.1). `userId` = Twitch ID, immuable.
@@ -108,7 +108,7 @@ export function toCell(cellKey: number): { x: number; y: number } {
 export type Gauge = { charges: number; at: Timestamp };
 export type GaugeParams = { gaugeMax: number; refillMs: number; refillCharges: number };
 
-// Écart §5.1 (JOURNAL 2026-09-30) : la jauge max de chaque joueur se calcule entre ces deux réglages du streamer.
+// §5.1 : la jauge max de chaque joueur se calcule entre ces deux réglages du streamer.
 export type GaugeLimits = { gaugeMaxStart: number; gaugeMaxCeiling: number };
 
 // `cv:<id>:meta` sans `ready` (§5.1).
@@ -121,7 +121,7 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     obsBackground: ObsBackground;
   };
 
-// Écart CDC v3 §1 (JOURNAL 2026-09-29) : le fond de la vue OBS. Transparent par défaut, et sur un canvas d'avant.
+// CDC 2026 §1 : le fond de la vue OBS. Transparent par défaut, et sur un canvas d'avant.
 export const OBS_BACKGROUNDS = ["transparent", "white"] as const;
 export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
 export const OBS_BACKGROUND: ObsBackground = "transparent";
@@ -135,12 +135,12 @@ export const COUNTED_PIXELS_PER_DAY = 600;
 export const REFILL_MS = 10_000;
 export const REFILL_CHARGES = 1;
 
-// Écart §5.3 (JOURNAL 2026-09-15) : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
+// §5.3 : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
 export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: GaugeParams): Gauge {
   if (!gauge) return { charges: params.gaugeMax, at: nowMs };
   const refills = Math.max(0, Math.floor((nowMs - gauge.at) / params.refillMs));
   const charges = Math.min(params.gaugeMax, gauge.charges + refills * params.refillCharges);
-  // Écart §5.3 (JOURNAL 2026-09-29) : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
+  // §5.3 : pleine, elle n'avance plus ; la recharge repart de la première charge dépensée.
   return { charges, at: charges >= params.gaugeMax ? nowMs : gauge.at + refills * params.refillMs };
 }
 
@@ -185,7 +185,7 @@ export function claimableRewards({ countedPixels, claimed }: Progress, limits: G
   return Math.max(0, Math.min(earnedRewards(countedPixels) - claimed, room));
 }
 
-// Écart CDC v3 §1 (JOURNAL 2026-09-25) : le streamer règle le délai par crans, jusqu'à 10 min.
+// CDC 2026 §1 : le streamer règle le délai par crans, jusqu'à 10 min.
 export const OBS_DELAY_STEPS_MS = [
   0, 5_000, 10_000, 20_000, 30_000, 60_000, 120_000, 300_000, 600_000,
 ] as const;

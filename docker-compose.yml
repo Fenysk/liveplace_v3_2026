@@ -2,7 +2,7 @@
 #
 # Les variables viennent de l'onglet Environment du Compose dans Dokploy. Chaque service ne reçoit que
 # ce que son `config.ts` lit, et `${NOM:?}` fait échouer le déploiement s'il en manque une
-# (Écart §11.1, JOURNAL 2026-09-19). Aucun port n'est publié : Traefik est le seul point d'entrée.
+# (§11.1). Aucun port n'est publié : Traefik est le seul point d'entrée.
 #
 # Ne jamais renommer le projet Compose : le volume de Redis porte son nom, et l'AOF avec.
 

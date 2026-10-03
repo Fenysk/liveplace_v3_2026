@@ -20,7 +20,7 @@ const MODERATORS_URL = "https://api.twitch.tv/helix/moderation/moderators";
 const BANNED_URL = "https://api.twitch.tv/helix/moderation/banned";
 const PAGE_SIZE = 100; // le maximum de Twitch
 
-// Écart §10.1 (JOURNAL 2026-09-27) : l'e-mail pour tous ; lire ses modérateurs et ses bans, et être prévenu d'un
+// §10.1 : l'e-mail pour tous ; lire ses modérateurs et ses bans, et être prévenu d'un
 // ban, pour le seul streamer qui synchronise.
 const SCOPES: Record<TwitchPurpose, string> = {
   signIn: "user:read:email",
@@ -135,7 +135,7 @@ export function createTwitchAuth({ clientId, clientSecret, redirectUri }: Twitch
       return getUser(await exchangeCode(code));
     },
 
-    // Écart §10.1 (JOURNAL 2026-09-27) : la chaîne du streamer, lue avec le token qu'il vient d'accorder.
+    // §10.1 : la chaîne du streamer, lue avec le token qu'il vient d'accorder.
     async getChannelFromCode(code) {
       const grant = await exchangeCode(code);
       const user = await getUser(grant);
