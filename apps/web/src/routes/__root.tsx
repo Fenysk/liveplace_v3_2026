@@ -4,6 +4,7 @@ import { createRootRouteWithContext, HeadContent, ScriptOnce, Scripts } from "@t
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import type { CanvasOpener } from "../state/canvas-store";
+import { ADSENSE_CLIENT } from "../ui/ads/adsense";
 import { BetaBadge } from "../ui/beta/beta-badge";
 import betaBadgeCss from "../ui/beta/beta-badge.css?url";
 import designSystemCss from "../ui/design/design-system.css?url";
@@ -44,6 +45,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "LivePlace" },
+      // Connecte le site à AdSense sans charger de script : rien de Google chez le visiteur.
+      { name: "google-adsense-account", content: ADSENSE_CLIENT },
     ],
     // Un `link` et non un `import "…css"` : la page rendue par le serveur arrive déjà stylée.
     links: [
