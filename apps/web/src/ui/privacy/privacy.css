@@ -1,0 +1,139 @@
+/* Page légale sur le vide LivePlace : feuille lisible, pas une mega-pill. */
+
+.lp-privacy {
+  position: relative;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.lp-privacy > .lp-void {
+  z-index: 0;
+}
+
+.lp-privacy-bar,
+.lp-pill.lp-privacy-sheet {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-privacy-bar {
+  box-sizing: border-box;
+  width: min(40rem, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  animation: lp-rise-in var(--lp-dur) var(--lp-ease);
+}
+
+.lp-privacy-brand,
+.lp-privacy-brand:link,
+.lp-privacy-brand:visited {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .lp-privacy-brand:hover {
+    color: var(--accent-hover);
+  }
+}
+
+.lp-pill.lp-privacy-sheet {
+  width: min(40rem, 100%);
+  max-width: min(40rem, 100%);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  animation: lp-rise-in var(--lp-dur) var(--lp-ease);
+}
+
+.lp-privacy-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--chip);
+}
+
+.lp-privacy-intro h1 {
+  margin: 0;
+}
+
+.lp-privacy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lp-privacy-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lp-privacy-section h2 {
+  margin: 0;
+}
+
+.lp-privacy-section p,
+.lp-privacy-section ul {
+  margin: 0;
+}
+
+.lp-privacy-list {
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lp-privacy-todo {
+  display: inline;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--chip);
+  color: var(--muted);
+}
+
+.lp-privacy-aside {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--lp-radius-box);
+  background: var(--chip);
+}
+
+@media (max-width: 640px) {
+  .lp-privacy {
+    padding: var(--space-2);
+    gap: var(--space-3);
+  }
+
+  .lp-pill.lp-privacy-sheet {
+    padding: var(--space-4) var(--space-3);
+  }
+}
+
+/* Le choix de la publicité : sa ligne tient sa place avant la lecture du choix, les boutons se posent dessous */
+.lp-privacy-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.lp-privacy-choice p {
+  margin: 0;
+  min-height: 1.5em;
+}
+
+.lp-privacy-choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
