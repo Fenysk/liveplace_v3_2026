@@ -8,6 +8,7 @@ import { AccountPill } from "../ui/account/account-pill";
 import { type AccountSection, AccountWindow } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
+import { CanvasAds } from "../ui/ads/canvas-ads";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
@@ -152,17 +153,18 @@ const GamePage = () => {
           ownerName={owner.displayName}
         />
       )}
-      {stores ? (
-        // CDC 2026, Toasts : un seul à la fois, pour toute la page.
-        <ToastProvider>
+      {/* CDC 2026, Toasts : un seul à la fois. CanvasAds : pub / consentement, jamais en OBS. */}
+      <ToastProvider>
+        <CanvasAds />
+        {stores ? (
           <LivePills stores={stores} login={login} owner={owner} isCompact={isCompact} />
-        </ToastProvider>
-      ) : (
-        <>
-          <CanvasPill owner={owner} isCompact={isCompact} />
-          <DraftPill state={{ kind: "connecting" }} actions={CONNECTING_ACTIONS} />
-        </>
-      )}
+        ) : (
+          <>
+            <CanvasPill owner={owner} isCompact={isCompact} />
+            <DraftPill state={{ kind: "connecting" }} actions={CONNECTING_ACTIONS} />
+          </>
+        )}
+      </ToastProvider>
     </main>
   );
 };

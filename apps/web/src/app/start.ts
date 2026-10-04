@@ -10,10 +10,12 @@ const serverDepsMiddleware = createMiddleware({ type: "request" }).server(async 
 });
 
 // JOURNAL 2026-09-29 : les en-têtes de sécurité, et le nonce que le routeur pose sur ses scripts (`router.tsx`).
+// JOURNAL 2026-10-04 : la CSP se choisit sur la route servie.
 const securityMiddleware = createMiddleware({ type: "request" })
   .middleware([serverDepsMiddleware])
-  .server(async ({ request, next, context }) => {
-    const { createNonce, refuseMethod, securityHeaders } = await import("./security-headers");
+  .server(async ({ request, pathname, next, context }) => {
+    const { createNonce, policyFor, refuseMethod, securityHeaders } = await import("./security-headers");
+    const { routeIdOf } = await import("./route-id");
     const { betaHeaders } = await import("./beta");
     const nonce = createNonce();
     const headers = {
@@ -21,6 +23,7 @@ const securityMiddleware = createMiddleware({ type: "request" })
         nonce,
         publicUrl: context.deps.publicUrl,
         isProduction: import.meta.env.PROD,
+        policy: policyFor(routeIdOf(pathname)),
       }),
       ...betaHeaders(context.deps.betaLabel),
     };

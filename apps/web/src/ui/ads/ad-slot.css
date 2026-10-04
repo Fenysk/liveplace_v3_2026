@@ -1,0 +1,106 @@
+/* La bande de la publicité (CDC 2026, Publicité) : réservée, jamais effacée. Le canvas s'arrête à son bord :
+   sa taille est mesurée (use-measured-size.ts) et lue par canvas.css et pill.css. Pas de `style=` inline (garde-fou design system). */
+
+.lp-ad-band {
+  /* Google recommande 150 px entre une pub et un jeu : ramenée à 100 px, pour que la bande ne prenne pas un quart de l'écran */
+  --lp-ad-gap: 100px;
+  position: fixed;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  background: var(--void);
+  transition: opacity var(--lp-dur-fade) ease;
+}
+
+/* Au PC : à gauche, sur toute la hauteur, l'encart au bord et la marge entre lui et le jeu */
+.lp-ad-band[data-edge="side"] {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  align-items: center;
+  padding: 0 var(--lp-ad-gap) 0 var(--space-4);
+  border-right: 1px solid var(--void-dot);
+}
+
+/* Sur mobile : en haut, sous l'encoche, sur toute la largeur */
+.lp-ad-band[data-edge="top"] {
+  top: 0;
+  left: 0;
+  right: 0;
+  justify-content: center;
+  padding: max(var(--space-2), env(safe-area-inset-top)) var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--void-dot);
+}
+
+/* Avant l'annonce : dans la page, pour qu'AdSense la mesure, mais invisible et sans rien pousser */
+.lp-ad-band.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* /design : la bande posée sur place, à la taille de son encart */
+.lp-ad-band--inline {
+  position: relative;
+  inset: auto;
+  width: max-content;
+  max-width: 100%;
+}
+
+.lp-ad-band--inline[data-edge="side"] {
+  padding-block: var(--space-4);
+}
+
+.lp-ad-slot {
+  display: inline-block;
+}
+
+/* Tailles fixes, posées en CSS : ni data-ad-format ni data-full-width-responsive (aide AdSense, pubs fixes) */
+.lp-ad-slot--rail {
+  width: 160px;
+  height: 600px;
+}
+
+.lp-ad-slot--banner {
+  width: 320px;
+  height: 50px;
+}
+
+/* Placeholder /design et DEV quand AdSense ne remplit pas (localhost, site non prêt) */
+.lp-ad-slot--placeholder {
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: var(--space-2);
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  background: var(--chip);
+  text-align: center;
+}
+
+/* Consentement : aère le texte des arrondis de la pill, et les boutons entre eux. */
+.lp-ad-consent {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+}
+
+.lp-ad-consent-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-ad-consent-copy p {
+  margin: 0;
+}
+
+.lp-ad-consent-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.lp-ad-consent-actions .lp-btn {
+  flex: 1;
+  justify-content: center;
+}

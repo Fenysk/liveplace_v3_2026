@@ -7,9 +7,3 @@
   text-align: center;
   text-wrap: balance;
 }
-
-.lp-sign-in-note a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}

@@ -2,6 +2,9 @@
 // Le tracé vient de Simple Icons (CC0). Les couleurs de marque sont des tokens : --twitch, --on-twitch.
 
 import { Button } from "./button";
+import { PRIVACY_PATH } from "./privacy-path";
+
+export { PRIVACY_PATH } from "./privacy-path";
 
 export const TwitchGlyph = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -22,14 +25,11 @@ export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
   );
 };
 
-// La page de confidentialité, provisoire (JOURNAL 2026-09-27).
-const PRIVACY_PATH = "/confidentialite";
-
 // Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
 export const SignInNote = () => (
   <p className="lp-sign-in-note lp-type-caption lp-muted">
     En te connectant, tu acceptes la{" "}
-    <a href={PRIVACY_PATH} target="_blank" rel="noopener">
+    <a className="lp-link" href={PRIVACY_PATH} target="_blank" rel="noopener">
       politique de confidentialité
     </a>
   </p>

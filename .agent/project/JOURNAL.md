@@ -67,3 +67,9 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 **Contexte.** Tester une branche en ligne, depuis un téléphone, sans toucher `main` ni la prod : le §11 ne décrit qu'un environnement, et les noms des routeurs Traefik y étaient fixes.
 **Décision.** `docker-compose.yml` sert aussi aux emplacements de bêta (environnement `beta` de Dokploy, un Compose par emplacement, son propre Redis, le Convex de dev). `ROUTER_PREFIX` y distingue les routeurs, labels en liste parce que Compose ne remplace pas une variable dans une clé. `BETA_LABEL`, vide en production, pose le bandeau (caché en vue OBS) et `X-Robots-Tag: noindex, nofollow`. Claude déploie une branche sur la bêta librement ; la prod ne reçoit que `main`, sur go explicite.
 **Renoncement.** Pas de branche `beta`, pas de pull request ni de CI, pas de déploiement par branche automatique.
+
+## 2026-10-04 — CSP de `/{login}` : celle de Google ; la stricte du 2026-09-29 ailleurs
+
+**Contexte.** Le script AdSense charge des iframes et des requêtes dont les domaines changent : la liste d'hôtes du 3/10 est bloquée en build de prod, et Google ne prend en charge qu'une CSP stricte.
+**Décision.** `/{login}` porte `script-src 'nonce-…' 'strict-dynamic' https: 'unsafe-inline'`, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`, le reste ouvert. La politique se choisit sur la route servie, jamais sur le chemin ; `/{login}/obs`, `/`, `/design` et `/confidentialite` gardent la stricte.
+**Renoncement.** Pas de liste de domaines Google. Pas de CMP tierce : pill de consentement, pubs non personnalisées, script chargé seulement si accepté.

@@ -1,0 +1,20 @@
+/* Lien inline dans une phrase : hérite de l'encre (ou du muted parent), jamais le bleu/violet du navigateur. */
+
+.lp-link,
+.lp-link:link,
+.lp-link:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .lp-link:hover {
+    color: var(--accent-hover);
+  }
+}
+
+.lp-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

@@ -10,6 +10,8 @@ import {
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
+import { AdBand } from "../ads/ad-band";
+import { ConsentPill } from "../ads/consent-pill";
 import { CanvasPill } from "../canvas/canvas-pill";
 import {
   CanvasSettings,
@@ -318,6 +320,21 @@ export const GamePillsSection = () => {
             </div>
           </Specimen>
         ))}
+      </SpecimenSection>
+
+      <SpecimenSection
+        title="Publicité"
+        note="Le consentement, bas-gauche au PC, en haut sur mobile. Puis la bande de la publicité, réservée : à gauche au PC, en haut sur mobile, jamais recouverte ni effacée. Jamais en OBS."
+      >
+        <Specimen caption="ConsentPill">
+          <ConsentPill onAccept={noop} onRefuse={noop} isDocked={false} />
+        </Specimen>
+        <Specimen caption="AdBand, à gauche (spécimen, sans AdSense)">
+          <AdBand edge="side" isDocked={false} isLive={false} />
+        </Specimen>
+        <Specimen caption="AdBand, en haut (spécimen, sans AdSense)">
+          <AdBand edge="top" isDocked={false} isLive={false} />
+        </Specimen>
       </SpecimenSection>
 
       <SpecimenSection title="Canvas et Compte" note="En haut à gauche, en haut à droite.">

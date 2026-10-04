@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { createNonce, refuseMethod, securityHeaders } from "./security-headers";
+import {
+  createNonce,
+  policyFor,
+  refuseMethod,
+  type SecurityHeadersInput,
+  securityHeaders,
+} from "./security-headers";
 
-const production = { nonce: "abc123", publicUrl: "https://liveplace.tv", isProduction: true };
-const development = { nonce: "abc123", publicUrl: "http://localhost:3000", isProduction: false };
+const production: SecurityHeadersInput = {
+  nonce: "abc123",
+  publicUrl: "https://liveplace.tv",
+  isProduction: true,
+  policy: "strict",
+};
+const development: SecurityHeadersInput = {
+  nonce: "abc123",
+  publicUrl: "http://localhost:3000",
+  isProduction: false,
+  policy: "strict",
+};
 
-const policyOf = (input: typeof production): string =>
+const policyOf = (input: SecurityHeadersInput): string =>
   securityHeaders(input)["Content-Security-Policy"] ?? "";
 
 describe("securityHeaders (audit de sécurité §2)", () => {
@@ -48,6 +64,38 @@ describe("securityHeaders (audit de sécurité §2)", () => {
   // Aucune CSP en dev : le serveur de Vite injecte ses propres scripts et styles
   it("sends no CSP in development", () => {
     expect(securityHeaders(development)).not.toHaveProperty("Content-Security-Policy");
+  });
+});
+
+describe("securityHeaders, la CSP de Google sur /{login} (JOURNAL 2026-10-04)", () => {
+  const adsense: SecurityHeadersInput = { ...production, policy: "adsense" };
+
+  // Google ne prend en charge qu'une CSP stricte : un nonce et `strict-dynamic` pour les scripts, le reste ouvert
+  it("lets scripts run through the nonce and strict-dynamic, and leaves the rest open", () => {
+    const policy = policyOf(adsense);
+
+    expect(policy).toContain("script-src 'nonce-abc123' 'strict-dynamic' https: 'unsafe-inline'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("base-uri 'none'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).not.toContain("default-src");
+  });
+
+  // Les autres en-têtes ne changent pas avec la politique, et le dev reste sans CSP
+  it("keeps the other headers, and sends no CSP in development", () => {
+    expect(securityHeaders(adsense)).toMatchObject({ "X-Frame-Options": "DENY" });
+    expect(securityHeaders({ ...development, policy: "adsense" })).not.toHaveProperty(
+      "Content-Security-Policy",
+    );
+  });
+});
+
+describe("policyFor", () => {
+  // Seule la page de jeu charge Google : toute autre route, connue ou non, garde la stricte
+  it("gives Google's policy to the canvas page alone", () => {
+    expect(policyFor("/$login")).toBe("adsense");
+    for (const routeId of ["/$login_/obs", "/", "/design", "/confidentialite", "/ads.txt", undefined])
+      expect(policyFor(routeId)).toBe("strict");
   });
 });
 

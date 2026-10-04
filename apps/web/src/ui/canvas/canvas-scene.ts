@@ -17,10 +17,12 @@ import {
   fitViewport,
   type Insets,
   isArrivalView,
+  keepCenter,
   panBy,
   panToShow,
   type ScreenPoint,
   type Size,
+  toSurfacePoint,
   type Viewport,
   viewportToCell,
   zoomAt,
@@ -67,13 +69,6 @@ const KEY_MARGIN = 48;
 // Pendant un glissement ou un pincement, les pills s'effacent en fondu (CDC 2026) : le CSS lit cet attribut.
 const PANNING_ATTRIBUTE = "data-panning";
 
-const toPointerInput = (event: PointerEvent): PointerInput => ({
-  pointerId: event.pointerId,
-  pointerType: event.pointerType,
-  button: event.button,
-  point: { x: event.clientX, y: event.clientY },
-});
-
 const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y === b?.y;
 
 export function createCanvasScene(
@@ -86,6 +81,18 @@ export function createCanvasScene(
   if (!context) throw new Error("canvas-scene : contexte 2d indisponible");
   const image = createCanvasImage();
   const tracker = createGestureTracker({ isTouchTracing: () => draftStore.getView().isTouchTracing });
+
+  // Les gestes se comptent depuis le coin du canvas, que la bande de la publicité décale du coin de la fenêtre.
+  const surfacePoint = (event: MouseEvent): ScreenPoint => {
+    const { left, top } = surface.getBoundingClientRect();
+    return toSurfacePoint({ x: event.clientX, y: event.clientY }, { x: left, y: top });
+  };
+  const toPointerInput = (event: PointerEvent): PointerInput => ({
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    button: event.button,
+    point: surfacePoint(event),
+  });
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
   const root = document.documentElement;
@@ -267,7 +274,14 @@ export function createCanvasScene(
 
   const resizeObserver = new ResizeObserver(([entry]) => {
     if (!entry) return;
+    const previous = screen;
     screen = { width: entry.contentRect.width, height: entry.contentRect.height };
+    // L'écran change quand la bande de la publicité arrive ou part : la vue d'arrivée se recadre, les autres gardent leur centre.
+    const canvas = canvasSize();
+    if (viewport && previous.width > 0 && canvas.width > 0)
+      viewport = isArrivalView(viewport, previous, canvas)
+        ? fitViewport(screen, canvas)
+        : keepCenter(viewport, previous, screen);
     pixelRatio = window.devicePixelRatio;
     surface.width = Math.round(screen.width * pixelRatio);
     surface.height = Math.round(screen.height * pixelRatio);
@@ -359,7 +373,7 @@ export function createCanvasScene(
     (event) => {
       event.preventDefault();
       const factor = wheelFactor(event.deltaY, event.deltaMode, event.ctrlKey);
-      apply({ kind: "zoom", point: { x: event.clientX, y: event.clientY }, factor });
+      apply({ kind: "zoom", point: surfacePoint(event), factor });
     },
     { passive: false, signal },
   );

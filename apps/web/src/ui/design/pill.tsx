@@ -1,13 +1,15 @@
 // La seule bulle d'interface (CDC 2026) : la taille suit le contenu, ronde et concentrique à toute taille.
 
-import { type ReactNode, type RefObject, useEffect } from "react";
+import type { ReactNode } from "react";
+import { CONSENT_BAR_HEIGHT } from "./ad-bar";
 import { BOTTOM_BAR_HEIGHT } from "./bottom-bar";
 import { classNames } from "./class-names";
+import { useMeasuredSize } from "./use-measured-size";
 import { useMorph } from "./use-morph";
 
-// Le bord où la pill flotte : haut gauche, haut droite, centre droite, bas droite, bas centre. `toast` : en bas à
-// gauche, là où aucune pill ne vit, et en haut au centre sur mobile (CDC 2026, Toasts).
-export type PillDock = "tl" | "tr" | "cr" | "br" | "bc" | "toast";
+// Le bord où la pill flotte : haut gauche, haut droite, centre droite, bas droite, bas centre.
+// `bl` : consentement de la publicité, bas-gauche (haut pleine largeur sur mobile). `toast` : en bas à gauche, en haut au centre sur mobile.
+export type PillDock = "tl" | "tr" | "cr" | "br" | "bc" | "bl" | "toast";
 
 // `row` : une ligne. `stack` : des lignes empilées. `rail` : une colonne large d'un seul contrôle.
 export type PillLayout = "row" | "stack" | "rail";
@@ -20,6 +22,7 @@ type PillProps = {
   layout?: PillLayout | undefined;
   state?: PillState | undefined;
   isVisible?: boolean;
+  isForeground?: boolean; // au-dessus des autres pills (CMP consentement)
   children: ReactNode;
 };
 
@@ -29,26 +32,21 @@ const LAYOUT_CLASSES: Record<PillLayout, { pill?: string; content?: string }> = 
   rail: { pill: "lp-pill--v" },
 };
 
-// Sur mobile, l'inspection et Recentrer se posent au-dessus de la barre du bas, à sa hauteur du moment (pill.css).
-const useBottomBarHeight = (content: RefObject<HTMLElement | null>, isBottomBar: boolean) => {
-  useEffect(() => {
-    const element = content.current;
-    if (!isBottomBar || !element) return;
-    const root = document.documentElement;
-    const observer = new ResizeObserver(() =>
-      root.style.setProperty(BOTTOM_BAR_HEIGHT, `${element.offsetHeight}px`),
-    );
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty(BOTTOM_BAR_HEIGHT);
-    };
-  }, [content, isBottomBar]);
-};
-
-export const Pill = ({ dock, layout = "row", state, isVisible = true, children }: PillProps) => {
+export const Pill = ({
+  dock,
+  layout = "row",
+  state,
+  isVisible = true,
+  isForeground = false,
+  children,
+}: PillProps) => {
   const morph = useMorph<HTMLDivElement, HTMLDivElement>();
-  useBottomBarHeight(morph.content, dock === "bc");
+  // La barre du bas et le consentement se mesurent : sur mobile, d'autres pills se posent au-dessus ou au-dessous.
+  useMeasuredSize(morph.content, {
+    cssVar: dock === "bc" ? BOTTOM_BAR_HEIGHT : dock === "bl" ? CONSENT_BAR_HEIGHT : null,
+    dimension: "height",
+    isActive: dock === "bc" || (dock === "bl" && isVisible),
+  });
   const pill = (
     <div
       ref={morph.pill}
@@ -81,7 +79,7 @@ export const Pill = ({ dock, layout = "row", state, isVisible = true, children }
     </div>
   );
   return dock ? (
-    <div className="lp-floating" data-dock={dock}>
+    <div className={classNames("lp-floating", isForeground && "is-foreground")} data-dock={dock}>
       {pill}
     </div>
   ) : (

@@ -28,6 +28,16 @@ export function fitViewport(screen: Size, canvas: Size): Viewport {
   };
 }
 
+// Un point de la fenêtre, compté depuis le coin du canvas : la bande de la publicité peut le décaler du coin de la fenêtre.
+export function toSurfacePoint(point: ScreenPoint, surfaceOrigin: ScreenPoint): ScreenPoint {
+  return { x: point.x - surfaceOrigin.x, y: point.y - surfaceOrigin.y };
+}
+
+// Quand l'écran change de taille (la bande de la publicité arrive ou part), le point du canvas au centre y reste.
+export function keepCenter(viewport: Viewport, from: Size, to: Size): Viewport {
+  return panBy(viewport, (to.width - from.width) / 2, (to.height - from.height) / 2);
+}
+
 // Le seul chemin de l'écran vers une case. `null` : le point est dans le vide.
 export function viewportToCell(viewport: Viewport, point: ScreenPoint, canvas: Size): Cell | null {
   const x = Math.floor((point.x - viewport.offsetX) / viewport.scale);

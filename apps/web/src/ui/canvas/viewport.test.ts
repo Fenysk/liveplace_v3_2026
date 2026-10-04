@@ -3,8 +3,10 @@ import {
   clampCell,
   fitViewport,
   isArrivalView,
+  keepCenter,
   panBy,
   panToShow,
+  toSurfacePoint,
   viewportToCell,
   zoomAt,
   zoomLimits,
@@ -165,5 +167,45 @@ describe("panToShow (CDC 2026, la vue suit la case visée)", () => {
       offsetX: 0,
       offsetY: -60,
     });
+  });
+});
+
+describe("toSurfacePoint (CDC 2026, publicité)", () => {
+  // Le canvas ne commence pas au coin de la fenêtre quand la bande de la publicité est à gauche : le point se compte depuis son coin
+  it("counts a window point from the corner of the canvas", () => {
+    expect(toSurfacePoint({ x: 400, y: 300 }, { x: 310, y: 0 })).toEqual({ x: 90, y: 300 });
+    expect(toSurfacePoint({ x: 400, y: 300 }, { x: 0, y: 60 })).toEqual({ x: 400, y: 240 });
+  });
+
+  // Le point qu'on clique sur une case reste cette case, bande ou non
+  it("keeps a clicked cell the same with or without a band", () => {
+    const viewport = fitViewport(DESKTOP, CANVAS);
+    const withoutBand = viewportToCell(viewport, { x: 500, y: 400 }, CANVAS);
+    const shifted = toSurfacePoint({ x: 500 + 310, y: 400 }, { x: 310, y: 0 });
+
+    expect(viewportToCell(viewport, shifted, CANVAS)).toEqual(withoutBand);
+  });
+});
+
+describe("keepCenter (CDC 2026, publicité : la vue ne saute pas)", () => {
+  // Quand la bande arrive, le point du canvas au centre de l'écran reste au centre
+  it("keeps the canvas point at the center of the screen when the screen changes size", () => {
+    const viewport = { scale: 8, offsetX: 120, offsetY: 40 };
+    const smaller = { width: DESKTOP.width - 310, height: DESKTOP.height };
+
+    const kept = keepCenter(viewport, DESKTOP, smaller);
+
+    const before = canvasPosition(viewport, DESKTOP.width / 2, DESKTOP.height / 2);
+    const after = canvasPosition(kept, smaller.width / 2, smaller.height / 2);
+    expect(after.x).toBeCloseTo(before.x);
+    expect(after.y).toBeCloseTo(before.y);
+    expect(kept.scale).toBe(viewport.scale);
+  });
+
+  // Un écran de la même taille ne bouge rien
+  it("leaves the view alone when the size does not change", () => {
+    const viewport = { scale: 8, offsetX: 120, offsetY: 40 };
+
+    expect(keepCenter(viewport, DESKTOP, DESKTOP)).toEqual(viewport);
   });
 });

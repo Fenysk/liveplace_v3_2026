@@ -5,6 +5,7 @@
 @import "./canvas.css";
 @import "./pill.css";
 @import "./button.css";
+@import "./link.css";
 @import "./twitch.css";
 @import "./badge.css";
 @import "./profile.css";
@@ -18,6 +19,7 @@
 @import "./slider.css";
 @import "./checkbox.css";
 @import "./toast.css";
+@import "../ads/ad-slot.css";
 
 html,
 body {

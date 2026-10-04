@@ -127,7 +127,7 @@
 
 .lp-floating[data-dock="tl"] {
   top: var(--space-4);
-  left: var(--space-4);
+  left: calc(var(--space-4) + var(--lp-ad-side, 0px));
 }
 
 .lp-floating[data-dock="tr"] {
@@ -140,9 +140,10 @@
   right: var(--space-4);
 }
 
+/* Au centre de l'espace hors de la bande de la publicité */
 .lp-floating[data-dock="bc"] {
   bottom: var(--space-4);
-  left: 50%;
+  left: calc(50% + var(--lp-ad-side, 0px) / 2);
   transform: translateX(-50%);
 }
 
@@ -152,16 +153,27 @@
   transform: translateY(-50%);
 }
 
-/* Le toast (CDC 2026, Toasts) : en bas à gauche, par-dessus les autres pills */
+/* Consentement de la publicité : bas-gauche, devant le toast le temps du choix */
+.lp-floating[data-dock="bl"] {
+  bottom: var(--space-4);
+  left: calc(var(--space-4) + var(--lp-ad-side, 0px));
+}
+
+/* Le toast (CDC 2026, Toasts) : en bas à gauche, à côté de la bande de la publicité */
 .lp-floating[data-dock="toast"] {
   z-index: 3;
   bottom: var(--space-4);
-  left: var(--space-4);
+  left: calc(var(--space-4) + var(--lp-ad-side, 0px));
+}
+
+/* CMP consentement : devant les autres pills et le toast, le temps du choix */
+.lp-floating.is-foreground {
+  z-index: 4;
 }
 
 /* Il monte du bas en fondu, et y redescend en s'effaçant, au PC comme sur mobile */
 .lp-floating[data-dock="toast"] > .lp-pill {
-  animation: lp-toast-in var(--lp-dur) var(--lp-ease);
+  animation: lp-rise-in var(--lp-dur) var(--lp-ease);
 }
 
 /* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
@@ -185,7 +197,7 @@ html[data-panning] .lp-floating > .lp-pill,
   transform: translateY(var(--space-4));
 }
 
-@keyframes lp-toast-in {
+@keyframes lp-rise-in {
   from {
     opacity: 0;
     transform: translateY(var(--space-4));
@@ -258,13 +270,41 @@ html[data-panning] .lp-floating > .lp-pill,
 /* Écran étroit : pills du haut sous l'encoche, barre du bas pleine largeur au-dessus de l'indicateur d'accueil.
    L'inspection et Recentrer se posent juste au-dessus de la barre du bas : une seule feuille à la fois. */
 @media (max-width: 640px) {
-  .lp-floating[data-dock="tl"] {
+  :root {
+    /* Où commencent Canvas et Compte : sous l'encoche, puis sous la bande de la publicité ou la pill de consentement
+       quand l'une est là. Leurs mesures n'existent que pendant leur présence : sans elles, le repli annule l'espace. */
+    --lp-pills-top: max(
+      max(var(--space-2), env(safe-area-inset-top)),
+      calc(var(--lp-ad-bar, 0px) + var(--space-2)),
+      calc(
+        max(var(--space-2), env(safe-area-inset-top)) +
+        var(--lp-consent-bar, calc(var(--space-2) * -1)) +
+        var(--space-2)
+      )
+    );
+  }
+
+  /* Consentement : bandeau haut pleine largeur ; sa hauteur décale Canvas et Compte */
+  .lp-floating[data-dock="bl"] {
     top: max(var(--space-2), env(safe-area-inset-top));
+    bottom: auto;
+    left: var(--space-2);
+    right: var(--space-2);
+  }
+
+  .lp-floating[data-dock="bl"] .lp-pill,
+  .lp-floating[data-dock="bl"] .lp-pill-content {
+    width: 100%;
+    max-width: none;
+  }
+
+  .lp-floating[data-dock="tl"] {
+    top: var(--lp-pills-top);
     left: var(--space-2);
   }
 
   .lp-floating[data-dock="tr"] {
-    top: max(var(--space-2), env(safe-area-inset-top));
+    top: var(--lp-pills-top);
     right: var(--space-2);
   }
 
@@ -301,7 +341,7 @@ html[data-panning] .lp-floating > .lp-pill,
 
   /* En haut au centre, sous les pills Canvas et Compte */
   .lp-floating[data-dock="toast"] {
-    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size-touch) + var(--space-4));
+    top: calc(var(--lp-pills-top) + var(--control-size-touch) + var(--space-4));
     bottom: auto;
     left: 50%;
     transform: translateX(-50%);
