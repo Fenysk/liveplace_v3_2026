@@ -8,7 +8,7 @@ const GatewayEnvSchema = z.object({
   SESSION_SECRET: z.string().min(32), // §10.2 : 32 octets minimum
   BROADCAST_HZ: z.coerce.number().int().positive().default(10), // D-13, JOURNAL 2026-09-15
   PUBLIC_URL: z.url(), // §11.5
-  GATEWAY_PORT: z.coerce.number().int().positive().default(8080), // §11.1 ; une place de dev le change (JOURNAL 2026-10-05)
+  GATEWAY_PORT: z.coerce.number().int().positive().default(8080), // §11.1 ; Écart §11.7 (JOURNAL 2026-10-05) : une place de dev le change
 });
 
 export type GatewayConfig = {

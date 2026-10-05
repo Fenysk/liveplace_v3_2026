@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   // En dev, le gateway tourne à part : `/ws` reste sur l'origine de la page, comme en production.
-  // Les ports suivent la place de dev du worktree (`.claude/launch.json`, JOURNAL 2026-10-05).
+  // Écart §11.7 (JOURNAL 2026-10-05) : les ports suivent la place de dev du worktree (`.claude/launch.json`).
   server: {
     port: Number(process.env.WEB_PORT ?? 3000),
     strictPort: true,

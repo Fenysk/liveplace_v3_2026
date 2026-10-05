@@ -13,7 +13,7 @@ import { OBS_VIEW_SCRIPT } from "../ui/obs/obs-view";
 
 export type RouterContext = { openCanvas: CanvasOpener };
 
-// JOURNAL 2026-10-04 : l'étiquette d'un emplacement de bêta, `null` en production.
+// Écart §11.1 (JOURNAL 2026-10-04) : l'étiquette d'un emplacement de bêta, `null` en production.
 const getBetaLabel = createServerFn({ method: "GET" }).handler(({ context }) => context.deps.betaLabel);
 
 const RootDocument = ({ children }: { children: ReactNode }) => {

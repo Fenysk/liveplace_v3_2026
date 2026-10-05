@@ -1,5 +1,5 @@
 #!/bin/sh
-# Un chantier = une branche = un worktree (JOURNAL 2026-10-05). Se lance depuis le dossier principal, resté sur `main`.
+# Écart §11.7 (JOURNAL 2026-10-05) : un chantier = une branche = un worktree. Se lance depuis le dossier principal, resté sur `main`.
 #
 #   sh tools/worktree.sh add feat/adsense     .claude/worktrees/feat-adsense, branche existante ou neuve (partie de origin/main)
 #   sh tools/worktree.sh status               les worktrees et les branches, et celles déjà sur main

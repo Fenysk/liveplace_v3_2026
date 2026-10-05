@@ -12,7 +12,7 @@ const WebEnvSchema = z.object({
   CONVEX_SERVICE_KEY: z.string().min(1),
   REDIS_URL: z.string().min(1),
   TWITCH_EVENTSUB_SECRET: z.string().min(10).max(100), // JOURNAL 2026-09-27 : les bornes de Twitch
-  BETA_LABEL: z.string().optional(), // JOURNAL 2026-10-04 : vide en production, le compose la passe toujours
+  BETA_LABEL: z.string().optional(), // Écart §11.1 (JOURNAL 2026-10-04) : vide en production, le compose la passe toujours
 });
 
 export type WebConfig = {
