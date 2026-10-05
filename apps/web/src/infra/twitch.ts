@@ -237,6 +237,7 @@ const AppGrantSchema = z.object({ access_token: z.string().min(1) });
 const SubscriptionsSchema = z.object({
   data: z.array(
     z.object({
+      id: z.string(),
       type: z.string(),
       status: z.string(),
       transport: z.object({ callback: z.string().optional() }),
@@ -244,13 +245,20 @@ const SubscriptionsSchema = z.object({
   ),
 });
 
-type TwitchEventSubOptions = { clientId: string; clientSecret: string; callbackUrl: string; secret: string };
+type TwitchEventSubOptions = {
+  clientId: string;
+  clientSecret: string;
+  callbackUrl: string;
+  secret: string;
+  isBeta: boolean;
+};
 
 export function createTwitchEventSub({
   clientId,
   clientSecret,
   callbackUrl,
   secret,
+  isBeta,
 }: TwitchEventSubOptions): TwitchEventSub {
   let appGrant: string | null = null; // gardé en mémoire seulement, redemandé quand Twitch le refuse
 
@@ -282,37 +290,69 @@ export function createTwitchEventSub({
     return callHelix(url, init, true);
   };
 
+  type Subscription = z.infer<typeof SubscriptionsSchema>["data"][number];
+
+  // Pourquoi on ne s'abonne pas d'ici, ou `null` si on le peut.
+  const skipReason = (): string | null => {
+    // Twitch ne livre qu'à une adresse publique en https : sur le poste de développement, rien à prendre.
+    if (!callbackUrl.startsWith("https://")) return "l'adresse de retour n'est pas publique";
+    // Écart §10.1 (JOURNAL 2026-10-05) : Twitch ne garde qu'un abonnement par type et par chaîne ; une bêta le volerait à la prod.
+    return isBeta ? "emplacement de bêta" : null;
+  };
+
+  const listSubscriptions = async (broadcasterId: string): Promise<Subscription[]> => {
+    const listed = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams({ user_id: broadcasterId })}`);
+    if (!listed.ok) throw new Error(`eventsub/subscriptions refuse la liste (${listed.status})`);
+    return SubscriptionsSchema.parse(await listed.json()).data;
+  };
+
+  // Un des nôtres vers une autre adresse (une bêta d'avant le 2026-10-05) : la prod le reprend.
+  const clearElsewhere = async (found: Subscription[]): Promise<void> => {
+    const elsewhere = found.filter(
+      (one) => MODERATION_TYPES.includes(one.type) && one.transport.callback !== callbackUrl,
+    );
+    for (const one of elsewhere) {
+      const cleared = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams({ id: one.id })}`, {
+        method: "DELETE",
+      });
+      if (!cleared.ok && cleared.status !== 404)
+        throw new Error(`eventsub ${one.type} non supprimé (${cleared.status})`);
+    }
+  };
+
+  const createMissing = async (broadcasterId: string, found: Subscription[]): Promise<void> => {
+    const live = new Set(
+      found
+        .filter((one) => LIVE_STATUSES.has(one.status) && one.transport.callback === callbackUrl)
+        .map((one) => one.type),
+    );
+    for (const type of MODERATION_TYPES.filter((wanted) => !live.has(wanted))) {
+      const created = await callHelix(SUBSCRIPTIONS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          version: "1",
+          condition: { broadcaster_user_id: broadcasterId },
+          transport: { method: "webhook", callback: callbackUrl, secret },
+        }),
+      });
+      // 409 : Twitch l'a déjà, créé entre la liste et maintenant.
+      if (!created.ok && created.status !== 409)
+        throw new Error(`eventsub ${type} refusé (${created.status})`);
+    }
+  };
+
   return {
     async subscribeToModeration(broadcasterId) {
-      // Twitch ne livre qu'à une adresse publique en https : sur le poste de développement, rien à prendre.
-      if (!callbackUrl.startsWith("https://")) {
-        console.info("EventSub sauté : l'adresse de retour n'est pas publique", callbackUrl);
+      const reason = skipReason();
+      if (reason) {
+        console.info(`EventSub sauté : ${reason}`, callbackUrl);
         return;
       }
-      const listed = await callHelix(
-        `${SUBSCRIPTIONS_URL}?${new URLSearchParams({ user_id: broadcasterId })}`,
-      );
-      if (!listed.ok) throw new Error(`eventsub/subscriptions refuse la liste (${listed.status})`);
-      const live = new Set(
-        SubscriptionsSchema.parse(await listed.json())
-          .data.filter((found) => LIVE_STATUSES.has(found.status) && found.transport.callback === callbackUrl)
-          .map((found) => found.type),
-      );
-      for (const type of MODERATION_TYPES.filter((wanted) => !live.has(wanted))) {
-        const created = await callHelix(SUBSCRIPTIONS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type,
-            version: "1",
-            condition: { broadcaster_user_id: broadcasterId },
-            transport: { method: "webhook", callback: callbackUrl, secret },
-          }),
-        });
-        // 409 : Twitch l'a déjà, créé entre la liste et maintenant.
-        if (!created.ok && created.status !== 409)
-          throw new Error(`eventsub ${type} refusé (${created.status})`);
-      }
+      const found = await listSubscriptions(broadcasterId);
+      await clearElsewhere(found);
+      await createMissing(broadcasterId, found);
     },
   };
 }

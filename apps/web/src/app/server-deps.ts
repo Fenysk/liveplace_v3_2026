@@ -27,6 +27,7 @@ const buildServerDeps = () => {
       clientSecret: config.twitchClientSecret,
       callbackUrl: `${config.publicUrl}/twitch/eventsub`,
       secret: config.twitchEventSubSecret,
+      isBeta: config.betaLabel !== null,
     }),
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),

@@ -167,11 +167,13 @@ describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
     clientSecret: "client-secret",
     callbackUrl: "https://liveplace.tv/twitch/eventsub",
     secret: "eventsub-secret",
+    isBeta: false,
   };
 
   // Twitch, joué par URL : le jeton de l'application, puis les abonnements de la chaîne.
   const stubSubscriptions = (existing: string) => {
     const created: unknown[] = [];
+    const cleared: string[] = [];
     const asked: string[] = [];
     vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
       const url = new URL(input);
@@ -181,17 +183,21 @@ describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
         created.push(String(init.body));
         return new Response("{}", { status: 202 });
       }
+      if (url.pathname === "/helix/eventsub/subscriptions" && init?.method === "DELETE") {
+        cleared.push(url.searchParams.get("id") ?? "");
+        return new Response(null, { status: 204 });
+      }
       if (url.pathname === "/helix/eventsub/subscriptions") return json(existing);
       return new Response("inconnu", { status: 404 });
     });
-    return { created, asked };
+    return { created, cleared, asked };
   };
 
   // Abonne la chaîne à ce qui lui manque, par webhook signé, avec un seul jeton d'application
   it("subscribes the channel to what it lacks, by signed webhook, with a single app token", async () => {
     const { created, asked } = stubSubscriptions(
-      '{"data":[{"type":"channel.ban","status":"enabled","transport":{"callback":"https://liveplace.tv/twitch/eventsub"}},' +
-        '{"type":"channel.unban","status":"authorization_revoked",' +
+      '{"data":[{"id":"ban","type":"channel.ban","status":"enabled","transport":{"callback":"https://liveplace.tv/twitch/eventsub"}},' +
+        '{"id":"unban","type":"channel.unban","status":"authorization_revoked",' +
         '"transport":{"callback":"https://liveplace.tv/twitch/eventsub"}}],"pagination":{}}',
     );
 
@@ -206,6 +212,41 @@ describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
       ),
     );
     expect(asked.filter((line) => line === "POST /oauth2/token")).toHaveLength(1);
+  });
+
+  // Reprend un abonnement de la chaîne parti vers une autre adresse : Twitch n'en garde qu'un par type (JOURNAL 2026-10-05)
+  it("takes back a subscription of the channel that points to another address", async () => {
+    const { created, cleared } = stubSubscriptions(
+      '{"data":[{"id":"from-beta","type":"channel.ban","status":"enabled",' +
+        '"transport":{"callback":"https://beta.liveplace.tv/twitch/eventsub"}},' +
+        '{"id":"ours","type":"channel.unban","status":"enabled",' +
+        '"transport":{"callback":"https://liveplace.tv/twitch/eventsub"}}],"pagination":{}}',
+    );
+
+    await createTwitchEventSub(options).subscribeToModeration("1234");
+
+    expect(cleared).toEqual(["from-beta"]);
+    expect(created.map((body) => JSON.parse(String(body)).type)).toEqual([
+      "channel.ban",
+      "channel.moderator.add",
+      "channel.moderator.remove",
+    ]);
+  });
+
+  // Une bêta ne demande rien à Twitch : elle prendrait l'abonnement de la prod (JOURNAL 2026-10-05)
+  it("asks Twitch nothing from a beta slot, which would take the subscription away from production", async () => {
+    const { asked } = stubSubscriptions('{"data":[],"pagination":{}}');
+    const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await createTwitchEventSub({
+      ...options,
+      callbackUrl: "https://beta.liveplace.tv/twitch/eventsub",
+      isBeta: true,
+    }).subscribeToModeration("1234");
+
+    expect(asked).toEqual([]);
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 
   // Ne demande rien à Twitch quand l'adresse n'est pas publique en https : le poste de développement

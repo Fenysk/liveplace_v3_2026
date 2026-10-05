@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-05 — Écart §10.1 : une bêta ne s'abonne jamais à EventSub, la prod reprend les abonnements partis ailleurs
+
+**Contexte.** Twitch ne garde qu'un abonnement par type et par chaîne pour une application. Une chaîne synchronisée depuis une bêta y envoyait ses bans et ses modérateurs, et la prod, qui lit le 409 comme un succès, ne recevait plus rien.
+**Décision.** Avec `BETA_LABEL`, le web ne demande rien à Twitch, comme sur le poste. En prod, la synchro supprime d'abord les abonnements de modération de la chaîne qui pointent vers une autre adresse, puis crée ceux qui manquent : une resynchro répare une chaîne prise par une bêta.
+**Renoncement.** Pas de synchro Twitch de la modération sur les bêtas.
+
 ## 2026-10-05 — Une seule convention de branche, que le hook vérifie à chaque commit
 
 **Contexte.** L'option « worktree » de l'app Claude crée ses propres branches (`worktree-…`) sans passer par `tools/worktree.sh` : deux façons de faire, et rien n'empêchait d'en dériver.
