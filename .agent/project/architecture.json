@@ -13,7 +13,7 @@
   },
 
   "_ignore": "Code généré par un outil (routeTree.gen.ts de Start, convex/_generated de Convex) : hors couche et hors cycles, un import vers lui reste contrôlé (JOURNAL 2026-09-22).",
-  "ignore": ["**/*.gen.ts", "packages/durable/convex/_generated/**"],
+  "ignore": ["**/*.gen.ts", "packages/durable/convex/_generated/**", ".claude/worktrees/**"],
 
   "layers": [
     {
@@ -69,6 +69,6 @@
 
     "maxDuplicationPercent": 3,
     "duplicationWindow": 8,
-    "duplicationIgnore": ["**/*.test.ts", "**/*.test.tsx"]
+    "duplicationIgnore": ["**/*.test.ts", "**/*.test.tsx", ".claude/worktrees/**"]
   }
 }

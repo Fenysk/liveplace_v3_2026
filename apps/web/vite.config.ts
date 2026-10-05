@@ -16,7 +16,12 @@ export default defineConfig({
     },
   },
   // En dev, le gateway tourne à part : `/ws` reste sur l'origine de la page, comme en production.
-  server: { proxy: { "/ws": { target: "ws://127.0.0.1:8080", ws: true } } },
+  // Les ports suivent la place de dev du worktree (`.claude/launch.json`, JOURNAL 2026-10-05).
+  server: {
+    port: Number(process.env.WEB_PORT ?? 3000),
+    strictPort: true,
+    proxy: { "/ws": { target: `ws://127.0.0.1:${process.env.GATEWAY_PORT ?? 8080}`, ws: true } },
+  },
   plugins: [
     // Le routeur et l'arbre généré vivent dans `app/`, la seule couche qui voit `routes/` et le reste.
     tanstackStart({

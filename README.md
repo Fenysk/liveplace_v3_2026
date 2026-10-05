@@ -41,7 +41,9 @@ pnpm --filter @liveplace/web dev
 
 Le premier lance Redis seul. Le `.env` se remplit à la main : chaque app lit sa part et refuse
 de démarrer s'il lui en manque une, en la nommant. Le gateway écoute sur `:8080` (`/ws` et
-`/healthz`), le web sur `:3000`. Les deux derniers sont aussi dans `.claude/launch.json`.
+`/healthz`), le web sur `:3000`. Les deux derniers sont aussi dans `.claude/launch.json`, nommés
+`<serveur>-<place>` : `gateway-1`, `web-1` et `web-prod-1` pour la place 1 (3000/8080), puis les
+places 2 (3010/8090) et 3 (3020/8100), pour faire tourner trois worktrees à la fois.
 
 En local, `PUBLIC_URL` vaut `http://localhost:3000` : le web y construit le redirect OAuth, et
 le gateway n'accepte un WebSocket que de cette origine.
@@ -51,7 +53,44 @@ IPv6 sur le même port. Et `pnpm gate` exige ce Redis de dev, parce que les test
 `redis-core` tournent contre un vrai Redis.
 
 Twitch accepte `http://localhost:3000/auth/twitch/callback` comme redirect : l'OAuth marche en
-local, sans tunnel.
+local, sans tunnel, sur la première place seulement.
+
+## Les branches, les worktrees et la bêta
+
+`main` est ce qui part en prod, et seulement sur un go explicite. Une fonctionnalité vit sur
+`feat/…`, un correctif sur `fix/…`, toujours partis de `main`, et rejoint `main` par une fusion
+squash : un commit d'une ligne.
+
+Le dossier principal reste sur `main` : on n'y code pas. Chaque chantier a son worktree, un
+second dossier sur sa branche, pour que deux sessions ne se volent jamais la branche :
+
+```
+sh tools/worktree.sh add feat/xxx      # .claude/worktrees/feat-xxx, avec le .env et pnpm install
+sh tools/worktree.sh status            # ce qui est en cours, et ce qui est déjà sur main
+sh tools/worktree.sh remove feat/xxx   # après la fusion : le worktree et la branche, ici et sur GitHub
+```
+
+C'est la seule façon de créer un worktree : pas l'option « worktree » de l'app Claude, dont les
+branches s'appellent `worktree-…`. Le hook refuse tout commit sur une branche hors convention.
+
+Avant de demander la fusion, la branche se met à jour : `git merge origin/main` dans son worktree
+(jamais de rebase), puis le gate, le build de prod et la bêta. La version validée est donc celle
+qui arrive sur `main`, et le squash ne rencontre aucun conflit. Le commit de merge reste sur la
+branche : le squash l'écrase avec le reste.
+
+Pour la tester en ligne, un emplacement de bêta (`beta` à `beta4.liveplace.tv`, environnement
+`beta` de Dokploy, un Compose chacun) montre la branche qu'on y règle, avec un
+bandeau, son propre Redis et le Convex de dev (JOURNAL 2026-10-04). Le poste et la bêta
+partagent ce Convex : un changement de schéma ajoute avant de retirer.
+
+Un hook `pre-commit` (`tools/git-hooks/`, branché par `pnpm install`) refuse tout commit direct
+sur `main` (seuls passent la fin d'un `git merge --squash` et un `git revert`), et tout commit
+sur une branche qui ne s'appelle pas `feat/…`, `fix/…` ou `chore/…`. Un commit isolé, même une
+ligne du JOURNAL, passe donc lui aussi par une branche. Les petits correctifs s'accumulent sur
+leurs branches et rejoignent `main` ensemble, sur une seule validation.
+
+Les bêtas se déploient à la main, jamais à chaque push : Dokploy n'est pas exposé à internet,
+et c'est ce qui le garde à l'abri.
 
 ## L'état du dépôt
 

@@ -13,6 +13,9 @@ coverage/
 .env.*
 !.env.example
 
+# Un worktree par chantier, créé par `tools/worktree.sh` seulement (JOURNAL 2026-10-05).
+.claude/worktrees/
+
 *.log
 .DS_Store
 Thumbs.db

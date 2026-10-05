@@ -14,12 +14,16 @@ const securityMiddleware = createMiddleware({ type: "request" })
   .middleware([serverDepsMiddleware])
   .server(async ({ request, next, context }) => {
     const { createNonce, refuseMethod, securityHeaders } = await import("./security-headers");
+    const { betaHeaders } = await import("./beta");
     const nonce = createNonce();
-    const headers = securityHeaders({
-      nonce,
-      publicUrl: context.deps.publicUrl,
-      isProduction: import.meta.env.PROD,
-    });
+    const headers = {
+      ...securityHeaders({
+        nonce,
+        publicUrl: context.deps.publicUrl,
+        isProduction: import.meta.env.PROD,
+      }),
+      ...betaHeaders(context.deps.betaLabel),
+    };
     const refused = refuseMethod(request.method, headers);
     if (refused) return refused;
     const result = await next({ context: { nonce } });

@@ -2,16 +2,73 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "gateway",
+      "name": "gateway-1",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@liveplace/gateway", "dev"],
-      "port": 8080
+      "port": 8080,
+      "autoPort": false
     },
     {
-      "name": "web",
+      "name": "web-1",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@liveplace/web", "dev"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "web-prod-1",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env", "apps/web/.output/server/index.mjs"],
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "gateway-2",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@liveplace/gateway", "dev"],
+      "port": 8090,
+      "autoPort": false,
+      "env": { "GATEWAY_PORT": "8090", "PUBLIC_URL": "http://localhost:3010" }
+    },
+    {
+      "name": "web-2",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@liveplace/web", "dev"],
+      "port": 3010,
+      "autoPort": false,
+      "env": { "WEB_PORT": "3010", "GATEWAY_PORT": "8090", "PUBLIC_URL": "http://localhost:3010" }
+    },
+    {
+      "name": "web-prod-2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env", "apps/web/.output/server/index.mjs"],
+      "port": 3010,
+      "autoPort": false,
+      "env": { "PORT": "3010", "PUBLIC_URL": "http://localhost:3010" }
+    },
+    {
+      "name": "gateway-3",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@liveplace/gateway", "dev"],
+      "port": 8100,
+      "autoPort": false,
+      "env": { "GATEWAY_PORT": "8100", "PUBLIC_URL": "http://localhost:3020" }
+    },
+    {
+      "name": "web-3",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@liveplace/web", "dev"],
+      "port": 3020,
+      "autoPort": false,
+      "env": { "WEB_PORT": "3020", "GATEWAY_PORT": "8100", "PUBLIC_URL": "http://localhost:3020" }
+    },
+    {
+      "name": "web-prod-3",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env", "apps/web/.output/server/index.mjs"],
+      "port": 3020,
+      "autoPort": false,
+      "env": { "PORT": "3020", "PUBLIC_URL": "http://localhost:3020" }
     }
   ]
 }

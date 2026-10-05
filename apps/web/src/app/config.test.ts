@@ -55,6 +55,13 @@ describe("parseWebConfig (§11.5)", () => {
     expect(message).not.toContain(tooShort);
   });
 
+  // Lit l'étiquette d'un emplacement de bêta ; absente ou vide, c'est la production (JOURNAL 2026-10-04)
+  it("reads a beta slot's label, and treats it missing or empty as production", () => {
+    expect(parseWebConfig({ ...env, BETA_LABEL: "feat/adsense" }).betaLabel).toBe("feat/adsense");
+    expect(parseWebConfig({ ...env, BETA_LABEL: "" }).betaLabel).toBeNull();
+    expect(parseWebConfig(env).betaLabel).toBeNull();
+  });
+
   // Retire la barre finale de PUBLIC_URL : le redirect Twitch doit correspondre octet pour octet
   it("strips the trailing slash of PUBLIC_URL: the Twitch redirect must match byte for byte", () => {
     expect(parseWebConfig({ ...env, PUBLIC_URL: "https://liveplace.tv/" }).publicUrl).toBe(

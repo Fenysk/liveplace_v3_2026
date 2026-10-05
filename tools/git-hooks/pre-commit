@@ -1,0 +1,30 @@
+#!/bin/sh
+# Une seule convention, vérifiée à chaque commit (JOURNAL 2026-10-04 et 2026-10-05) :
+# un chantier vit sur une branche feat/…, fix/… ou chore/…, dans son worktree ;
+# rien n'arrive sur `main` sans fusion squash validée, sauf un `git revert`.
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+case "$branch" in
+"" | feat/* | fix/* | chore/*)
+  # Vide : HEAD détachée, le temps d'un rebase ou d'un cherry-pick.
+  exit 0
+  ;;
+main)
+  [ -f "$(git rev-parse --git-path SQUASH_MSG)" ] && exit 0
+  [ -f "$(git rev-parse --git-path REVERT_HEAD)" ] && exit 0
+  cat >&2 <<'MSG'
+Commit refusé sur main : on travaille dans un worktree, sur une branche feat/…, fix/… ou chore/…
+(`sh tools/worktree.sh add <branche>`), qui rejoint main par `git merge --squash` après validation
+(README, « Les branches, les worktrees et la bêta »).
+MSG
+  exit 1
+  ;;
+*)
+  cat >&2 <<MSG
+Commit refusé sur « $branch » : hors convention. Une branche s'appelle feat/…, fix/… ou chore/…,
+et son worktree se crée par \`sh tools/worktree.sh add <branche>\` (README, « Les branches, les worktrees et la bêta »).
+MSG
+  exit 1
+  ;;
+esac

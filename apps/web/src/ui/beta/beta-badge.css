@@ -1,0 +1,23 @@
+/* Au-dessus de tout, sans jamais intercepter un geste : le jeu reste jouable dessous. */
+
+.lp-beta-badge {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.lp-beta-badge .lp-badge {
+  background: var(--claim);
+  color: var(--on-claim);
+  box-shadow: var(--pill-shadow);
+  /* Un onglet accroché au bord : il mord le moins possible sur les pills du haut. */
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+html[data-view="obs"] .lp-beta-badge {
+  display: none;
+}

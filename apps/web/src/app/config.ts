@@ -12,6 +12,7 @@ const WebEnvSchema = z.object({
   CONVEX_SERVICE_KEY: z.string().min(1),
   REDIS_URL: z.string().min(1),
   TWITCH_EVENTSUB_SECRET: z.string().min(10).max(100), // JOURNAL 2026-09-27 : les bornes de Twitch
+  BETA_LABEL: z.string().optional(), // JOURNAL 2026-10-04 : vide en production, le compose la passe toujours
 });
 
 export type WebConfig = {
@@ -23,6 +24,7 @@ export type WebConfig = {
   convexServiceKey: string;
   redisUrl: string;
   twitchEventSubSecret: string;
+  betaLabel: string | null;
 };
 
 export function parseWebConfig(env: unknown): WebConfig {
@@ -37,5 +39,6 @@ export function parseWebConfig(env: unknown): WebConfig {
     convexServiceKey: parsed.CONVEX_SERVICE_KEY,
     redisUrl: parsed.REDIS_URL,
     twitchEventSubSecret: parsed.TWITCH_EVENTSUB_SECRET,
+    betaLabel: parsed.BETA_LABEL || null,
   };
 }

@@ -34,14 +34,21 @@ describe("parseGatewayConfig (§11.5)", () => {
     expect(message).not.toContain(tooShort);
   });
 
-  // Applique le défaut de BROADCAST_HZ quand la variable est absente (D-13)
-  it("defaults BROADCAST_HZ to 10", () => {
+  // Applique les défauts de BROADCAST_HZ (D-13) et de GATEWAY_PORT, le port que vise Traefik (§11.1)
+  it("defaults BROADCAST_HZ to 10 and GATEWAY_PORT to 8080", () => {
     expect(parseGatewayConfig(env)).toEqual({
       redisUrl: env.REDIS_URL,
       sessionSecret,
       broadcastHz: 10,
       publicOrigin: "https://liveplace.tv",
+      port: 8080,
     });
+  });
+
+  // Écoute sur GATEWAY_PORT quand une place de développement le donne (JOURNAL 2026-10-05)
+  it("listens on GATEWAY_PORT when a development slot sets it", () => {
+    expect(parseGatewayConfig({ ...env, GATEWAY_PORT: "8090" }).port).toBe(8090);
+    expect(messageOf(() => parseGatewayConfig({ ...env, GATEWAY_PORT: "huit" }))).toContain("GATEWAY_PORT");
   });
 
   // Nomme PUBLIC_URL absente, et n'en garde que l'origine : celle d'où une page ouvre le WebSocket (JOURNAL 2026-09-29)

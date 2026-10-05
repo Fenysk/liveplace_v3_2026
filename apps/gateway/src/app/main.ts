@@ -9,7 +9,6 @@ import { createConnection } from "../usecase/connection";
 import { consumeTwitchCommands } from "../usecase/twitch-commands";
 import { parseGatewayConfig } from "./config";
 
-const GATEWAY_PORT = 8080; // §11.1 : le port que vise Traefik
 const CLOSE_RESTART = 1012; // §6.3 : les pages se reconnectent, un redéploiement coûte une seconde de blanc
 const SHUTDOWN_GRACE_MS = 2000; // une socket qui ne répond plus à la fermeture ne retient pas l'arrêt
 
@@ -37,7 +36,7 @@ consumeTwitchCommands(
 });
 
 const server = startGatewayServer({
-  port: GATEWAY_PORT,
+  port: config.port,
   publicOrigin: config.publicOrigin,
   verifier: createSessionVerifier(config.sessionSecret),
   openConnection: (socket, session) => createConnection({ core, broadcast, now: Date.now }, socket, session),

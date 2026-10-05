@@ -5,6 +5,10 @@
 # (§11.1). Aucun port n'est publié : Traefik est le seul point d'entrée.
 #
 # Ne jamais renommer le projet Compose : le volume de Redis porte son nom, et l'AOF avec.
+#
+# Écart §11.1 (JOURNAL 2026-10-04) : le même fichier sert aussi aux emplacements de bêta, un Compose
+# chacun. `ROUTER_PREFIX` y distingue les routeurs Traefik, et `BETA_LABEL` y pose le bandeau.
+# Labels en liste : Compose ne remplace pas une variable dans le nom d'une clé.
 
 services:
   redis:
@@ -39,14 +43,14 @@ services:
       interval: 10s
     restart: unless-stopped
     labels:
-      traefik.enable: "true"
-      traefik.docker.network: dokploy-network
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
       # Règle plus longue que celle du web, donc prioritaire. `Path` et non `PathPrefix` : `/ws_pseudo` est une page.
-      traefik.http.routers.liveplace-ws.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`) && Path(`/ws`)
-      traefik.http.routers.liveplace-ws.entrypoints: websecure
-      traefik.http.routers.liveplace-ws.tls.certresolver: letsencrypt
-      traefik.http.routers.liveplace-ws.service: liveplace-ws
-      traefik.http.services.liveplace-ws.loadbalancer.server.port: "8080"
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-ws.rule=Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`) && Path(`/ws`)
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-ws.entrypoints=websecure
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-ws.service=${ROUTER_PREFIX:-liveplace}-ws
+      - traefik.http.services.${ROUTER_PREFIX:-liveplace}-ws.loadbalancer.server.port=8080
 
   web:
     build:
@@ -62,6 +66,8 @@ services:
       REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
       # JOURNAL 2026-09-27 : la signature des messages que Twitch poste sur /twitch/eventsub.
       TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:?TWITCH_EVENTSUB_SECRET manquante}
+      # Vide en production : ni bandeau, ni `noindex`.
+      BETA_LABEL: ${BETA_LABEL:-}
     # Le callback OAuth crée le canvas dans Redis (§10.1).
     depends_on:
       redis:
@@ -69,18 +75,18 @@ services:
     networks: [default, dokploy-network]
     restart: unless-stopped
     labels:
-      traefik.enable: "true"
-      traefik.docker.network: dokploy-network
-      traefik.http.routers.liveplace-web.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
-      traefik.http.routers.liveplace-web.entrypoints: websecure
-      traefik.http.routers.liveplace-web.tls.certresolver: letsencrypt
-      traefik.http.routers.liveplace-web.service: liveplace-web
-      traefik.http.services.liveplace-web.loadbalancer.server.port: "3000"
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-web.rule=Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-web.entrypoints=websecure
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-web.service=${ROUTER_PREFIX:-liveplace}-web
+      - traefik.http.services.${ROUTER_PREFIX:-liveplace}-web.loadbalancer.server.port=3000
       # HTTP → HTTPS, par le middleware que Dokploy déclare déjà côté Traefik.
-      traefik.http.routers.liveplace-http.rule: Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
-      traefik.http.routers.liveplace-http.entrypoints: web
-      traefik.http.routers.liveplace-http.middlewares: redirect-to-https@file
-      traefik.http.routers.liveplace-http.service: liveplace-web
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-http.rule=Host(`${PUBLIC_HOST:?PUBLIC_HOST manquante}`)
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-http.entrypoints=web
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-http.middlewares=redirect-to-https@file
+      - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-http.service=${ROUTER_PREFIX:-liveplace}-web
 
 volumes:
   redis-data:

@@ -58,5 +58,5 @@
 
   "booleanPrefixes": ["is", "has", "can", "should", "will", "was", "did"],
 
-  "ignore": ["packages/durable/convex/_generated/**", "**/*.gen.ts", "**/*.generated.ts"]
+  "ignore": ["packages/durable/convex/_generated/**", "**/*.gen.ts", "**/*.generated.ts", ".claude/worktrees/**"]
 }
