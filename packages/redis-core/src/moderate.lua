@@ -9,6 +9,8 @@ local clearedPlacementsKey, clearedRangesKey, offStreamKey, reportedKey, approve
   KEYS[12], KEYS[13], KEYS[14], KEYS[15], KEYS[16]
 -- §5.4 : ce qu'un retrait vient d'ôter à la cible, la preuve d'un ban qui suivrait.
 local recentlyClearedKey = KEYS[17]
+-- §5.1 : le classement, d'où un banni sort, et où son score l'attend.
+local scoreboardKey, scoreboardBannedKey = KEYS[18], KEYS[19]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), ARGV[11]
@@ -126,6 +128,12 @@ if action == "ban" then
     if source == "twitch" then
       redis.call("SADD", bansTwitchKey, target)
     end
+    -- §5.1 : le classement se compte sans lui, son score attend le déban.
+    local score = redis.call("ZSCORE", scoreboardKey, target)
+    if score then
+      redis.call("ZREM", scoreboardKey, target)
+      redis.call("HSET", scoreboardBannedKey, target, score)
+    end
   end
   local version = redis.call("INCR", versionKey)
   publish(version, {}, "clear")
@@ -142,6 +150,12 @@ if action == "unban" then
   redis.call("SREM", bansKey, target)
   redis.call("SREM", bansTwitchKey, target)
   redis.call("DEL", banKey)
+  -- §5.1 : il revient au classement avec son score, et sa place à égalité.
+  local score = redis.call("HGET", scoreboardBannedKey, target)
+  if score then
+    redis.call("ZADD", scoreboardKey, score, target)
+    redis.call("HDEL", scoreboardBannedKey, target)
+  end
   local version = redis.call("INCR", versionKey)
   publish(version, {}, "clear")
   control("unbanned")

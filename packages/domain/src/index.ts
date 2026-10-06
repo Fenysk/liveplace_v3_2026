@@ -135,6 +135,9 @@ export const COUNTED_PIXELS_PER_DAY = 600;
 export const REFILL_MS = 10_000;
 export const REFILL_CHARGES = 1;
 
+// JOURNAL 2026-10-06 : le `scoreboard` montre les cinq premiers joueurs du canvas.
+export const SCOREBOARD_SIZE = 5;
+
 // §5.3 : `max(0, …)`, une horloge qui recule ne vide pas la jauge.
 export function refillGauge(gauge: Gauge | undefined, nowMs: Timestamp, params: GaugeParams): Gauge {
   if (!gauge) return { charges: params.gaugeMax, at: nowMs };

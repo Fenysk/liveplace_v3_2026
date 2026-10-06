@@ -17,6 +17,8 @@ import type {
   Placement,
   Report,
   ReportedPlacement,
+  ScoreboardEntry,
+  ScoreboardRank,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -137,6 +139,8 @@ type SetupOptions = {
   reportCount?: number; // ce que rend `getReportCount`
   canReport?: boolean; // ce que rend `canReport`
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
+  scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
+  ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
 };
 
 const setup = (options: SetupOptions = {}) => {
@@ -242,6 +246,12 @@ const setup = (options: SetupOptions = {}) => {
     },
     async listOffStreamCells() {
       return options.offStream ?? [];
+    },
+    async listScoreboard() {
+      return options.scoreboard ?? [];
+    },
+    async listScoreboardRanks(_asked: string, userIds: readonly string[]) {
+      return new Map([...(options.ranks ?? [])].filter(([userId]) => userIds.includes(userId)));
     },
     async resizeCanvas(_asked: string, { width, height }: { width: number; height: number }) {
       currentMeta = { ...currentMeta, width, height };
@@ -1162,5 +1172,76 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
     }
     await other.connection.receive(inspect(63, 35));
     expect(context.inspected).toEqual([{ x: 63, y: 35 }]);
+  });
+});
+
+describe("the scoreboard of a canvas, for each page (JOURNAL 2026-10-06)", () => {
+  const top: ScoreboardEntry[] = [
+    { login: "ada", displayName: "Ada", pixels: 9 },
+    { login: "bob", displayName: "Bob", pixels: 4 },
+  ];
+  const placed = new Map([[session.userId, { rank: 7, pixels: 2 }]]);
+
+  const kinds = (sent: (ServerFrame | { snapshot: Uint8Array })[]) =>
+    sent.map((frame) => ("t" in frame ? frame.t : "snapshot"));
+
+  // Envoie à un connecté le top et sa place, juste après le snapshot
+  it("sends a signed-in page the top and its place, right after the snapshot", async () => {
+    const { connection, sent } = setup({ scoreboard: top, ranks: placed });
+
+    await connection.receive(hello());
+
+    expect(kinds(sent)).toEqual(["welcome", "snapshot", "scoreboard"]);
+    expect(sent.at(-1)).toEqual({ t: "scoreboard", top, you: { rank: 7, pixels: 2 } });
+  });
+
+  // N'envoie que le top à un invité, et pas de place à un connecté qui n'a rien posé ou qui est banni
+  it("sends the top alone to a guest, and no place to a signed-in page that placed nothing or is banned", async () => {
+    const guest = setup({ session: null, scoreboard: top, ranks: placed });
+    const withoutPlace = setup({ scoreboard: top });
+
+    await guest.connection.receive(hello());
+    await withoutPlace.connection.receive(hello());
+
+    expect(guest.sent.at(-1)).toEqual({ t: "scoreboard", top });
+    expect(withoutPlace.sent.at(-1)).toEqual({ t: "scoreboard", top });
+  });
+
+  // N'envoie rien à une page qui arrive sur un canvas où personne n'a posé
+  it("sends nothing to a page arriving on a canvas where nobody placed", async () => {
+    const { connection, sent } = setup();
+
+    await connection.receive(hello());
+
+    expect(kinds(sent)).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Ne dit rien du classement à une vue OBS, ni à l'arrivée ni ensuite
+  it("says nothing of the scoreboard to an OBS view, neither on arrival nor later", async () => {
+    const { connection, sent, publish, broadcast } = setup({ session: null, scoreboard: top });
+
+    await connection.receive(hello({ mode: "obs" }));
+    publish(event(1, 1, 5));
+    await broadcast.tickScoreboard();
+
+    expect(kinds(sent)).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Passe à une page prête ce qu'une fenêtre du classement lui envoie, sa place comprise
+  it("passes a ready page what a scoreboard window sends it, its place included", async () => {
+    const options: SetupOptions = { scoreboard: top, ranks: placed };
+    const { connection, sent, publish, broadcast } = setup(options);
+    await connection.receive(hello());
+
+    options.scoreboard = [{ login: "eve", displayName: "Eve", pixels: 12 }, ...top];
+    options.ranks = new Map([[session.userId, { rank: 8, pixels: 2 }]]);
+    publish(event(1, 1, 5));
+    await broadcast.tickScoreboard();
+
+    expect(sent.at(-1)).toEqual({
+      t: "scoreboard",
+      top: options.scoreboard,
+      you: { rank: 8, pixels: 2 },
+    });
   });
 });

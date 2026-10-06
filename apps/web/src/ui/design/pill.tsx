@@ -5,9 +5,9 @@ import { BOTTOM_BAR_HEIGHT } from "./bottom-bar";
 import { classNames } from "./class-names";
 import { useMorph } from "./use-morph";
 
-// Le bord où la pill flotte : haut gauche, haut droite, centre droite, bas droite, bas centre. `toast` : en bas à
-// gauche, là où aucune pill ne vit, et en haut au centre sur mobile (CDC 2026, Toasts).
-export type PillDock = "tl" | "tr" | "cr" | "br" | "bc" | "toast";
+// Le bord où la pill flotte : haut gauche, haut droite, centre gauche, centre droite, bas droite, bas centre. `toast` :
+// en bas à gauche, là où aucune pill ne vit, et en haut au centre sur mobile (CDC 2026, Toasts).
+export type PillDock = "tl" | "tr" | "cl" | "cr" | "br" | "bc" | "toast";
 
 // `row` : une ligne. `stack` : des lignes empilées. `rail` : une colonne large d'un seul contrôle.
 export type PillLayout = "row" | "stack" | "rail";

@@ -57,6 +57,8 @@ export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
 // Les modérateurs, et l'état de la synchro Twitch quand elle a été faite (JOURNAL 2026-09-27).
 export type ModeratorList = { users: Moderator[]; twitchSync?: TwitchSync };
 export type StaleList = Extract<ServerFrame, { t: "staleList" }>["list"];
+// Écart §4.3 (JOURNAL 2026-10-06) : le top du classement et la place de cette page.
+export type Scoreboard = Omit<Extract<ServerFrame, { t: "scoreboard" }>, "t">;
 
 // Une requête de modération ou de lecture (JOURNAL 2026-09-25), réglée par la réponse de son `requestId`.
 export type RequestResult<T> = Result<T, ErrorCode | "closed">;
@@ -84,6 +86,7 @@ export type CanvasView = {
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
+  scoreboard?: Scoreboard | undefined; // absent avant sa première frame et après une coupure : le gateway renvoie le sien
   lastError: ErrorCode | null;
   inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
@@ -392,6 +395,11 @@ export function createCanvasStore(
       case "staleList":
         emitStale(frame.list);
         break;
+      case "scoreboard": {
+        const { t, ...scoreboard } = frame;
+        publish({ scoreboard });
+        break;
+      }
       case "banned":
       case "unbanned":
         publish({ isBanned: frame.t === "banned" });
@@ -434,6 +442,8 @@ export function createCanvasStore(
     onClose: () => {
       failAllRequests("closed");
       if (view.status !== "closed") publish({ status: "reconnecting" });
+      // Après une coupure, rien n'est sûr : la page efface son classement, et le gateway lui renvoie le sien.
+      if (view.scoreboard) publish({ scoreboard: undefined });
     },
   });
 

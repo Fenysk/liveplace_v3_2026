@@ -104,6 +104,62 @@ describe("protocol frames", () => {
     expect(decodeServerFrame({ t: "staleList" }).ok).toBe(false);
   });
 
+  // Accepte le classement du canvas avec la place de qui regarde, ou sans elle, et un top vide (écart §4.3, JOURNAL 2026-10-06)
+  it("accepts the scoreboard with the place of whoever watches, or without it, and an empty top", () => {
+    const top = [
+      {
+        login: "kalyss",
+        displayName: "Kalyss",
+        avatarUrl: "https://static-cdn.jtvnw.net/k.png",
+        pixels: 1204,
+      },
+      { login: "pixelmoth", displayName: "pixelmoth", pixels: 3 },
+    ];
+    const withPlace = { t: "scoreboard", top, you: { rank: 7, pixels: 2 } };
+
+    expect(decodeServerFrame(withPlace)).toEqual({ ok: true, value: withPlace });
+    expect(decodeServerFrame({ t: "scoreboard", top })).toEqual({
+      ok: true,
+      value: { t: "scoreboard", top },
+    });
+    expect(decodeServerFrame({ t: "scoreboard", top: [] }).ok).toBe(true);
+  });
+
+  // Refuse un top de plus de cinq lignes, une place sans rang ni pixel, et un classement sans top
+  it("refuses a top of more than five rows, a place without a rank or a pixel, and a scoreboard without a top", () => {
+    const row = (pixels: number) => ({ login: "a", displayName: "A", pixels });
+
+    expect(decodeServerFrame({ t: "scoreboard", top: Array.from({ length: 6 }, () => row(1)) }).ok).toBe(
+      false,
+    );
+    expect(decodeServerFrame({ t: "scoreboard", top: [row(0)] }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "scoreboard", top: [], you: { rank: 0, pixels: 1 } }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "scoreboard", top: [], you: { rank: 1, pixels: 0 } }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "scoreboard" }).ok).toBe(false);
+  });
+
+  // Ne laisse jamais passer l'identifiant d'un joueur du top : le décodage l'écarte
+  it("never lets the id of a player of the top through", () => {
+    const decoded = decodeServerFrame({
+      t: "scoreboard",
+      top: [{ userId: "42", login: "kalyss", displayName: "Kalyss", pixels: 5 }],
+    });
+
+    expect(decoded).toEqual({
+      ok: true,
+      value: { t: "scoreboard", top: [{ login: "kalyss", displayName: "Kalyss", pixels: 5 }] },
+    });
+  });
+
+  // Refuse une page du protocole 11 : elle se recharge pour reprendre le 12 (écart §4.3, JOURNAL 2026-10-06)
+  it("refuses a page of protocol 11, which reloads to take protocol 12", () => {
+    const hello = (protocolVersion: number) =>
+      decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
+
+    expect(hello(11).ok).toBe(false);
+    expect(hello(12).ok).toBe(true);
+  });
+
   // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
   it("accepts an inspected author without its id, and a refusal that names its request", () => {
     const inspected = {

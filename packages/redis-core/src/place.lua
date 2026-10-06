@@ -11,7 +11,10 @@ local placementId = ARGV[13]
 -- §5.3 : la progression, comptée au jour de Paris.
 local progressKey = KEYS[12]
 local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), tonumber(ARGV[16])
-local firstPixelArg = 17
+-- §5.1 : le classement, et l'encodage de son score (keys.ts).
+local scoreboardKey = KEYS[13]
+local scoreTieSpan, scoreMaxPixels, transparentColorIndex = tonumber(ARGV[17]), tonumber(ARGV[18]), tonumber(ARGV[19])
+local firstPixelArg = 20
 local pixelCount = (#ARGV - firstPixelArg + 1) / 3
 
 -- cjson encode une table vide en `{}`, or `rejected` est un tableau.
@@ -129,6 +132,20 @@ if #accepted > 0 then
   progress.counted = progress.counted + counted
   progress.dayCounted = progress.dayCounted + counted
   redis.call("HSET", progressKey, "counted", progress.counted, "day", day, "dayCounted", progress.dayCounted)
+
+  -- §5.1 : le classement compte chaque pixel accepté, sans plafond, la gomme exceptée. À égalité, la plus petite version
+  -- (le premier arrivé) reste devant.
+  local placed = 0
+  for _, pixel in ipairs(accepted) do
+    if pixel.colorIndex ~= transparentColorIndex then
+      placed = placed + 1
+    end
+  end
+  if placed > 0 then
+    local pixels = math.floor((tonumber(redis.call("ZSCORE", scoreboardKey, userId)) or 0) / scoreTieSpan)
+    local score = math.min(pixels + placed, scoreMaxPixels) * scoreTieSpan + math.max(0, scoreTieSpan - 1 - version)
+    redis.call("ZADD", scoreboardKey, score, userId)
+  end
 
   -- 9. Publication. MAXLEN se place avant l'ID.
   local event = cjson.encode({ version = version, kind = "place", authorId = userId, occurredAt = nowMs, cells = cells })

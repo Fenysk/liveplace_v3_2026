@@ -18,6 +18,7 @@
     { "canonical": "gaugeMaxStart",   "definition": "La jauge max d'un joueur qui n'a rien réclamé sur ce canvas, réglée par le streamer.", "banned": [] },
     { "canonical": "gaugeMaxCeiling", "definition": "La jauge max qu'aucun joueur ne dépasse sur ce canvas, réglée par le streamer. Baissé, il rabote sans rien reprendre.", "banned": [] },
     { "canonical": "countedPixels",   "definition": "Les pixels acceptés qui comptent pour la progression d'un joueur, au plus `COUNTED_PIXELS_PER_DAY` par jour. Un retrait n'en ôte aucun.", "banned": [] },
+    { "canonical": "scoreboard",   "definition": "Le classement d'un canvas : ses joueurs du plus grand nombre de pixels posés au plus petit, sans les bannis. À égalité, le premier arrivé reste devant.", "banned": ["leaderboard", "ranking"] },
     { "canonical": "guest",        "definition": "Qui regarde sans compte. Lecture seule. Jamais la chaîne \"anon\" en base (AP-11).", "banned": ["anon", "anonymous"] },
     { "canonical": "viewer",       "definition": "Qui a un compte. Le mot `user` désigne la personne, jamais le rôle.",  "banned": [] },
     { "canonical": "owner",        "definition": "Le streamer sur son canvas.",                                          "banned": ["admin", "streamer"] },

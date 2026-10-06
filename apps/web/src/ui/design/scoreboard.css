@@ -1,0 +1,280 @@
+/* Le classement (JOURNAL 2026-10-06) : une colonne au centre à gauche sur PC, une liste dans la fenêtre sur mobile.
+   Tout se mesure en --control-size et --sb-ring : replié, ou sur un écran bas, il suffit de les réduire ici. */
+
+/* --sb-ring : la respiration de chaque ligne, juste de quoi loger la teinte de la sienne et la pastille d'un rang.
+   La pill s'arrondit d'autant pour rester concentrique aux avatars. */
+.lp-pill:has(.lp-scoreboard) {
+  --sb-ring: 4px;
+  --sb-width: 196px; /* avec les marges de la pill : 212 px, déplié */
+  --lp-radius-box: calc(var(--control-size) / 2 + var(--sb-ring) + var(--space-2));
+  /* Les étiquettes du survol (replié) débordent de la pill : elle ne coupe plus ce qui sort de sa forme */
+  overflow: visible;
+}
+
+/* Replié : la colonne se resserre, les avatars rapetissent avec leur pill */
+.lp-pill:has(.lp-scoreboard[data-collapsed="true"]) {
+  --control-size: 26px;
+  --sb-ring: 3px;
+}
+
+/* Un écran bas : la colonne ne doit pas toucher la pill Canvas (en haut) ni les toasts (en bas) */
+@media (max-height: 520px) {
+  .lp-pill:has(.lp-scoreboard) {
+    --control-size: 28px;
+  }
+}
+
+/* Le chevron au milieu de la pill, replié comme déplié */
+.lp-pill:has(.lp-scoreboard) .lp-pill-content > .lp-btn {
+  align-self: center;
+}
+
+.lp-scoreboard {
+  /* `offsetTop` des lignes, pour le glissement (slide-on-reorder.ts) */
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Déplié : une largeur fixe, que ni un pseudo long ni un nombre qui grandit ne font bouger */
+.lp-scoreboard[data-collapsed="false"] {
+  width: var(--sb-width);
+}
+
+.lp-rank {
+  position: relative;
+  animation: lp-rank-in var(--lp-dur) var(--lp-ease);
+}
+
+@keyframes lp-rank-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* Sa place à part, sous le top : un filet au milieu de l'espace qui la sépare */
+.lp-rank--outside {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--chip-hover);
+}
+
+/* Une ligne : l'avatar, et déplié le pseudo puis le nombre de pixels. Le --sb-ring autour de l'avatar loge tout ce qui
+   le déborde : rien ne touche le bord de la pill. */
+.lp-rank-main {
+  appearance: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--sb-ring);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border-radius: var(--radius-pill);
+  /* Un clic sur un avatar ne fait rien : le curseur ne promet rien non plus */
+  cursor: default;
+}
+
+.lp-rank-main:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+/* L'anneau : un dégradé discret pour les trois premiers, une marge transparente pour les autres. Tous les avatars
+   ont ainsi la même taille. */
+.lp-rank-ring {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--control-size);
+  height: var(--control-size);
+  padding: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.lp-rank-ring .lp-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.lp-rank-ring--1 {
+  background: linear-gradient(135deg, var(--rank-gold-from), var(--rank-gold-to));
+}
+
+.lp-rank-ring--2 {
+  background: linear-gradient(135deg, var(--rank-silver-from), var(--rank-silver-to));
+}
+
+.lp-rank-ring--3 {
+  background: linear-gradient(135deg, var(--rank-bronze-from), var(--rank-bronze-to));
+}
+
+/* Déplié, le nombre sort de la courbe de la ligne : --space-3 depuis son bord, comme l'avatar à gauche, la même
+   marge à toutes les lignes pour que les nombres restent alignés, teintées ou non. Les écarts entre avatar, pseudo et
+   nombre sont l'espacement --space-2 du gap ; l'avatar, lui, garde 2 px de marge dans son anneau (36 px au total pour
+   tous, anneau visible ou non), d'où 10 px de l'image du pseudo, et 8 px du bord d'un anneau de podium. */
+.lp-scoreboard[data-collapsed="false"] .lp-rank-main {
+  padding-right: var(--space-3);
+}
+
+/* La sienne : une teinte sur toute la ligne, arrondie comme elle, et jamais un anneau (ils sont au podium). Déplié, elle
+   couvre la ligne ; replié, un disque derrière l'avatar. Elle tient dans le --sb-ring, loin du bord de la pill. */
+.lp-rank.is-me .lp-rank-main {
+  background: var(--chip-hover);
+}
+
+/* Déplié : le pseudo en texte normal, tronqué ; sa place à part, le rang en dessous, atténué */
+.lp-rank-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.lp-rank-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le nombre de pixels, atténué, aligné à droite en chiffres tabulaires */
+.lp-rank-pixels {
+  flex: none;
+  text-align: right;
+}
+
+.lp-rank-sup {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+/* Replié : le rang en indice sur l'avatar, dans la respiration de la ligne */
+.lp-rank-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  box-sizing: border-box;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--chip-hover);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--pill-surface);
+  pointer-events: none;
+}
+
+/* Replié : l'étiquette du survol et du focus, le pseudo, puis le rang et les pixels en retrait */
+.lp-rank-tip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-3));
+  display: grid;
+  max-width: 240px;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--space-3);
+  background: var(--pill-surface);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--pill-border),
+    var(--pill-shadow);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-4px, -50%);
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    transform var(--lp-dur) var(--lp-ease);
+}
+
+.lp-rank-tip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* L'étiquette passe par-dessus ce qui est posé à côté (les exemples de /design) */
+.lp-pill:has(.lp-scoreboard):is(:hover, :focus-within) {
+  z-index: 1;
+}
+
+.lp-rank-main:focus-visible + .lp-rank-tip {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+/* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
+@media (hover: hover) {
+  .lp-rank-main:hover + .lp-rank-tip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+/* Sur mobile : la même liste, dans la fenêtre. Tout se voit sans survol. */
+.lp-scoreboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lp-scoreboard-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-size);
+}
+
+.lp-scoreboard-row.is-me {
+  padding-right: var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--chip-hover);
+}
+
+/* Sa place à part, sous le top : un filet au milieu de l'espace qui la sépare */
+.lp-scoreboard-row--outside {
+  position: relative;
+  margin-top: var(--space-3);
+}
+
+.lp-scoreboard-row--outside::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * (var(--space-2) + var(--space-3)) / 2);
+  border-top: 1px solid var(--chip-hover);
+}
+
+.lp-scoreboard-avatar {
+  flex: none;
+  width: var(--control-size);
+  height: var(--control-size);
+}
+
+.lp-scoreboard-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-scoreboard-meta {
+  flex: none;
+  white-space: nowrap;
+}

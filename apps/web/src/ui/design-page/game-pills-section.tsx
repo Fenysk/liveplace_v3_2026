@@ -29,6 +29,7 @@ import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/
 import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
 import { ObsSettings } from "../obs/obs-settings";
 import { noop, SAMPLE_CANVAS, SAMPLE_DRAWING, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
+import { ScoreboardSpecimens } from "./scoreboard-specimens";
 import { Specimen, SpecimenSection } from "./specimen-section";
 
 const HOUR = 3_600_000;
@@ -382,6 +383,8 @@ export const GamePillsSection = () => {
           </Specimen>
         ))}
       </SpecimenSection>
+
+      <ScoreboardSpecimens />
 
       <SpecimenSection
         title="Pratique"

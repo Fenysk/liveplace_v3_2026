@@ -11,6 +11,16 @@ export const RECENT_MAX_EVENTS = 2000; // §5.6 : le `recent` de la vue OBS, bor
 export const CLEAR_SLICE_CELLS = 4096; // §5.4 : la latence Redis pire cas d'une tranche, connue d'avance
 export const RECENTLY_CLEARED_TTL_SECONDS = 3600; // JOURNAL 2026-09-29 : le temps de décider d'un ban après un retrait
 
+// §5.1 (JOURNAL 2026-10-06) : le score d'un joueur vaut `pixels × SCORE_TIE_SPAN + (SCORE_TIE_SPAN − 1 − version)`. À
+// égalité de pixels, la plus petite version, donc le premier arrivé, reste devant. Les deux bornes gardent le score un
+// entier exact d'un double : (2^24 − 1) × 2^29 + 2^29 − 1 = 2^53 − 1.
+export const SCORE_TIE_SPAN = 2 ** 29;
+export const SCORE_MAX_PIXELS = 2 ** 24 - 1;
+
+export function toScorePixels(score: number): number {
+  return Math.floor(score / SCORE_TIE_SPAN);
+}
+
 // §2 : les actions venues de Twitch, déposées par le web, lues par le seul gateway.
 export const TWITCH_COMMANDS_KEY = "twitch:commands";
 export const TWITCH_COMMANDS_MAXLEN = 10_000; // `MAXLEN ~` : une action acquittée n'a plus besoin de rester
@@ -71,6 +81,9 @@ export function buildCanvasKeys(canvasId: string) {
     gauge: (userId: string) => `${prefix}gauge:${userId}`,
     // §5.1 : sans EXPIRE, contrairement à la jauge : une progression ne se perd pas.
     progress: (userId: string) => `${prefix}progress:${userId}`,
+    // §5.1 : le classement, un ZSET `userId` → score, à part de `progress` que le reste copie. Sans EXPIRE non plus.
+    scoreboard: `${prefix}scoreboard`,
+    scoreboardBanned: `${prefix}scoreboard:banned`, // `userId` → score, mis à l'écart par ban, rendu par unban
     req: (userId: string, requestId: string) => `${prefix}req:${userId}:${requestId}`,
   };
 }

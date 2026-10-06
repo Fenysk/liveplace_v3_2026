@@ -1,13 +1,17 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
-import type { CanvasCore, LiveControl, Unsubscribe } from "@liveplace/domain/ports";
+import type { CanvasCore, LiveControl, ScoreboardRank, Unsubscribe } from "@liveplace/domain/ports";
 import type { Event, ServerFrame } from "@liveplace/protocol";
 import { conflate } from "./conflate";
+import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 
 // La frame telle qu'elle part : construite une fois par tick, le même objet pour chaque client du canvas.
 export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => void;
-// Un message de contrôle de moderate.lua (§5.4) : ni tick ni conflation, il n'a aucune case.
-export type ControlListener = (control: LiveControl) => void;
+// JOURNAL 2026-10-06 : le classement, au plus une fois par fenêtre ; la frame est celle de cette page.
+export type ScoreboardControl = { t: "scoreboard"; frame: ScoreboardFrame };
+// Un message de contrôle de moderate.lua (§5.4), ou le classement : ni tick ni conflation, il n'a aucune case.
+export type ControlMessage = LiveControl | ScoreboardControl;
+export type ControlListener = (control: ControlMessage) => void;
 
 export interface Broadcast {
   // `accountId` : le compte de la page, absent pour un invité et pour la vue OBS (JOURNAL 2026-09-28).
@@ -19,6 +23,8 @@ export interface Broadcast {
   ): Promise<void>;
   leave(canvasId: string, listener: CellsListener): Promise<void>;
   tick(): void;
+  // JOURNAL 2026-10-06 : une fenêtre du classement. Ne relit que les canvas où une pose, un ban ou un déban a eu lieu.
+  tickScoreboard(): Promise<void>;
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
 }
 
@@ -29,16 +35,59 @@ type CanvasBroadcast = {
   pendingEvents: Event[];
   ticksWaited: number;
   subscription: Promise<Unsubscribe>;
+  isScoreboardStale: boolean; // une pose, un ban ou un déban depuis la dernière lecture
+  isReadingScoreboard: boolean;
+  scoreboardTopKey: string; // le top tel qu'il est parti, pour ne le redire que s'il change
+  scoreboardRankKeys: Map<string, string>; // la place de chaque compte qui en a une, telle qu'elle est partie
 };
 
 // D-13 : un canvas n'est vidé qu'un tick sur N, N = ⌈clients / 500⌉, au plus 3.
 const CLIENTS_PER_TICK = 500;
 const MAX_TICKS_BETWEEN_FRAMES = 3;
+// JOURNAL 2026-10-06 : une page voit son classement à quelques secondes près, jamais à chaque pose.
+export const SCOREBOARD_WINDOW_MS = 2500;
 
 const ticksBetweenFrames = (clients: number): number =>
   Math.min(MAX_TICKS_BETWEEN_FRAMES, Math.max(1, Math.ceil(clients / CLIENTS_PER_TICK)));
 
-export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast {
+// Un pixel posé change un score ; un ban ou un déban, qui y figure. Un retrait de pixels n'en change aucun.
+const changesScoreboard = ({ kind, moderation }: Event): boolean =>
+  kind === "place" || moderation?.action === "ban" || moderation?.action === "unban";
+
+const rankKeyOf = ({ rank, pixels }: ScoreboardRank): string => `${rank}/${pixels}`;
+
+type ScoreboardCore = Pick<CanvasCore, "listScoreboard" | "listScoreboardRanks">;
+
+const accountIdsOf = (canvas: CanvasBroadcast | undefined): Set<string> => {
+  const accountIds = new Set<string>();
+  for (const { accountId } of canvas?.listeners.values() ?? []) if (accountId) accountIds.add(accountId);
+  return accountIds;
+};
+
+// Une lecture du top et des places pour tout le canvas, jamais une par page : chaque page ne reçoit que ce qui a
+// changé pour elle (le top, ou sa place).
+const refreshScoreboard = async (core: ScoreboardCore, canvasId: string, canvas: CanvasBroadcast) => {
+  const accountIds = accountIdsOf(canvas);
+  const [top, ranks] = await Promise.all([
+    core.listScoreboard(canvasId),
+    core.listScoreboardRanks(canvasId, [...accountIds]),
+  ]);
+  const topKey = JSON.stringify(top);
+  const isTopChanged = topKey !== canvas.scoreboardTopKey;
+  const rankKeys = new Map([...ranks].map(([accountId, rank]) => [accountId, rankKeyOf(rank)]));
+  const shared = toScoreboardFrame(top);
+  for (const { onControl, accountId } of canvas.listeners.values()) {
+    const rank = accountId ? ranks.get(accountId) : undefined;
+    const isRankChanged =
+      accountId !== undefined && rankKeys.get(accountId) !== canvas.scoreboardRankKeys.get(accountId);
+    if (isTopChanged || isRankChanged)
+      onControl({ t: "scoreboard", frame: rank ? toScoreboardFrame(top, rank) : shared });
+  }
+  canvas.scoreboardTopKey = topKey;
+  canvas.scoreboardRankKeys = rankKeys;
+};
+
+export function createBroadcast(core: Pick<CanvasCore, "subscribe"> & ScoreboardCore): Broadcast {
   const canvases = new Map<string, CanvasBroadcast>();
 
   const start = (canvasId: string): CanvasBroadcast => {
@@ -47,12 +96,32 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
       pendingEvents: [],
       ticksWaited: 0,
       subscription: core.subscribe(canvasId, (message) => {
-        if ("e" in message) canvas.pendingEvents.push(message.e);
-        else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
+        if ("e" in message) {
+          canvas.pendingEvents.push(message.e);
+          if (changesScoreboard(message.e)) canvas.isScoreboardStale = true;
+        } else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
       }),
+      isScoreboardStale: false,
+      isReadingScoreboard: false,
+      scoreboardTopKey: "[]", // une page qui arrive sur un canvas sans pose n'a rien reçu : c'est son état de départ
+      scoreboardRankKeys: new Map(),
     };
     canvases.set(canvasId, canvas);
     return canvas;
+  };
+
+  // Marqué lu avant la lecture : ce qui arrive pendant elle rouvre la fenêtre suivante. Un échec la rouvre aussi.
+  const refresh = async (canvasId: string, canvas: CanvasBroadcast): Promise<void> => {
+    canvas.isScoreboardStale = false;
+    canvas.isReadingScoreboard = true;
+    try {
+      await refreshScoreboard(core, canvasId, canvas);
+    } catch (error) {
+      canvas.isScoreboardStale = true;
+      console.error("gateway: classement non relu", canvasId, error);
+    } finally {
+      canvas.isReadingScoreboard = false;
+    }
   };
 
   return {
@@ -87,11 +156,15 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe">): Broadcast 
       }
     },
 
+    async tickScoreboard() {
+      const due = [...canvases].filter(
+        ([, { isScoreboardStale, isReadingScoreboard }]) => isScoreboardStale && !isReadingScoreboard,
+      );
+      await Promise.all(due.map(([canvasId, canvas]) => refresh(canvasId, canvas)));
+    },
+
     countAccounts(canvasId) {
-      const accountIds = new Set<string>();
-      for (const { accountId } of canvases.get(canvasId)?.listeners.values() ?? [])
-        if (accountId) accountIds.add(accountId);
-      return accountIds.size;
+      return accountIdsOf(canvases.get(canvasId)).size;
     },
   };
 }

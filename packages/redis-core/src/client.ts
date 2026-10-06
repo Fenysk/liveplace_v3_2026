@@ -12,7 +12,9 @@ import {
   PALETTE,
   playerGaugeMax,
   refillGauge,
+  SCOREBOARD_SIZE,
   type Timestamp,
+  TRANSPARENT_COLOR_INDEX,
   toCell,
   toCellKey,
   toParisDay,
@@ -31,6 +33,8 @@ import type {
   OffStreamCell,
   Placement,
   ReportedPlacement,
+  ScoreboardEntry,
+  ScoreboardRank,
   SignInWrites,
   Snapshot,
   TwitchCommand,
@@ -51,12 +55,15 @@ import {
   RECENT_MAX_EVENTS,
   RECENTLY_CLEARED_TTL_SECONDS,
   REQ_TTL_SECONDS,
+  SCORE_MAX_PIXELS,
+  SCORE_TIE_SPAN,
   TWITCH_COMMANDS_CONSUMER,
   TWITCH_COMMANDS_KEY,
   TWITCH_COMMANDS_MAXLEN,
   TWITCH_COMMANDS_READER,
   toPlacementKey,
   toPlacementRef,
+  toScorePixels,
   userKey,
 } from "./keys";
 
@@ -275,9 +282,9 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
   // §5.3 : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
   const gauge = scriptOf("gauge.lua");
-  redis.defineCommand("place", { numberOfKeys: 12, lua: `${gauge}\n${withPile("place.lua")}` });
+  redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withPile("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
-  redis.defineCommand("moderate", { numberOfKeys: 17, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 19, lua: withPile("moderate.lua") });
   redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
   redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
@@ -425,6 +432,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.clearedRanges,
         keys.offStream,
         keys.progress(userId),
+        keys.scoreboard,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -441,6 +449,9 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         toParisDay(nowMs), // A3 (JOURNAL 2026-09-30)
         GAUGE_GROWTH_FACTOR,
         COUNTED_PIXELS_PER_DAY,
+        SCORE_TIE_SPAN,
+        SCORE_MAX_PIXELS,
+        TRANSPARENT_COLOR_INDEX,
         ...pixels.flatMap(({ x, y, colorIndex }) => [x, y, colorIndex]),
       );
       if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
@@ -515,6 +526,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.reported,
         keys.approved,
         keys.recentlyCleared(target),
+        keys.scoreboard,
+        keys.scoreboardBanned,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -686,6 +699,41 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
     async getReportCount(canvasId: string): Promise<number> {
       return redis.zcard(buildCanvasKeys(canvasId).reported);
+    },
+
+    // JOURNAL 2026-10-06 : du plus grand score au plus petit. Un banni n'y est plus, moderate.lua l'a mis à l'écart.
+    async listScoreboard(canvasId: string): Promise<ScoreboardEntry[]> {
+      const keys = buildCanvasKeys(canvasId);
+      const flat = await redis.zrevrange(keys.scoreboard, 0, SCOREBOARD_SIZE - 1, "WITHSCORES");
+      const userIds = flat.filter((_, index) => index % 2 === 0);
+      return Promise.all(
+        userIds.map(async (userId, index): Promise<ScoreboardEntry> => {
+          const { login, displayName, avatarUrl } = await getProfile(keys, userId);
+          return {
+            login,
+            displayName,
+            ...(avatarUrl ? { avatarUrl } : {}),
+            pixels: toScorePixels(Number(flat[index * 2 + 1])),
+          };
+        }),
+      );
+    },
+
+    // Une lecture pour tous les joueurs demandés : le rang est celui du classement, sans les bannis.
+    async listScoreboardRanks(canvasId, userIds) {
+      const ranks = new Map<string, ScoreboardRank>();
+      if (userIds.length === 0) return ranks;
+      const { scoreboard } = buildCanvasKeys(canvasId);
+      const pipeline = redis.pipeline();
+      for (const userId of userIds) pipeline.zrevrank(scoreboard, userId).zscore(scoreboard, userId);
+      const replies = (await pipeline.exec()) ?? [];
+      userIds.forEach((userId, index) => {
+        const rank = unwrap(replies[index * 2]);
+        const score = unwrap(replies[index * 2 + 1]);
+        if (typeof rank === "number" && typeof score === "string")
+          ranks.set(userId, { rank: rank + 1, pixels: toScorePixels(Number(score)) });
+      });
+      return ranks;
     },
 
     // L'ordre des arguments est celui que lit stream-view.lua.

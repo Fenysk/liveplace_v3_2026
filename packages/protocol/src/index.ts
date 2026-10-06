@@ -6,6 +6,7 @@ import {
   isObsDelayStep,
   OBS_BACKGROUNDS,
   ROLES,
+  SCOREBOARD_SIZE,
   type Timestamp,
 } from "@liveplace/domain";
 import type { Result } from "@liveplace/shared";
@@ -21,7 +22,8 @@ import { z } from "zod";
 // 8 : le streamer change la taille de son canvas (JOURNAL 2026-09-29).
 // 9 : le fond de la vue OBS, transparent ou blanc (JOURNAL 2026-09-29).
 // 11 : une liste de l'onglet Modération se périme en direct, frame `staleList` (JOURNAL 2026-10-06).
-export const PROTOCOL_VERSION = 11;
+// 12 : le classement du canvas et la place de chaque page, frame `scoreboard` (JOURNAL 2026-10-06).
+export const PROTOCOL_VERSION = 12;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -476,6 +478,26 @@ const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 // Écart §4.3 (JOURNAL 2026-10-06) : pour qui modère, la liste des bannis ou celle des modérateurs a bougé, la page la relit.
 const StaleListFrameSchema = z.object({ t: z.literal("staleList"), list: z.enum(["bans", "moderators"]) });
 
+// Écart §4.3 (JOURNAL 2026-10-06) : une ligne du classement, sans identifiant ; `you.rank` désigne la ligne du top.
+const ScoreboardEntrySchema = z.object({
+  login: TwitchLoginSchema,
+  displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(),
+  pixels: z.number().int().positive(),
+});
+
+// La place de qui regarde : absente pour un invité, un banni, ou qui n'a rien posé.
+const ScoreboardRankSchema = z.object({
+  rank: z.number().int().positive(),
+  pixels: z.number().int().positive(),
+});
+
+const ScoreboardFrameSchema = z.object({
+  t: z.literal("scoreboard"),
+  top: z.array(ScoreboardEntrySchema).max(SCOREBOARD_SIZE),
+  you: ScoreboardRankSchema.optional(),
+});
+
 // Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
 const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: ObsDelaySchema });
 
@@ -523,6 +545,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   ReportsFrameSchema,
   ReportCountFrameSchema,
   StaleListFrameSchema,
+  ScoreboardFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);

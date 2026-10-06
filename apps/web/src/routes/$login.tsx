@@ -29,6 +29,10 @@ import { useReport } from "../ui/moderation/use-report";
 import { ObsPage } from "../ui/obs/obs-page";
 import { ObsTab } from "../ui/obs/obs-tab";
 import { isObsView, useIsObsView } from "../ui/obs/obs-view";
+import { ScoreboardList } from "../ui/scoreboard/scoreboard-list";
+import { ScoreboardPill } from "../ui/scoreboard/scoreboard-pill";
+import { useScoreboardRows } from "../ui/scoreboard/use-scoreboard";
+import { useScoreboardCollapse } from "../ui/scoreboard/use-scoreboard-collapse";
 import { CanvasNotFound, noStoreHeaders, resolveGameCanvasPage } from "./-canvas-page";
 
 // Lu à chaque accès : dans une fenêtre qui refuse le stockage, l'accès lui-même lève (le brouillon l'attrape).
@@ -77,6 +81,8 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   useCanvasToasts(stores);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
+  const scoreboard = useScoreboardRows(stores.canvas);
+  const scoreboardCollapse = useScoreboardCollapse();
   const getRole = () => stores.canvas.getView().role;
   const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
   const isOwner = role === "owner";
@@ -117,9 +123,18 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
           }
           obsTab={isOwner ? <ObsTab canvas={stores.canvas} login={login} /> : undefined}
           canvasTab={isOwner ? <CanvasTab canvas={stores.canvas} /> : undefined}
+          scoreboardTab={isCompact ? <ScoreboardList rows={scoreboard} /> : undefined}
         />
       )}
       <InspectionPill {...inspection} />
+      {/* Sur mobile, le classement est une section de la fenêtre, pas une colonne. */}
+      {!isCompact && (
+        <ScoreboardPill
+          rows={scoreboard}
+          isCollapsed={scoreboardCollapse.isCollapsed}
+          onToggle={scoreboardCollapse.toggle}
+        />
+      )}
       <DraftPill {...draft} isCompact={isCompact} />
       <ModerationWindow {...moderation.window} />
       <ModerationWindow {...reporting.window} />

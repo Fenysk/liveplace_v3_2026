@@ -4,7 +4,7 @@ import { createCanvasCore, createTwitchCommandQueue } from "@liveplace/redis-cor
 import { Redis } from "ioredis";
 import { createSessionVerifier } from "../infra/session";
 import { startGatewayServer } from "../infra/ws-server";
-import { createBroadcast } from "../usecase/broadcast";
+import { createBroadcast, SCOREBOARD_WINDOW_MS } from "../usecase/broadcast";
 import { createConnection } from "../usecase/connection";
 import { consumeTwitchCommands } from "../usecase/twitch-commands";
 import { parseGatewayConfig } from "./config";
@@ -22,6 +22,8 @@ const core = createCanvasCore(redis, liveSubscriber);
 const broadcast = createBroadcast(core);
 
 setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
+// JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
+setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
 
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;

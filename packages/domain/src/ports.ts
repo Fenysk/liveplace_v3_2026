@@ -97,6 +97,10 @@ export interface TwitchCommandQueue {
   ackTwitchCommand(id: string): Promise<void>;
 }
 
+// §4.3 : une ligne du classement d'un canvas, et la place d'un joueur dans ce classement (JOURNAL 2026-10-06).
+export type ScoreboardEntry = Extract<ServerFrame, { t: "scoreboard" }>["top"][number];
+export type ScoreboardRank = NonNullable<Extract<ServerFrame, { t: "scoreboard" }>["you"]>;
+
 // L'auteur du pixel visible d'une case (§4.3).
 export type InspectEntry = NonNullable<Extract<ServerFrame, { t: "inspected" }>["entry"]>;
 
@@ -155,6 +159,10 @@ export interface CanvasCore {
     placementId: string,
   ): Promise<AuthoredPixel[] | null>;
   getReportCount(canvasId: string): Promise<number>;
+  // JOURNAL 2026-10-06 : le top du classement, sans les bannis, et la place de chacun des joueurs demandés. Un joueur
+  // qui n'y figure pas (rien posé, banni) n'a pas de place.
+  listScoreboard(canvasId: string): Promise<ScoreboardEntry[]>;
+  listScoreboardRanks(canvasId: string, userIds: readonly string[]): Promise<Map<string, ScoreboardRank>>;
   listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
   // §5.3 : le streamer seul. Publie le `ctl` `resize`.
   resizeCanvas(

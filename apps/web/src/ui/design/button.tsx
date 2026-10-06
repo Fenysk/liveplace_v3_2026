@@ -23,6 +23,7 @@ export type ButtonProps = ButtonText &
     kbd?: string; // le raccourci, écrit dans le bouton, masqué au doigt
     variant?: ButtonVariant;
     isPressed?: boolean; // un outil armé : gomme, tracé
+    isExpanded?: boolean; // un contrôle qui replie ou déplie ce qu'il commande
     isDisabled?: boolean;
   };
 
@@ -34,7 +35,7 @@ export const blurAfterClick = (onPress: () => void) => (event: MouseEvent<HTMLBu
 };
 
 export const Button = (props: ButtonProps) => {
-  const { label, title, icon: Icon, kbd, variant, isPressed, isDisabled } = props;
+  const { label, title, icon: Icon, kbd, variant, isPressed, isExpanded, isDisabled } = props;
   const className = classNames(
     "lp-btn lp-type-body",
     variant && `lp-btn--${variant}`,
@@ -73,6 +74,7 @@ export const Button = (props: ButtonProps) => {
       title={title}
       aria-label={accessibleName}
       aria-pressed={isPressed}
+      aria-expanded={isExpanded}
       disabled={isDisabled}
       onClick={blurAfterClick(props.onPress)}
     >

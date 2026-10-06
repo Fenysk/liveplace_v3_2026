@@ -1,7 +1,13 @@
-import type { CanvasCore, LiveControl, LiveMessage } from "@liveplace/domain/ports";
-import type { CellsFrame, Event } from "@liveplace/protocol";
-import { describe, expect, it } from "vitest";
-import { type CellsListener, type ControlListener, createBroadcast } from "./broadcast";
+import type {
+  CanvasCore,
+  LiveControl,
+  LiveMessage,
+  ScoreboardEntry,
+  ScoreboardRank,
+} from "@liveplace/domain/ports";
+import type { CellsFrame, Event, ServerFrame } from "@liveplace/protocol";
+import { describe, expect, it, vi } from "vitest";
+import { type CellsListener, type ControlListener, type ControlMessage, createBroadcast } from "./broadcast";
 
 const occurredAt = 1_700_000_000_000;
 
@@ -15,11 +21,19 @@ const event = (version: number, x: number, colorIndex: number): Event => ({
   cells: [{ x, y: 2, colorIndex, previousColorIndex: 0, placedAt: occurredAt }],
 });
 
-// Le noyau vu par la diffusion : un abonnement, et de quoi publier à la main.
+// Le noyau vu par la diffusion : un abonnement, de quoi publier à la main, et le classement que les tests règlent.
 const fakeCore = () => {
   const callbacks = new Map<string, (message: LiveMessage) => void>();
   const counts = { subscribe: 0, unsubscribe: 0 };
-  const core: Pick<CanvasCore, "subscribe"> = {
+  const scoreboard = {
+    top: [] as ScoreboardEntry[],
+    ranks: new Map<string, ScoreboardRank>(),
+    topReads: 0,
+    rankReads: [] as (readonly string[])[],
+    failNext: false,
+    holdNext: null as Promise<void> | null, // la prochaine lecture du top attend cette promesse
+  };
+  const core: Pick<CanvasCore, "subscribe" | "listScoreboard" | "listScoreboardRanks"> = {
     async subscribe(canvasId, onMessage) {
       counts.subscribe += 1;
       callbacks.set(canvasId, onMessage);
@@ -28,10 +42,25 @@ const fakeCore = () => {
         callbacks.delete(canvasId);
       };
     },
+    async listScoreboard() {
+      scoreboard.topReads += 1;
+      if (scoreboard.failNext) {
+        scoreboard.failNext = false;
+        throw new Error("Redis injoignable");
+      }
+      const held = scoreboard.holdNext;
+      scoreboard.holdNext = null;
+      await held;
+      return scoreboard.top;
+    },
+    async listScoreboardRanks(_canvasId, userIds) {
+      scoreboard.rankReads.push(userIds);
+      return new Map([...scoreboard.ranks].filter(([userId]) => userIds.includes(userId)));
+    },
   };
   const publish = (canvasId: string, published: Event) => callbacks.get(canvasId)?.({ e: published });
   const control = (canvasId: string, published: LiveControl) => callbacks.get(canvasId)?.({ ctl: published });
-  return { core, counts, publish, control };
+  return { core, counts, publish, control, scoreboard };
 };
 
 describe("createBroadcast (§6.2, §6.3)", () => {
@@ -161,7 +190,7 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     const { core, publish, control } = fakeCore();
     const broadcast = createBroadcast(core);
     const cells: CellsFrame[] = [];
-    const controls: LiveControl[] = [];
+    const controls: ControlMessage[] = [];
     await broadcast.join(
       "canvas-1",
       (frame) => cells.push(frame),
@@ -183,5 +212,226 @@ describe("createBroadcast (§6.2, §6.3)", () => {
 
     expect(cells).toHaveLength(1);
     expect(cells[0]?.toVersion).toBe(1);
+  });
+});
+
+const entry = (login: string, pixels: number): ScoreboardEntry => ({ login, displayName: login, pixels });
+
+// Une action de modération telle que moderate.lua la publie : un événement `clear`, sans case.
+const moderation = (action: "ban" | "unban" | "clearUser"): Event => ({
+  version: 7,
+  kind: "clear",
+  authorId: "owner-1",
+  occurredAt,
+  cells: [],
+  moderation: { action, target: "user-2" },
+});
+
+// Une page du canvas : tout ce qu'elle reçoit du classement, dans l'ordre.
+const joinPage = async (broadcast: ReturnType<typeof createBroadcast>, accountId?: string) => {
+  const frames: ServerFrame[] = [];
+  await broadcast.join(
+    "canvas-1",
+    () => undefined,
+    (control) => {
+      if (control.t === "scoreboard") frames.push(control.frame);
+    },
+    accountId,
+  );
+  return frames;
+};
+
+describe("the scoreboard window of a canvas (JOURNAL 2026-10-06)", () => {
+  // Lit le top une seule fois pour tout le canvas, et envoie la même frame à chaque page
+  it("reads the top once for the whole canvas, and sends the same frame to every page", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9), entry("bob", 4)];
+    const first = await joinPage(broadcast);
+    const second = await joinPage(broadcast);
+
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    expect(scoreboard.topReads).toBe(1);
+    expect(first).toEqual([{ t: "scoreboard", top: scoreboard.top }]);
+    expect(second[0]).toBe(first[0]);
+  });
+
+  // Ne lit rien tant qu'une pose, un ban ou un déban n'a pas eu lieu depuis la dernière fenêtre
+  it("reads nothing until a placement, a ban or an unban happened since the last window", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    await joinPage(broadcast);
+
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(0);
+
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(1);
+
+    publish("canvas-1", moderation("ban"));
+    await broadcast.tickScoreboard();
+    publish("canvas-1", moderation("unban"));
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(3);
+  });
+
+  // Ne lit rien pour un retrait de pixels, qui ne change aucun score
+  it("reads nothing for a removal of pixels, which changes no score", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    await joinPage(broadcast);
+
+    publish("canvas-1", moderation("clearUser"));
+    publish("canvas-1", { ...event(8, 3, 5), kind: "hide" });
+    await broadcast.tickScoreboard();
+
+    expect(scoreboard.topReads).toBe(0);
+  });
+
+  // Reste muette quand le top n'a pas changé depuis la fenêtre précédente
+  it("stays silent when the top did not change since the previous window", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    const page = await joinPage(broadcast);
+
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+    publish("canvas-1", event(2, 4, 5));
+    await broadcast.tickScoreboard();
+
+    expect(scoreboard.topReads).toBe(2);
+    expect(page).toHaveLength(1);
+  });
+
+  // Dit une dernière fois un top devenu vide, quand le seul joueur qui y était est banni
+  it("says a top that became empty once, when the only player in it is banned", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    const page = await joinPage(broadcast);
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    scoreboard.top = [];
+    publish("canvas-1", moderation("ban"));
+    await broadcast.tickScoreboard();
+
+    expect(page.at(-1)).toEqual({ t: "scoreboard", top: [] });
+  });
+
+  // Donne à chaque compte sa place, et la frame commune à qui n'en a pas
+  it("gives each account its own place, and the shared frame to whoever has none", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    scoreboard.ranks = new Map([["user-1", { rank: 7, pixels: 2 }]]);
+    const placed = await joinPage(broadcast, "user-1");
+    const unplaced = await joinPage(broadcast, "user-2");
+    const guest = await joinPage(broadcast);
+
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    expect(placed).toEqual([{ t: "scoreboard", top: scoreboard.top, you: { rank: 7, pixels: 2 } }]);
+    expect(unplaced).toEqual([{ t: "scoreboard", top: scoreboard.top }]);
+    expect(guest[0]).toBe(unplaced[0]);
+  });
+
+  // Lit la place de chaque compte une seule fois, même ouvert dans deux pages, et jamais celle d'un invité
+  it("reads the place of each account once, even in two pages, and never that of a guest", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    await joinPage(broadcast, "user-1");
+    await joinPage(broadcast, "user-1");
+    await joinPage(broadcast, "user-2");
+    await joinPage(broadcast);
+
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    expect(scoreboard.rankReads).toEqual([["user-1", "user-2"]]);
+  });
+
+  // N'envoie sa nouvelle place qu'au compte dont elle a changé, quand le top est resté le même
+  it("sends a new place only to the account whose place changed, when the top stayed the same", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    scoreboard.ranks = new Map([["user-1", { rank: 7, pixels: 2 }]]);
+    const mover = await joinPage(broadcast, "user-1");
+    const still = await joinPage(broadcast, "user-2");
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    scoreboard.ranks = new Map([["user-1", { rank: 8, pixels: 2 }]]);
+    publish("canvas-1", event(2, 4, 5));
+    await broadcast.tickScoreboard();
+
+    expect(mover).toHaveLength(2);
+    expect(mover.at(-1)).toEqual({ t: "scoreboard", top: scoreboard.top, you: { rank: 8, pixels: 2 } });
+    expect(still).toHaveLength(1);
+  });
+
+  // Dit à un compte qui perd sa place (banni) qu'il n'en a plus, sans toucher au top
+  it("tells an account that loses its place (banned) that it has none, without touching the top", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    scoreboard.ranks = new Map([["user-1", { rank: 7, pixels: 2 }]]);
+    const page = await joinPage(broadcast, "user-1");
+    publish("canvas-1", event(1, 3, 5));
+    await broadcast.tickScoreboard();
+
+    scoreboard.ranks = new Map();
+    publish("canvas-1", moderation("ban"));
+    await broadcast.tickScoreboard();
+
+    expect(page.at(-1)).toEqual({ t: "scoreboard", top: scoreboard.top });
+  });
+
+  // Garde le canvas à relire après une lecture qui échoue, et la journalise
+  it("keeps the canvas to read again after a failed read, and logs it", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    scoreboard.top = [entry("ada", 9)];
+    const page = await joinPage(broadcast);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    scoreboard.failNext = true;
+    publish("canvas-1", event(1, 3, 5));
+
+    await broadcast.tickScoreboard();
+    expect(page).toHaveLength(0);
+    expect(logged).toHaveBeenCalledWith("gateway: classement non relu", "canvas-1", expect.any(Error));
+
+    await broadcast.tickScoreboard();
+    expect(page).toHaveLength(1);
+    logged.mockRestore();
+  });
+
+  // Ne lance pas une seconde lecture d'un canvas dont la lecture dure encore
+  it("does not start a second read of a canvas whose read is still running", async () => {
+    const { core, publish, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    await joinPage(broadcast);
+    let release: () => void = () => undefined;
+    scoreboard.holdNext = new Promise((resolve) => {
+      release = resolve;
+    });
+    publish("canvas-1", event(1, 3, 5));
+
+    const running = broadcast.tickScoreboard();
+    publish("canvas-1", event(2, 4, 5));
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(1);
+
+    release();
+    await running;
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(2);
   });
 });

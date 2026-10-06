@@ -152,6 +152,13 @@
   transform: translateY(-50%);
 }
 
+/* En face de l'inspection. Le bord gauche reviendra à la bande de pub (--lp-ad-side) : la colonne se décale d'autant */
+.lp-floating[data-dock="cl"] {
+  top: 50%;
+  left: calc(var(--lp-ad-side, 0px) + var(--space-4));
+  transform: translateY(-50%);
+}
+
 /* Le toast (CDC 2026, Toasts) : en bas à gauche, par-dessus les autres pills */
 .lp-floating[data-dock="toast"] {
   z-index: 3;
@@ -266,6 +273,11 @@ html[data-panning] .lp-floating > .lp-pill,
   .lp-floating[data-dock="tr"] {
     top: max(var(--space-2), env(safe-area-inset-top));
     right: var(--space-2);
+  }
+
+  /* Le classement n'a pas de colonne sur mobile : il est dans la fenêtre */
+  .lp-floating[data-dock="cl"] {
+    display: none;
   }
 
   .lp-floating[data-dock="bc"],

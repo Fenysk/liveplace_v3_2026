@@ -724,3 +724,40 @@ describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
     expect(await listing).toEqual({ ok: true, value: pixels });
   });
 });
+
+describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
+  const top = [
+    { login: "ada", displayName: "Ada", pixels: 9 },
+    { login: "bob", displayName: "Bob", pixels: 4 },
+  ];
+
+  // N'a pas de classement avant sa première frame
+  it("has no scoreboard before its first frame", () => {
+    const { store } = setup();
+
+    expect(store.getView().scoreboard).toBeUndefined();
+  });
+
+  // Prend le classement de chaque frame tel quel, sa place comprise, et le remplace en entier
+  it("takes the scoreboard of each frame as it is, its place included, and replaces it whole", () => {
+    const { store, receive } = setup();
+
+    receive({ t: "scoreboard", top, you: { rank: 7, pixels: 2 } });
+    expect(store.getView().scoreboard).toEqual({ top, you: { rank: 7, pixels: 2 } });
+
+    receive({ t: "scoreboard", top: top.slice(0, 1) });
+    expect(store.getView().scoreboard).toEqual({ top: top.slice(0, 1) });
+  });
+
+  // Efface le classement à la coupure, et le garde quand d'autres frames passent
+  it("clears the scoreboard when the connection drops, and keeps it through other frames", () => {
+    const { store, receive, close } = setup();
+    receive({ t: "scoreboard", top });
+
+    receive({ t: "gauge", ...gauge });
+    expect(store.getView().scoreboard).toEqual({ top });
+
+    close();
+    expect(store.getView().scoreboard).toBeUndefined();
+  });
+});

@@ -32,6 +32,13 @@
   --scrim: rgba(16, 18, 28, 0.4);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
+  /* Les anneaux du classement : un dégradé discret par place, plus soutenu sur le fond clair */
+  --rank-gold-from: #c8901a;
+  --rank-gold-to: #f2cf6b;
+  --rank-silver-from: #8e95a3;
+  --rank-silver-to: #cdd2db;
+  --rank-bronze-from: #a5653a;
+  --rank-bronze-to: #dba57a;
 }
 
 [data-theme="dark"] {
@@ -64,6 +71,12 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --rank-gold-from: #e8b84a;
+  --rank-gold-to: #f7e08a;
+  --rank-silver-from: #b8bfcc;
+  --rank-silver-to: #f0f2f6;
+  --rank-bronze-from: #cf8f5c;
+  --rank-bronze-to: #f3c9a4;
 }
 
 :root {

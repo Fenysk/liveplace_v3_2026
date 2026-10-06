@@ -28,8 +28,9 @@ import {
   PROTOCOL_VERSION,
   type ServerFrame,
 } from "@liveplace/protocol";
-import type { Broadcast, CellsListener, ControlListener } from "./broadcast";
+import type { Broadcast, CellsListener, ControlListener, ScoreboardControl } from "./broadcast";
 import { toCellsFrame } from "./cells-frame";
+import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 
 // « policy violation » : la frame est refusée et la connexion fermée.
 const CLOSE_POLICY = 1008;
@@ -53,10 +54,20 @@ type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
-// attente et les listes périmées pour qui modère (JOURNAL 2026-09-28, 2026-10-06).
+// attente et les listes périmées pour qui modère, et le classement (JOURNAL 2026-09-28, 2026-10-06).
 type ControlFrame = Extract<
   ServerFrame,
-  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "gaugeLimits" | "reportCount" | "staleList" }
+  {
+    t:
+      | "banned"
+      | "unbanned"
+      | "obsDelay"
+      | "obsBackground"
+      | "gaugeLimits"
+      | "reportCount"
+      | "staleList"
+      | "scoreboard";
+  }
 >;
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
@@ -213,6 +224,7 @@ export function createConnection(
 
   // §10.2 et CDC 2026 §1 : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
+    if (control.t === "scoreboard") return onScoreboardControl(control);
     tellStaleList(control);
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
@@ -225,6 +237,11 @@ export function createConnection(
   const deliverControl = (frame: ControlFrame): void => {
     if (state.status === "joining") state.pendingControls.push(frame);
     else if (state.status === "ready") socket.sendFrame(frame);
+  };
+
+  // JOURNAL 2026-10-06 : le classement de cette page, jamais en vue OBS.
+  const onScoreboardControl = ({ frame }: ScoreboardControl): void => {
+    if (state.status !== "awaitingHello" && state.mode === "ui") deliverControl(frame);
   };
 
   // JOURNAL 2026-09-30 : de nouvelles bornes changent la jauge max de chaque compte.
@@ -289,6 +306,12 @@ export function createConnection(
     socket.sendSnapshot(arrival.state);
   };
 
+  // Après le snapshot : les signalements en attente pour qui modère, le classement pour tous (JOURNAL 2026-10-06).
+  const sendAfterArrival = (reportCount: number | null, scoreboard: ScoreboardFrame | null): void => {
+    if (reportCount !== null) socket.sendFrame({ t: "reportCount", count: reportCount });
+    if (scoreboard) socket.sendFrame(scoreboard);
+  };
+
   // Ce qui est tombé pendant l'arrivée : un ban l'emporte sur celui qu'on a lu, le reste part après le `welcome`.
   const sendHeldControls = (held: ControlFrame[], wasBanned: boolean): void => {
     const lastBan = held.filter((frame) => frame.t === "banned" || frame.t === "unbanned").at(-1);
@@ -316,16 +339,23 @@ export function createConnection(
     meta: CanvasMeta,
     role: Role,
     gauge: AckFrame["gauge"] | null,
+    scoreboard: ScoreboardFrame | null,
   ) => {
     startJoining(frame.canvasId, frame.mode, role);
     // §8 : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
-    await arrive(frame, meta, role, gauge);
+    await arrive(frame, meta, role, gauge, scoreboard);
   };
 
   // Le `welcome`, le snapshot (ou le resync), puis ce qui est tombé entre-temps.
-  const arrive = async (frame: HelloFrame, meta: CanvasMeta, role: Role, gauge: AckFrame["gauge"] | null) => {
+  const arrive = async (
+    frame: HelloFrame,
+    meta: CanvasMeta,
+    role: Role,
+    gauge: AckFrame["gauge"] | null,
+    scoreboard: ScoreboardFrame | null,
+  ) => {
     const { canvasId } = frame;
     const [arrival, wasBanned, reportCount] = await Promise.all([
       getArrival(frame, meta),
@@ -334,7 +364,7 @@ export function createConnection(
     ]);
 
     sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge));
-    if (reportCount !== null) socket.sendFrame({ t: "reportCount", count: reportCount });
+    sendAfterArrival(reportCount, scoreboard);
 
     const held =
       state.status === "joining"
@@ -363,7 +393,7 @@ export function createConnection(
     const meta = await deps.core.getCanvas(canvasId);
     if (!meta) return refuse("canvas_not_found");
     const gauge = session ? await deps.core.getGauge(canvasId, session.userId, deps.now()) : null;
-    await arrive({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode }, meta, role, gauge);
+    await arrive({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode }, meta, role, gauge, null);
   };
 
   const onResizeControl = (): void => {
@@ -371,13 +401,28 @@ export function createConnection(
     else void rearrive().catch((error: unknown) => console.error("nouvelle taille non reprise", error));
   };
 
+  // JOURNAL 2026-10-06 : le classement à l'arrivée, lu avant de s'abonner comme la jauge, donc plus ancien que tout ce
+  // qui tombe ensuite. Rien en vue OBS, rien non plus sans pose : une page qui se coupe efface le sien.
+  const getScoreboardFrame = async ({ canvasId, mode }: HelloFrame) => {
+    if (mode === "obs") return null;
+    const [top, ranks] = await Promise.all([
+      deps.core.listScoreboard(canvasId),
+      deps.core.listScoreboardRanks(canvasId, session ? [session.userId] : []),
+    ]);
+    if (top.length === 0) return null;
+    return toScoreboardFrame(top, session ? ranks.get(session.userId) : undefined);
+  };
+
   const greet = async (frame: HelloFrame): Promise<void> => {
     const meta = await deps.core.getCanvas(frame.canvasId);
     if (!meta) return refuse("canvas_not_found");
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
     // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas.
-    const gauge = session ? await deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null;
-    await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge);
+    const [gauge, scoreboard] = await Promise.all([
+      session ? deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null,
+      getScoreboardFrame(frame),
+    ]);
+    await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge, scoreboard);
   };
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {

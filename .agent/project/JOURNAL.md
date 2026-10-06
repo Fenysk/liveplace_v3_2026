@@ -32,6 +32,30 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-06 — Le classement déplié montre les pseudos : les cas de la pill dépliée sont réécrits
+
+**Contexte.** À l'écran, Alexis veut voir les pseudos quand le classement n'est pas replié ; le premier jet n'avait que des avatars et une étiquette au survol, et la ligne de sa propre place touchait le bord de la pill.
+**Décision.** Déplié, une ligne est l'avatar (anneau de podium), le pseudo tronqué et les pixels atténués, sur 184 px (la pill fait environ 200 px) ; le rang ne s'écrit que sous le pseudo de sa place hors du top. L'étiquette au survol ne vit plus que repliée. Les cas de `scoreboard-pill.test.ts` qui décrivaient l'ancien déplié (avatars seuls, pastille de rang, étiquette) sont réécrits sur cette règle, sans perdre une assertion.
+**Renoncement.** Le mot « pixels » sur chaque ligne (la ligne est assez chargée, le nom accessible le dit) ; un rang écrit sur chacun des cinq premiers (l'ordre et les anneaux le disent).
+
+## 2026-10-06 — Écart §4.3 : la frame `scoreboard` donne à chaque page le top 5 de son canvas et sa propre place
+
+**Contexte.** Le classement s'affiche à toutes les pages d'un canvas, mais la place de chaque joueur lui est propre : une frame par pose et par page serait un coût par connexion.
+**Décision.** Le gateway lit le top (un `ZREVRANGE` et cinq miroirs `user:`) au plus toutes les 2,5 s par canvas, et seulement si une pose ou un ban ou un déban a eu lieu depuis ; il envoie `{ t: "scoreboard", top, you? }`, où `you` porte le rang et les pixels de qui a posé sans être banni, un invité n'en a pas. Aucun `userId` ne franchit le fil : `you.rank` désigne la ligne du top. Rien en vue OBS. `PROTOCOL_VERSION` passe à 12 : les pages ouvertes se rechargent au déploiement. La branche `feat/canvas-archive` vise aussi 11 → 12 : la seconde fusionnée renumérote.
+**Renoncement.** Une frame par pose ; une frame par page à chaque fenêtre (elle ne part que si le top ou la place a changé) ; l'identifiant des joueurs dans le top.
+
+## 2026-10-06 — Écart §5.1 : le classement d'un canvas compte les pixels posés dans `scoreboard`, à part de `progress`
+
+**Contexte.** `progress.counted` est plafonné par jour (bonus de jauge) et un autre chantier le recopie d'un canvas à l'autre : il ne dit ni qui a le plus posé ici, ni jusqu'où.
+**Décision.** Deux clés sous `cv:<id>:`, sans EXPIRE : `scoreboard`, un ZSET `userId` → `pixels × 2^29 + (2^29 − 1 − version)` (chaque pixel accepté compte, la gomme jamais, aucun plafond ; à égalité, la plus petite version, donc le premier arrivé, reste devant), et `scoreboard:banned`, un hash où `moderate.lua` met le score d'un banni à l'écart, pour que les rangs se comptent sans lui, et le rend au déban (de LivePlace ou de Twitch : tout passe par `moderate.lua`). Un retrait sans ban n'ôte rien, comme `countedPixels`. Rien ne se recopie ni ne se reconstitue : le compteur part de zéro à la mise en ligne.
+**Renoncement.** Réutiliser `progress` (plafond, recopie) ; un ZSET de tous les joueurs filtré à la lecture (le rang et le top devraient décompter les bannis) ; un score en pur `pixels` (l'égalité se jouerait à l'ordre alphabétique) ; l'heure en secondes (deux joueurs dans la même seconde).
+
+## 2026-10-06 — Le lexique gagne `scoreboard`, le classement d'un canvas
+
+**Contexte.** Le classement des joueurs d'un canvas n'avait pas de mot ; `board` est banni (c'est un `canvas`), et laisser `leaderboard` ou `ranking` s'installer en ferait trois.
+**Décision.** `scoreboard` entre dans `lexique.json` comme nom canonique, un seul mot (jamais `leaderBoard`), avec `leaderboard` et `ranking` bannis ; l'interface dit « Classement ».
+**Renoncement.** Pas de mot au lexique pour `rank` ni `pixels` : ce sont les champs d'une ligne du `scoreboard`, pas des concepts.
+
 ## 2026-10-06 — Écart §4.3 : la frame `staleList` dit à qui modère que la liste des bannis ou des modérateurs a bougé
 
 **Contexte.** L'onglet Modération ne lisait ses listes qu'à son ouverture : `moderate.lua` et `moderators.lua` ne préviennent que la cible (`banned`, `unbanned`, `role`), donc un ban, un déban ou un modérateur venu de Twitch (file `twitch:commands`) ou d'un autre modérateur n'apparaissait qu'à la réouverture de la fenêtre.

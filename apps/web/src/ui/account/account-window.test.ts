@@ -98,3 +98,37 @@ describe("la section Mon compte (CDC 2026, Fenêtre)", () => {
     expect(markup).not.toMatch(/checked=""[^>]*value="(auto|light)"/);
   });
 });
+
+describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)", () => {
+  const list = tab("contenu de la section Classement");
+
+  // Met Classement avant Mon compte quand le mobile le donne, et nulle part sinon
+  it("puts Classement before Mon compte when the phone gives it, and nowhere otherwise", () => {
+    expect(sectionsOf(renderWindow({ scoreboardTab: list }))).toEqual(["Classement", "Mon compte"]);
+    expect(sectionsOf(renderWindow({ ...OWNER_TABS, scoreboardTab: list }))).toEqual([
+      "Canvas",
+      "Vue OBS",
+      "Modération",
+      "Classement",
+      "Mon compte",
+    ]);
+    expect(sectionsOf(renderWindow())).not.toContain("Classement");
+  });
+
+  // Ouvre la section Classement sur sa liste, et pas sur celle de Mon compte
+  it("opens the Classement section on its list, and not on that of Mon compte", () => {
+    const markup = renderWindow({ sectionId: "scoreboard", scoreboardTab: list });
+
+    expect(markup).toContain("contenu de la section Classement");
+    expect(markup).toMatch(/<h2[^>]*>Classement<\/h2>/);
+    expect(markup).not.toContain("Se déconnecter");
+  });
+
+  // Retombe sur la première section quand Classement a disparu, sans titre de l'une et contenu d'une autre
+  it("falls back to the first section when Classement is gone, with no title of one and content of another", () => {
+    const markup = renderWindow({ sectionId: "scoreboard" });
+
+    expect(markup).toMatch(/<h2[^>]*>Mon compte<\/h2>/);
+    expect(markup).toContain("Se déconnecter");
+  });
+});

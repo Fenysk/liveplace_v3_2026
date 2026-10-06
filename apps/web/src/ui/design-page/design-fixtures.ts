@@ -1,7 +1,14 @@
 // Les exemples de /design : des utilisateurs de démonstration, et rien d'autre. Aucune connexion, aucun store.
 
 import { PALETTE } from "@liveplace/domain";
-import type { AuthoredPixel, BannedUser, Moderator, Pixel, ReportedPlacement } from "@liveplace/domain/ports";
+import type {
+  AuthoredPixel,
+  BannedUser,
+  Moderator,
+  Pixel,
+  ReportedPlacement,
+  ScoreboardEntry,
+} from "@liveplace/domain/ports";
 import type { ProfileUser } from "../design/profile";
 import sampleAvatarUrl from "./sample-avatar.svg?url";
 
@@ -17,6 +24,18 @@ export const SAMPLE_BROKEN_PHOTO: ProfileUser = {
   login: "nuagelle",
   avatarUrl: "/photo-introuvable.png",
 };
+
+// Qui regarde, dans les exemples du classement : un joueur qui n'est pas dans le top.
+export const SAMPLE_PLAYER: ProfileUser = { displayName: "Chaton42", login: "chaton42" };
+
+// Le top 5 des exemples : deux joueurs à égalité, une photo qui ne charge pas, un pseudo trop long pour l'étiquette.
+export const SAMPLE_SCOREBOARD_TOP: readonly ScoreboardEntry[] = [
+  { login: "kalyss", displayName: "Kalyss", avatarUrl: sampleAvatarUrl, pixels: 1204 },
+  { login: "pixelmoth", displayName: "pixelmoth", pixels: 987 },
+  { login: "nuagelle", displayName: "Nuagelle", avatarUrl: "/photo-introuvable.png", pixels: 640 },
+  { login: "bourguitv", displayName: "BourguiTv", pixels: 640 },
+  { login: "adventurouscastingfrmsqgc", displayName: "adventurouscastingfrmsqgc", pixels: 41 },
+];
 
 // Un clic sur /design ne fait rien : les exemples montrent un état, pas un comportement.
 export const noop = (): void => undefined;
