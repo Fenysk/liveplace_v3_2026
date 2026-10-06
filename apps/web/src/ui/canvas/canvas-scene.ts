@@ -278,7 +278,7 @@ export function createCanvasScene(
   });
   resizeObserver.observe(surface);
 
-  // Le thème change (bouton, Préférences, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
+  // Le thème change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
   const themeObserver = new MutationObserver(() => {
     shades = getSceneShades(root);
     requestRender();

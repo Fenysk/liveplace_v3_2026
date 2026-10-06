@@ -1,7 +1,7 @@
 // Les composants du design system, chacun dans chacun de ses états.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Settings, Trash, User, X } from "lucide-react";
+import { Brush, Eraser, LocateFixed, LogOut, Minus, Plus, Trash, User, X } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { Badge } from "../design/badge";
@@ -199,35 +199,28 @@ const PaletteSpecimens = () => {
   );
 };
 
-type DemoSection = "account" | "preferences";
-const DEMO_SECTIONS = [
-  { id: "account", label: "Mon compte", icon: User },
-  { id: "preferences", label: "Préférences", icon: Settings },
-] as const;
+// La fenêtre d'un viewer : Mon compte seul. Les sections du streamer et de qui modère suivent, plus bas.
+const DEMO_SECTIONS = [{ id: "account", label: "Mon compte", icon: User }] as const;
 
 const WindowSpecimen = () => {
   const themeChoice = useThemeChoice();
   const [isOpen, setIsOpen] = useState(false);
-  const [sectionId, setSectionId] = useState<DemoSection>("account");
   return (
     <Specimen caption="Modale sur un voile : Échap ou Fermer, le focus revient au bouton">
       <Button label="Ouvrir la fenêtre" onPress={() => setIsOpen(true)} />
       <Window
         isOpen={isOpen}
         sections={DEMO_SECTIONS}
-        sectionId={sectionId}
-        onSelect={setSectionId}
+        sectionId="account"
+        onSelect={noop}
         onClose={() => setIsOpen(false)}
       >
-        {sectionId === "account" ? (
-          <WindowRow label={<Profile user={SAMPLE_OWNER} variant="full" />}>
-            <Button label="Se déconnecter" onPress={noop} />
-          </WindowRow>
-        ) : (
-          <WindowRow label="Thème">
-            <ThemePicker choice={themeChoice} onPick={pickTheme} />
-          </WindowRow>
-        )}
+        <WindowRow label={<Profile user={SAMPLE_OWNER} variant="full" />}>
+          <Button label="Se déconnecter" onPress={noop} />
+        </WindowRow>
+        <WindowRow label="Thème">
+          <ThemePicker choice={themeChoice} onPick={pickTheme} />
+        </WindowRow>
       </Window>
     </Specimen>
   );
@@ -429,7 +422,7 @@ export const ComponentsSection = () => {
         title="Segmented et thème"
         note="Un choix exclusif. Le bouton de thème fait le cycle auto, clair, sombre."
       >
-        <Specimen caption="Thème, comme dans Préférences">
+        <Specimen caption="Thème, comme dans Mon compte">
           <ThemePicker choice={themeChoice} onPick={pickTheme} />
         </Specimen>
         <Specimen caption="Thème, comme dans la pill Compte">

@@ -1,4 +1,4 @@
-// Le choix du thème, partagé par tous ceux qui l'affichent (pill Compte, Préférences, /design).
+// Le choix du thème, partagé par tous ceux qui l'affichent (pill Compte, Mon compte, /design).
 // Le script de `ScriptOnce` l'a déjà posé avant la peinture : ici, on le relit et on le change.
 
 import { useSyncExternalStore } from "react";

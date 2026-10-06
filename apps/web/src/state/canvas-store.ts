@@ -296,7 +296,8 @@ export function createCanvasStore(
 
   const welcome = (frame: WelcomeFrame): void => {
     heldRecent = frame.recent ?? null;
-    publish(welcomeView(frame));
+    // Le canvas existe : un `welcome` démentit `canvas_not_found`, les autres refus restent.
+    publish({ ...welcomeView(frame), ...(view.lastError === "canvas_not_found" ? { lastError: null } : {}) });
     if (hasWelcomed) resendPending();
     hasWelcomed = true;
   };

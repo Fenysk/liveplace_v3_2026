@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-06 — Écart §10.2 : le web vérifie aussi le cookie de session, pour que `/{login}` arrive avec la bonne pill dès le premier octet
+
+**Contexte.** Le rôle `owner` n'arrive qu'au `hello` du gateway : le streamer voyait d'abord la pill Canvas, qui disparaissait ensuite. Le web ne faisait que signer `lp_session`, seul le gateway la vérifiait.
+**Décision.** Le web implémente aussi le port `SessionVerifier` (même secret, même algorithme épinglé) ; le loader de la page du jeu rend `isOwnerSession`, comparé au propriétaire par `roleFor`. Affichage seulement : le gateway décide du vrai rôle (§10.3), et un cookie absent, expiré, falsifié ou une erreur donne le comportement d'avant. La vue OBS ne vérifie rien.
+**Renoncement.** Ni paramètre d'URL (absent d'un lien tapé, falsifiable), ni souvenir `localStorage` (le HTML serveur garderait la pill de gauche). Pas de package partagé pour le vérificateur : deux copies de dix lignes (gateway, web), à extraire à la troisième.
+
 ## 2026-10-05 — Écart §10.1 : une bêta ne s'abonne jamais à EventSub, la prod reprend les abonnements partis ailleurs
 
 **Contexte.** Twitch ne garde qu'un abonnement par type et par chaîne pour une application. Une chaîne synchronisée depuis une bêta y envoyait ses bans et ses modérateurs, et la prod, qui lit le 409 comme un succès, ne recevait plus rien.

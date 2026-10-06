@@ -192,6 +192,7 @@ const ACCOUNT_IDENTITIES: readonly {
   identity: AccountPillProps["identity"];
   isCompact?: boolean;
   pendingReports?: number;
+  hasSettings?: boolean;
 }[] = [
   { caption: "Avant la réponse du gateway", identity: { kind: "unknown" } },
   { caption: "Invité", identity: { kind: "guest" } },
@@ -201,6 +202,23 @@ const ACCOUNT_IDENTITIES: readonly {
     caption: "Qui modère, un signalement attend : sa photo ouvre Modération",
     identity: { kind: "signedIn", user: SAMPLE_OWNER },
     pendingReports: 2,
+  },
+  {
+    caption: "Le streamer sur son canvas : sa seule pill, Réglages ouvre la fenêtre sur Canvas",
+    identity: { kind: "signedIn", user: SAMPLE_OWNER },
+    hasSettings: true,
+  },
+  {
+    caption: "Le streamer sur son canvas, sur mobile",
+    identity: { kind: "signedIn", user: SAMPLE_OWNER },
+    isCompact: true,
+    hasSettings: true,
+  },
+  {
+    caption: "Le streamer sur son canvas, un signalement attend : le point sur sa photo",
+    identity: { kind: "signedIn", user: SAMPLE_OWNER },
+    pendingReports: 2,
+    hasSettings: true,
   },
 ];
 
@@ -320,17 +338,17 @@ export const GamePillsSection = () => {
         ))}
       </SpecimenSection>
 
-      <SpecimenSection title="Canvas et Compte" note="En haut à gauche, en haut à droite.">
+      <SpecimenSection
+        title="Canvas et Compte"
+        note="En haut à gauche, en haut à droite. Le streamer sur son canvas n'a que la pill Compte."
+      >
         <Specimen caption="Canvas">
           <CanvasPill owner={SAMPLE_OWNER} isDocked={false} />
         </Specimen>
         <Specimen caption="Canvas, sur mobile">
           <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
         </Specimen>
-        <Specimen caption="Canvas, pour le streamer : Réglages ouvre la fenêtre sur Vue OBS">
-          <CanvasPill owner={SAMPLE_OWNER} onOpenSettings={noop} isDocked={false} />
-        </Specimen>
-        {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact, pendingReports }) => (
+        {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact, pendingReports, hasSettings }) => (
           <Specimen key={caption} caption={caption}>
             <AccountPill
               identity={identity}
@@ -338,6 +356,7 @@ export const GamePillsSection = () => {
               themeChoice={themeChoice}
               onPickTheme={pickTheme}
               onOpenAccount={noop}
+              onOpenSettings={hasSettings ? noop : undefined}
               pendingReports={pendingReports ?? 0}
               isCompact={isCompact ?? false}
               isDocked={false}

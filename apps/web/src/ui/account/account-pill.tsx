@@ -1,5 +1,8 @@
-// La pill Compte (CDC 2026), en haut à droite : le thème, puis sa photo (Mon compte) ou Se connecter.
+// La pill Compte (CDC 2026), en haut à droite : Réglages (le streamer sur son canvas), le thème, puis sa photo
+// (Mon compte) ou Se connecter. Sur son canvas, c'est la seule pill du streamer.
 
+import { Settings } from "lucide-react";
+import { Button } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
@@ -21,10 +24,12 @@ export type AccountPillProps = {
   themeChoice: ThemeChoice;
   onPickTheme: (choice: ThemeChoice) => void;
   onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent
+  onOpenSettings?: (() => void) | undefined; // la fenêtre, sur Canvas ; absent : pas le streamer sur son canvas
   pendingReports?: number; // pour qui modère : un point sur sa photo tant qu'il y en a (JOURNAL 2026-09-28)
   onSignIn?: () => void; // la page part chez Twitch
   isCompact?: boolean;
   isDocked?: boolean;
+  isVisible?: boolean; // masquée tant que le serveur a reconnu le streamer et que le gateway n'a pas répondu
 };
 
 export const AccountPill = ({
@@ -33,12 +38,15 @@ export const AccountPill = ({
   themeChoice,
   onPickTheme,
   onOpenAccount,
+  onOpenSettings,
   pendingReports = 0,
   onSignIn,
   isCompact = false,
   isDocked = true,
+  isVisible = true,
 }: AccountPillProps) => (
-  <Pill dock={isDocked ? DOCK : undefined}>
+  <Pill dock={isDocked ? DOCK : undefined} isVisible={isVisible}>
+    {onOpenSettings && <Button icon={Settings} variant="ghost" title="Réglages" onPress={onOpenSettings} />}
     <ThemeButton choice={themeChoice} onPick={onPickTheme} />
     {identity.kind === "guest" &&
       // Sur mobile, l'icône seule : la place manque en haut de l'écran.

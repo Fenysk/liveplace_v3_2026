@@ -95,6 +95,31 @@ const cellsFrame = (x: number, y: number, colorIndex: number): ServerFrame => ({
   cells: [{ x, y, colorIndex, previousColorIndex: 0, placedAt: now, version: 8, kind: "place" }],
 });
 
+describe("a canvas the gateway does not know (§4.2)", () => {
+  // Le canvas existe de nouveau : le welcome démentit canvas_not_found, la page reprend d'elle-même
+  it("forgets canvas_not_found when a welcome comes", () => {
+    const { store, receive, close, open } = setup({ isWelcomed: false });
+    receive({ t: "error", code: "canvas_not_found" });
+    close();
+
+    expect(store.getView()).toMatchObject({ lastError: "canvas_not_found", status: "reconnecting" });
+
+    open();
+    receive(welcome);
+
+    expect(store.getView()).toMatchObject({ lastError: null, status: "live" });
+  });
+
+  // Un autre refus survit à un welcome : seul canvas_not_found est démenti par lui
+  it("keeps any other refusal across a welcome", () => {
+    const { store, receive } = setup();
+    receive({ t: "error", code: "rate_limited" });
+    receive(welcome);
+
+    expect(store.getView().lastError).toBe("rate_limited");
+  });
+});
+
 describe("the gauge (§9.4)", () => {
   // Prend la jauge et l'identité dans le welcome
   it("takes the gauge and the identity from the welcome", () => {

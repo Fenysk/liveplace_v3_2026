@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createDurableStore } from "@liveplace/durable";
 import { createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
-import { createSessionSigner } from "../infra/session";
+import { createSessionSigner, createSessionVerifier } from "../infra/session";
 import { createTwitchAuth, createTwitchEventSub, createTwitchWebhook } from "../infra/twitch";
 import { parseWebConfig } from "./config";
 
@@ -31,6 +31,7 @@ const buildServerDeps = () => {
     }),
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
+    verifier: createSessionVerifier(config.sessionSecret), // Écart §10.2 (JOURNAL 2026-10-06) : l'affichage de `/{login}`
     randomCanvasId: randomUUID,
     publicUrl: config.publicUrl, // les en-têtes de sécurité en tirent HTTPS et l'hôte du WebSocket (JOURNAL 2026-09-29)
     // Derrière Traefik, la requête arrive en http : c'est l'URL publique qui dit si le site est en https.

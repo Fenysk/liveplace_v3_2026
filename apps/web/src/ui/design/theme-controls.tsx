@@ -1,4 +1,4 @@
-// Choisir le thème : un bouton qui fait le cycle (pill Compte), ou les trois choix côte à côte (Préférences, /design).
+// Choisir le thème : un bouton qui fait le cycle (pill Compte), ou les trois choix côte à côte (Mon compte, /design).
 
 import { Moon, Sun, SunMoon } from "lucide-react";
 import { Button } from "./button";

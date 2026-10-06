@@ -5,9 +5,10 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
-import { type AccountSection, AccountWindow } from "../ui/account/account-window";
+import { type AccountSection, AccountWindow, SETTINGS_SECTION } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
+import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
@@ -28,7 +29,7 @@ import { useReport } from "../ui/moderation/use-report";
 import { ObsPage } from "../ui/obs/obs-page";
 import { ObsTab } from "../ui/obs/obs-tab";
 import { isObsView, useIsObsView } from "../ui/obs/obs-view";
-import { CanvasNotFound, noStoreHeaders, resolveCanvasPage } from "./-canvas-page";
+import { CanvasNotFound, noStoreHeaders, resolveGameCanvasPage } from "./-canvas-page";
 
 // Lu à chaque accès : dans une fenêtre qui refuse le stockage, l'accès lui-même lève (le brouillon l'attrape).
 const getBrowserStorage = () => window.localStorage;
@@ -55,13 +56,19 @@ const CONNECTING_ACTIONS: DraftPillActions = {
   onSignIn: doNothing,
 };
 
-type LivePillsProps = { stores: Stores; login: string; owner: ProfileUser; isCompact: boolean };
+type LivePillsProps = {
+  stores: Stores;
+  login: string;
+  owner: ProfileUser;
+  isCompact: boolean;
+  isOwnerSession: boolean; // le serveur a lu le cookie : vrai tant que le gateway n'a pas dit le rôle (JOURNAL 2026-10-06)
+};
 
-// Un seul menu flottant (CDC 2026) : la pill Compte l'ouvre sur Mon compte, la pill Canvas sur Vue OBS.
+// Un seul menu flottant (CDC 2026) : la pill Compte l'ouvre sur Mon compte, ou sur Canvas par Réglages.
 type WindowState = { isOpen: boolean; sectionId: AccountSection };
 
 // Les pills qui lisent les stores : chacune reçoit ses props de son hook (JOURNAL 2026-09-24).
-const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
+const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePillsProps) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
   const draft = useDraftPillProps(stores, login, signingIn);
@@ -71,20 +78,22 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
   const getRole = () => stores.canvas.getView().role;
-  const isOwner = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole) === "owner";
+  const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
+  const isOwner = role === "owner";
+  // Avant le `hello`, le streamer n'attend que sa pill : ni celle de gauche, ni celle de droite ; ensuite, le gateway décide.
+  const isWaitingForOwner = role === undefined && isOwnerSession;
   const [windowState, setWindowState] = useState<WindowState>({ isOpen: false, sectionId: "account" });
   const openWindow = (sectionId: AccountSection) => setWindowState({ isOpen: true, sectionId });
   return (
     <>
-      <CanvasPill
-        owner={owner}
-        isCompact={isCompact}
-        onOpenSettings={isOwner ? () => openWindow("obs") : undefined}
-      />
+      {/* Sur son canvas, le streamer n'a qu'une pill : la pill Compte porte ses Réglages. */}
+      {!isOwner && !isWaitingForOwner && <CanvasPill owner={owner} isCompact={isCompact} />}
       <AccountPill
         {...account}
         isCompact={isCompact}
+        isVisible={!isWaitingForOwner}
         onOpenAccount={() => openWindow(account.pendingReports ? "moderation" : "account")}
+        onOpenSettings={isOwner ? () => openWindow(SETTINGS_SECTION) : undefined}
         onSignIn={signingIn.onSignIn}
       />
       {account.identity.kind === "signedIn" && (
@@ -120,11 +129,12 @@ const LivePills = ({ stores, login, owner, isCompact }: LivePillsProps) => {
 };
 
 const GamePage = () => {
-  const { canvasId, owner } = Route.useLoaderData();
+  const { canvasId, owner, isOwnerSession = false } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
+  const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
@@ -138,6 +148,9 @@ const GamePage = () => {
       canvas.close();
     };
   }, [canvasId, openCanvas]);
+
+  // Le gateway ne connaît pas ce canvas : la page du canvas introuvable. Les stores restent ouverts, la page se rétablit seule.
+  if (isCanvasMissing) return <CanvasNotFound />;
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
   // `lp-game` : caché dès la première image en vue OBS (JOURNAL 2026-09-25).
@@ -155,11 +168,17 @@ const GamePage = () => {
       {stores ? (
         // CDC 2026, Toasts : un seul à la fois, pour toute la page.
         <ToastProvider>
-          <LivePills stores={stores} login={login} owner={owner} isCompact={isCompact} />
+          <LivePills
+            stores={stores}
+            login={login}
+            owner={owner}
+            isCompact={isCompact}
+            isOwnerSession={isOwnerSession}
+          />
         </ToastProvider>
       ) : (
         <>
-          <CanvasPill owner={owner} isCompact={isCompact} />
+          {!isOwnerSession && <CanvasPill owner={owner} isCompact={isCompact} />}
           <DraftPill state={{ kind: "connecting" }} actions={CONNECTING_ACTIONS} />
         </>
       )}
@@ -175,7 +194,7 @@ const CanvasPage = () => {
 };
 
 export const Route = createFileRoute("/$login")({
-  loader: resolveCanvasPage,
+  loader: resolveGameCanvasPage,
   headers: noStoreHeaders,
   component: CanvasPage,
   notFoundComponent: CanvasNotFound,
