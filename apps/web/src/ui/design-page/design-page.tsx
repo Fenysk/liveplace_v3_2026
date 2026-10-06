@@ -3,7 +3,7 @@
 // Navigation par barre latérale (JOURNAL 2026-09-27) : même motif que la fenêtre du jeu (design/window.tsx).
 
 import type { LucideIcon } from "lucide-react";
-import { Blocks, Gamepad2, Palette, Shield } from "lucide-react";
+import { Activity, Blocks, Gamepad2, Palette, Shield } from "lucide-react";
 import { useState } from "react";
 import { blurAfterClick } from "../design/button";
 import { classNames } from "../design/class-names";
@@ -11,6 +11,7 @@ import { Segmented } from "../design/segmented";
 import { ThemePicker } from "../design/theme-controls";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { ComponentsSection } from "./components-section";
+import { DeveloperSection } from "./developer-section";
 import { FoundationsSection } from "./foundations-section";
 import { GamePillsSection } from "./game-pills-section";
 import { ModerationSection } from "./moderation-section";
@@ -22,7 +23,7 @@ const POINTER_OPTIONS = [
   { value: "touch", label: "Doigt" },
 ] as const;
 
-type SectionId = "foundations" | "components" | "game-pills" | "moderation";
+type SectionId = "foundations" | "components" | "game-pills" | "moderation" | "developer";
 
 // Le libellé reprend exactement le titre (h2) de la section visée : la navigation ne nomme rien à part.
 const SECTIONS: readonly { id: SectionId; label: string; icon: LucideIcon }[] = [
@@ -30,6 +31,7 @@ const SECTIONS: readonly { id: SectionId; label: string; icon: LucideIcon }[] = 
   { id: "components", label: "Composants", icon: Blocks },
   { id: "game-pills", label: "Les pills du jeu", icon: Gamepad2 },
   { id: "moderation", label: "La modération", icon: Shield },
+  { id: "developer", label: "Le développeur", icon: Activity },
 ];
 
 export const DesignPage = () => {
@@ -72,6 +74,7 @@ export const DesignPage = () => {
           {sectionId === "components" && <ComponentsSection />}
           {sectionId === "game-pills" && <GamePillsSection />}
           {sectionId === "moderation" && <ModerationSection />}
+          {sectionId === "developer" && <DeveloperSection />}
         </div>
       </div>
     </main>

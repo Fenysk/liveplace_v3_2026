@@ -1,7 +1,7 @@
 // Le serveur WebSocket : upgrade sur /ws, /healthz, et les limites d'entrée (§6.1, §6.3).
 
 import { createServer } from "node:http";
-import type { Session } from "@liveplace/domain";
+import type { Device, Session } from "@liveplace/domain";
 import type { ClientConnection, ClientSocket, SessionVerifier } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
 import { type WebSocket, WebSocketServer } from "ws";
@@ -19,7 +19,7 @@ export type GatewayServerDeps = {
   port: number;
   publicOrigin: string;
   verifier: SessionVerifier;
-  openConnection: (socket: ClientSocket, session: Session | null) => ClientConnection;
+  openConnection: (socket: ClientSocket, session: Session | null, device: Device) => ClientConnection;
 };
 
 // Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
@@ -45,11 +45,18 @@ export function isAllowedOrigin(origin: string | undefined, publicOrigin: string
   return origin === undefined || origin === publicOrigin;
 }
 
+// Écart §4.3 (JOURNAL 2026-10-06) : PC ou téléphone, pour le suivi d'activité. Sans `User-Agent`, un PC.
+const PHONE_USER_AGENT = /Mobi|Android|iPhone|iPad|iPod/;
+
+export function toDevice(userAgent: string | undefined): Device {
+  return userAgent && PHONE_USER_AGENT.test(userAgent) ? "phone" : "desktop";
+}
+
 export function startGatewayServer(deps: GatewayServerDeps) {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
-  const serve = (socket: WebSocket, session: Session | null): void => {
-    const connection = deps.openConnection(toClientSocket(socket), session);
+  const serve = (socket: WebSocket, session: Session | null, device: Device): void => {
+    const connection = deps.openConnection(toClientSocket(socket), session, device);
     // `hello` attendu dans les 5 s (§6.3) : le compte à rebours s'arrête à la première frame.
     const greeting = setTimeout(() => socket.close(CLOSE_POLICY), HELLO_TIMEOUT_MS);
 
@@ -86,7 +93,8 @@ export function startGatewayServer(deps: GatewayServerDeps) {
       return;
     }
     const session = await deps.verifier.verify(request.headers.cookie);
-    sockets.handleUpgrade(request, socket, head, (opened) => serve(opened, session));
+    const device = toDevice(request.headers["user-agent"]);
+    sockets.handleUpgrade(request, socket, head, (opened) => serve(opened, session, device));
   });
 
   server.listen(deps.port);

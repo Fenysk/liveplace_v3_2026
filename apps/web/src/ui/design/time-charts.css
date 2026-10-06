@@ -1,0 +1,91 @@
+/* Des courbes empilées sur un même axe du temps : une ligne de 2 px, un lavis à 10 %, un sol fin (dataviz). */
+
+.lp-time-charts {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  /* Le doigt glisse le long du temps ; un glissement vertical fait défiler la fenêtre */
+  touch-action: pan-y;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--lp-dur-fast) ease;
+}
+
+.lp-time-charts:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+/* Une autre période se charge : les courbes d'avant restent, sans sauter */
+.lp-time-charts.is-loading {
+  opacity: 0.5;
+}
+
+.lp-time-chart {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-time-chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lp-time-chart svg {
+  display: block;
+  width: 100%;
+  height: 48px;
+  overflow: visible;
+  border-bottom: 1px solid var(--chip-hover);
+}
+
+.lp-time-chart-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lp-time-chart-area {
+  fill: var(--ink);
+  fill-opacity: 0.1;
+}
+
+/* Le repère de l'instant survolé, sur toutes les courbes à la fois */
+.lp-time-charts-crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--muted);
+  pointer-events: none;
+}
+
+.lp-time-charts-tooltip {
+  position: absolute;
+  top: var(--space-4);
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--pill-surface);
+  box-shadow: var(--pill-shadow);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(var(--space-2));
+  animation: lp-time-charts-tooltip-in var(--lp-dur-fade) ease;
+}
+
+/* Passé le milieu, l'infobulle bascule à gauche du repère : elle ne sort jamais de la fenêtre */
+.lp-time-charts-tooltip.is-flipped {
+  transform: translateX(calc(-100% - var(--space-2)));
+}
+
+@keyframes lp-time-charts-tooltip-in {
+  from {
+    opacity: 0;
+  }
+}

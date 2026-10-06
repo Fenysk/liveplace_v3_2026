@@ -92,3 +92,26 @@ export function buildCanvasKeys(canvasId: string) {
 export function userKey(userId: string): string {
   return `user:${userId}`;
 }
+
+// Écart §5.1 (JOURNAL 2026-10-06) : l'activité, des nombres seulement. Un autre préfixe isole les clés d'un test.
+export const ACTIVITY_MINUTES_RETENTION_MS = 7 * 24 * 3600 * 1000;
+export const ACTIVITY_HOURS_RETENTION_MS = 366 * 24 * 3600 * 1000;
+export const CANVAS_PIXELS_TTL_SECONDS = 61 * 60; // la température relit les 59 minutes d'avant la minute en cours
+export const SIGNUPS_TTL_SECONDS = 48 * 3600;
+export const WITHOUT_DISCOVERED_VIA = "none"; // un nouveau compte venu de l'accueil (§8.1)
+
+// Les nouveaux comptes d'un point, à côté de lui dans le même HASH : le web les compte sans script.
+export function toSignupsField(pointAt: number): string {
+  return `${pointAt}:signups`;
+}
+
+export function buildActivityKeys(prefix = "activity:") {
+  return {
+    // `HASH` début du point → `people,streamed,pixels` (activity.lua), et `toSignupsField` → nouveaux comptes.
+    minutes: `${prefix}minute`, // élagué au-delà de 7 jours
+    hours: `${prefix}hour`, // élagué au-delà de 366 jours
+    days: `${prefix}day`, // le début du jour de Paris, sans limite
+    canvasPixels: (minuteAt: number) => `${prefix}pixels:${minuteAt}`, // `canvasId` → pixels de la minute, EXPIRE
+    signups: (parisDay: string) => `${prefix}signups:${parisDay}`, // provenance → nouveaux comptes, EXPIRE
+  };
+}

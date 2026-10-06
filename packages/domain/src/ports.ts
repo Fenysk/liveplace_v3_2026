@@ -2,7 +2,16 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CanvasMeta, CanvasSize, GaugeLimits, ObsBackground, Session, Timestamp, User } from "./index";
+import type {
+  ActivityPeriod,
+  CanvasMeta,
+  CanvasSize,
+  GaugeLimits,
+  ObsBackground,
+  Session,
+  Timestamp,
+  User,
+} from "./index";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
@@ -189,8 +198,44 @@ export interface CanvasCore {
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 
-// Ce que le web écrit dans Redis à la connexion (§2) : jamais un pixel, donc jamais de script.
-export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser">;
+// Ce que le web écrit dans Redis à la connexion (§2) : jamais un pixel, donc jamais de script. Un nouveau compte
+// compte aussi dans l'activité (écart §5.1, JOURNAL 2026-10-06).
+export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser"> & SignupWrites;
+
+// Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, tel que le gateway l'envoie au développeur.
+export type ActivityFrame = Extract<ServerFrame, { t: "activity" }>;
+export type ActivityCanvas = ActivityFrame["canvases"][number];
+export type ActivityUser = ActivityCanvas["owner"];
+export type ConnectedAccount = ActivityCanvas["accounts"][number];
+export type ActivityPoint = Extract<ServerFrame, { t: "activityHistory" }>["points"][number];
+
+// La minute écoulée, vue du gateway : le pic des personnes et des canvas streamés, ses pixels, et ceux de chaque canvas.
+export type ActivityMinute = Omit<ActivityPoint, "signups"> & { pixelsByCanvas: ReadonlyMap<string, number> };
+
+// Les pixels d'une minute passée, canvas par canvas : la température survit à un redémarrage.
+export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
+
+// Un nouveau compte, à sa première connexion, et le streamer depuis la page duquel il s'est connecté (§8.1).
+export type Signup = { nowMs: Timestamp; discoveredViaUserId?: string | undefined };
+
+// Les nouveaux comptes d'un jour de Paris : tous, et ceux venus de la page de chaque streamer.
+export type DaySignups = { total: number; byDiscoveredViaUserId: ReadonlyMap<string, number> };
+
+// Écart §5.1 (JOURNAL 2026-10-06) : des nombres sous `activity:`, jamais un nom. Le gateway écrit chaque minute, élague,
+// et lit ce que le développeur regarde.
+export interface ActivityStore {
+  storeActivityMinute(minute: ActivityMinute): Promise<void>;
+  pruneActivity(nowMs: Timestamp): Promise<void>; // les minutes de plus de 7 jours, les heures de plus de 366
+  listActivityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<ActivityPoint[]>; // un point absent le reste
+  listCanvasPixels(fromMs: Timestamp, toMs: Timestamp): Promise<CanvasPixelsMinute[]>; // les minutes de [from, to), alignés
+  getDaySignups(nowMs: Timestamp): Promise<DaySignups>;
+  getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
+}
+
+// Le web compte un nouveau compte au callback OAuth : des compteurs seulement, jamais un script (§2).
+export interface SignupWrites {
+  storeSignup(signup: Signup): Promise<void>;
+}
 
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };

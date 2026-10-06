@@ -1,6 +1,14 @@
-import { type CanvasMeta, defaultCanvasMeta, type GaugeLimits, type Session } from "@liveplace/domain";
+import {
+  type CanvasMeta,
+  DEVELOPER_USER_ID,
+  type Device,
+  defaultCanvasMeta,
+  type GaugeLimits,
+  type Session,
+} from "@liveplace/domain";
 import type {
   AckFrame,
+  ActivityStore,
   BannedUser,
   CanvasCore,
   ClientSocket,
@@ -23,6 +31,7 @@ import type {
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
+import { createActivity } from "./activity";
 import { createBroadcast } from "./broadcast";
 import { createConnection } from "./connection";
 
@@ -39,6 +48,17 @@ const meta: CanvasMeta = {
 };
 
 const session: Session = { userId: "user-1", login: "user1", displayName: "User 1" };
+const developer: Session = { userId: DEVELOPER_USER_ID, login: "fenysk", displayName: "Fenysk" };
+
+// Le suivi d'activité garde ses nombres ailleurs : ici, il n'y a rien à relire (écart §5.1, JOURNAL 2026-10-06).
+const activityStore: ActivityStore = {
+  storeActivityMinute: async () => undefined,
+  pruneActivity: async () => undefined,
+  listActivityHistory: async () => [],
+  listCanvasPixels: async () => [],
+  getDaySignups: async () => ({ total: 0, byDiscoveredViaUserId: new Map() }),
+  getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
+};
 const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
 
 const proof: Pixel[] = [{ x: 1, y: 2, colorIndex: 3 }];
@@ -270,8 +290,14 @@ const setup = (options: SetupOptions = {}) => {
 
   const broadcast = createBroadcast(core);
   const clock = { nowMs: now };
+  const activity = createActivity({
+    store: activityStore,
+    core,
+    now: () => clock.nowMs,
+    isProduction: false,
+  });
   // Une connexion de plus sur le même noyau : un autre onglet, ou un autre joueur.
-  const open = (opened: Session | null) => {
+  const open = (opened: Session | null, device: Device = "desktop") => {
     const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
     const closed: number[] = [];
     const socket: ClientSocket = {
@@ -286,7 +312,12 @@ const setup = (options: SetupOptions = {}) => {
       },
     };
     return {
-      connection: createConnection({ core, broadcast, now: () => clock.nowMs }, socket, opened),
+      connection: createConnection(
+        { core, broadcast, activity, now: () => clock.nowMs },
+        socket,
+        opened,
+        device,
+      ),
       sent,
       closed,
     };
@@ -296,6 +327,7 @@ const setup = (options: SetupOptions = {}) => {
   return {
     connection,
     broadcast,
+    activity,
     sent,
     closed,
     placements,
@@ -1172,6 +1204,74 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
     }
     await other.connection.receive(inspect(63, 35));
     expect(context.inspected).toEqual([{ x: 63, y: 35 }]);
+  });
+});
+
+describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", () => {
+  const watch = JSON.stringify({ t: "watchActivity", isWatching: true });
+  const listHistory = JSON.stringify({ t: "listActivityHistory", requestId: "history-1", period: "day" });
+
+  // Ignore les frames d'activité d'une session qui n'est pas celle du développeur, et d'un invité, sans fermer
+  it("ignores the activity frames of a session that is not the developer's, without closing", async () => {
+    for (const opened of [setup(), setup({ session: null })]) {
+      await opened.connection.receive(hello());
+      const before = opened.sent.length;
+
+      await opened.connection.receive(watch);
+      await opened.connection.receive(listHistory);
+
+      expect(opened.sent).toHaveLength(before);
+      expect(opened.closed).toEqual([]);
+    }
+  });
+
+  // Rend l'historique au développeur, avec sa requête
+  it("answers the history to the developer, with its request", async () => {
+    const { connection, sent } = setup({ session: developer });
+    await connection.receive(hello());
+
+    await connection.receive(listHistory);
+
+    expect(sent.at(-1)).toEqual({ t: "activityHistory", requestId: "history-1", points: [] });
+  });
+
+  // Met la page dans l'activité au hello, avec son appareil et ses pixels acceptés, et l'en retire à sa fermeture
+  it("puts the page in the activity at hello, with its device and accepted pixels, and takes it out at close", async () => {
+    const context = setup();
+    const watcher = context.open(developer, "phone");
+    await watcher.connection.receive(hello());
+    await watcher.connection.receive(watch);
+    await context.connection.receive(hello());
+
+    await context.connection.receive(place());
+    await context.activity.tick();
+    const during = watcher.sent.at(-1);
+    await context.connection.close();
+    await context.activity.tick();
+    const after = watcher.sent.at(-1);
+
+    expect(during).toMatchObject({ t: "activity", now: { people: 2, pixels: ack.accepted } });
+    const accounts = during && "t" in during && during.t === "activity" ? during.canvases[0]?.accounts : [];
+    expect(accounts?.map(({ userId, devices }) => [userId, devices])).toEqual([
+      [DEVELOPER_USER_ID, ["phone"]],
+      [session.userId, ["desktop"]],
+    ]);
+    expect(after).toMatchObject({ t: "activity", now: { people: 1 } });
+  });
+
+  // Ne lui envoie plus rien une fois sa page fermée
+  it("sends the developer nothing more once his page is closed", async () => {
+    const { activity, connection, sent } = setup({ session: developer });
+    await connection.receive(hello());
+    await connection.receive(watch);
+    await activity.tick();
+    const count = sent.length;
+
+    await connection.close();
+    await activity.tick();
+
+    expect(sent).toHaveLength(count);
+    expect(sent.at(-1)).toMatchObject({ t: "activity" });
   });
 });
 

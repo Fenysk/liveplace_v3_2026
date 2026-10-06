@@ -1,6 +1,8 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
 import {
+  ACTIVITY_PERIODS,
+  DEVICES,
   isCanvasSize,
   isGaugeLimits,
   isObsDelayStep,
@@ -23,7 +25,8 @@ import { z } from "zod";
 // 9 : le fond de la vue OBS, transparent ou blanc (JOURNAL 2026-09-29).
 // 11 : une liste de l'onglet Modération se périme en direct, frame `staleList` (JOURNAL 2026-10-06).
 // 12 : le classement du canvas et la place de chaque page, frame `scoreboard` (JOURNAL 2026-10-06).
-export const PROTOCOL_VERSION = 12;
+// 13 : le développeur suit l'activité, `watchActivity`, `listActivityHistory`, `activity`, `activityHistory` (JOURNAL 2026-10-06).
+export const PROTOCOL_VERSION = 13;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -293,6 +296,15 @@ const SetGaugeLimitsFrameSchema = GaugeLimitsSchema.extend({
   requestId: RequestIdSchema,
 }).refine(isGaugeLimits, "hors des bornes de la jauge");
 
+// Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; venues d'une autre session, le gateway les ignore.
+const WatchActivityFrameSchema = z.strictObject({ t: z.literal("watchActivity"), isWatching: z.boolean() });
+
+const ListActivityHistoryFrameSchema = z.strictObject({
+  t: z.literal("listActivityHistory"),
+  requestId: RequestIdSchema,
+  period: z.enum(ACTIVITY_PERIODS),
+});
+
 const PingFrameSchema = z.strictObject({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -312,6 +324,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetObsBackgroundFrameSchema,
   ClaimGaugeFrameSchema,
   SetGaugeLimitsFrameSchema,
+  WatchActivityFrameSchema,
+  ListActivityHistoryFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -514,6 +528,58 @@ const GaugeLimitsFrameSchema = z.object({
   gaugeMaxCeiling: z.number().int().positive(),
 });
 
+// Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, pour le développeur seul.
+const CountSchema = z.number().int().nonnegative();
+
+// Ce que l'historique garde, et ce que disent les chiffres de l'instant : des nombres, aucun nom (écart §5.1, JOURNAL 2026-10-06).
+const ActivityCountsSchema = z.object({
+  people: CountSchema,
+  streamed: CountSchema, // les canvas où une vue OBS est ouverte
+  pixels: CountSchema,
+  signups: CountSchema,
+});
+
+// Un compte vu par le suivi : sa session, ou le miroir `user:` pour le streamer d'un canvas.
+const ActivityUserSchema = z.object({
+  userId: UserIdSchema,
+  login: TwitchLoginSchema,
+  displayName: DisplayNameSchema,
+  avatarUrl: z.string().optional(),
+});
+
+// Depuis sa plus ancienne page ouverte sur ce canvas, et les appareils de ses pages.
+const ConnectedAccountSchema = ActivityUserSchema.extend({
+  role: RoleSchema,
+  connectedAt: TimestampSchema,
+  devices: z.array(z.enum(DEVICES)),
+});
+
+// `obsViews` au-dessus de zéro : le canvas est streamé. `heat` : ses pixels de la dernière heure.
+const ActivityCanvasSchema = z.object({
+  canvasId: CanvasIdSchema,
+  owner: ActivityUserSchema,
+  obsViews: CountSchema,
+  people: CountSchema,
+  guests: CountSchema,
+  heat: CountSchema,
+  signups: CountSchema, // les nouveaux comptes du jour venus de sa page
+  accounts: z.array(ConnectedAccountSchema),
+});
+
+// `pixels` : la dernière minute, glissante ; `signups` : le jour de Paris. Les canvas, du plus chaud au plus froid.
+const ActivityFrameSchema = z.object({
+  t: z.literal("activity"),
+  now: ActivityCountsSchema.extend({ guests: CountSchema }),
+  canvases: z.array(ActivityCanvasSchema),
+});
+
+// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels et des comptes.
+const ActivityHistoryFrameSchema = z.object({
+  t: z.literal("activityHistory"),
+  requestId: RequestIdSchema,
+  points: z.array(ActivityCountsSchema.extend({ at: TimestampSchema })),
+});
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -546,6 +612,8 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   ReportCountFrameSchema,
   StaleListFrameSchema,
   ScoreboardFrameSchema,
+  ActivityFrameSchema,
+  ActivityHistoryFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);

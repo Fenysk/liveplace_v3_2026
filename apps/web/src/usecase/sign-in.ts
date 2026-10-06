@@ -1,6 +1,6 @@
 // Le callback OAuth, dans l'ordre du §10.1. Chaque étape est idempotente : un callback rejoué ne crée rien en double.
 
-import { defaultCanvasMeta, type User } from "@liveplace/domain";
+import { defaultCanvasMeta, type Timestamp, type User } from "@liveplace/domain";
 import type {
   DurableStore,
   SessionSigner,
@@ -15,6 +15,7 @@ export type SignInDeps = {
   redis: SignInWrites;
   signer: SessionSigner;
   randomCanvasId: () => string;
+  now: () => Timestamp;
 };
 
 export type SignInResult = { signedSession: string; login: string };
@@ -51,13 +52,20 @@ export async function signInTwitchUser(
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);
   const meta = defaultCanvasMeta(user.userId);
+  const candidateCanvasId = deps.randomCanvasId();
   // Le candidat n'est retenu qu'à la première connexion : seul le `canvasId` rendu fait foi (D-14).
   const canvasId = await deps.durable.ensureCanvasForOwner(user.userId, {
-    canvasId: deps.randomCanvasId(),
+    canvasId: candidateCanvasId,
     width: meta.width,
     height: meta.height,
   });
   await deps.redis.setUser(user);
   await deps.redis.createCanvas(canvasId, meta);
+  // Écart §5.1 (JOURNAL 2026-10-06) : le candidat retenu, c'est un nouveau compte.
+  if (canvasId === candidateCanvasId)
+    await deps.redis.storeSignup({
+      nowMs: deps.now(),
+      ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
+    });
   return { signedSession: await deps.signer.sign(user), login: user.login };
 }

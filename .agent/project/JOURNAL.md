@@ -32,6 +32,30 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-06 — Écart §10.3 et §11.5 : le développeur est nommé dans `domain`, et le gateway lit `BETA_LABEL`
+
+**Contexte.** Seul `fenysk` voit le suivi d'activité, dans chaque environnement ; en production seulement, ses onglets ne comptent pas (cahier des charges du suivi d'activité, §1).
+**Décision.** `DEVELOPER_USER_ID` (son `twitchId`) vit dans `packages/domain`, hors de `roleFor` : le web montre le bouton, le gateway décide d'envoyer (§10.3). Le gateway lit aussi `BETA_LABEL`, facultative et vide par défaut, que le compose lui passe : la production, c'est `PUBLIC_URL` en https et `BETA_LABEL` vide. Là, ses connexions et ses pixels sortent des chiffres et de l'historique, pas de la liste des connectés.
+**Renoncement.** Pas de variable d'environnement pour le nommer (une ligne de plus dans cinq Compose, et un oubli le rendrait invisible) ; pas de nouveau rôle de canvas.
+
+## 2026-10-06 — Écart §5.1 : l'activité garde des nombres dans Redis, sous `activity:`
+
+**Contexte.** L'historique et la température doivent survivre à un redémarrage du gateway, et chaque environnement a les siens. Le Convex de dev est partagé par le poste et toutes les bêtas, et trois branches y poussent déjà.
+**Décision.** Des clés `activity:` : l'historique en trois niveaux (minute 7 jours, heure 366 jours, jour sans limite ; le pic des personnes et des canvas streamés, la somme des pixels et des nouveaux comptes), les pixels de chaque canvas par minute (61 minutes), les nouveaux comptes du jour de Paris par provenance (48 h). Le gateway écrit à chaque minute et élague ; le web compte un nouveau compte au callback OAuth, quand `ensureCanvasForOwner` rend le candidat (première connexion). La liste des connexions reste en mémoire : §6.4 tient.
+**Renoncement.** Pas de Convex (un push de plus sur un déploiement partagé, une écriture par minute) ; aucun nom ni identifiant dans l'historique.
+
+## 2026-10-06 — Écart §4.2 et §4.3 : le développeur suit l'activité par le WebSocket, protocole 13
+
+**Contexte.** La section Activité vit en direct ; le seul canal live est le WebSocket (§8.3), et seul le gateway connaît les connexions.
+**Décision.** Deux frames client : `watchActivity` (`isWatching`) et `listActivityHistory` (`period` : `day`, `month` ou `all`, avec un `requestId`). Deux frames serveur : `activity` (les chiffres de l'instant et les canvas, toutes les 2 s tant que le développeur regarde) et `activityHistory`. Le gateway ignore ces deux frames venues d'une session qui n'est pas `DEVELOPER_USER_ID`. `PROTOCOL_VERSION` passe à 13 : la branche qui fusionne après une autre en 13 renumérote.
+**Renoncement.** Ni fonction serveur du web interrogée en boucle (un second canal live, AP-14), ni route HTTP du gateway (Traefik ne lui envoie que `/ws`).
+
+## 2026-10-06 — Lexique : `developer`, `activity`, `heat` et `signup`
+
+**Contexte.** Le suivi d'activité apporte quatre concepts sans mot au lexique ; `admin` y est déjà banni au profit de `owner`.
+**Décision.** `developer` : le compte qui voit le suivi, jamais un rôle de canvas (bannis : `superuser`, `staff`). `activity` : les chiffres du suivi et leur historique (bannis : `stats`, `metrics`, `analytics`, `telemetry`). `heat` : les pixels posés sur un canvas dans la dernière heure (banni : `temperature`). `signup` : un nouveau compte, compté à sa première connexion (banni : `registration`).
+**Renoncement.** Pas de `presence` : « connecté » (`connected`) est déjà le mot du seuil de signalement.
+
 ## 2026-10-06 — Le classement déplié montre les pseudos : les cas de la pill dépliée sont réécrits
 
 **Contexte.** À l'écran, Alexis veut voir les pseudos quand le classement n'est pas replié ; le premier jet n'avait que des avatars et une étiquette au survol, et la ligne de sa propre place touchait le bord de la pill.

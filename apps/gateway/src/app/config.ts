@@ -9,6 +9,7 @@ const GatewayEnvSchema = z.object({
   BROADCAST_HZ: z.coerce.number().int().positive().default(10), // D-13, JOURNAL 2026-09-15
   PUBLIC_URL: z.url(), // §11.5
   GATEWAY_PORT: z.coerce.number().int().positive().default(8080), // §11.1 ; Écart §11.7 (JOURNAL 2026-10-05) : une place de dev le change
+  BETA_LABEL: z.string().optional(), // Écart §10.3 (JOURNAL 2026-10-06) : vide en production, le compose la passe toujours
 });
 
 export type GatewayConfig = {
@@ -17,6 +18,7 @@ export type GatewayConfig = {
   broadcastHz: number;
   publicOrigin: string; // la seule origine d'où une page ouvre le WebSocket (JOURNAL 2026-09-29)
   port: number;
+  isProduction: boolean; // Écart §10.3 (JOURNAL 2026-10-06) : là seulement, les onglets du développeur ne comptent pas
 };
 
 export function parseGatewayConfig(env: unknown): GatewayConfig {
@@ -27,5 +29,6 @@ export function parseGatewayConfig(env: unknown): GatewayConfig {
     broadcastHz: parsed.BROADCAST_HZ,
     publicOrigin: new URL(parsed.PUBLIC_URL).origin,
     port: parsed.GATEWAY_PORT,
+    isProduction: new URL(parsed.PUBLIC_URL).protocol === "https:" && !parsed.BETA_LABEL,
   };
 }

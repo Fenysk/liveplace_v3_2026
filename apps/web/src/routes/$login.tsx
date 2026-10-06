@@ -16,6 +16,9 @@ import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import type { ProfileUser } from "../ui/design/profile";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
+import { DeveloperWindow } from "../ui/developer/developer-window";
+import { LiveActivitySection } from "../ui/developer/live-activity-section";
+import { useDeveloperWindow } from "../ui/developer/use-developer-window";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
@@ -81,6 +84,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   useCanvasToasts(stores);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
+  const developer = useDeveloperWindow(stores.canvas); // écart §10.3 (JOURNAL 2026-10-06) : le développeur seul
   const scoreboard = useScoreboardRows(stores.canvas);
   const scoreboardCollapse = useScoreboardCollapse();
   const getRole = () => stores.canvas.getView().role;
@@ -100,8 +104,14 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
         isVisible={!isWaitingForOwner}
         onOpenAccount={() => openWindow(account.pendingReports ? "moderation" : "account")}
         onOpenSettings={isOwner ? () => openWindow(SETTINGS_SECTION) : undefined}
+        onOpenDeveloper={developer.onOpen}
         onSignIn={signingIn.onSignIn}
       />
+      {developer.onOpen && (
+        <DeveloperWindow isOpen={developer.isOpen} onClose={developer.onClose}>
+          <LiveActivitySection canvas={stores.canvas} isOpen={developer.isOpen} />
+        </DeveloperWindow>
+      )}
       {account.identity.kind === "signedIn" && (
         <AccountWindow
           {...windowState}

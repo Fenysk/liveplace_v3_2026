@@ -7,12 +7,14 @@ import {
   type CellKey,
   canModerate,
   claimableRewards,
+  DEVELOPER_USER_ID,
   defaultCanvasMeta,
   earnedRewards,
   GAUGE_MAX_CEILING,
   GAUGE_MAX_START,
   type GaugeParams,
   isCanvasSize,
+  isDeveloper,
   isGaugeLimits,
   isObsDelayStep,
   OBS_DELAY_MS,
@@ -27,6 +29,7 @@ import {
   type Session,
   type StateOffset,
   TRANSPARENT_COLOR_INDEX,
+  toActivityPointStarts,
   toCell,
   toCellKey,
   toParisDay,
@@ -349,5 +352,33 @@ describe("the OBS delay steps (JOURNAL 2026-09-25)", () => {
     expect(isObsDelayStep(7_000)).toBe(false);
     expect(isObsDelayStep(-5_000)).toBe(false);
     expect(isObsDelayStep(20 * 60_000)).toBe(false);
+  });
+});
+
+// Écart §10.3 et §5.1 (JOURNAL 2026-10-06) : le développeur, et le début des points de l'historique d'activité.
+describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
+  // Le développeur est le compte Twitch de fenysk, et lui seul
+  it("names fenysk's Twitch account as the developer, and no one else", () => {
+    expect(DEVELOPER_USER_ID).toBe("68710381");
+    expect(isDeveloper("68710381")).toBe(true);
+    expect(isDeveloper("1234")).toBe(false);
+    expect(isDeveloper(undefined)).toBe(false);
+  });
+
+  // Commence la minute et l'heure à leur début, et le jour à minuit à Paris
+  it("starts the minute and the hour at their start, and the day at midnight in Paris", () => {
+    expect(toActivityPointStarts(Date.UTC(2026, 0, 15, 12, 34, 56, 789))).toEqual({
+      minute: Date.UTC(2026, 0, 15, 12, 34),
+      hour: Date.UTC(2026, 0, 15, 12),
+      day: Date.UTC(2026, 0, 14, 23),
+    });
+    expect(toActivityPointStarts(Date.UTC(2026, 6, 15, 12)).day).toBe(Date.UTC(2026, 6, 14, 22));
+    expect(toActivityPointStarts(Date.UTC(2026, 9, 5, 22, 30)).day).toBe(Date.UTC(2026, 9, 5, 22));
+  });
+
+  // Les jours d'un changement d'heure commencent à l'heure d'avant le changement
+  it("starts a day of a clock change at the offset before the change", () => {
+    expect(toActivityPointStarts(Date.UTC(2026, 2, 29, 10)).day).toBe(Date.UTC(2026, 2, 28, 23));
+    expect(toActivityPointStarts(Date.UTC(2026, 9, 25, 10)).day).toBe(Date.UTC(2026, 9, 24, 22));
   });
 });

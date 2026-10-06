@@ -41,7 +41,11 @@ const doubles = () => {
       getActiveCanvasForOwner: async (ownerId) =>
         ownerId === owner.userId ? { canvasId: "canvas-1", width: 256, height: 256 } : null,
     },
-    redis: { createCanvas: async () => undefined, setUser: async () => undefined },
+    redis: {
+      createCanvas: async () => undefined,
+      setUser: async () => undefined,
+      storeSignup: async () => undefined,
+    },
     signer: {
       sign: async ({ userId }) => {
         signedUsers.push(userId);
@@ -49,6 +53,7 @@ const doubles = () => {
       },
     },
     randomCanvasId: () => "random-candidate",
+    now: () => now,
   };
   const twitchWrites = {
     setTwitchUsers: async (_canvasId: string, users: readonly TwitchUser[]) => {

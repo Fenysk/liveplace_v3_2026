@@ -1,8 +1,9 @@
 import type { User } from "@liveplace/domain";
-import type { SignedInUser } from "@liveplace/domain/ports";
+import type { SignedInUser, Signup } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { completeSignIn, type SignInDeps } from "./sign-in";
 
+const now = 1_700_000_000_000;
 const user: User = { userId: "1234", login: "fenysk", displayName: "Fenysk", avatarUrl: "https://avatar" };
 const owner: User = {
   userId: "5678",
@@ -19,6 +20,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
   const upserts: { user: SignedInUser; discoveredViaUserId: string | undefined }[] = [];
   const mirrored: object[] = [];
   const signed: object[] = [];
+  const signups: Signup[] = [];
   const known = [user, owner];
   const deps: SignInDeps = {
     twitch: {
@@ -42,6 +44,9 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
         mirroredUsers.push(mirroredUser.userId);
         mirrored.push(mirroredUser);
       },
+      storeSignup: async (signup) => {
+        signups.push(signup);
+      },
     },
     signer: {
       sign: async (session) => {
@@ -51,8 +56,9 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
       },
     },
     randomCanvasId: () => "random-candidate",
+    now: () => now,
   };
-  return { deps, createdCanvases, mirroredUsers, signedUsers, upserts, mirrored, signed };
+  return { deps, createdCanvases, mirroredUsers, signedUsers, upserts, mirrored, signed, signups };
 };
 
 describe("completeSignIn (§10.1)", () => {
@@ -112,5 +118,28 @@ describe("completeSignIn (§10.1)", () => {
     await completeSignIn(deps, "code", "/nobody");
 
     expect(upserts[0]?.discoveredViaUserId).toBeUndefined();
+  });
+
+  // Compte un nouveau compte quand Convex garde le canvas candidat, avec sa provenance, et pas à une connexion suivante
+  // (écart §5.1, JOURNAL 2026-10-06)
+  it("counts a signup when Convex keeps the candidate canvas, with its provenance, and not at a later sign-in", async () => {
+    const first = doubles("random-candidate");
+    const later = doubles("existing-canvas");
+
+    await completeSignIn(first.deps, "code", "/benitoad");
+    await completeSignIn(later.deps, "code", "/benitoad");
+
+    expect(first.signups).toEqual([{ nowMs: now, discoveredViaUserId: owner.userId }]);
+    expect(later.signups).toEqual([]);
+  });
+
+  // Compte sans provenance un nouveau compte venu de l'accueil
+  it("counts a signup from home without a provenance", async () => {
+    const { deps, signups } = doubles("random-candidate");
+
+    await completeSignIn(deps, "code", null);
+
+    expect(signups).toEqual([{ nowMs: now }]);
+    expect(signups[0]).not.toHaveProperty("discoveredViaUserId");
   });
 });

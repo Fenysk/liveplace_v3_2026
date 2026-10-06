@@ -19,6 +19,9 @@
 @import "./checkbox.css";
 @import "./toast.css";
 @import "./scoreboard.css";
+@import "./stat-tile.css";
+@import "./time-charts.css";
+@import "./canvas-activity-card.css";
 
 html,
 body {

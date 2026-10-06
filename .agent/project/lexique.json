@@ -33,7 +33,11 @@
     { "canonical": "tile",         "definition": "RÉSERVÉ, n'existe pas encore : une subdivision spatiale du canvas. Ne jamais appeler ça un `chunk`.", "banned": [] },
     { "canonical": "still",        "definition": "RÉSERVÉ, n'existe pas encore : une image d'un timelapse. Ne jamais appeler ça une `frame`.", "banned": [] },
     { "canonical": "obsDelay",     "definition": "Le délai de la vue OBS, appliqué par le client (D-08). L'instant d'affichage d'une case est `showAt`.", "banned": ["buffer", "lag"] },
-    { "canonical": "session",      "definition": "Le jeton du navigateur, cookie `lp_session` signé HS256. Le mot `token` est réservé au token Twitch, qu'on ne garde pas.", "banned": ["token"] }
+    { "canonical": "session",      "definition": "Le jeton du navigateur, cookie `lp_session` signé HS256. Le mot `token` est réservé au token Twitch, qu'on ne garde pas.", "banned": ["token"] },
+    { "canonical": "developer",    "definition": "Le compte qui voit le suivi d'activité, `DEVELOPER_USER_ID`. Jamais un rôle de canvas (JOURNAL 2026-10-06).", "banned": ["superuser", "staff"] },
+    { "canonical": "activity",     "definition": "Les chiffres du suivi et leur historique : connectés, canvas streamés, pixels, nouveaux comptes (JOURNAL 2026-10-06).", "banned": ["stats", "metrics", "analytics", "telemetry"] },
+    { "canonical": "heat",         "definition": "Les pixels posés sur un canvas dans la dernière heure (JOURNAL 2026-10-06).", "banned": ["temperature"] },
+    { "canonical": "signup",       "definition": "Un nouveau compte, compté à sa première connexion (JOURNAL 2026-10-06).", "banned": ["registration"] }
   ],
 
   "verbs": [

@@ -3,6 +3,7 @@
 import {
   type CanvasMeta,
   canModerate,
+  type Device,
   PALETTE,
   type Role,
   reportThreshold,
@@ -28,6 +29,7 @@ import {
   PROTOCOL_VERSION,
   type ServerFrame,
 } from "@liveplace/protocol";
+import type { Activity, ActivityMember } from "./activity";
 import type { Broadcast, CellsListener, ControlListener, ScoreboardControl } from "./broadcast";
 import { toCellsFrame } from "./cells-frame";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
@@ -52,6 +54,7 @@ type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
+type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
 // attente et les listes périmées pour qui modère, et le classement (JOURNAL 2026-09-28, 2026-10-06).
@@ -108,6 +111,7 @@ export type ConnectionDeps = {
   // Tout le noyau, sauf ce qu'écrit le web à la connexion et l'abonnement, que tient `broadcast`.
   core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe">;
   broadcast: Broadcast;
+  activity: Omit<Activity, "tick" | "start">; // écart §4.3 (JOURNAL 2026-10-06) : le gateway décide, et ne dit rien aux autres
   now: () => Timestamp;
 };
 
@@ -182,12 +186,15 @@ const toStreamState = (state: Uint8Array, cells: OffStreamCell[], width: number)
   return shown;
 };
 
+// `device` : lu au `User-Agent` du handshake, pour le suivi d'activité (écart §4.3, JOURNAL 2026-10-06).
 export function createConnection(
   deps: ConnectionDeps,
   socket: ClientSocket,
   session: Session | null,
+  device: Device,
 ): ClientConnection {
   let state: State = { status: "awaitingHello" };
+  let member: ActivityMember | null = null;
   let queue: Promise<void> = Promise.resolve();
   const inspectedAt: Timestamp[] = []; // les dernières inspections acceptées, la plus ancienne en tête
 
@@ -204,6 +211,7 @@ export function createConnection(
     const role = roleFor(session, ready, isModerator);
     if (state !== ready || role === ready.role) return;
     state = { ...ready, role };
+    member?.setRole(role);
     socket.sendFrame({ t: "role", role });
     if (canModerate(role))
       socket.sendFrame({ t: "reportCount", count: await deps.core.getReportCount(ready.canvasId) });
@@ -345,6 +353,8 @@ export function createConnection(
     // §8 : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
+    const { canvasId, mode } = frame;
+    member = deps.activity.join({ canvasId, ownerId: meta.ownerId, mode, session, role, device });
     await arrive(frame, meta, role, gauge, scoreboard);
   };
 
@@ -436,6 +446,7 @@ export function createConnection(
       pixels: frame.pixels,
     });
     if (!result.ok) return refuse("canvas_not_found");
+    deps.activity.countPixels(canvasId, session.userId, result.value.accepted);
     socket.sendFrame(result.value);
   };
 
@@ -606,6 +617,12 @@ export function createConnection(
     await deps.core.setGaugeLimits(ready.canvasId, { gaugeMaxStart, gaugeMaxCeiling });
   };
 
+  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; pour les autres, rien, pas même un refus.
+  const listActivityHistory = async ({ requestId, period }: ListActivityHistoryFrame): Promise<void> => {
+    const points = await deps.activity.listHistory(session, period);
+    if (points) socket.sendFrame({ t: "activityHistory", requestId, points });
+  };
+
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     switch (frame.t) {
@@ -639,6 +656,10 @@ export function createConnection(
         return resizeCanvas(frame, ready);
       case "listReports":
         return listReports(frame.requestId, ready);
+      case "watchActivity":
+        return deps.activity.watch(socket, session, frame.isWatching);
+      case "listActivityHistory":
+        return listActivityHistory(frame);
       case "ping":
         return socket.sendFrame({ t: "pong" });
     }
@@ -663,6 +684,8 @@ export function createConnection(
     },
 
     async close() {
+      member?.leave();
+      deps.activity.watch(socket, session, false);
       if (state.status !== "awaitingHello") await deps.broadcast.leave(state.canvasId, listener);
     },
   };

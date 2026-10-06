@@ -48,6 +48,22 @@ export function canModerate(role: Role): boolean {
   return role === "owner" || role === "moderator";
 }
 
+// Écart §10.3 (JOURNAL 2026-10-06) : le développeur, `fenysk`, voit le suivi d'activité. Jamais un rôle de canvas.
+export const DEVELOPER_USER_ID = "68710381";
+
+// Le web montre le bouton, le gateway décide d'envoyer : la même règle des deux côtés.
+export function isDeveloper(userId: string | undefined): boolean {
+  return userId === DEVELOPER_USER_ID;
+}
+
+// Écart §4.2 (JOURNAL 2026-10-06) : 24 h (un point par minute), 30 jours (un par heure), ou tout (un par jour).
+export const ACTIVITY_PERIODS = ["day", "month", "all"] as const;
+export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];
+
+// L'appareil d'une page, lu au `User-Agent` de son WebSocket.
+export const DEVICES = ["desktop", "phone"] as const;
+export type Device = (typeof DEVICES)[number];
+
 // CDC 2026, Signalement : 20 % des comptes connectés au canvas, arrondi au-dessus, au moins un.
 // En entiers : 0,2 × 15 vaut 3,0000000000000004 en flottants, qu'un arrondi au-dessus porterait à 4.
 const REPORT_PERCENT = 20;
@@ -180,6 +196,33 @@ const PARIS_DAY = new Intl.DateTimeFormat("en-CA", {
 
 export function toParisDay(nowMs: Timestamp): string {
   return PARIS_DAY.format(nowMs);
+}
+
+export const MINUTE_MS = 60_000;
+export const HOUR_MS = 3_600_000;
+
+// Le début des trois points d'activité d'un instant : sa minute, son heure, son jour de Paris (écart §5.1, JOURNAL 2026-10-06).
+export type ActivityPointStarts = { minute: Timestamp; hour: Timestamp; day: Timestamp };
+
+// Minuit à Paris tombe à 22 h UTC la veille en été, à 23 h en hiver, jamais dans le trou d'un changement d'heure.
+const toParisDayStart = (nowMs: Timestamp): Timestamp => {
+  const day = toParisDay(nowMs);
+  const [year = 0, month = 1, date = 1] = day.split("-").map(Number);
+  const summerStart = Date.UTC(year, month - 1, date) - 2 * HOUR_MS;
+  return toParisDay(summerStart) === day ? summerStart : summerStart + HOUR_MS;
+};
+
+// Sans le jour, qui passe par `Intl` : le gateway s'en sert à chaque pose.
+export function toMinuteStart(nowMs: Timestamp): Timestamp {
+  return nowMs - (nowMs % MINUTE_MS);
+}
+
+export function toHourStart(nowMs: Timestamp): Timestamp {
+  return nowMs - (nowMs % HOUR_MS);
+}
+
+export function toActivityPointStarts(nowMs: Timestamp): ActivityPointStarts {
+  return { minute: toMinuteStart(nowMs), hour: toHourStart(nowMs), day: toParisDayStart(nowMs) };
 }
 
 // Ce que le plafond laisse encore réclamer, parmi les récompenses gagnées.

@@ -46,6 +46,7 @@ import type {
 import { decodeServerFrame, type Event } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
+import { createSignupWrites } from "./activity";
 import {
   buildCanvasKeys,
   CLEAR_SLICE_CELLS,
@@ -145,6 +146,7 @@ const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
 // Ce que le web écrit à la connexion (§2) : ni script ni connexion abonnée, il ne pose jamais un pixel.
 export function createSignInWrites(redis: Redis): SignInWrites {
   return {
+    ...createSignupWrites(redis), // écart §5.1 (JOURNAL 2026-10-06) : un nouveau compte, à sa première connexion
     // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
     async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
       const keys = buildCanvasKeys(canvasId);
@@ -349,8 +351,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     await redis.publish(keys.live, JSON.stringify(control));
   };
 
+  const { createCanvas, setUser } = createSignInWrites(redis);
   return {
-    ...createSignInWrites(redis),
+    createCanvas,
+    setUser,
 
     // `null` tant que `ready` n'est pas à 1 : on ne sert jamais un canvas en cours de restore (§5.5).
     async getCanvas(canvasId: string): Promise<CanvasMeta | null> {

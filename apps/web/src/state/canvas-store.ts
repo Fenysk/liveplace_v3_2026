@@ -1,6 +1,7 @@
 // L'état local d'un canvas : la copie de `state`, sa version, la jauge, et le rôle et le nom donnés par le gateway (§9.2).
 
 import {
+  type ActivityPeriod,
   type GaugeLimits,
   type ObsBackground,
   type Role,
@@ -9,6 +10,8 @@ import {
 } from "@liveplace/domain";
 import type {
   AckFrame,
+  ActivityFrame,
+  ActivityPoint,
   AuthoredPixel,
   BannedUser,
   InspectEntry,
@@ -121,6 +124,10 @@ export type CanvasStore = {
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   // JOURNAL 2026-10-06 : une liste de l'onglet Modération a bougé ailleurs, et à chaque reprise de la socket.
   listenStaleLists(listener: (list: StaleList) => void): () => void;
+  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul, le gateway décide. Redit à chaque reprise de la socket.
+  watchActivity(isWatching: boolean): void;
+  listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityPoint[]>>;
+  listenActivity(listener: (frame: ActivityFrame) => void): () => void;
   close(): void;
 };
 
@@ -139,7 +146,18 @@ type PendingBatch = {
 
 type ReplyFrame = Extract<
   ServerFrame,
-  { t: "moderated" | "pixels" | "bans" | "moderators" | "reported" | "reports" | "authorPixels" | "resized" }
+  {
+    t:
+      | "moderated"
+      | "pixels"
+      | "bans"
+      | "moderators"
+      | "reported"
+      | "reports"
+      | "authorPixels"
+      | "resized"
+      | "activityHistory";
+  }
 >;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
@@ -179,6 +197,8 @@ export function createCanvasStore(
   let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
   const staleListeners = new Set<(list: StaleList) => void>();
+  const activityListeners = new Set<(frame: ActivityFrame) => void>();
+  let isWatchingActivity = false;
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
 
@@ -314,6 +334,8 @@ export function createCanvasStore(
       // Pendant la coupure, rien n'a dit ce qui a bougé.
       emitStale("bans");
       emitStale("moderators");
+      // La nouvelle connexion ne sait pas que le développeur regarde (écart §4.2, JOURNAL 2026-10-06).
+      if (isWatchingActivity) transport.send({ t: "watchActivity", isWatching: true });
     }
     hasWelcomed = true;
   };
@@ -387,7 +409,11 @@ export function createCanvasStore(
       case "reports":
       case "authorPixels":
       case "resized":
+      case "activityHistory":
         answer(frame);
+        break;
+      case "activity":
+        for (const listener of activityListeners) listener(frame);
         break;
       case "reportCount":
         publish({ reportCount: frame.count });
@@ -531,6 +557,18 @@ export function createCanvasStore(
     listenStaleLists(listener) {
       staleListeners.add(listener);
       return () => staleListeners.delete(listener);
+    },
+    watchActivity(isWatching) {
+      isWatchingActivity = isWatching;
+      transport.send({ t: "watchActivity", isWatching });
+    },
+    listActivityHistory: (period) =>
+      request({ t: "listActivityHistory", requestId: crypto.randomUUID(), period }, (reply) =>
+        reply.t === "activityHistory" ? reply.points : undefined,
+      ),
+    listenActivity(listener) {
+      activityListeners.add(listener);
+      return () => activityListeners.delete(listener);
     },
     close: () => transport.close(),
   };

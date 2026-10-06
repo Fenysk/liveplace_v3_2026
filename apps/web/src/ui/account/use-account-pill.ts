@@ -16,7 +16,7 @@ const toIdentity = ({ role, userId, login, displayName, avatarUrl }: CanvasView)
 // Ce que la pill Compte montre, et ce que la fenêtre ouverte par elle en reprend.
 export type AccountProps = Omit<
   AccountPillProps,
-  "onOpenAccount" | "onOpenSettings" | "isCompact" | "isDocked" | "isVisible"
+  "onOpenAccount" | "onOpenSettings" | "onOpenDeveloper" | "isCompact" | "isDocked" | "isVisible"
 > & {
   signOutHref: string;
 };

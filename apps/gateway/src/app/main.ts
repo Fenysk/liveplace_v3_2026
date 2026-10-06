@@ -1,9 +1,10 @@
 // Le câblage du gateway : config, Redis, usecases, serveur (§3.3).
 
-import { createCanvasCore, createTwitchCommandQueue } from "@liveplace/redis-core";
+import { createActivityStore, createCanvasCore, createTwitchCommandQueue } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionVerifier } from "../infra/session";
 import { startGatewayServer } from "../infra/ws-server";
+import { ACTIVITY_TICK_MS, createActivity } from "../usecase/activity";
 import { createBroadcast, SCOREBOARD_WINDOW_MS } from "../usecase/broadcast";
 import { createConnection } from "../usecase/connection";
 import { consumeTwitchCommands } from "../usecase/twitch-commands";
@@ -25,6 +26,20 @@ setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
 setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
 
+// Écart §4.3 et §5.1 (JOURNAL 2026-10-06) : la température d'avant le redémarrage, avant la première page.
+const activity = createActivity({
+  store: createActivityStore(redis),
+  core,
+  now: Date.now,
+  isProduction: config.isProduction,
+});
+await activity.start();
+setInterval(() => {
+  activity
+    .tick()
+    .catch((error: unknown) => console.error("gateway: activité non écrite ou non envoyée", error));
+}, ACTIVITY_TICK_MS);
+
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
@@ -41,7 +56,8 @@ const server = startGatewayServer({
   port: config.port,
   publicOrigin: config.publicOrigin,
   verifier: createSessionVerifier(config.sessionSecret),
-  openConnection: (socket, session) => createConnection({ core, broadcast, now: Date.now }, socket, session),
+  openConnection: (socket, session, device) =>
+    createConnection({ core, broadcast, activity, now: Date.now }, socket, session, device),
 });
 
 const shutDown = (): void => {

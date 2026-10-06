@@ -1,0 +1,116 @@
+/* Un canvas de la section Activité : une ligne séparée de la suivante par un filet, une carte sur mobile. */
+
+/* Une colonne qui peut descendre sous la largeur du nom entier : sinon, c'est la ligne qui déborde */
+.lp-canvas-activity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--chip-hover);
+}
+
+/* Le chevron reste en haut à droite ; à sa gauche, le streamer puis ses chiffres */
+.lp-canvas-activity-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Faute de place pour les deux sur une ligne, les chiffres passent dessous : le nom n'est jamais écrasé */
+.lp-canvas-activity-summary {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--control-size);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+/* Le streamer prend la place qui reste ; seul sur sa ligne et trop long, son nom se coupe */
+.lp-canvas-activity-owner {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lp-canvas-activity-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+}
+
+.lp-canvas-activity-toggle {
+  flex: none;
+}
+
+.lp-canvas-activity-accounts {
+  margin: 0;
+  padding: 0 0 var(--space-1) var(--space-4);
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  animation: lp-canvas-activity-in var(--lp-dur-fade) ease;
+}
+
+.lp-canvas-activity-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lp-canvas-activity-devices {
+  flex: none;
+  display: flex;
+  gap: var(--space-1);
+  color: var(--muted);
+}
+
+.lp-canvas-activity-device {
+  display: inline-flex;
+}
+
+.lp-canvas-activity-device svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lp-canvas-activity-toggle svg {
+  transition: transform var(--lp-dur) var(--lp-ease);
+}
+
+.lp-canvas-activity.is-open .lp-canvas-activity-toggle svg {
+  transform: rotate(180deg);
+}
+
+@keyframes lp-canvas-activity-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Écran étroit : une carte par canvas, les chiffres sous le streamer */
+@media (max-width: 640px) {
+  .lp-canvas-activity {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 0;
+    border-radius: var(--radius-sm);
+    background: var(--chip);
+  }
+
+  .lp-canvas-activity + .lp-canvas-activity {
+    margin-top: var(--space-2);
+  }
+
+  .lp-canvas-activity-facts {
+    flex-basis: 100%;
+  }
+
+  .lp-canvas-activity-accounts {
+    padding-left: 0;
+  }
+}

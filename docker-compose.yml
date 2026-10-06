@@ -34,6 +34,8 @@ services:
       BROADCAST_HZ: ${BROADCAST_HZ:-10}
       # JOURNAL 2026-09-29 : la seule origine d'où une page ouvre le WebSocket.
       PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL manquante}
+      # Écart §10.3 (JOURNAL 2026-10-06) : vide en production, où les onglets du développeur ne comptent pas.
+      BETA_LABEL: ${BETA_LABEL:-}
     depends_on:
       redis:
         condition: service_healthy

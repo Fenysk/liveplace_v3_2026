@@ -42,6 +42,7 @@ describe("parseGatewayConfig (§11.5)", () => {
       broadcastHz: 10,
       publicOrigin: "https://liveplace.tv",
       port: 8080,
+      isProduction: true,
     });
   });
 
@@ -59,5 +60,12 @@ describe("parseGatewayConfig (§11.5)", () => {
     expect(parseGatewayConfig({ ...env, PUBLIC_URL: "https://liveplace.tv/" }).publicOrigin).toBe(
       "https://liveplace.tv",
     );
+  });
+
+  // N'est en production qu'avec PUBLIC_URL en https et BETA_LABEL vide (écart §10.3, JOURNAL 2026-10-06)
+  it("is in production only over https without a beta label", () => {
+    expect(parseGatewayConfig({ ...env, BETA_LABEL: "" }).isProduction).toBe(true);
+    expect(parseGatewayConfig({ ...env, BETA_LABEL: "feat/activity" }).isProduction).toBe(false);
+    expect(parseGatewayConfig({ ...env, PUBLIC_URL: "http://localhost:3000" }).isProduction).toBe(false);
   });
 });

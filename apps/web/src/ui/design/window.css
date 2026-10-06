@@ -119,6 +119,11 @@
   gap: var(--space-2);
 }
 
+/* Le titre d'un bloc de la section, au-dessus de son contenu (la section Activité, écart §4.3, JOURNAL 2026-10-06) */
+.lp-window-subhead {
+  margin: 0;
+}
+
 .lp-window-row {
   display: flex;
   flex-wrap: wrap;

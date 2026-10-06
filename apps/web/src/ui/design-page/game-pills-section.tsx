@@ -194,6 +194,7 @@ const ACCOUNT_IDENTITIES: readonly {
   isCompact?: boolean;
   pendingReports?: number;
   hasSettings?: boolean;
+  isDeveloper?: boolean; // écart §10.3 (JOURNAL 2026-10-06) : le bouton Développeur
 }[] = [
   { caption: "Avant la réponse du gateway", identity: { kind: "unknown" } },
   { caption: "Invité", identity: { kind: "guest" } },
@@ -220,6 +221,12 @@ const ACCOUNT_IDENTITIES: readonly {
     identity: { kind: "signedIn", user: SAMPLE_OWNER },
     pendingReports: 2,
     hasSettings: true,
+  },
+  {
+    caption: "Le développeur sur son canvas : Développeur ouvre sa fenêtre, sur Activité",
+    identity: { kind: "signedIn", user: SAMPLE_OWNER },
+    hasSettings: true,
+    isDeveloper: true,
   },
 ];
 
@@ -349,21 +356,24 @@ export const GamePillsSection = () => {
         <Specimen caption="Canvas, sur mobile">
           <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
         </Specimen>
-        {ACCOUNT_IDENTITIES.map(({ caption, identity, isCompact, pendingReports, hasSettings }) => (
-          <Specimen key={caption} caption={caption}>
-            <AccountPill
-              identity={identity}
-              signInHref="#"
-              themeChoice={themeChoice}
-              onPickTheme={pickTheme}
-              onOpenAccount={noop}
-              onOpenSettings={hasSettings ? noop : undefined}
-              pendingReports={pendingReports ?? 0}
-              isCompact={isCompact ?? false}
-              isDocked={false}
-            />
-          </Specimen>
-        ))}
+        {ACCOUNT_IDENTITIES.map(
+          ({ caption, identity, isCompact, pendingReports, hasSettings, isDeveloper }) => (
+            <Specimen key={caption} caption={caption}>
+              <AccountPill
+                identity={identity}
+                signInHref="#"
+                themeChoice={themeChoice}
+                onPickTheme={pickTheme}
+                onOpenAccount={noop}
+                onOpenSettings={hasSettings ? noop : undefined}
+                onOpenDeveloper={isDeveloper ? noop : undefined}
+                pendingReports={pendingReports ?? 0}
+                isCompact={isCompact ?? false}
+                isDocked={false}
+              />
+            </Specimen>
+          ),
+        )}
       </SpecimenSection>
 
       <SpecimenSection

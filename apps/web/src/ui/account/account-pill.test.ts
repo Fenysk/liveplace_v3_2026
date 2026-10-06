@@ -47,4 +47,13 @@ describe("pill Compte", () => {
   it("garde le point des signalements à côté de Réglages", () => {
     expect(render({ onOpenSettings: doNothing, pendingReports: 2 })).toContain("lp-avatar-dot");
   });
+
+  // Si le compte connecté est le développeur, alors la pill Compte porte le bouton Développeur, avant Réglages
+  // (écart §10.3, JOURNAL 2026-10-06)
+  it("porte le bouton Développeur pour le développeur seul, avant Réglages", () => {
+    const markup = render({ onOpenDeveloper: doNothing, onOpenSettings: doNothing });
+    expect(positionOf(markup, "Développeur")).toBeGreaterThanOrEqual(0);
+    expect(positionOf(markup, "Réglages")).toBeGreaterThan(positionOf(markup, "Développeur"));
+    expect(render()).not.toContain("Développeur");
+  });
 });

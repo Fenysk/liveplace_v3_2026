@@ -4,7 +4,7 @@ import type { Pixel } from "@liveplace/domain/ports";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll } from "vitest";
 import { createCanvasCore } from "./client";
-import { buildCanvasKeys } from "./keys";
+import { buildActivityKeys, buildCanvasKeys } from "./keys";
 
 // Hors de `index.ts` : réservé aux tests. Une fabrique par fichier, jamais d'état de module : chaque fichier a son `runId`.
 export function createRedisHarness() {
@@ -18,6 +18,8 @@ export function createRedisHarness() {
   const runId = randomUUID();
   let canvasCount = 0;
   const uniqueCanvasId = () => `${runId}-${++canvasCount}`;
+  // L'activité n'a pas de canvas pour la séparer : un préfixe par appel (écart §5.1, JOURNAL 2026-10-06).
+  const uniqueActivityKeys = () => buildActivityKeys(`activity:${uniqueCanvasId()}-`);
 
   beforeAll(async () => {
     await redis.connect().catch(() => {
@@ -27,7 +29,7 @@ export function createRedisHarness() {
 
   afterAll(async () => {
     const found: string[] = [];
-    for (const prefix of ["cv", "user"])
+    for (const prefix of ["cv", "user", "activity"])
       for await (const names of redis.scanStream({ match: `${prefix}:${runId}-*`, count: 1000 }))
         found.push(...names);
     if (found.length > 0) await redis.del(...found);
@@ -66,5 +68,5 @@ export function createRedisHarness() {
     }
   };
 
-  return { redis, core, runId, uniqueCanvasId, readyCanvas, colorAt, placeInBatches };
+  return { redis, core, runId, uniqueCanvasId, uniqueActivityKeys, readyCanvas, colorAt, placeInBatches };
 }

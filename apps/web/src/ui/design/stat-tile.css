@@ -1,0 +1,27 @@
+/* Un chiffre de l'instant : posé sur le fond des contrôles, son libellé au-dessus, sa précision dessous. */
+
+.lp-stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.lp-stat-tile {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--chip);
+}
+
+/* Le chiffre change toutes les 2 s : ses chiffres gardent leur largeur, il ne tremble pas */
+.lp-stat-tile-value {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .lp-stat-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

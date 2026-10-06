@@ -151,13 +151,14 @@ describe("protocol frames", () => {
     });
   });
 
-  // Refuse une page du protocole 11 : elle se recharge pour reprendre le 12 (écart §4.3, JOURNAL 2026-10-06)
-  it("refuses a page of protocol 11, which reloads to take protocol 12", () => {
+  // Refuse une page du protocole 11 : elle se recharge pour reprendre le protocole du moment, 13 depuis l'activité
+  // (écart §4.3, JOURNAL 2026-10-06)
+  it("refuses a page of protocol 11, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
 
     expect(hello(11).ok).toBe(false);
-    expect(hello(12).ok).toBe(true);
+    expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
   // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
@@ -269,6 +270,7 @@ describe("strict client frames", () => {
       { t: "moderate", requestId: "r", action: { ...clear, force: true } },
       { t: "moderate", requestId: "r", action: { ...clear, range: { ...range, all: true } } },
       { ...report, range: { ...range, all: true } },
+      { t: "watchActivity", isWatching: true, isAdmin: true },
       { t: "ping", extra: 1 },
     ])
       expect(decodeClientFrame(frame).ok).toBe(false);
@@ -310,8 +312,85 @@ describe("strict client frames", () => {
       { t: "listAuthorPixels", requestId: "r", x: 0, y: 0, placementId: "42" },
       { t: "listReports", requestId: "r" },
       { t: "resizeCanvas", requestId: "r", width: 50, height: 50 },
+      { t: "watchActivity", isWatching: true },
+      { t: "listActivityHistory", requestId: "r", period: "day" },
       { t: "ping" },
     ])
       expect(decodeClientFrame(frame)).toEqual({ ok: true, value: frame });
+  });
+});
+
+// Protocole 13 (écart §4.2 et §4.3, JOURNAL 2026-10-06) : le développeur suit l'activité par le WebSocket.
+describe("activity frames", () => {
+  const account = {
+    userId: "68710381",
+    login: "fenysk",
+    displayName: "Fenysk",
+    avatarUrl: "https://avatar",
+    role: "owner",
+    connectedAt: 1,
+    devices: ["desktop", "phone"],
+  };
+  const activity = {
+    t: "activity",
+    now: { people: 3, guests: 1, streamed: 1, pixels: 40, signups: 2 },
+    canvases: [
+      {
+        canvasId: "c1",
+        owner: { userId: "68710381", login: "fenysk", displayName: "Fenysk" },
+        obsViews: 1,
+        people: 3,
+        guests: 1,
+        heat: 120,
+        signups: 2,
+        accounts: [account],
+      },
+    ],
+  };
+  const point = { at: 60_000, people: 3, streamed: 1, pixels: 40, signups: 0 };
+
+  // Passe au protocole 13, après le 12 du classement : une page en 12 se recharge
+  it("is protocol 13, after the scoreboard's 12: a page in 12 reloads", () => {
+    expect(PROTOCOL_VERSION).toBe(13);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 12, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Accepte de regarder ou de ne plus regarder l'activité, et rien d'autre dans la frame
+  it("accepts watching the activity or not, and nothing else in the frame", () => {
+    expect(decodeClientFrame({ t: "watchActivity", isWatching: false }).ok).toBe(true);
+    expect(decodeClientFrame({ t: "watchActivity", isWatching: "yes" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "watchActivity" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "watchActivity", isWatching: true, canvasId: "c1" }).ok).toBe(false);
+  });
+
+  // Demande l'historique sur 24 h, 30 jours ou tout, avec sa requête, et aucune autre période
+  it("asks the history over a day, a month or all, with its request, and no other period", () => {
+    const list = (period: string) => decodeClientFrame({ t: "listActivityHistory", requestId: "r", period });
+
+    expect(list("day").ok).toBe(true);
+    expect(list("month").ok).toBe(true);
+    expect(list("all").ok).toBe(true);
+    expect(list("week").ok).toBe(false);
+    expect(decodeClientFrame({ t: "listActivityHistory", period: "day" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "listActivityHistory", requestId: "r", period: "day", x: 1 }).ok).toBe(
+      false,
+    );
+  });
+
+  // Rend les chiffres de l'instant et les canvas avec leurs comptes connectés, sur PC et téléphone
+  it("carries the numbers of the moment and the canvases with their connected accounts", () => {
+    expect(decodeServerFrame(activity)).toEqual({ ok: true, value: activity });
+    const onTablet = { ...activity.canvases[0], accounts: [{ ...account, devices: ["tablet"] }] };
+    expect(decodeServerFrame({ ...activity, canvases: [onTablet] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...activity, now: { ...activity.now, people: -1 } }).ok).toBe(false);
+  });
+
+  // Rend l'historique avec sa requête : des nombres seulement, à leur heure
+  it("answers the history with its request: numbers only, at their time", () => {
+    const history = { t: "activityHistory", requestId: "r", points: [point] };
+
+    expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
+    expect(decodeServerFrame({ t: "activityHistory", points: [point] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...history, points: [{ ...point, pixels: 1.5 }] }).ok).toBe(false);
   });
 });

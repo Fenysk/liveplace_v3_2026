@@ -725,6 +725,66 @@ describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
   });
 });
 
+describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () => {
+  const activity: ServerFrame = {
+    t: "activity",
+    now: { people: 1, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+    canvases: [],
+  };
+
+  // Dit au gateway de commencer ou d'arrêter, et le redit à chaque reprise tant qu'il regarde
+  it("tells the gateway to start or stop, and says it again at each resumption while watching", () => {
+    const { store, sent, receive, close, open } = setup();
+    const watching = () => sent.filter((frame) => frame.t === "watchActivity");
+
+    store.watchActivity(true);
+    close();
+    open();
+    receive(welcome);
+    expect(watching()).toEqual([
+      { t: "watchActivity", isWatching: true },
+      { t: "watchActivity", isWatching: true },
+    ]);
+
+    store.watchActivity(false);
+    close();
+    open();
+    receive(welcome);
+    expect(watching()).toHaveLength(3);
+    expect(watching().at(-1)).toEqual({ t: "watchActivity", isWatching: false });
+  });
+
+  // Rend l'historique de la période demandée, réglé par la réponse de sa requête, ou la coupure
+  it("gives the history of the asked period, settled by the answer of its request, or the drop", async () => {
+    const { store, sent, receive, close } = setup();
+    const point = { at: 60_000, people: 2, streamed: 1, pixels: 30, signups: 0 };
+
+    const listed = store.listActivityHistory("month");
+    const asked = sent.at(-1);
+    if (asked?.t !== "listActivityHistory") throw new Error("aucune frame listActivityHistory");
+    receive({ t: "activityHistory", requestId: asked.requestId, points: [point] });
+    const dropped = store.listActivityHistory("day");
+    close();
+
+    expect(asked.period).toBe("month");
+    expect(await listed).toEqual({ ok: true, value: [point] });
+    expect(await dropped).toEqual({ ok: false, error: "closed" });
+  });
+
+  // Donne chaque frame activity à qui écoute, jusqu'à ce qu'il se retire
+  it("hands each activity frame to its listeners, until they stop listening", () => {
+    const { store, receive } = setup();
+    const heard: ServerFrame[] = [];
+    const stop = store.listenActivity((frame) => heard.push(frame));
+
+    receive(activity);
+    stop();
+    receive(activity);
+
+    expect(heard).toEqual([activity]);
+  });
+});
+
 describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
   const top = [
     { login: "ada", displayName: "Ada", pixels: 9 },
