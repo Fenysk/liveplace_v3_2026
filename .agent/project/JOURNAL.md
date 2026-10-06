@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-06 — Écart §4.3 : la frame `staleList` dit à qui modère que la liste des bannis ou des modérateurs a bougé
+
+**Contexte.** L'onglet Modération ne lisait ses listes qu'à son ouverture : `moderate.lua` et `moderators.lua` ne préviennent que la cible (`banned`, `unbanned`, `role`), donc un ban, un déban ou un modérateur venu de Twitch (file `twitch:commands`) ou d'un autre modérateur n'apparaissait qu'à la réouverture de la fenêtre.
+**Décision.** Le gateway dérive de ces `ctl` déjà publiés (aucun script, aucun port ne change) une frame `staleList` (`bans` ou `moderators`) pour chaque socket qui modère ; le store la relaie, et la redit pour les deux listes à chaque reprise de la socket ; l'onglet relit la liste, une lecture à la fois. `PROTOCOL_VERSION` passe à 11 : les pages ouvertes se rechargent au déploiement.
+**Renoncement.** Pas de nouveau `ctl` dans les scripts Lua (le cœur et le worker y touchent, et un test de script de plus) ; pas de liste poussée dans la frame (le gateway n'a pas à relire les bannis à chaque ban) ; pas de relecture par minuterie.
+
 ## 2026-10-06 — Écart §10.2 : le web vérifie aussi le cookie de session, pour que `/{login}` arrive avec la bonne pill dès le premier octet
 
 **Contexte.** Le rôle `owner` n'arrive qu'au `hello` du gateway : le streamer voyait d'abord la pill Canvas, qui disparaissait ensuite. Le web ne faisait que signer `lp_session`, seul le gateway la vérifiait.

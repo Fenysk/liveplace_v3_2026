@@ -787,6 +787,60 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
       "banned",
     ]);
   });
+
+  // Dit en direct à qui modère que la liste des bannis a bougé, quelle que soit la cible, et à personne d'autre (JOURNAL 2026-10-06)
+  it("tells the owner and the moderators, live, that the banned list is stale whoever the target is, and no one else", async () => {
+    const byOwner = setup({ session: owner });
+    const byModerator = setup({ isModerator: true });
+    const byViewer = setup();
+    const byGuest = setup({ session: null });
+    for (const context of [byOwner, byModerator, byViewer, byGuest])
+      await context.connection.receive(hello());
+
+    for (const context of [byOwner, byModerator, byViewer, byGuest]) {
+      context.control({ t: "banned", userId: "user-2" });
+      context.control({ t: "unbanned", userId: "user-2" });
+    }
+
+    const stale: ServerFrame = { t: "staleList", list: "bans" };
+    for (const context of [byOwner, byModerator]) expect(context.sent.slice(3)).toEqual([stale, stale]);
+    for (const context of [byViewer, byGuest])
+      expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+        "welcome",
+        "snapshot",
+      ]);
+  });
+
+  // Dit à qui modère que la liste des modérateurs a bougé quand le rôle de quelqu'un d'autre change (JOURNAL 2026-10-06)
+  it("tells the moderators that the moderator list is stale when someone else's role changes", async () => {
+    const byOwner = setup({ session: owner });
+    const byViewer = setup();
+    for (const context of [byOwner, byViewer]) await context.connection.receive(hello());
+
+    for (const context of [byOwner, byViewer]) context.control({ t: "role", userId: "mod-1" });
+
+    expect(byOwner.sent.at(-1)).toEqual({ t: "staleList", list: "moderators" });
+    expect(byViewer.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+    ]);
+  });
+
+  // Garde la liste périmée tombée pendant l'arrivée, et l'envoie après le welcome (JOURNAL 2026-10-06)
+  it("holds a stale list that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ session: owner, duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "banned", userId: "user-2" });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "reportCount",
+      "staleList",
+    ]);
+  });
 });
 
 describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {

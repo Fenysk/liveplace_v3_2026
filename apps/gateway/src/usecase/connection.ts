@@ -53,10 +53,10 @@ type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
-// attente pour qui modère (JOURNAL 2026-09-28).
+// attente et les listes périmées pour qui modère (JOURNAL 2026-09-28, 2026-10-06).
 type ControlFrame = Extract<
   ServerFrame,
-  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "gaugeLimits" | "reportCount" }
+  { t: "banned" | "unbanned" | "obsDelay" | "obsBackground" | "gaugeLimits" | "reportCount" | "staleList" }
 >;
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
@@ -204,8 +204,16 @@ export function createConnection(
     else void refreshRole().catch((error: unknown) => console.error("rôle non relu", error));
   };
 
+  // JOURNAL 2026-10-06 : un ban, un déban ou un rôle, de qui que ce soit, périme la liste de qui modère.
+  const tellStaleList = (control: LiveControl): void => {
+    if (state.status === "awaitingHello" || !canModerate(state.role)) return;
+    if (control.t === "banned" || control.t === "unbanned") deliverControl({ t: "staleList", list: "bans" });
+    if (control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
+  };
+
   // §10.2 et CDC 2026 §1 : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
+    tellStaleList(control);
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
     if (control.t === "gaugeLimits") return onGaugeLimitsControl(control);

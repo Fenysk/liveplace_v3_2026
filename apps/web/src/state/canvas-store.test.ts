@@ -490,6 +490,36 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
     receive({ t: "unbanned" });
     expect(store.getView().isBanned).toBe(false);
   });
+
+  // Dit à qui écoute quelle liste est périmée, une fois par frame, jusqu'à ce qu'il se retire (JOURNAL 2026-10-06)
+  it("tells its listeners which list went stale, until they stop listening", () => {
+    const { store, receive } = setup();
+    const stale: string[] = [];
+    const stop = store.listenStaleLists((list) => stale.push(list));
+
+    receive({ t: "staleList", list: "bans" });
+    receive({ t: "staleList", list: "moderators" });
+    stop();
+    receive({ t: "staleList", list: "bans" });
+
+    expect(stale).toEqual(["bans", "moderators"]);
+  });
+
+  // Après une coupure, rien n'a dit ce qui a bougé : les deux listes se relisent à la reprise, pas au premier welcome
+  it("calls both lists stale when the page resumes after a drop, and not at its first welcome", () => {
+    const { store, receive, close, open } = setup({ isWelcomed: false });
+    const stale: string[] = [];
+    store.listenStaleLists((list) => stale.push(list));
+
+    receive(welcome);
+    expect(stale).toEqual([]);
+
+    close();
+    open();
+    receive(welcome);
+
+    expect(stale).toEqual(["bans", "moderators"]);
+  });
 });
 
 describe("the reconnection (§4.5, JOURNAL 2026-09-25)", () => {

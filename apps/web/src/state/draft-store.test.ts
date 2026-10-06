@@ -77,6 +77,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
     claimGauge: () => undefined,
     setGaugeLimits: () => undefined,
     listenArrivals: () => () => undefined,
+    listenStaleLists: () => () => undefined,
     close: () => undefined,
   };
   const entries = new Map<string, string>();

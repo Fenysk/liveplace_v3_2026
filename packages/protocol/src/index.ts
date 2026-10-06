@@ -20,7 +20,8 @@ import { z } from "zod";
 // 7 : signaler une plage d'heures, et les pixels de l'auteur d'une pose pour la choisir (JOURNAL 2026-09-29).
 // 8 : le streamer change la taille de son canvas (JOURNAL 2026-09-29).
 // 9 : le fond de la vue OBS, transparent ou blanc (JOURNAL 2026-09-29).
-export const PROTOCOL_VERSION = 10;
+// 11 : une liste de l'onglet Modération se périme en direct, frame `staleList` (JOURNAL 2026-10-06).
+export const PROTOCOL_VERSION = 11;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -472,6 +473,9 @@ const ReportCountFrameSchema = z.object({
 // §10.3 : ses droits ont changé pendant la session.
 const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 
+// Écart §4.3 (JOURNAL 2026-10-06) : pour qui modère, la liste des bannis ou celle des modérateurs a bougé, la page la relit.
+const StaleListFrameSchema = z.object({ t: z.literal("staleList"), list: z.enum(["bans", "moderators"]) });
+
 // Le délai vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-09-25).
 const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: ObsDelaySchema });
 
@@ -518,6 +522,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   AuthorPixelsFrameSchema,
   ReportsFrameSchema,
   ReportCountFrameSchema,
+  StaleListFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);

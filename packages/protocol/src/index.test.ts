@@ -93,6 +93,17 @@ describe("protocol frames", () => {
     expect(decodeServerFrame({ t: "role", role: "admin" }).ok).toBe(false);
   });
 
+  // Accepte la liste périmée de qui modère, bannis ou modérateurs, et aucune autre (écart §4.3, JOURNAL 2026-10-06)
+  it("accepts a stale list for the banned users or the moderators, and no other list", () => {
+    expect(decodeServerFrame({ t: "staleList", list: "bans" })).toEqual({
+      ok: true,
+      value: { t: "staleList", list: "bans" },
+    });
+    expect(decodeServerFrame({ t: "staleList", list: "moderators" }).ok).toBe(true);
+    expect(decodeServerFrame({ t: "staleList", list: "reports" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "staleList" }).ok).toBe(false);
+  });
+
   // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
   it("accepts an inspected author without its id, and a refusal that names its request", () => {
     const inspected = {

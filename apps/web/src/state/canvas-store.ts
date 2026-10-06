@@ -56,6 +56,7 @@ export type ServerGauge = AckFrame["gauge"];
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
 // Les modérateurs, et l'état de la synchro Twitch quand elle a été faite (JOURNAL 2026-09-27).
 export type ModeratorList = { users: Moderator[]; twitchSync?: TwitchSync };
+export type StaleList = Extract<ServerFrame, { t: "staleList" }>["list"];
 
 // Une requête de modération ou de lecture (JOURNAL 2026-09-25), réglée par la réponse de son `requestId`.
 export type RequestResult<T> = Result<T, ErrorCode | "closed">;
@@ -115,6 +116,8 @@ export type CanvasStore = {
   listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
   listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
+  // JOURNAL 2026-10-06 : une liste de l'onglet Modération a bougé ailleurs, et à chaque reprise de la socket.
+  listenStaleLists(listener: (list: StaleList) => void): () => void;
   close(): void;
 };
 
@@ -172,11 +175,16 @@ export function createCanvasStore(
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
   let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
+  const staleListeners = new Set<(list: StaleList) => void>();
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
 
   const emit = (arrival: Arrival): void => {
     for (const listener of arrivalListeners) listener(arrival);
+  };
+
+  const emitStale = (list: StaleList): void => {
+    for (const listener of staleListeners) listener(list);
   };
 
   // Un nouvel objet à chaque changement : `useSyncExternalStore` compare les références.
@@ -298,7 +306,12 @@ export function createCanvasStore(
     heldRecent = frame.recent ?? null;
     // Le canvas existe : un `welcome` démentit `canvas_not_found`, les autres refus restent.
     publish({ ...welcomeView(frame), ...(view.lastError === "canvas_not_found" ? { lastError: null } : {}) });
-    if (hasWelcomed) resendPending();
+    if (hasWelcomed) {
+      resendPending();
+      // Pendant la coupure, rien n'a dit ce qui a bougé.
+      emitStale("bans");
+      emitStale("moderators");
+    }
     hasWelcomed = true;
   };
 
@@ -375,6 +388,9 @@ export function createCanvasStore(
         break;
       case "reportCount":
         publish({ reportCount: frame.count });
+        break;
+      case "staleList":
+        emitStale(frame.list);
         break;
       case "banned":
       case "unbanned":
@@ -501,6 +517,10 @@ export function createCanvasStore(
     listenArrivals(listener) {
       arrivalListeners.add(listener);
       return () => arrivalListeners.delete(listener);
+    },
+    listenStaleLists(listener) {
+      staleListeners.add(listener);
+      return () => staleListeners.delete(listener);
     },
     close: () => transport.close(),
   };

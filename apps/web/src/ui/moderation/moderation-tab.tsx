@@ -1,16 +1,18 @@
 // L'onglet Modération, branché sur le store (JOURNAL 2026-09-25) : monté à l'ouverture de l'onglet, il relit alors
 // la liste des modérateurs avec l'état de la synchro Twitch (JOURNAL 2026-09-27). Les signalements et les bannis se
 // relisent aussi à chaque changement du nombre de signalements : bannir depuis un signalement les change tous deux
-// (JOURNAL 2026-09-28).
+// (JOURNAL 2026-09-28). Les bannis et les modérateurs se relisent enfin quand le gateway dit leur liste périmée, un ban
+// ou un rôle venu de Twitch ou d'un autre modérateur (JOURNAL 2026-10-06).
 // L'affichage est dans `reported-placements.tsx`, `banned-users.tsx`, `moderator-users.tsx` et `twitch-sync.tsx`.
 
 import type { ReportedPlacement } from "@liveplace/domain/ports";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { CanvasStore, StaleList } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
 import { useToast } from "../design/toast";
 import { type BannedList, BannedUsers, type BanPreview } from "./banned-users";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
+import { oneAtATime } from "./one-at-a-time";
 import { ReportedPlacements, type ReportList } from "./reported-placements";
 import { TwitchSyncBlock, type TwitchSyncView } from "./twitch-sync";
 import type { ModerationControls } from "./use-moderation";
@@ -32,6 +34,17 @@ const viewsOf = (result: ModeratorsAnswer): { moderators: ModeratorListView; syn
   sync: result.ok && result.value.twitchSync ? result.value.twitchSync : { status: "never" },
 });
 
+// `relist` à chaque fois que le gateway dit cette liste périmée, et à la reprise de la socket (JOURNAL 2026-10-06).
+const useRelistOnStale = (canvas: CanvasStore, list: StaleList, relist: () => void) => {
+  useEffect(
+    () =>
+      canvas.listenStaleLists((stale) => {
+        if (stale === list) relist();
+      }),
+    [canvas, list, relist],
+  );
+};
+
 const useModeratorsProps = (canvas: CanvasStore) => {
   const [views, setViews] = useState<{ moderators: ModeratorListView; sync: TwitchSyncView }>({
     moderators: { status: "loading" },
@@ -40,9 +53,15 @@ const useModeratorsProps = (canvas: CanvasStore) => {
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const toast = useToast();
 
-  useEffect(() => {
-    void canvas.listModerators().then((result) => setViews(viewsOf(result)));
-  }, [canvas]);
+  const relist = useMemo(
+    () =>
+      oneAtATime(async () => {
+        setViews(viewsOf(await canvas.listModerators()));
+      }),
+    [canvas],
+  );
+  useEffect(relist, [relist]);
+  useRelistOnStale(canvas, "moderators", relist);
 
   // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour.
   const onRemove = (userId: string) => {
@@ -112,12 +131,16 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
   const toast = useToast();
 
-  const relist = useCallback(() => {
-    void canvas.listBans().then((result) => {
-      setList(result.ok ? { status: "ready", users: result.value } : { status: "failed" });
-    });
-  }, [canvas]);
+  const relist = useMemo(
+    () =>
+      oneAtATime(async () => {
+        const result = await canvas.listBans();
+        setList(result.ok ? { status: "ready", users: result.value } : { status: "failed" });
+      }),
+    [canvas],
+  );
   useRelistOnReports(canvas, relist);
+  useRelistOnStale(canvas, "bans", relist);
 
   const onPreview = (userId: string) => {
     if (preview?.userId === userId) return setPreview(null);
