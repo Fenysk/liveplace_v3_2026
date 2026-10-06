@@ -61,9 +61,12 @@ const SEND_INTERVAL_MS = 1000 / 8; // 8 frames `place` par seconde au plus (§6.
 // §5.1 : une pose par validation ; une lettre d'abord, jamais confondue avec une version.
 const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", "").slice(0, 15)}`;
 
+// Du store du canvas, ce que le brouillon lit et appelle : un ajout au store n'a pas à toucher ses tests.
+export type DraftCanvas = Pick<CanvasStore, "subscribe" | "getView" | "placeBatch">;
+
 export function createDraftStore(
   canvasId: string,
-  canvas: CanvasStore,
+  canvas: DraftCanvas,
   getStorage: () => DraftStorage,
   clock: DraftClock,
 ): DraftStore {

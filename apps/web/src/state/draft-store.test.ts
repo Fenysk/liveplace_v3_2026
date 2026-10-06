@@ -1,7 +1,7 @@
 import { PALETTE, toCellKey } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
-import type { CanvasStore, CanvasView, Pixel, PlaceResult } from "./canvas-store";
-import { createDraftStore, type DraftClock } from "./draft-store";
+import type { CanvasView, Pixel, PlaceResult } from "./canvas-store";
+import { createDraftStore, type DraftCanvas, type DraftClock } from "./draft-store";
 import type { DraftStorage } from "./saved-draft";
 
 const now = 1_700_000_000_000;
@@ -48,7 +48,7 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
   const canvasListeners = new Set<() => void>();
   const sentBatches: Pixel[][] = [];
   const sentPlacementIds: string[] = [];
-  const canvas: CanvasStore = {
+  const canvas: DraftCanvas = {
     subscribe: (listener) => {
       canvasListeners.add(listener);
       return () => canvasListeners.delete(listener);
@@ -61,24 +61,6 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
       const accepted = { ok: true as const, value: acceptAll(pixels) };
       return results.shift() ?? accepted;
     },
-    inspect: () => undefined,
-    closeInspection: () => undefined,
-    moderate: async () => ({ ok: true as const, value: { cells: 0 } }),
-    listPixels: async () => ({ ok: true as const, value: [] }),
-    listBans: async () => ({ ok: true as const, value: [] }),
-    listModerators: async () => ({ ok: true as const, value: { users: [] } }),
-    setModerator: async () => ({ ok: true as const, value: { users: [] } }),
-    report: async () => ({ ok: true as const, value: true as const }),
-    listReports: async () => ({ ok: true as const, value: [] }),
-    listAuthorPixels: async () => ({ ok: true as const, value: [] }),
-    resizeCanvas: async () => ({ ok: true as const, value: true as const }),
-    setObsDelay: () => undefined,
-    setObsBackground: () => undefined,
-    claimGauge: () => undefined,
-    setGaugeLimits: () => undefined,
-    listenArrivals: () => () => undefined,
-    listenStaleLists: () => () => undefined,
-    close: () => undefined,
   };
   const entries = new Map<string, string>();
   if (saved) entries.set("liveplace:draft:canvas-1:user-1", saved);

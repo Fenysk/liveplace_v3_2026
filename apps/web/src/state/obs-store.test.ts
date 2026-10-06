@@ -1,7 +1,7 @@
 import { PALETTE } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
-import type { Arrival, CanvasStore, CanvasView } from "./canvas-store";
-import { createObsStore, type ObsClock } from "./obs-store";
+import type { Arrival, CanvasView } from "./canvas-store";
+import { createObsStore, type ObsCanvas, type ObsClock } from "./obs-store";
 
 const t0 = 1_700_000_000_000;
 const OFFSET = 9; // la case (1, 2) sur un canvas de 4 de large
@@ -34,10 +34,7 @@ const setup = () => {
   let view = viewWithDelay(10_000);
   const listeners = new Set<() => void>();
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
-  const unused = () => {
-    throw new Error("la vue OBS ne pose ni ne modère rien");
-  };
-  const canvas: CanvasStore = {
+  const canvas: ObsCanvas = {
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -47,24 +44,6 @@ const setup = () => {
       arrivalListeners.add(listener);
       return () => arrivalListeners.delete(listener);
     },
-    placeBatch: unused,
-    inspect: unused,
-    closeInspection: unused,
-    moderate: unused,
-    listPixels: unused,
-    listBans: unused,
-    listModerators: unused,
-    setModerator: unused,
-    setObsDelay: unused,
-    setObsBackground: unused,
-    claimGauge: unused,
-    setGaugeLimits: unused,
-    report: unused,
-    listReports: unused,
-    listAuthorPixels: unused,
-    resizeCanvas: unused,
-    listenStaleLists: unused,
-    close: () => undefined,
   };
   // Une horloge qu'on avance à la main : les minuteurs partent quand on y arrive.
   const clock = { nowMs: t0, timers: [] as { at: number; run: () => void }[] };

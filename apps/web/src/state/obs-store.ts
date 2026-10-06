@@ -30,7 +30,10 @@ export type ObsStore = {
   dispose(): void;
 };
 
-export function createObsStore(canvas: CanvasStore, clock: ObsClock): ObsStore {
+// Du store du canvas, ce que la vue OBS lit : un ajout au store n'a pas à toucher ses tests.
+export type ObsCanvas = Pick<CanvasStore, "subscribe" | "getView" | "listenArrivals">;
+
+export function createObsStore(canvas: ObsCanvas, clock: ObsClock): ObsStore {
   const backgroundOf = (): ObsBackground => canvas.getView().params?.obsBackground ?? OBS_BACKGROUND;
   let view: ObsView = {
     isReady: false,
