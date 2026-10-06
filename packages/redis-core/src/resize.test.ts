@@ -1,54 +1,25 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { type CanvasMeta, toStateOffset } from "@liveplace/domain";
+import { type CanvasMeta, defaultCanvasMeta, toStateOffset } from "@liveplace/domain";
 import type { LiveMessage, Moderation, Pixel } from "@liveplace/domain/ports";
-import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore } from "./client";
-import { buildCanvasKeys } from "./keys";
+import { describe, expect, it } from "vitest";
+import { createRedisHarness } from "./test-harness";
 
-// Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-const liveSubscriber = redis.duplicate();
-const core = createCanvasCore(redis, liveSubscriber);
-
-const runId = randomUUID();
-let canvasCount = 0;
+const harness = createRedisHarness();
+const { redis, core, colorAt } = harness;
 
 const OWNER = "owner-1";
 const now = 1_700_000_000_000;
 
 const meta: CanvasMeta = {
-  ownerId: OWNER,
+  ...defaultCanvasMeta(OWNER),
   width: 100,
   height: 100,
   gaugeMaxStart: 100,
-  gaugeMaxCeiling: 150,
   refillMs: 1000,
-  refillCharges: 1,
-  obsDelayMs: 10_000,
-  obsBackground: "transparent",
 };
 
-beforeAll(async () => {
-  await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
-  });
-});
-
-afterAll(async () => {
-  const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
-  if (found.length > 0) await redis.del(...found);
-  liveSubscriber.disconnect();
-  await redis.quit();
-});
-
-const readyCanvas = async () => {
-  const canvasId = `${runId}-${++canvasCount}`;
-  await core.createCanvas(canvasId, meta);
-  return { canvasId, keys: buildCanvasKeys(canvasId) };
-};
+const readyCanvas = () => harness.readyCanvas(meta);
 
 const placeAs = async (canvasId: string, userId: string, pixels: Pixel[]) => {
   const result = await core.place(canvasId, {
@@ -64,9 +35,6 @@ const placeAs = async (canvasId: string, userId: string, pixels: Pixel[]) => {
 
 const resize = async (canvasId: string, width: number, height: number, by = OWNER) =>
   core.resizeCanvas(canvasId, { by, width, height });
-
-const colorAt = async (canvasId: string, x: number, y: number, width: number) =>
-  (await redis.getBuffer(buildCanvasKeys(canvasId).state))?.[toStateOffset(x, y, width)];
 
 describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
   // Rétrécir garde les pixels hors du cadre, invisibles ; ré-agrandir les rend, là où ils étaient

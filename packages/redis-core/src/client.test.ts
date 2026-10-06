@@ -4,6 +4,7 @@ import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   type CanvasMeta,
+  defaultCanvasMeta,
   PALETTE,
   refillGauge,
   TRANSPARENT_COLOR_INDEX,
@@ -12,48 +13,24 @@ import {
 } from "@liveplace/domain";
 import type { LiveMessage, Placement, TwitchCommand } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
-import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore, createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
+import { describe, expect, it } from "vitest";
+import { createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
 import { buildCanvasKeys, HIST_DEPTH, TWITCH_COMMANDS_KEY, userKey } from "./keys";
+import { createRedisHarness } from "./test-harness";
 
-// Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-// Une connexion abonnée à part : en mode subscribe, Redis n'accepte plus les autres commandes (§6.3).
-const liveSubscriber = redis.duplicate();
-const core = createCanvasCore(redis, liveSubscriber);
-
-// Un préfixe par exécution : le nettoyage ne touche que les canvas de ce fichier.
-const runId = randomUUID();
-let canvasCount = 0;
-const uniqueCanvasId = () => `${runId}-${++canvasCount}`;
+const harness = createRedisHarness();
+const { redis, core, runId, uniqueCanvasId } = harness;
 
 const meta: CanvasMeta = {
-  ownerId: "owner-1",
+  ...defaultCanvasMeta("owner-1"),
   width: CANVAS_WIDTH,
   height: CANVAS_HEIGHT,
   gaugeMaxStart: 3,
-  gaugeMaxCeiling: 150,
   refillMs: 1000,
   refillCharges: 2, // ≠ 1 : un oubli du `× refillCharges` ne passerait pas
   obsDelayMs: 5000,
-  obsBackground: "transparent",
 };
 const gaugeParams = { ...meta, gaugeMax: meta.gaugeMaxStart }; // personne n'a rien réclamé
-
-beforeAll(async () => {
-  await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
-  });
-});
-
-afterAll(async () => {
-  const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
-  if (found.length > 0) await redis.del(...found);
-  liveSubscriber.disconnect();
-  await redis.quit();
-});
 
 describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
   // Rend au gateway, dans l'ordre, ce que le web a déposé, et le rend encore après un redémarrage tant qu'il n'est pas acquitté
@@ -147,11 +124,7 @@ describe("place (§5.3)", () => {
   // Horloge figée réaliste : 13 chiffres, comme un vrai Date.now().
   const now = 1_700_000_000_000;
 
-  const readyCanvas = async () => {
-    const canvasId = uniqueCanvasId();
-    await core.createCanvas(canvasId, meta);
-    return { canvasId, keys: buildCanvasKeys(canvasId) };
-  };
+  const readyCanvas = () => harness.readyCanvas(meta);
 
   const placement = (overrides: Partial<Placement> = {}): Placement => ({
     userId: "user-1",

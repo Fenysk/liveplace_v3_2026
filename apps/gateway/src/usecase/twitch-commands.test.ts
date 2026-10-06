@@ -1,4 +1,4 @@
-import type { CanvasMeta } from "@liveplace/domain";
+import { type CanvasMeta, defaultCanvasMeta } from "@liveplace/domain";
 import type {
   BannedUser,
   Moderation,
@@ -15,15 +15,12 @@ const now = 1_700_000_000_000;
 const canvasId = "canvas-1";
 
 const meta: CanvasMeta = {
-  ownerId: "owner-1",
+  ...defaultCanvasMeta("owner-1"),
   width: 4,
   height: 4,
   gaugeMaxStart: 3,
-  gaugeMaxCeiling: 150,
   refillMs: 1000,
-  refillCharges: 1,
   obsDelayMs: 5000,
-  obsBackground: "transparent",
 };
 
 // Ce que le canvas a déjà : `twitch` vient de Twitch, `here` de LivePlace.

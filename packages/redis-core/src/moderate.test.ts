@@ -4,6 +4,7 @@ import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   type CanvasMeta,
+  defaultCanvasMeta,
   TRANSPARENT_COLOR_INDEX,
   toCellKey,
   toStateOffset,
@@ -16,20 +17,15 @@ import type {
   Pixel,
 } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
-import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore, createSignInWrites, createTwitchWrites } from "./client";
-import { buildCanvasKeys, CLEAR_SLICE_CELLS, userKey } from "./keys";
+import { describe, expect, it } from "vitest";
+import { createSignInWrites, createTwitchWrites } from "./client";
+import { CLEAR_SLICE_CELLS, userKey } from "./keys";
+import { createRedisHarness } from "./test-harness";
 
-// Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-const liveSubscriber = redis.duplicate();
-const core = createCanvasCore(redis, liveSubscriber);
+const harness = createRedisHarness();
+const { redis, core, runId } = harness;
 const writes = createSignInWrites(redis);
 const twitchWrites = createTwitchWrites(redis);
-
-const runId = randomUUID();
-let canvasCount = 0;
 
 const OWNER = "owner-1";
 const now = 1_700_000_000_000;
@@ -37,51 +33,19 @@ const later = now + 60_000;
 
 // Une grande jauge : un troll de plus de 4096 pixels se pose en quelques lots.
 const meta: CanvasMeta = {
-  ownerId: OWNER,
+  ...defaultCanvasMeta(OWNER),
   width: CANVAS_WIDTH,
   height: CANVAS_HEIGHT,
   gaugeMaxStart: 10_000,
   gaugeMaxCeiling: 10_000,
   refillMs: 1000,
-  refillCharges: 1,
   obsDelayMs: 5000,
-  obsBackground: "transparent",
 };
 
-beforeAll(async () => {
-  await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
-  });
-});
+const readyCanvas = () => harness.readyCanvas(meta);
 
-afterAll(async () => {
-  const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
-  for await (const names of redis.scanStream({ match: `user:${runId}-*`, count: 1000 })) found.push(...names);
-  if (found.length > 0) await redis.del(...found);
-  liveSubscriber.disconnect();
-  await redis.quit();
-});
-
-const readyCanvas = async () => {
-  const canvasId = `${runId}-${++canvasCount}`;
-  await core.createCanvas(canvasId, meta);
-  return { canvasId, keys: buildCanvasKeys(canvasId) };
-};
-
-const placeAs = async (canvasId: string, userId: string, pixels: readonly Pixel[], nowMs = now) => {
-  for (let start = 0; start < pixels.length; start += 64) {
-    const batch = pixels.slice(start, start + 64);
-    const result = await core.place(canvasId, {
-      userId,
-      requestId: randomUUID(),
-      placementId: "ptest0001",
-      nowMs,
-      pixels: batch,
-    });
-    if (!result.ok || result.value.accepted !== batch.length) throw new Error(`pose refusée pour ${userId}`);
-  }
-};
+const placeAs = (canvasId: string, userId: string, pixels: readonly Pixel[], nowMs = now) =>
+  harness.placeInBatches(canvasId, userId, "ptest0001", pixels, nowMs);
 
 const moderateOnce = async (canvasId: string, moderation: Moderation): Promise<ModerationSlice> => {
   const result = await core.moderate(canvasId, moderation);
@@ -101,8 +65,7 @@ const clearUser = (target: string) => ({ action: "clearUser", target }) as const
 const ban = (target: string) => ({ action: "ban", target }) as const;
 const unban = (target: string) => ({ action: "unban", target }) as const;
 
-const colorAt = async (canvasId: string, x: number, y: number) =>
-  (await redis.getBuffer(buildCanvasKeys(canvasId).state))?.[toStateOffset(x, y, meta.width)];
+const colorAt = (canvasId: string, x: number, y: number) => harness.colorAt(canvasId, x, y, meta.width);
 
 const eventAt = async (events: string, version: number): Promise<Event> => {
   const entries = await redis.xrange(events, `${version}-0`, `${version}-0`);

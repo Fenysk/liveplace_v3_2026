@@ -1,54 +1,26 @@
 import { randomUUID } from "node:crypto";
-import { type CanvasMeta, COUNTED_PIXELS_PER_DAY, toParisDay } from "@liveplace/domain";
+import { type CanvasMeta, COUNTED_PIXELS_PER_DAY, defaultCanvasMeta, toParisDay } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
-import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore } from "./client";
-import { buildCanvasKeys } from "./keys";
+import { describe, expect, it } from "vitest";
+import { createRedisHarness } from "./test-harness";
 
-// Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-const liveSubscriber = redis.duplicate();
-const core = createCanvasCore(redis, liveSubscriber);
-
-const runId = randomUUID();
-let canvasCount = 0;
+const harness = createRedisHarness();
+const { redis, core } = harness;
 
 const USER = "user-1";
 const now = Date.UTC(2026, 9, 5, 10, 0); // midi à Paris
 const nextDay = now + 24 * 3_600_000;
 
 const meta: CanvasMeta = {
-  ownerId: "owner-1",
+  ...defaultCanvasMeta("owner-1"),
   width: 64,
   height: 64,
   gaugeMaxStart: 50,
   gaugeMaxCeiling: 60,
   refillMs: 1000,
-  refillCharges: 1,
-  obsDelayMs: 10_000,
-  obsBackground: "transparent",
 };
 
-beforeAll(async () => {
-  await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
-  });
-});
-
-afterAll(async () => {
-  const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
-  if (found.length > 0) await redis.del(...found);
-  liveSubscriber.disconnect();
-  await redis.quit();
-});
-
-const readyCanvas = async (overrides: Partial<CanvasMeta> = {}) => {
-  const canvasId = `${runId}-${++canvasCount}`;
-  await core.createCanvas(canvasId, { ...meta, ...overrides });
-  return { canvasId, keys: buildCanvasKeys(canvasId) };
-};
+const readyCanvas = (overrides: Partial<CanvasMeta> = {}) => harness.readyCanvas({ ...meta, ...overrides });
 
 const row = (count: number, y = 0): Pixel[] =>
   Array.from({ length: count }, (_, x) => ({ x, y, colorIndex: 1 }));

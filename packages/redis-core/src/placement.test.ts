@@ -1,77 +1,37 @@
-import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { type CanvasMeta, TRANSPARENT_COLOR_INDEX, toCellKey, toStateOffset } from "@liveplace/domain";
+import {
+  type CanvasMeta,
+  defaultCanvasMeta,
+  TRANSPARENT_COLOR_INDEX,
+  toCellKey,
+  toStateOffset,
+} from "@liveplace/domain";
 import type { LiveMessage, Moderation, Pixel, Report } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
-import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createCanvasCore } from "./client";
+import { describe, expect, it } from "vitest";
 import { buildCanvasKeys, toPlacementKey } from "./keys";
+import { createRedisHarness } from "./test-harness";
 
-// Base 15 : jamais celle du dev. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 15, lazyConnect: true, retryStrategy: () => null });
-const liveSubscriber = redis.duplicate();
-const core = createCanvasCore(redis, liveSubscriber);
-
-const runId = randomUUID();
-let canvasCount = 0;
+const harness = createRedisHarness();
+const { redis, core } = harness;
 
 const OWNER = "owner-1";
 const now = 1_700_000_000_000;
 const later = now + 3_600_000;
 
 const meta: CanvasMeta = {
-  ownerId: OWNER,
+  ...defaultCanvasMeta(OWNER),
   width: 16,
   height: 16,
   gaugeMaxStart: 1000,
   gaugeMaxCeiling: 1000,
   refillMs: 1000,
-  refillCharges: 1,
-  obsDelayMs: 10_000,
-  obsBackground: "transparent",
 };
 
-beforeAll(async () => {
-  await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
-  });
-});
+const readyCanvas = () => harness.readyCanvas(meta);
 
-afterAll(async () => {
-  const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${runId}-*`, count: 1000 })) found.push(...names);
-  if (found.length > 0) await redis.del(...found);
-  liveSubscriber.disconnect();
-  await redis.quit();
-});
-
-const readyCanvas = async () => {
-  const canvasId = `${runId}-${++canvasCount}`;
-  await core.createCanvas(canvasId, meta);
-  return { canvasId, keys: buildCanvasKeys(canvasId) };
-};
-
-// Une pose : tous ses lots portent la même `placementId`, 64 pixels au plus par lot.
-const placeAs = async (
-  canvasId: string,
-  userId: string,
-  placementId: string,
-  pixels: Pixel[],
-  nowMs = now,
-) => {
-  for (let start = 0; start < pixels.length; start += 64) {
-    const batch = pixels.slice(start, start + 64);
-    const result = await core.place(canvasId, {
-      userId,
-      requestId: randomUUID(),
-      placementId,
-      nowMs,
-      pixels: batch,
-    });
-    if (!result.ok || result.value.accepted !== batch.length) throw new Error(`pose refusée pour ${userId}`);
-  }
-};
+const placeAs = (canvasId: string, userId: string, placementId: string, pixels: Pixel[], nowMs = now) =>
+  harness.placeInBatches(canvasId, userId, placementId, pixels, nowMs);
 
 const moderateAll = async (canvasId: string, action: Moderation["action"]) => {
   const slice = async (which: "first" | "next") => {
@@ -83,8 +43,7 @@ const moderateAll = async (canvasId: string, action: Moderation["action"]) => {
   while (!last.isDone) last = await slice("next");
 };
 
-const colorAt = async (canvasId: string, x: number, y: number) =>
-  (await redis.getBuffer(buildCanvasKeys(canvasId).state))?.[toStateOffset(x, y, meta.width)];
+const colorAt = (canvasId: string, x: number, y: number) => harness.colorAt(canvasId, x, y, meta.width);
 
 const lastEvent = async (canvasId: string): Promise<Event> => {
   const [entry] = await redis.xrevrange(buildCanvasKeys(canvasId).events, "+", "-", "COUNT", 1);
