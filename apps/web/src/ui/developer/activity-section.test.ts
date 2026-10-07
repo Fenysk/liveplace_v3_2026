@@ -9,9 +9,19 @@ import { ActivitySection } from "./activity-section";
 const now = Date.now();
 const lastMinute = toActivityPointStarts(now).minute - MINUTE_MS;
 
+const audienceDay = {
+  visits: 12,
+  phoneVisits: 5,
+  visitMinutes: 80,
+  activeAccounts: 4,
+  activePlayers: 2,
+  activeStreamers: 1,
+};
+
 const frame: ActivityFrame = {
   t: "activity",
   now: { people: 6, guests: 3, streamed: 1, pixels: 87, signups: 2 },
+  audience: { today: audienceDay, month: audienceDay },
   canvases: [
     {
       canvasId: "c1",
@@ -30,20 +40,33 @@ const render = (view: ActivityWatchView): string =>
   renderToStaticMarkup(createElement(ActivitySection, { view, nowMs: now, onSelectPeriod: () => undefined }));
 
 describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
-  // Montre, de haut en bas, les chiffres de l'instant, les canvas, puis les courbes de la période
-  it("shows, top to bottom, the numbers of the moment, the canvases, then the curves of the period", () => {
+  // Montre, de haut en bas, les chiffres de l'instant, l'audience, les canvas, puis les courbes de la période
+  it("shows, top to bottom, the numbers of the moment, the audience, the canvases, then the curves of the period", () => {
     const markup = render({
       activity: frame,
       period: "day",
       history: {
         status: "ready",
-        points: [{ at: lastMinute, people: 6, streamed: 1, pixels: 87, signups: 2 }],
+        points: [
+          {
+            at: lastMinute,
+            people: 6,
+            streamed: 1,
+            pixels: 87,
+            signups: 2,
+            visits: 0,
+            phoneVisits: 0,
+            visitMinutes: 0,
+          },
+        ],
       },
     });
 
     const order = [
       "Maintenant",
       "dont 3 invités",
+      "L'audience",
+      "Visites",
       "Les canvas",
       "Kalyss",
       "120 px/h",
@@ -55,6 +78,46 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect([...positions].sort((left, right) => left - right)).toEqual(positions);
     expect(markup).toContain("lp-time-chart-line");
     expect(markup).toContain(">OBS<");
+  });
+
+  // Montre l'audience dans un tableau, une ligne par chiffre, aujourd'hui et 30 jours en colonnes
+  it("shows the audience in a table, a row per figure, today and 30 days as columns", () => {
+    const markup = render({ activity: frame, period: "day", history: { status: "loading" } });
+
+    const table = markup.slice(markup.indexOf("<table"), markup.indexOf("</table>"));
+    expect(table).toContain("Aujourd&#x27;hui");
+    expect(table).toContain("30 jours");
+    expect(table.match(/<tr/g)).toHaveLength(7);
+    expect(table.match(/scope="col"/g)).toHaveLength(3);
+    expect(table.match(/scope="row"/g)).toHaveLength(6);
+    for (const text of [
+      "Visites",
+      "dont 42 % au téléphone",
+      "Temps passé",
+      "1 h 20 min",
+      "Durée moyenne d&#x27;une visite",
+      "6 min 40 s",
+      "Comptes actifs",
+      "Joueurs actifs",
+      "Streamers actifs",
+    ])
+      expect(table).toContain(text);
+  });
+
+  // Ne montre que six courbes sur 24 h, et neuf sur Tout avec les comptes, joueurs et streamers actifs
+  it("shows six curves over 24 h, and nine over All with the active accounts, players and streamers", () => {
+    const point = { at: lastMinute, people: 6, streamed: 1, pixels: 87, signups: 2 };
+    const day = { ...point, visits: 3, phoneVisits: 1, visitMinutes: 9 };
+    const ready = (period: "day" | "all", extra: object) => ({
+      activity: frame,
+      period,
+      history: { status: "ready" as const, points: [{ ...day, ...extra }] },
+    });
+
+    const charts = (markup: string) => markup.match(/<figure/g)?.length;
+
+    expect(charts(render(ready("day", {})))).toBe(6);
+    expect(charts(render(ready("all", { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 })))).toBe(9);
   });
 
   // Dit quand personne n'est sur LivePlace, et attend la première frame sans rien inventer
@@ -69,6 +132,7 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(empty).toContain("Personne sur LivePlace en ce moment.");
     expect(waiting).toContain("Chargement…");
     expect(waiting).not.toContain("Personnes connectées");
+    expect(waiting).not.toContain("<table");
     expect(waiting).toContain("L&#x27;historique n&#x27;a pas pu se charger.");
   });
 });

@@ -4,11 +4,30 @@ import { describe, expect, it } from "vitest";
 import { type ActivityClock, type ActivityWatchCanvas, createActivityWatch } from "./activity-watch";
 import type { RequestResult } from "./canvas-store";
 
-const point = (at: number): ActivityPoint => ({ at, people: 1, streamed: 0, pixels: 2, signups: 0 });
+const point = (at: number): ActivityPoint => ({
+  at,
+  people: 1,
+  streamed: 0,
+  pixels: 2,
+  signups: 0,
+  visits: 0,
+  phoneVisits: 0,
+  visitMinutes: 0,
+});
+
+const noAudience = {
+  visits: 0,
+  phoneVisits: 0,
+  visitMinutes: 0,
+  activeAccounts: 0,
+  activePlayers: 0,
+  activeStreamers: 0,
+};
 
 const frame: ActivityFrame = {
   t: "activity",
   now: { people: 2, guests: 1, streamed: 0, pixels: 5, signups: 0 },
+  audience: { today: noAudience, month: noAudience },
   canvases: [],
 };
 
@@ -114,6 +133,7 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
     watch.open();
     listening.listener?.(frame);
     expect(watch.getView().activity).toBe(frame);
+    expect(watch.getView().activity?.audience).toEqual({ today: noAudience, month: noAudience });
     watch.close();
     watch.open();
 

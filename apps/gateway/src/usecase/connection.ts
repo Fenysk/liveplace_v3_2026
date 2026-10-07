@@ -380,7 +380,8 @@ export function createConnection(
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
     const { canvasId, mode } = frame;
-    member = deps.activity.join({ canvasId, ownerId: meta.ownerId, mode, session, role, device });
+    const isResumed = frame.lastVersion !== undefined; // la même page qui reprend, JOURNAL 2026-10-07
+    member = deps.activity.join({ canvasId, ownerId: meta.ownerId, mode, session, role, device, isResumed });
     await arrive(frame, meta, role, gauge, scoreboard);
   };
 

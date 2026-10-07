@@ -210,9 +210,23 @@ export type ActivityCanvas = ActivityFrame["canvases"][number];
 export type ActivityUser = ActivityCanvas["owner"];
 export type ConnectedAccount = ActivityCanvas["accounts"][number];
 export type ActivityPoint = Extract<ServerFrame, { t: "activityHistory" }>["points"][number];
+// JOURNAL 2026-10-07 : l'audience d'aujourd'hui et des 30 jours, chacune avec ses six nombres.
+export type ActivityAudience = ActivityFrame["audience"];
 
-// La minute écoulée, vue du gateway : le pic des personnes et des canvas streamés, ses pixels, et ceux de chaque canvas.
-export type ActivityMinute = Omit<ActivityPoint, "signups"> & { pixelsByCanvas: ReadonlyMap<string, number> };
+// Les identifiants que la minute a vus : de quoi compter les distincts d'un jour, jamais gardés tels quels.
+export type ActiveIds = {
+  accountIds: ReadonlySet<string>; // les comptes qui ont ouvert le jeu
+  playerIds: ReadonlySet<string>; // les comptes dont une pose a été acceptée
+  streamedCanvasIds: ReadonlySet<string>; // les canvas où une vue OBS était ouverte
+};
+
+// La minute écoulée, vue du gateway : le pic des personnes et des canvas streamés, ses pixels, ses visites et son temps passé,
+// et les pixels de chaque canvas. Les distincts ne se gardent que par jour : la minute n'apporte que ses identifiants.
+export type ActivityMinute = Omit<
+  ActivityPoint,
+  "signups" | "activeAccounts" | "activePlayers" | "activeStreamers"
+> &
+  ActiveIds & { pixelsByCanvas: ReadonlyMap<string, number> };
 
 // Les pixels d'une minute passée, canvas par canvas : la température survit à un redémarrage.
 export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
@@ -231,6 +245,9 @@ export interface ActivityStore {
   listActivityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<ActivityPoint[]>; // un point absent le reste
   listCanvasPixels(fromMs: Timestamp, toMs: Timestamp): Promise<CanvasPixelsMinute[]>; // les minutes de [from, to), alignés
   getDaySignups(nowMs: Timestamp): Promise<DaySignups>;
+  // L'audience du jour et des 30 jours : les sommes des minutes écrites, les distincts avec `opened`, ce que la minute en
+  // cours a déjà vu, versé à ce moment (sans effet pour qui est déjà compté).
+  getAudience(nowMs: Timestamp, opened: ActiveIds): Promise<ActivityAudience>;
   getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
 }
 

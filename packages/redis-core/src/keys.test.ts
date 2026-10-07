@@ -1,6 +1,15 @@
 import { type CellKey, toCellKey } from "@liveplace/domain";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { buildActivityKeys, buildCanvasKeys, SCORE_MAX_PIXELS, SCORE_TIE_SPAN, toScorePixels } from "./keys";
+import {
+  ACTIVE_TTL_SECONDS,
+  buildActivityKeys,
+  buildCanvasKeys,
+  SCORE_MAX_PIXELS,
+  SCORE_TIE_SPAN,
+  toActiveField,
+  toScorePixels,
+  toSignupsField,
+} from "./keys";
 
 describe("buildCanvasKeys (§5.1)", () => {
   const canvasId = "canvas-1";
@@ -46,12 +55,30 @@ describe("buildActivityKeys", () => {
     keys.days,
     keys.canvasPixels(Date.UTC(2026, 9, 6, 12, 34)),
     keys.signups("2026-10-06"),
+    keys.activeAccounts("2026-10-06"),
+    keys.activePlayers("2026-10-06"),
+    keys.activeStreamers("2026-10-06"),
   ];
 
   // Range toute l'activité sous `activity:`, chaque clé sous un nom distinct
   it("keeps all the activity under activity:, each key under its own name", () => {
     for (const name of names) expect(name.startsWith("activity:")).toBe(true);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  // JOURNAL 2026-10-07 : les comptes, joueurs et streamers actifs se nomment par le jour de Paris, un jour une clé
+  it("names the active accounts, players and streamers by the Paris day, one key per day", () => {
+    for (const name of [keys.activeAccounts, keys.activePlayers, keys.activeStreamers]) {
+      expect(name("2026-10-06")).toContain("2026-10-06");
+      expect(name("2026-10-06")).not.toBe(name("2026-10-07"));
+    }
+  });
+
+  // Garde un HyperLogLog 31 jours, pour que les 30 jours d'avant n'en perdent aucun, et le point du jour à côté du point
+  it("keeps an active key 31 days, and a day's active counts next to its point", () => {
+    expect(ACTIVE_TTL_SECONDS).toBe(31 * 24 * 3600);
+    expect(toActiveField(Date.UTC(2026, 9, 5, 22))).toBe(`${Date.UTC(2026, 9, 5, 22)}:active`);
+    expect(toActiveField(1)).not.toBe(toSignupsField(1));
   });
 
   // Nomme les pixels d'une minute par son début, et les nouveaux comptes par le jour de Paris

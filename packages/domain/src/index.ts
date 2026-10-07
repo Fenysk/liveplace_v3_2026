@@ -271,6 +271,20 @@ export function toActivityPointStarts(nowMs: Timestamp): ActivityPointStarts {
   return { minute: toMinuteStart(nowMs), hour: toHourStart(nowMs), day: toParisDayStart(nowMs) };
 }
 
+// JOURNAL 2026-10-07 : l'audience compte les 30 derniers jours de Paris, aujourd'hui compris.
+export const AUDIENCE_DAYS = 30;
+
+export type AudienceDay = { at: Timestamp; day: string }; // le début du jour de Paris, et son nom
+
+// Du plus ancien au plus récent. On recule d'une milliseconde depuis le début du jour : 24 h en arrière tombe à côté
+// un jour de changement d'heure.
+export function toAudienceDays(nowMs: Timestamp): AudienceDay[] {
+  const days: AudienceDay[] = [];
+  for (let at = toParisDayStart(nowMs); days.length < AUDIENCE_DAYS; at = toParisDayStart(at - 1))
+    days.unshift({ at, day: toParisDay(at) });
+  return days;
+}
+
 // Ce que le plafond laisse encore réclamer, parmi les récompenses gagnées.
 export function claimableRewards({ countedPixels, claimed }: Progress, limits: GaugeLimits): number {
   const room = limits.gaugeMaxCeiling - limits.gaugeMaxStart - claimed;

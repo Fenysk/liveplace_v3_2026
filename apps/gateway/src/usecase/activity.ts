@@ -1,5 +1,6 @@
-// Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06) : qui est connecté, où, depuis quand, et
-// les pixels acceptés. La liste des connexions reste en mémoire ; Redis ne garde que des nombres.
+// Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06 et 2026-10-07) : qui est connecté, où, depuis
+// quand, les pixels acceptés, et l'audience : visites, temps passé, comptes, joueurs et streamers. La liste des connexions
+// reste en mémoire ; Redis ne garde que des nombres.
 
 import {
   type ActivityPeriod,
@@ -14,6 +15,7 @@ import {
   toMinuteStart,
 } from "@liveplace/domain";
 import type {
+  ActivityAudience,
   ActivityCanvas,
   ActivityFrame,
   ActivityPoint,
@@ -48,6 +50,7 @@ export type ActivityPage = {
   session: Session | null;
   role: Role;
   device: Device;
+  isResumed: boolean; // un `hello` avec `lastVersion` : la même page qui reprend, pas une visite
 };
 
 // Ce que la connexion garde de sa page : son rôle se relit en direct (§10.3).
@@ -64,13 +67,20 @@ export interface Activity {
 
 type OpenPage = ActivityPage & { connectedAt: Timestamp; isCounted: boolean };
 
-// La minute en cours : le pic des personnes et des canvas streamés, les pixels, et ceux de chaque canvas.
+// La minute en cours : le pic des personnes et des canvas streamés, les pixels, et ceux de chaque canvas, les visites
+// dont celles au téléphone, le temps passé en minutes entières (posé à la fermeture), et les identifiants vus.
 type OpenMinute = {
   at: Timestamp;
   people: number;
   streamed: number;
   pixels: number;
+  visits: number;
+  phoneVisits: number;
+  visitMinutes: number;
   pixelsByCanvas: Map<string, number>;
+  accountIds: Set<string>;
+  playerIds: Set<string>;
+  streamedCanvasIds: Set<string>;
 };
 
 // Un canvas tel que la frame le montre, avant son streamer et sa température.
@@ -158,13 +168,24 @@ export function createActivity(deps: ActivityDeps): Activity {
   const accountPages = new Map<string, number>(); // `userId` → ses pages en jeu
   const obsPages = new Map<string, number>(); // `canvasId` → ses vues OBS
   let guestPages = 0;
+  // Le temps passé (JOURNAL 2026-10-07) : les pages du jeu ouvertes fois la durée écoulée, en millisecondes. Les minutes
+  // entières partent avec la minute qui se ferme, le reste attend la suivante : aucune seconde n'est perdue.
+  let uiPages = 0;
+  let pendingVisitMs = 0;
+  let accruedAt = deps.now();
   const recentPixels = createRecentPixels();
   const openMinute = (at: Timestamp): OpenMinute => ({
     at,
     people: accountPages.size + guestPages,
     streamed: obsPages.size,
     pixels: 0,
+    visits: 0,
+    phoneVisits: 0,
+    visitMinutes: 0,
     pixelsByCanvas: new Map(),
+    accountIds: new Set(),
+    playerIds: new Set(),
+    streamedCanvasIds: new Set(obsPages.keys()),
   });
   let minute = openMinute(toMinuteStart(deps.now()));
   let pastMinutes: CanvasPixelsMinute[] = [];
@@ -176,25 +197,58 @@ export function createActivity(deps: ActivityDeps): Activity {
 
   const isCounted = (userId: string | undefined): boolean => !(deps.isProduction && isDeveloper(userId));
 
+  const accrueVisitTime = (nowMs: Timestamp): void => {
+    pendingVisitMs += uiPages * Math.max(0, nowMs - accruedAt);
+    accruedAt = Math.max(accruedAt, nowMs);
+  };
+
   // Une minute sans serveur reste un trou : on ne comble pas, on ferme la minute et on ouvre celle du moment.
   const rollMinute = (nowMs: Timestamp): void => {
     const at = toMinuteStart(nowMs);
     if (at <= minute.at) return;
+    accrueVisitTime(minute.at + MINUTE_MS);
+    minute.visitMinutes = Math.floor(pendingVisitMs / MINUTE_MS);
+    pendingVisitMs -= minute.visitMinutes * MINUTE_MS;
     closedMinutes.push(minute);
     pastMinutes = [...pastMinutes, { at: minute.at, pixelsByCanvas: minute.pixelsByCanvas }].filter(
       (past) => past.at >= at - HEAT_PAST_MINUTES * MINUTE_MS,
     );
     minute = openMinute(at);
+    accruedAt = at;
   };
 
   const tally = (page: OpenPage, delta: number): void => {
     if (!page.isCounted) return;
-    if (page.mode === "obs") addTo(obsPages, page.canvasId, delta);
-    else if (page.session) addTo(accountPages, page.session.userId, delta);
-    else guestPages += delta;
+    if (page.mode === "obs") {
+      addTo(obsPages, page.canvasId, delta);
+      if (delta > 0) minute.streamedCanvasIds.add(page.canvasId);
+    } else {
+      uiPages += delta;
+      if (page.session) addTo(accountPages, page.session.userId, delta);
+      else guestPages += delta;
+    }
     minute.people = Math.max(minute.people, accountPages.size + guestPages);
     minute.streamed = Math.max(minute.streamed, obsPages.size);
   };
+
+  // Une visite : la page du jeu qui s'ouvre, jamais celle qui reprend ni la vue OBS ; le compte compte pour la minute.
+  const countVisit = (page: OpenPage): void => {
+    if (!page.isCounted || page.mode !== "ui" || page.isResumed) return;
+    minute.visits += 1;
+    if (page.device === "phone") minute.phoneVisits += 1;
+    if (page.session) minute.accountIds.add(page.session.userId);
+  };
+
+  // Les sommes de la minute en cours s'ajoutent à l'audience gardée ; ses identifiants sont déjà dans la lecture.
+  const addOpenMinute = (
+    { visits, phoneVisits, visitMinutes, ...distinct }: ActivityAudience["today"],
+    open: Pick<OpenMinute, "visits" | "phoneVisits" | "visitMinutes">,
+  ): ActivityAudience["today"] => ({
+    ...distinct,
+    visits: visits + open.visits,
+    phoneVisits: phoneVisits + open.phoneVisits,
+    visitMinutes: visitMinutes + open.visitMinutes,
+  });
 
   const heatByCanvas = (): Map<string, number> => {
     const heat = new Map<string, number>();
@@ -263,7 +317,17 @@ export function createActivity(deps: ActivityDeps): Activity {
   const buildFrame = async (nowMs: Timestamp): Promise<ActivityFrame> => {
     const heat = heatByCanvas();
     const canvases = tallyCanvases();
-    const [signups] = await Promise.all([deps.store.getDaySignups(nowMs), addHotCanvases(canvases, heat)]);
+    // Pris avant d'attendre : une page qui s'ouvre pendant la lecture change de minute, pas ce que la lecture a compté.
+    const open = {
+      visits: minute.visits,
+      phoneVisits: minute.phoneVisits,
+      visitMinutes: Math.floor(pendingVisitMs / MINUTE_MS),
+    };
+    const [signups, audience] = await Promise.all([
+      deps.store.getDaySignups(nowMs),
+      deps.store.getAudience(nowMs, minute),
+      addHotCanvases(canvases, heat),
+    ]);
     const shown = await Promise.all(
       [...canvases.values()].map((canvas) =>
         toCanvas(canvas, heat.get(canvas.canvasId) ?? 0, signups, nowMs),
@@ -278,6 +342,7 @@ export function createActivity(deps: ActivityDeps): Activity {
         pixels: recentPixels.sum(nowMs),
         signups: signups.total,
       },
+      audience: { today: addOpenMinute(audience.today, open), month: addOpenMinute(audience.month, open) },
       canvases: shown.sort(byHeatThenPeople),
     };
   };
@@ -297,6 +362,7 @@ export function createActivity(deps: ActivityDeps): Activity {
   const run = async (): Promise<void> => {
     const nowMs = deps.now();
     rollMinute(nowMs);
+    accrueVisitTime(nowMs);
     await storeClosedMinutes(nowMs);
     if (watchers.size === 0) return;
     const frame = await buildFrame(nowMs);
@@ -307,16 +373,20 @@ export function createActivity(deps: ActivityDeps): Activity {
     join(page) {
       const nowMs = deps.now();
       rollMinute(nowMs);
+      accrueVisitTime(nowMs);
       const opened: OpenPage = { ...page, connectedAt: nowMs, isCounted: isCounted(page.session?.userId) };
       pages.add(opened);
       tally(opened, 1);
+      countVisit(opened);
       return {
         setRole(role) {
           opened.role = role;
         },
         leave() {
           if (!pages.delete(opened)) return;
-          rollMinute(deps.now());
+          const leftAt = deps.now();
+          rollMinute(leftAt);
+          accrueVisitTime(leftAt);
           tally(opened, -1);
         },
       };
@@ -326,6 +396,7 @@ export function createActivity(deps: ActivityDeps): Activity {
       if (pixels === 0 || !isCounted(userId)) return;
       const nowMs = deps.now();
       rollMinute(nowMs);
+      minute.playerIds.add(userId);
       minute.pixels += pixels;
       addTo(minute.pixelsByCanvas, canvasId, pixels);
       recentPixels.add(nowMs, pixels);

@@ -841,9 +841,18 @@ describe("a store the page closes (Écart §15, JOURNAL 2026-10-06)", () => {
 });
 
 describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () => {
+  const noAudience = {
+    visits: 0,
+    phoneVisits: 0,
+    visitMinutes: 0,
+    activeAccounts: 0,
+    activePlayers: 0,
+    activeStreamers: 0,
+  };
   const activity: ServerFrame = {
     t: "activity",
     now: { people: 1, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+    audience: { today: noAudience, month: noAudience },
     canvases: [],
   };
 
@@ -872,7 +881,16 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
   // Rend l'historique de la période demandée, réglé par la réponse de sa requête, ou la coupure
   it("gives the history of the asked period, settled by the answer of its request, or the drop", async () => {
     const { store, sent, receive, close } = setup();
-    const point = { at: 60_000, people: 2, streamed: 1, pixels: 30, signups: 0 };
+    const point = {
+      at: 60_000,
+      people: 2,
+      streamed: 1,
+      pixels: 30,
+      signups: 0,
+      visits: 0,
+      phoneVisits: 0,
+      visitMinutes: 0,
+    };
 
     const listed = store.listActivityHistory("month");
     const asked = sent.at(-1);

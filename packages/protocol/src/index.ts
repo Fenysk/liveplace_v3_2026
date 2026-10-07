@@ -575,18 +575,42 @@ const ActivityCanvasSchema = z.object({
   accounts: z.array(ConnectedAccountSchema),
 });
 
-// `pixels` : la dernière minute, glissante ; `signups` : le jour de Paris. Les canvas, du plus chaud au plus froid.
+// L'audience d'une période (JOURNAL 2026-10-07) : les visites dont celles au téléphone, le temps passé en minutes, et les
+// comptes, joueurs et streamers distincts.
+const AudienceCountsSchema = z.object({
+  visits: CountSchema,
+  phoneVisits: CountSchema,
+  visitMinutes: CountSchema,
+  activeAccounts: CountSchema,
+  activePlayers: CountSchema,
+  activeStreamers: CountSchema,
+});
+
+// `pixels` : la dernière minute, glissante ; `signups` : le jour de Paris. L'audience : le jour de Paris et les 30 jours.
+// Les canvas, du plus chaud au plus froid.
 const ActivityFrameSchema = z.object({
   t: z.literal("activity"),
   now: ActivityCountsSchema.extend({ guests: CountSchema }),
+  audience: z.object({ today: AudienceCountsSchema, month: AudienceCountsSchema }),
   canvases: z.array(ActivityCanvasSchema),
 });
 
-// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels et des comptes.
+// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels, des comptes, des visites
+// et du temps passé. Un point d'avant l'audience se lit à zéro ; les distincts ne se gardent que par jour.
+const ActivityPointSchema = ActivityCountsSchema.extend({
+  at: TimestampSchema,
+  visits: CountSchema.default(0),
+  phoneVisits: CountSchema.default(0),
+  visitMinutes: CountSchema.default(0),
+  activeAccounts: CountSchema.optional(),
+  activePlayers: CountSchema.optional(),
+  activeStreamers: CountSchema.optional(),
+});
+
 const ActivityHistoryFrameSchema = z.object({
   t: z.literal("activityHistory"),
   requestId: RequestIdSchema,
-  points: z.array(ActivityCountsSchema.extend({ at: TimestampSchema })),
+  points: z.array(ActivityPointSchema),
 });
 
 const ErrorFrameSchema = z.object({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { decodeClientFrame, decodeServerFrame, PROTOCOL_VERSION } from "./index";
 
 describe("protocol frames", () => {
@@ -425,9 +426,18 @@ describe("activity frames", () => {
     connectedAt: 1,
     devices: ["desktop", "phone"],
   };
+  const audienceDay = {
+    visits: 12,
+    phoneVisits: 5,
+    visitMinutes: 80,
+    activeAccounts: 4,
+    activePlayers: 2,
+    activeStreamers: 1,
+  };
   const activity = {
     t: "activity",
     now: { people: 3, guests: 1, streamed: 1, pixels: 40, signups: 2 },
+    audience: { today: audienceDay, month: { ...audienceDay, visits: 300 } },
     canvases: [
       {
         canvasId: "c1",
@@ -441,7 +451,17 @@ describe("activity frames", () => {
       },
     ],
   };
-  const point = { at: 60_000, people: 3, streamed: 1, pixels: 40, signups: 0 };
+  const point = {
+    at: 60_000,
+    people: 3,
+    streamed: 1,
+    pixels: 40,
+    signups: 0,
+    visits: 2,
+    phoneVisits: 1,
+    visitMinutes: 7,
+  };
+  const pointBefore = { at: 60_000, people: 3, streamed: 1, pixels: 40, signups: 0 };
 
   // Passe au protocole 13, après le 12 du classement (le 14 des archives vient ensuite) : une page en 12 se recharge
   it("is protocol 13 or later, after the scoreboard's 12: a page in 12 reloads", () => {
@@ -486,5 +506,65 @@ describe("activity frames", () => {
     expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
     expect(decodeServerFrame({ t: "activityHistory", points: [point] }).ok).toBe(false);
     expect(decodeServerFrame({ ...history, points: [{ ...point, pixels: 1.5 }] }).ok).toBe(false);
+  });
+
+  // JOURNAL 2026-10-07 : l'audience d'aujourd'hui et des 30 jours, six nombres chacune, jamais un nombre négatif ni à virgule
+  it("carries the audience of the day and of the month, six whole numbers each", () => {
+    expect(decodeServerFrame(activity)).toEqual({ ok: true, value: activity });
+    const { audience, ...withoutAudience } = activity;
+
+    expect(decodeServerFrame(withoutAudience).ok).toBe(false);
+    expect(decodeServerFrame({ ...activity, audience: { today: audience.today } }).ok).toBe(false);
+    expect(
+      decodeServerFrame({ ...activity, audience: { ...audience, month: { ...audienceDay, visits: -1 } } }).ok,
+    ).toBe(false);
+    expect(
+      decodeServerFrame({
+        ...activity,
+        audience: { ...audience, today: { ...audienceDay, visitMinutes: 1.5 } },
+      }).ok,
+    ).toBe(false);
+  });
+
+  // Rend les visites, les visites au téléphone et le temps passé de chaque point, les comptes, joueurs et streamers actifs en plus
+  it("carries the visits, the phone visits and the time spent of each point, and the active counts on top", () => {
+    const active = { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 };
+    const history = { t: "activityHistory", requestId: "r", points: [{ ...point, ...active }] };
+
+    expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
+    expect(decodeServerFrame({ ...history, points: [{ ...point, visits: -1 }] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...history, points: [{ ...point, activePlayers: 0.5 }] }).ok).toBe(false);
+  });
+
+  // Lit un point d'avant l'audience avec zéro visite, zéro visite au téléphone et zéro minute, sans comptes actifs inventés
+  it("reads a point from before the audience with zero visits, phone visits and minutes", () => {
+    const history = { t: "activityHistory", requestId: "r", points: [pointBefore] };
+
+    expect(decodeServerFrame(history)).toEqual({
+      ok: true,
+      value: { ...history, points: [{ ...pointBefore, visits: 0, phoneVisits: 0, visitMinutes: 0 }] },
+    });
+  });
+
+  // Une page d'avant ignore les champs nouveaux : ses frames serveur ne sont pas strictes, et les nôtres lisent un champ inconnu
+  it("lets a page from before ignore the new fields, and reads a field it does not know", () => {
+    const before = z.object({
+      t: z.literal("activityHistory"),
+      requestId: z.string(),
+      points: z.array(
+        z.object({
+          at: z.number(),
+          people: z.number(),
+          streamed: z.number(),
+          pixels: z.number(),
+          signups: z.number(),
+        }),
+      ),
+    });
+    const history = { t: "activityHistory", requestId: "r", points: [{ ...point, activeAccounts: 4 }] };
+
+    expect(before.safeParse(history).data?.points).toEqual([pointBefore]);
+    expect(decodeServerFrame({ ...activity, later: true }).ok).toBe(true);
+    expect(decodeServerFrame({ ...history, points: [{ ...point, later: true }] }).ok).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ARCHIVE_NAME_MAX_LENGTH,
+  AUDIENCE_DAYS,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
   CANVAS_STATUSES,
@@ -40,6 +41,7 @@ import {
   TRANSPARENT_COLOR_INDEX,
   toActivityPointStarts,
   toArchiveName,
+  toAudienceDays,
   toCell,
   toCellKey,
   toParisDay,
@@ -472,5 +474,30 @@ describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
   it("starts a day of a clock change at the offset before the change", () => {
     expect(toActivityPointStarts(Date.UTC(2026, 2, 29, 10)).day).toBe(Date.UTC(2026, 2, 28, 23));
     expect(toActivityPointStarts(Date.UTC(2026, 9, 25, 10)).day).toBe(Date.UTC(2026, 9, 24, 22));
+  });
+
+  // Les 30 jours de l'audience sont les 30 derniers jours de Paris, aujourd'hui compris, du plus ancien au plus récent
+  it("takes the last 30 Paris days, today included, oldest first", () => {
+    const days = toAudienceDays(Date.UTC(2026, 9, 6, 12, 30));
+
+    expect(days).toHaveLength(AUDIENCE_DAYS);
+    expect(days[0]).toEqual({ at: Date.UTC(2026, 8, 6, 22), day: "2026-09-07" });
+    expect(days.at(-1)).toEqual({ at: Date.UTC(2026, 9, 5, 22), day: "2026-10-06" });
+    expect(new Set(days.map(({ day }) => day)).size).toBe(AUDIENCE_DAYS);
+  });
+
+  // Un jour qui change d'heure ne fait ni sauter ni répéter un jour, même tout juste après minuit
+  it("neither skips nor repeats a day around a clock change, even just after midnight", () => {
+    const after = toAudienceDays(Date.UTC(2026, 9, 25, 23, 30)); // 00 h 30 le 26/10, lendemain du changement d'heure
+    const before = toAudienceDays(Date.UTC(2026, 2, 29, 22, 30)); // 00 h 30 le 30/03, lendemain du changement d'heure
+
+    for (const days of [after, before]) {
+      expect(new Set(days.map(({ day }) => day)).size).toBe(AUDIENCE_DAYS);
+      for (const { at, day } of days) expect(toParisDay(at)).toBe(day);
+    }
+    expect(after.at(-1)?.day).toBe("2026-10-26");
+    expect(after.some(({ day }) => day === "2026-10-25")).toBe(true);
+    expect(before.at(-1)?.day).toBe("2026-03-30");
+    expect(before.some(({ day }) => day === "2026-03-29")).toBe(true);
   });
 });

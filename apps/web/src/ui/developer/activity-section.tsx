@@ -1,5 +1,6 @@
-// La section Activité de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06), de haut en bas : les chiffres de
-// l'instant, les canvas, puis l'historique. L'affichage seul : `LiveActivitySection` la branche sur le store.
+// La section Activité de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : les
+// chiffres de l'instant, l'audience, les canvas, puis l'historique. L'affichage seul : `LiveActivitySection` la branche
+// sur le store.
 
 import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
 import type { ActivityPoint } from "@liveplace/domain/ports";
@@ -7,10 +8,18 @@ import { useMemo, useRef, useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import { CanvasActivityCard } from "../design/canvas-activity-card";
 import { Segmented } from "../design/segmented";
+import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import { TimeCharts } from "../design/time-charts";
-import { formatCount, guestsNote, PERIOD_OPTIONS, toCanvasActivityCard } from "./activity-labels";
-import { CHART_LINES, toActivitySlots } from "./activity-slots";
+import {
+  AUDIENCE_COLUMNS,
+  formatCount,
+  guestsNote,
+  PERIOD_OPTIONS,
+  toAudienceRows,
+  toCanvasActivityCard,
+} from "./activity-labels";
+import { chartLinesFor, toActivitySlots } from "./activity-slots";
 
 export type ActivitySectionProps = {
   view: ActivityWatchView;
@@ -43,6 +52,17 @@ const NowBlock = ({ view }: { view: ActivityWatchView }) => {
   );
 };
 
+const AudienceBlock = ({ view }: { view: ActivityWatchView }) =>
+  view.activity ? (
+    <StatTable
+      caption="L'audience d'aujourd'hui et des 30 derniers jours"
+      columns={AUDIENCE_COLUMNS}
+      rows={toAudienceRows(view.activity.audience)}
+    />
+  ) : (
+    LOADING
+  );
+
 const CanvasesBlock = ({ view, nowMs }: Pick<ActivitySectionProps, "view" | "nowMs">) => {
   const [openCanvasIds, setOpenCanvasIds] = useState<ReadonlySet<string>>(new Set());
   const toggle = (canvasId: string) =>
@@ -70,9 +90,16 @@ const CanvasesBlock = ({ view, nowMs }: Pick<ActivitySectionProps, "view" | "now
 
 const HistoryBlock = ({ view, onSelectPeriod }: Pick<ActivitySectionProps, "view" | "onSelectPeriod">) => {
   const shown = useShownHistory(view);
-  // L'axe se recalcule à chaque relecture, chaque minute : pas à chaque frame de l'instant.
-  const slots = useMemo(
-    () => (shown ? toActivitySlots(shown.points, shown.period, Date.now()) : null),
+  // L'axe se recalcule à chaque relecture, chaque minute : pas à chaque frame de l'instant. Les courbes sont celles de
+  // la période des points montrés, pas de celle qu'on vient de choisir.
+  const chart = useMemo(
+    () =>
+      shown
+        ? {
+            lines: chartLinesFor(shown.period),
+            slots: toActivitySlots(shown.points, shown.period, Date.now()),
+          }
+        : null,
     [shown],
   );
   return (
@@ -83,15 +110,15 @@ const HistoryBlock = ({ view, onSelectPeriod }: Pick<ActivitySectionProps, "view
           L'historique n'a pas pu se charger. Il se relit dans une minute.
         </span>
       )}
-      {slots && (
+      {chart && (
         <TimeCharts
-          lines={CHART_LINES}
-          slots={slots}
+          lines={chart.lines}
+          slots={chart.slots}
           emptyText="Aucun point sur cette période."
           isLoading={view.history.status !== "ready"}
         />
       )}
-      {!slots && view.history.status === "loading" && LOADING}
+      {!chart && view.history.status === "loading" && LOADING}
     </>
   );
 };
@@ -101,6 +128,10 @@ export const ActivitySection = ({ view, nowMs, onSelectPeriod }: ActivitySection
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Maintenant</h3>
       <NowBlock view={view} />
+    </section>
+    <section className="lp-setting">
+      <h3 className="lp-type-title lp-window-subhead">L'audience</h3>
+      <AudienceBlock view={view} />
     </section>
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Les canvas</h3>

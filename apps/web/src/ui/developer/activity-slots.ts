@@ -12,25 +12,43 @@ import {
 import type { ActivityPoint } from "@liveplace/domain/ports";
 import type { ChartSlot, TimeChartLine } from "../design/time-charts";
 import {
+  activeAccountsLabel,
+  activePlayersLabel,
+  activeStreamersLabel,
   connectedPeopleLabel,
   placedPixelsLabel,
   signupsLabel,
   slotTitle,
   streamedCanvasesLabel,
+  visitMinutesLabel,
+  visitsLabel,
 } from "./activity-labels";
 
 const DAY_MS = 24 * HOUR_MS;
 
-// Les quatre courbes, de haut en bas, dans l'ordre des valeurs de chaque créneau : leur titre, et leur valeur accordée
-// dans l'infobulle.
+// Les six courbes, de haut en bas, dans l'ordre des valeurs de chaque créneau : leur titre, et leur valeur accordée
+// dans l'infobulle. Les visites et le temps passé suivent les personnes (JOURNAL 2026-10-07).
 export const CHART_LINES: readonly TimeChartLine[] = [
   { title: "Personnes connectées", countLabel: connectedPeopleLabel },
+  { title: "Visites", countLabel: visitsLabel },
+  { title: "Temps passé (min)", countLabel: visitMinutesLabel },
   { title: "Canvas streamés", countLabel: streamedCanvasesLabel },
   { title: "Pixels posés", countLabel: placedPixelsLabel },
   { title: "Nouveaux comptes", countLabel: signupsLabel },
 ];
 
 export const CHART_LABELS = CHART_LINES.map(({ title }) => title);
+
+// Tout seulement : les distincts de chaque jour, que les points d'une heure ou d'une minute ne gardent pas.
+const ALL_CHART_LINES: readonly TimeChartLine[] = [
+  ...CHART_LINES,
+  { title: "Comptes actifs", countLabel: activeAccountsLabel },
+  { title: "Joueurs actifs", countLabel: activePlayersLabel },
+  { title: "Streamers actifs", countLabel: activeStreamersLabel },
+];
+
+export const chartLinesFor = (period: ActivityPeriod): readonly TimeChartLine[] =>
+  period === "all" ? ALL_CHART_LINES : CHART_LINES;
 
 type TimeAxis = { firstAt: Timestamp; stepMs: number; count: number };
 
@@ -49,6 +67,12 @@ const toTimeAxis = (
   return { firstAt: first.at, stepMs: DAY_MS, count: Math.round((last.at - first.at) / DAY_MS) + 1 };
 };
 
+// Les trois dernières valeurs d'un jour : zéro pour un jour d'avant l'audience, et rien hors de Tout.
+const toDistinctValues = (
+  { activeAccounts = 0, activePlayers = 0, activeStreamers = 0 }: ActivityPoint,
+  period: ActivityPeriod,
+): number[] => (period === "all" ? [activeAccounts, activePlayers, activeStreamers] : []);
+
 // L'arrondi range chaque point dans son créneau, même un jour de Paris de 23 ou 25 heures.
 export function toActivitySlots(
   points: readonly ActivityPoint[],
@@ -58,10 +82,14 @@ export function toActivitySlots(
   const axis = toTimeAxis(points, period, nowMs);
   if (!axis) return [];
   const slots: ChartSlot[] = Array.from({ length: axis.count }, () => null);
-  for (const { at, people, streamed, pixels, signups } of points) {
+  for (const point of points) {
+    const { at, people, streamed, pixels, signups, visits, visitMinutes } = point;
     const index = Math.round((at - axis.firstAt) / axis.stepMs);
     if (index >= 0 && index < axis.count)
-      slots[index] = { title: slotTitle(at, period), values: [people, streamed, pixels, signups] };
+      slots[index] = {
+        title: slotTitle(at, period),
+        values: [people, visits, visitMinutes, streamed, pixels, signups, ...toDistinctValues(point, period)],
+      };
   }
   return slots;
 }

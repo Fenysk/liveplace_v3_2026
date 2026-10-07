@@ -1,0 +1,58 @@
+/* Un tableau de chiffres : des lignes séparées par un filet, les valeurs alignées à droite sous leur colonne. */
+
+/* Des colonnes de largeur fixe : une précision longue passe à la ligne, elle n'élargit jamais sa colonne */
+.lp-stat-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.lp-stat-table thead th:first-child {
+  width: 40%;
+}
+
+.lp-stat-table th,
+.lp-stat-table td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--chip-hover);
+}
+
+.lp-stat-table thead th {
+  padding-top: 0;
+}
+
+.lp-stat-table tbody tr:last-child th,
+.lp-stat-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.lp-stat-table-label {
+  text-align: left;
+}
+
+.lp-stat-table-column {
+  text-align: right;
+}
+
+.lp-stat-table-cell {
+  padding-left: var(--space-3);
+  text-align: right;
+}
+
+/* Les chiffres changent toutes les 2 s : leurs chiffres gardent leur largeur, la colonne ne tremble pas */
+.lp-stat-table-value {
+  display: block;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Écran étroit : le libellé cède de la place aux chiffres, qui gardent leurs deux colonnes */
+@media (max-width: 640px) {
+  .lp-stat-table thead th:first-child {
+    width: 34%;
+  }
+
+  .lp-stat-table-cell {
+    padding-left: var(--space-2);
+  }
+}

@@ -1,12 +1,14 @@
-import { HOUR_MS, MINUTE_MS, toActivityPointStarts } from "@liveplace/domain";
-import type { ActivityMinute } from "@liveplace/domain/ports";
+import { AUDIENCE_DAYS, HOUR_MS, MINUTE_MS, toActivityPointStarts, toParisDay } from "@liveplace/domain";
+import type { ActiveIds, ActivityMinute } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { createActivityStore, createSignupWrites } from "./activity";
 import {
+  ACTIVE_TTL_SECONDS,
   ACTIVITY_HOURS_RETENTION_MS,
   ACTIVITY_MINUTES_RETENTION_MS,
   CANVAS_PIXELS_TTL_SECONDS,
   SIGNUPS_TTL_SECONDS,
+  toActiveField,
 } from "./keys";
 import { createRedisHarness } from "./test-harness";
 
@@ -25,11 +27,22 @@ const stores = () => {
   return { keys, store: createActivityStore(redis, keys), signups: createSignupWrites(redis, keys) };
 };
 
+const noVisits = { visits: 0, phoneVisits: 0, visitMinutes: 0 };
+
+// Les identifiants d'une minute : ses comptes, ses joueurs, et ses canvas streamés.
+const ids = (accounts: string[] = [], players: string[] = [], streamed: string[] = []): ActiveIds => ({
+  accountIds: new Set(accounts),
+  playerIds: new Set(players),
+  streamedCanvasIds: new Set(streamed),
+});
+
 const minute = (at: number, counts: Partial<ActivityMinute> = {}): ActivityMinute => ({
   at,
   people: 0,
   streamed: 0,
   pixels: 0,
+  ...noVisits,
+  ...ids(),
   pixelsByCanvas: new Map(),
   ...counts,
 });
@@ -43,16 +56,16 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
     await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { people: 3, streamed: 1, pixels: 4 }));
     await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, { people: 8, streamed: 1, pixels: 10 }));
 
-    const point = { streamed: 2, signups: 0 };
+    const point = { streamed: 2, signups: 0, ...noVisits };
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: minuteAt - 2 * MINUTE_MS, people: 8, streamed: 1, pixels: 10, signups: 0 },
+      { at: minuteAt - 2 * MINUTE_MS, people: 8, streamed: 1, pixels: 10, signups: 0, ...noVisits },
       { at: minuteAt - MINUTE_MS, people: 5, pixels: 34, ...point },
     ]);
     expect(await store.listActivityHistory("month", now)).toEqual([
       { at: hourAt, people: 8, pixels: 44, ...point },
     ]);
     expect(await store.listActivityHistory("all", now)).toEqual([
-      { at: dayAt, people: 8, pixels: 44, ...point },
+      { at: dayAt, people: 8, pixels: 44, activeAccounts: 0, activePlayers: 0, activeStreamers: 0, ...point },
     ]);
   });
 
@@ -114,7 +127,7 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
 
     expect((await store.listActivityHistory("day", now)).map(({ signups: count }) => count)).toEqual([0]);
     expect(await store.listActivityHistory("month", now)).toEqual([
-      { at: hourAt, people: 1, streamed: 0, pixels: 0, signups: 1 },
+      { at: hourAt, people: 1, streamed: 0, pixels: 0, signups: 1, ...noVisits },
     ]);
   });
 
@@ -187,17 +200,254 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
     const fill = async (hash: string, count: number, stepMs: number) => {
       const fields = Array.from({ length: count }, (_, index) => [
         `${now - index * stepMs}`,
-        "1234,56,78901",
+        "1234,56,78901,2345,678,90123",
       ]);
       await redis.hset(hash, Object.fromEntries(fields));
     };
     await fill(keys.minutes, ACTIVITY_MINUTES_RETENTION_MS / MINUTE_MS, MINUTE_MS);
     await fill(keys.hours, ACTIVITY_HOURS_RETENTION_MS / HOUR_MS, HOUR_MS);
     await fill(keys.days, 366, DAY_MS);
+    const active = Array.from({ length: 366 }, (_, index) => [
+      toActiveField(now - index * DAY_MS),
+      "1234,567,89",
+    ]);
+    await redis.hset(keys.days, Object.fromEntries(active));
 
     let bytes = 0;
     for (const hash of [keys.minutes, keys.hours, keys.days])
       bytes += Number(await redis.call("MEMORY", "USAGE", hash, "SAMPLES", "0"));
     expect(bytes).toBeLessThan(2 * 1024 * 1024);
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-07) : l'audience, ses sommes dans les points et ses distincts dans des HyperLogLog.
+describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
+  const dayMinute = (daysAgo: number) => toActivityPointStarts(now - daysAgo * DAY_MS).minute;
+  const zero = {
+    visits: 0,
+    phoneVisits: 0,
+    visitMinutes: 0,
+    activeAccounts: 0,
+    activePlayers: 0,
+    activeStreamers: 0,
+  };
+
+  // Additionne les visites, les visites au téléphone et le temps passé sur la minute, l'heure et le jour
+  it("sums the visits, the phone visits and the time spent on the minute, hour and day", async () => {
+    const { store } = stores();
+
+    await store.storeActivityMinute(
+      minute(minuteAt - MINUTE_MS, { visits: 3, phoneVisits: 1, visitMinutes: 12 }),
+    );
+    await store.storeActivityMinute(
+      minute(minuteAt - MINUTE_MS, { visits: 2, phoneVisits: 2, visitMinutes: 5 }),
+    );
+    await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, { visits: 1, visitMinutes: 3 }));
+
+    expect(await store.listActivityHistory("day", now)).toMatchObject([
+      { at: minuteAt - 2 * MINUTE_MS, visits: 1, phoneVisits: 0, visitMinutes: 3 },
+      { at: minuteAt - MINUTE_MS, visits: 5, phoneVisits: 3, visitMinutes: 17 },
+    ]);
+    expect(await store.listActivityHistory("month", now)).toMatchObject([
+      { at: hourAt, visits: 6, phoneVisits: 3, visitMinutes: 20 },
+    ]);
+    expect(await store.listActivityHistory("all", now)).toMatchObject([
+      { at: dayAt, visits: 6, phoneVisits: 3, visitMinutes: 20 },
+    ]);
+  });
+
+  // Lit un point d'avant l'audience, à trois champs, avec des zéros, et lui ajoute les sommes nouvelles
+  it("reads a point from before the audience, with three fields, as zeros, and adds the new sums to it", async () => {
+    const { keys, store } = stores();
+    const before = minuteAt - MINUTE_MS;
+    for (const [hash, at] of [
+      [keys.minutes, before],
+      [keys.hours, hourAt],
+      [keys.days, dayAt],
+    ] as const)
+      await redis.hset(hash, String(at), "5,2,30");
+
+    expect(await store.listActivityHistory("day", now)).toEqual([
+      { at: before, people: 5, streamed: 2, pixels: 30, signups: 0, ...noVisits },
+    ]);
+
+    await store.storeActivityMinute(
+      minute(before, { people: 3, streamed: 3, pixels: 4, visits: 2, phoneVisits: 1, visitMinutes: 6 }),
+    );
+
+    const after = {
+      people: 5,
+      streamed: 3,
+      pixels: 34,
+      signups: 0,
+      visits: 2,
+      phoneVisits: 1,
+      visitMinutes: 6,
+    };
+    expect(await store.listActivityHistory("day", now)).toEqual([{ at: before, ...after }]);
+    expect(await store.listActivityHistory("month", now)).toMatchObject([{ at: hourAt, ...after }]);
+    expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, ...after }]);
+    expect(await redis.hget(keys.minutes, String(before))).toBe("5,3,34,2,1,6");
+  });
+
+  // Compte une fois un compte, un joueur et un canvas streamé que plusieurs minutes d'un jour revoient
+  it("counts once an account, a player and a streamed canvas that several minutes of a day see again", async () => {
+    const { store } = stores();
+
+    await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, ids(["u1", "u2"], ["u1"], ["c1"])));
+    await store.storeActivityMinute(
+      minute(minuteAt - MINUTE_MS, ids(["u2", "u3"], ["u1", "u3"], ["c1", "c2"])),
+    );
+
+    const [day] = await store.listActivityHistory("all", now);
+    expect(day).toMatchObject({ activeAccounts: 3, activePlayers: 2, activeStreamers: 2 });
+  });
+
+  // Garde les distincts d'un jour dans son point, pour la courbe Tout seulement, et après la fin de leur HyperLogLog
+  it("keeps a day's distinct counts in its point, for the all curve only, after their HyperLogLog is gone", async () => {
+    const { keys, store } = stores();
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, ids(["u1", "u2"], ["u1"], ["c1"])));
+
+    const today = toParisDay(now);
+    await redis.del(keys.activeAccounts(today), keys.activePlayers(today), keys.activeStreamers(today));
+
+    const [day] = await store.listActivityHistory("all", now);
+    expect(day).toMatchObject({ at: dayAt, activeAccounts: 2, activePlayers: 1, activeStreamers: 1 });
+    expect(await redis.hget(keys.days, toActiveField(dayAt))).toBe("2,1,1");
+    for (const period of ["day", "month"] as const) {
+      const [point] = await store.listActivityHistory(period, now);
+      expect(point).not.toHaveProperty("activeAccounts");
+    }
+  });
+
+  // Lit à zéro les distincts d'un jour d'avant l'audience, et n'écrit rien pour une minute sans identifiant
+  it("reads as zero the distinct counts of a day from before the audience, and writes none for a minute with no id", async () => {
+    const { keys, store } = stores();
+    await redis.hset(keys.days, String(dayAt), "5,2,30");
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { people: 1 }));
+
+    expect(await redis.hget(keys.days, toActiveField(dayAt))).toBeNull();
+    expect(await store.listActivityHistory("all", now)).toMatchObject([
+      { at: dayAt, activeAccounts: 0, activePlayers: 0, activeStreamers: 0 },
+    ]);
+  });
+
+  // Garde l'HyperLogLog d'un jour 31 jours, pour que les 30 jours d'avant aucun ne manque
+  it("keeps the HyperLogLog of a day 31 days", async () => {
+    const { keys, store } = stores();
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, ids(["u1"], ["u1"], ["c1"])));
+
+    const today = toParisDay(now);
+    for (const key of [keys.activeAccounts(today), keys.activePlayers(today), keys.activeStreamers(today)]) {
+      expect(await redis.type(key)).toBe("string");
+      const ttl = await redis.ttl(key);
+      expect(ttl).toBeGreaterThan(ACTIVE_TTL_SECONDS - 5);
+      expect(ttl).toBeLessThanOrEqual(ACTIVE_TTL_SECONDS);
+    }
+  });
+
+  // Compte l'audience d'aujourd'hui et celle des 30 derniers jours de Paris, les distincts en union
+  it("counts the audience of today and of the last 30 Paris days, the distinct ones as a union", async () => {
+    const { store } = stores();
+    const today = { visits: 3, phoneVisits: 1, visitMinutes: 10, ...ids(["a1", "a2"], ["a1"], ["c1"]) };
+    const yesterday = {
+      visits: 4,
+      phoneVisits: 2,
+      visitMinutes: 20,
+      ...ids(["a2", "a3"], ["a2", "a3"], ["c1", "c2"]),
+    };
+    const oldest = { visits: 1, visitMinutes: 5, ...ids(["a4"], [], ["c3"]) };
+    const outside = { visits: 100, phoneVisits: 50, visitMinutes: 900, ...ids(["a5"], ["a5"], ["c4"]) };
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, today));
+    await store.storeActivityMinute(minute(dayMinute(1), yesterday));
+    await store.storeActivityMinute(minute(dayMinute(AUDIENCE_DAYS - 1), oldest));
+    await store.storeActivityMinute(minute(dayMinute(AUDIENCE_DAYS), outside));
+
+    expect(await store.getAudience(now, ids())).toEqual({
+      today: {
+        visits: 3,
+        phoneVisits: 1,
+        visitMinutes: 10,
+        activeAccounts: 2,
+        activePlayers: 1,
+        activeStreamers: 1,
+      },
+      month: {
+        visits: 8,
+        phoneVisits: 3,
+        visitMinutes: 35,
+        activeAccounts: 4,
+        activePlayers: 3,
+        activeStreamers: 3,
+      },
+    });
+  });
+
+  // Rend une audience à zéro quand rien n'a été écrit, et ne compte pas un jour sans point
+  it("gives a zero audience when nothing was written, and counts no day without a point", async () => {
+    const { store } = stores();
+
+    expect(await store.getAudience(now, ids())).toEqual({ today: zero, month: zero });
+    await store.storeActivityMinute(minute(dayMinute(3), { visits: 2, visitMinutes: 4 }));
+    expect(await store.getAudience(now, ids())).toEqual({
+      today: zero,
+      month: { ...zero, visits: 2, visitMinutes: 4 },
+    });
+  });
+
+  // Compte les identifiants de la minute en cours sans l'attendre, et une seule fois quand elle s'écrit
+  it("counts the ids of the minute in progress without waiting for it, and once when it is written", async () => {
+    const { store } = stores();
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, ids(["u1"], ["u1"], ["c1"])));
+    const open = ids(["u1", "u2"], ["u2"], ["c1", "c2"]);
+
+    const first = await store.getAudience(now, open);
+    expect(await store.getAudience(now, open)).toEqual(first);
+    expect(first.today).toMatchObject({ activeAccounts: 2, activePlayers: 2, activeStreamers: 2 });
+    expect(first.month).toMatchObject({ activeAccounts: 2, activePlayers: 2, activeStreamers: 2 });
+
+    await store.storeActivityMinute(minute(minuteAt, open));
+    expect((await store.getAudience(now, ids())).today).toMatchObject({
+      activeAccounts: 2,
+      activePlayers: 2,
+    });
+    const [day] = await store.listActivityHistory("all", now);
+    expect(day).toMatchObject({ activeAccounts: 2, activePlayers: 2, activeStreamers: 2 });
+  });
+
+  // Tient chaque jour de Paris pour son jour : une minute après minuit compte pour le nouveau
+  it("holds each Paris day for its own: a minute after midnight belongs to the new day", async () => {
+    const { keys, store } = stores();
+    const midnight = toActivityPointStarts(now + DAY_MS).day;
+
+    await store.storeActivityMinute(minute(midnight - MINUTE_MS, ids(["u1"])));
+    await store.storeActivityMinute(minute(midnight, ids(["u2"])));
+
+    expect(await redis.pfcount(keys.activeAccounts(toParisDay(midnight - MINUTE_MS)))).toBe(1);
+    expect(await redis.pfcount(keys.activeAccounts(toParisDay(midnight)))).toBe(1);
+    const audience = await store.getAudience(midnight + 5 * MINUTE_MS, ids());
+    expect(audience.today.activeAccounts).toBe(1);
+    expect(audience.month.activeAccounts).toBe(2);
+  });
+
+  // Ne garde aucun identifiant : des compteurs et des HyperLogLog seulement, jamais de quoi retrouver un compte
+  it("keeps no identifier: counters and HyperLogLogs only, nothing to find an account in", async () => {
+    const { keys, store } = stores();
+    const prefix = keys.minutes.slice(0, -"minute".length);
+    await store.storeActivityMinute(
+      minute(minuteAt - MINUTE_MS, ids(["account-4242"], ["account-4242"], ["canvas-4242"])),
+    );
+
+    let dumped = "";
+    for await (const names of redis.scanStream({ match: `${prefix}*`, count: 1000 }))
+      for (const name of names as string[]) {
+        const type = await redis.type(name);
+        const content =
+          type === "hash" ? JSON.stringify(await redis.hgetall(name)) : await redis.getBuffer(name);
+        dumped += `${name}=${content}\n`;
+      }
+
+    expect(dumped).toContain("accounts:");
+    expect(dumped).not.toContain("4242");
   });
 });

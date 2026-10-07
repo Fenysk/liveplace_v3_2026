@@ -1,9 +1,10 @@
 // Les mots de la section Activité (écart §4.3, JOURNAL 2026-10-06) : des nombres au format français, des textes courts.
 
 import { type ActivityPeriod, MINUTE_MS, type Role, type Timestamp } from "@liveplace/domain";
-import type { ActivityCanvas } from "@liveplace/domain/ports";
+import type { ActivityAudience, ActivityCanvas } from "@liveplace/domain/ports";
 import type { CanvasActivityCardProps } from "../design/canvas-activity-card";
 import type { SegmentedOption } from "../design/segmented";
+import type { StatTableCell, StatTableRow } from "../design/stat-table";
 
 export const formatCount = (count: number): string => count.toLocaleString("fr-FR");
 
@@ -32,6 +33,71 @@ export const streamedCanvasesLabel = (streamed: number): string =>
   counted(streamed, "canvas streamé", "canvas streamés");
 
 export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pixel posé", "pixels posés");
+
+// L'audience (JOURNAL 2026-10-07) : les mêmes accords, pour l'infobulle des courbes.
+export const visitsLabel = (visits: number): string => counted(visits, "visite", "visites");
+
+export const visitMinutesLabel = (minutes: number): string => counted(minutes, "minute", "minutes");
+
+export const activeAccountsLabel = (accounts: number): string =>
+  counted(accounts, "compte actif", "comptes actifs");
+
+export const activePlayersLabel = (players: number): string =>
+  counted(players, "joueur actif", "joueurs actifs");
+
+export const activeStreamersLabel = (streamers: number): string =>
+  counted(streamers, "streamer actif", "streamers actifs");
+
+// « 3 h 20 min » : les minutes sur deux chiffres dès qu'il y a des heures.
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${formatCount(minutes)} min`;
+  return `${formatCount(Math.floor(minutes / 60))} h ${String(minutes % 60).padStart(2, "0")} min`;
+}
+
+// « 4 min 30 s » ; sans visite, la durée moyenne n'existe pas.
+export function averageVisit(visitMinutes: number, visits: number): string {
+  if (visits === 0) return "—";
+  const seconds = Math.round((visitMinutes * 60) / visits);
+  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, "0")} s`;
+  return formatDuration(Math.round(seconds / 60));
+}
+
+export const phoneShareNote = (phoneVisits: number, visits: number): string | undefined =>
+  visits === 0 ? undefined : `dont ${Math.round((phoneVisits * 100) / visits)} % au téléphone`;
+
+export const AUDIENCE_COLUMNS = ["Aujourd'hui", "30 jours"] as const;
+
+// Une ligne par chiffre, ses deux cellules dans l'ordre de `AUDIENCE_COLUMNS`.
+export function toAudienceRows({ today, month }: ActivityAudience): StatTableRow[] {
+  const cells = (toCell: (counts: ActivityAudience["today"]) => StatTableCell): StatTableCell[] => [
+    toCell(today),
+    toCell(month),
+  ];
+  return [
+    {
+      label: "Visites",
+      cells: cells(({ visits, phoneVisits }) => ({
+        value: formatCount(visits),
+        note: phoneShareNote(phoneVisits, visits),
+      })),
+    },
+    { label: "Temps passé", cells: cells(({ visitMinutes }) => ({ value: formatDuration(visitMinutes) })) },
+    {
+      label: "Durée moyenne d'une visite",
+      cells: cells(({ visits, visitMinutes }) => ({ value: averageVisit(visitMinutes, visits) })),
+    },
+    {
+      label: "Comptes actifs",
+      cells: cells(({ activeAccounts }) => ({ value: formatCount(activeAccounts) })),
+    },
+    { label: "Joueurs actifs", cells: cells(({ activePlayers }) => ({ value: formatCount(activePlayers) })) },
+    {
+      label: "Streamers actifs",
+      cells: cells(({ activeStreamers }) => ({ value: formatCount(activeStreamers) })),
+    },
+  ];
+}
 
 const ROLE_LABELS: Record<Role, string> = {
   owner: "Streamer",

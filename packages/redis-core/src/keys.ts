@@ -108,19 +108,32 @@ export const ACTIVITY_HOURS_RETENTION_MS = 366 * 24 * 3600 * 1000;
 export const CANVAS_PIXELS_TTL_SECONDS = 61 * 60; // la température relit les 59 minutes d'avant la minute en cours
 export const SIGNUPS_TTL_SECONDS = 48 * 3600;
 export const WITHOUT_DISCOVERED_VIA = "none"; // un nouveau compte venu de l'accueil (§8.1)
+// Écart §5.1 (JOURNAL 2026-10-07) : un jour de plus que les 30 de l'audience, pour que le jour qui sort s'y compte encore.
+export const ACTIVE_TTL_SECONDS = 31 * 24 * 3600;
 
 // Les nouveaux comptes d'un point, à côté de lui dans le même HASH : le web les compte sans script.
 export function toSignupsField(pointAt: number): string {
   return `${pointAt}:signups`;
 }
 
+// Les comptes, joueurs et streamers distincts d'un jour, `accounts,players,streamers`, à côté de son point : sans eux,
+// la courbe « Tout » les perdrait avec les HyperLogLog.
+export function toActiveField(dayAt: number): string {
+  return `${dayAt}:active`;
+}
+
 export function buildActivityKeys(prefix = "activity:") {
   return {
-    // `HASH` début du point → `people,streamed,pixels` (activity.lua), et `toSignupsField` → nouveaux comptes.
+    // `HASH` début du point → `people,streamed,pixels,visits,phoneVisits,visitMinutes` (activity.lua ; un point d'avant
+    // en a trois), `toSignupsField` → nouveaux comptes, et pour les jours `toActiveField` → distincts.
     minutes: `${prefix}minute`, // élagué au-delà de 7 jours
     hours: `${prefix}hour`, // élagué au-delà de 366 jours
     days: `${prefix}day`, // le début du jour de Paris, sans limite
     canvasPixels: (minuteAt: number) => `${prefix}pixels:${minuteAt}`, // `canvasId` → pixels de la minute, EXPIRE
     signups: (parisDay: string) => `${prefix}signups:${parisDay}`, // provenance → nouveaux comptes, EXPIRE
+    // Des HyperLogLog, un par jour de Paris, EXPIRE 31 jours : de quoi compter les distincts sans garder qui.
+    activeAccounts: (parisDay: string) => `${prefix}accounts:${parisDay}`, // les comptes qui ont ouvert le jeu
+    activePlayers: (parisDay: string) => `${prefix}players:${parisDay}`, // les comptes dont une pose a été acceptée
+    activeStreamers: (parisDay: string) => `${prefix}streamers:${parisDay}`, // les canvas avec une vue OBS ouverte
   };
 }

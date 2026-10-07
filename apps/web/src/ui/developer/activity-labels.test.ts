@@ -2,19 +2,29 @@ import { HOUR_MS, MINUTE_MS } from "@liveplace/domain";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import {
+  AUDIENCE_COLUMNS,
+  activeAccountsLabel,
+  activePlayersLabel,
+  activeStreamersLabel,
+  averageVisit,
   connectedPeopleLabel,
   connectedSince,
   formatCount,
+  formatDuration,
   guestsNote,
   heatLabel,
   PERIOD_OPTIONS,
   peopleLabel,
+  phoneShareNote,
   placedPixelsLabel,
   roleLabel,
   signupsLabel,
   slotTitle,
   streamedCanvasesLabel,
+  toAudienceRows,
   toCanvasActivityCard,
+  visitMinutesLabel,
+  visitsLabel,
 } from "./activity-labels";
 
 const now = Date.UTC(2026, 9, 6, 12, 30); // 14 h 30 à Paris
@@ -116,5 +126,103 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
     expect([placedPixelsLabel(1), placedPixelsLabel(3)]).toEqual(["1 pixel posé", "3 pixels posés"]);
     expect([signupsLabel(0), signupsLabel(2)]).toEqual(["0 nouveau compte", "2 nouveaux comptes"]);
     expect(placedPixelsLabel(1500)).toBe(`${(1500).toLocaleString("fr-FR")} pixels posés`);
+  });
+});
+
+describe("the words of the audience (JOURNAL 2026-10-07)", () => {
+  // Accorde les visites, les minutes et les comptes, joueurs et streamers actifs, au singulier jusqu'à 1
+  it("agrees the visits, the minutes and the active accounts, players and streamers, in the singular up to 1", () => {
+    expect([visitsLabel(0), visitsLabel(1), visitsLabel(12)]).toEqual(["0 visite", "1 visite", "12 visites"]);
+    expect([visitMinutesLabel(1), visitMinutesLabel(80)]).toEqual(["1 minute", "80 minutes"]);
+    expect([activeAccountsLabel(1), activeAccountsLabel(2)]).toEqual(["1 compte actif", "2 comptes actifs"]);
+    expect([activePlayersLabel(1), activePlayersLabel(3)]).toEqual(["1 joueur actif", "3 joueurs actifs"]);
+    expect([activeStreamersLabel(0), activeStreamersLabel(4)]).toEqual([
+      "0 streamer actif",
+      "4 streamers actifs",
+    ]);
+    expect(visitsLabel(1500)).toBe(`${(1500).toLocaleString("fr-FR")} visites`);
+  });
+
+  // Écrit un temps passé en heures et minutes, les minutes sur deux chiffres après les heures
+  it("writes a time spent in hours and minutes, the minutes on two digits after the hours", () => {
+    expect(formatDuration(0)).toBe("0 min");
+    expect(formatDuration(45)).toBe("45 min");
+    expect(formatDuration(60)).toBe("1 h 00 min");
+    expect(formatDuration(200)).toBe("3 h 20 min");
+    expect(formatDuration(5461)).toBe(`${(91).toLocaleString("fr-FR")} h 01 min`);
+    expect(formatDuration(1_500_000)).toBe(`${(25_000).toLocaleString("fr-FR")} h 00 min`);
+  });
+
+  // Écrit la durée moyenne d'une visite en minutes et secondes, un tiret sans visite
+  it("writes the average length of a visit in minutes and seconds, a dash with no visit", () => {
+    expect(averageVisit(9, 2)).toBe("4 min 30 s");
+    expect(averageVisit(1, 1)).toBe("1 min 00 s");
+    expect(averageVisit(1, 60)).toBe("1 s");
+    expect(averageVisit(0, 5)).toBe("0 s");
+    expect(averageVisit(130, 2)).toBe("1 h 05 min");
+    expect(averageVisit(10, 0)).toBe("—");
+    expect(averageVisit(0, 0)).toBe("—");
+  });
+
+  // Dit la part des visites faites au téléphone, arrondie, et rien sans visite
+  it("says the share of the visits made on a phone, rounded, and nothing with no visit", () => {
+    expect(phoneShareNote(5, 10)).toBe("dont 50 % au téléphone");
+    expect(phoneShareNote(1, 3)).toBe("dont 33 % au téléphone");
+    expect(phoneShareNote(2, 3)).toBe("dont 67 % au téléphone");
+    expect(phoneShareNote(0, 4)).toBe("dont 0 % au téléphone");
+    expect(phoneShareNote(0, 0)).toBeUndefined();
+  });
+
+  // Met l'audience en lignes, un chiffre par ligne, aujourd'hui puis les 30 jours
+  it("lays the audience out in rows, one figure per row, today then the 30 days", () => {
+    const today = {
+      visits: 38,
+      phoneVisits: 19,
+      visitMinutes: 200,
+      activeAccounts: 14,
+      activePlayers: 9,
+      activeStreamers: 3,
+    };
+    const month = {
+      visits: 1214,
+      phoneVisits: 497,
+      visitMinutes: 5461,
+      activeAccounts: 212,
+      activePlayers: 131,
+      activeStreamers: 11,
+    };
+
+    expect(AUDIENCE_COLUMNS).toEqual(["Aujourd'hui", "30 jours"]);
+    expect(toAudienceRows({ today, month })).toEqual([
+      {
+        label: "Visites",
+        cells: [
+          { value: "38", note: "dont 50 % au téléphone" },
+          { value: formatCount(1214), note: "dont 41 % au téléphone" },
+        ],
+      },
+      { label: "Temps passé", cells: [{ value: "3 h 20 min" }, { value: "91 h 01 min" }] },
+      { label: "Durée moyenne d'une visite", cells: [{ value: "5 min 16 s" }, { value: "4 min 30 s" }] },
+      { label: "Comptes actifs", cells: [{ value: "14" }, { value: "212" }] },
+      { label: "Joueurs actifs", cells: [{ value: "9" }, { value: "131" }] },
+      { label: "Streamers actifs", cells: [{ value: "3" }, { value: "11" }] },
+    ]);
+  });
+
+  // Sans visite, ne dit ni part au téléphone ni durée moyenne : un tiret, jamais zéro inventé
+  it("with no visit, says no phone share and no average: a dash, never an invented zero", () => {
+    const none = {
+      visits: 0,
+      phoneVisits: 0,
+      visitMinutes: 0,
+      activeAccounts: 0,
+      activePlayers: 0,
+      activeStreamers: 0,
+    };
+
+    const [visits, , average] = toAudienceRows({ today: none, month: none });
+
+    expect(visits?.cells).toEqual([{ value: "0" }, { value: "0" }]);
+    expect(average?.cells).toEqual([{ value: "—" }, { value: "—" }]);
   });
 });

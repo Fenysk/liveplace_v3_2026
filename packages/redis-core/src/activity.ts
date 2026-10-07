@@ -1,16 +1,32 @@
-// L'activité dans Redis (écart §5.1, JOURNAL 2026-10-06) : des nombres sous `activity:`, aucun nom ni identifiant dans
-// l'historique. Le gateway écrit chaque minute et élague ; le web compte un nouveau compte, sans script.
+// L'activité dans Redis (écart §5.1, JOURNAL 2026-10-06 et 2026-10-07) : des nombres sous `activity:`, aucun nom ni
+// identifiant dans l'historique ; les distincts d'un jour, dans des HyperLogLog. Le gateway écrit chaque minute et élague ;
+// le web compte un nouveau compte, sans script.
 
 import { readFileSync } from "node:fs";
-import { HOUR_MS, MINUTE_MS, type Timestamp, toActivityPointStarts, toParisDay } from "@liveplace/domain";
-import type { ActivityPoint, ActivityStore, SignupWrites } from "@liveplace/domain/ports";
+import {
+  HOUR_MS,
+  MINUTE_MS,
+  type Timestamp,
+  toActivityPointStarts,
+  toAudienceDays,
+  toParisDay,
+} from "@liveplace/domain";
+import type {
+  ActiveIds,
+  ActivityAudience,
+  ActivityPoint,
+  ActivityStore,
+  SignupWrites,
+} from "@liveplace/domain/ports";
 import type { ChainableCommander, Redis, Result as RedisResult } from "ioredis";
 import {
+  ACTIVE_TTL_SECONDS,
   ACTIVITY_HOURS_RETENTION_MS,
   ACTIVITY_MINUTES_RETENTION_MS,
   buildActivityKeys,
   CANVAS_PIXELS_TTL_SECONDS,
   SIGNUPS_TTL_SECONDS,
+  toActiveField,
   toSignupsField,
   userKey,
   WITHOUT_DISCOVERED_VIA,
@@ -34,11 +50,38 @@ const execAll = async (transaction: ChainableCommander): Promise<void> => {
   for (const [error] of (await transaction.exec()) ?? []) if (error) throw error;
 };
 
-// `stored` : `people,streamed,pixels`, écrit par activity.lua.
+// `stored` : `people,streamed,pixels,visits,phoneVisits,visitMinutes`, écrit par activity.lua ; un point d'avant l'audience
+// n'a que les trois premiers.
 const toPoint = (at: Timestamp, stored: string, signups: string | null | undefined): ActivityPoint => {
-  const [people = 0, streamed = 0, pixels = 0] = stored.split(",").map(Number);
-  return { at, people, streamed, pixels, signups: Number(signups ?? 0) };
+  const [people = 0, streamed = 0, pixels = 0, visits = 0, phoneVisits = 0, visitMinutes = 0] = stored
+    .split(",")
+    .map(Number);
+  return { at, people, streamed, pixels, signups: Number(signups ?? 0), visits, phoneVisits, visitMinutes };
 };
+
+// `stored` : `accounts,players,streamers` d'un jour, écrit à côté de son point ; sans lui, le jour est d'avant l'audience.
+const toActiveCounts = (stored: string | undefined) => {
+  const [activeAccounts = 0, activePlayers = 0, activeStreamers = 0] = (stored ?? "").split(",").map(Number);
+  return { activeAccounts, activePlayers, activeStreamers };
+};
+
+// L'audience d'une période : la somme de ses points, et ses distincts `accounts,players,streamers` déjà comptés.
+const toAudienceCounts = (
+  points: readonly ActivityPoint[],
+  [activeAccounts = 0, activePlayers = 0, activeStreamers = 0]: readonly number[],
+): ActivityAudience["today"] => ({
+  ...points.reduce(
+    (sum, point) => ({
+      visits: sum.visits + point.visits,
+      phoneVisits: sum.phoneVisits + point.phoneVisits,
+      visitMinutes: sum.visitMinutes + point.visitMinutes,
+    }),
+    { visits: 0, phoneVisits: 0, visitMinutes: 0 },
+  ),
+  activeAccounts,
+  activePlayers,
+  activeStreamers,
+});
 
 // Les débuts, du plus ancien au plus récent, de `count` points espacés de `stepMs` jusqu'à `lastAt`.
 const pointStarts = (lastAt: Timestamp, stepMs: number, count: number): Timestamp[] =>
@@ -77,12 +120,55 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     });
   };
 
+  // Les comptes, joueurs et streamers : la clé d'un jour de chacun, et ce que `ids` y verse.
+  const activeKinds = (ids: ActiveIds) => [
+    { toKey: keys.activeAccounts, members: ids.accountIds },
+    { toKey: keys.activePlayers, members: ids.playerIds },
+    { toKey: keys.activeStreamers, members: ids.streamedCanvasIds },
+  ];
+
+  // Un identifiant déjà compté ne change rien : verser deux fois la même minute est sans dégât.
+  const addActiveIds = async (parisDay: string, ids: ActiveIds): Promise<void> => {
+    const filled = activeKinds(ids).filter(({ members }) => members.size > 0);
+    if (filled.length === 0) return;
+    const transaction = redis.multi();
+    for (const { toKey, members } of filled)
+      transaction.pfadd(toKey(parisDay), ...members).expire(toKey(parisDay), ACTIVE_TTL_SECONDS);
+    await execAll(transaction);
+  };
+
+  // Les distincts du jour dans son point : sans eux, la courbe Tout les perdrait avec les HyperLogLog.
+  const storeActiveDay = async (minute: ActiveIds & { at: Timestamp }): Promise<void> => {
+    const parisDay = toParisDay(minute.at);
+    await addActiveIds(parisDay, minute);
+    const counts = await Promise.all(activeKinds(minute).map(({ toKey }) => redis.pfcount(toKey(parisDay))));
+    if (counts.some((count) => count > 0))
+      await redis.hset(keys.days, toActiveField(toActivityPointStarts(minute.at).day), counts.join(","));
+  };
+
   return {
-    async storeActivityMinute({ at, people, streamed, pixels, pixelsByCanvas }) {
+    // Les distincts d'abord, qui se rejouent sans dégât : une minute qui échoue plus loin revient au tic suivant, et ses
+    // sommes ne s'écrivent qu'une fois.
+    async storeActivityMinute(closed) {
+      const { at, people, streamed, pixels, visits, phoneVisits, visitMinutes, pixelsByCanvas } = closed;
+      await storeActiveDay(closed);
       const { minute, hour, day } = toActivityPointStarts(at);
       const transaction = redis
         .multi()
-        .activity(keys.minutes, keys.hours, keys.days, minute, hour, day, people, streamed, pixels);
+        .activity(
+          keys.minutes,
+          keys.hours,
+          keys.days,
+          minute,
+          hour,
+          day,
+          people,
+          streamed,
+          pixels,
+          visits,
+          phoneVisits,
+          visitMinutes,
+        );
       if (pixelsByCanvas.size > 0)
         transaction
           .hset(keys.canvasPixels(minute), Object.fromEntries(pixelsByCanvas))
@@ -90,7 +176,7 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
       await execAll(transaction);
     },
 
-    // Le champ d'un point et celui de ses nouveaux comptes commencent tous deux par son début.
+    // Le champ d'un point, celui de ses nouveaux comptes et celui de ses distincts commencent tous par son début.
     async pruneActivity(nowMs) {
       for (const [hash, retentionMs] of [
         [keys.minutes, ACTIVITY_MINUTES_RETENTION_MS],
@@ -111,8 +197,36 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
       const fields = await redis.hgetall(keys.days);
       return Object.entries(fields)
         .filter(([field]) => POINT_FIELD.test(field))
-        .map(([field, stored]) => toPoint(Number(field), stored, fields[toSignupsField(Number(field))]))
+        .map(([field, stored]) => ({
+          ...toPoint(Number(field), stored, fields[toSignupsField(Number(field))]),
+          ...toActiveCounts(fields[toActiveField(Number(field))]),
+        }))
         .sort((left, right) => left.at - right.at);
+    },
+
+    // Les sommes des 30 points du jour, les distincts en union de leurs HyperLogLog : les commandes partent ensemble.
+    async getAudience(nowMs, opened) {
+      const days = toAudienceDays(nowMs);
+      const today = toParisDay(nowMs);
+      await addActiveIds(today, opened);
+      const kinds = activeKinds(opened);
+      const [stored, todayCounts, monthCounts] = await Promise.all([
+        redis.hmget(keys.days, ...days.map(({ at }) => String(at))),
+        Promise.all(kinds.map(({ toKey }) => redis.pfcount(toKey(today)))),
+        Promise.all(kinds.map(({ toKey }) => redis.pfcount(...days.map(({ day }) => toKey(day))))),
+      ]);
+      const points = days.flatMap(({ at }, index) => {
+        const value = stored[index];
+        return value ? [toPoint(at, value, null)] : [];
+      });
+      const todayAt = toActivityPointStarts(nowMs).day;
+      return {
+        today: toAudienceCounts(
+          points.filter(({ at }) => at === todayAt),
+          todayCounts,
+        ),
+        month: toAudienceCounts(points, monthCounts),
+      };
     },
 
     // Lu au démarrage du gateway seulement : les commandes partent ensemble sur la connexion.

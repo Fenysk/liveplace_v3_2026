@@ -38,7 +38,8 @@
     { "canonical": "developer",    "definition": "Le compte qui voit le suivi d'activité, `DEVELOPER_USER_ID`. Jamais un rôle de canvas (JOURNAL 2026-10-06).", "banned": ["superuser", "staff"] },
     { "canonical": "activity",     "definition": "Les chiffres du suivi et leur historique : connectés, canvas streamés, pixels, nouveaux comptes (JOURNAL 2026-10-06).", "banned": ["stats", "metrics", "analytics", "telemetry"] },
     { "canonical": "heat",         "definition": "Les pixels posés sur un canvas dans la dernière heure (JOURNAL 2026-10-06).", "banned": ["temperature"] },
-    { "canonical": "signup",       "definition": "Un nouveau compte, compté à sa première connexion (JOURNAL 2026-10-06).", "banned": ["registration"] }
+    { "canonical": "signup",       "definition": "Un nouveau compte, compté à sa première connexion (JOURNAL 2026-10-06).", "banned": ["registration"] },
+    { "canonical": "visit",        "definition": "Une page du jeu ouverte, hors vue OBS : un rechargement en fait une nouvelle, une reprise de la même page (`hello` avec `lastVersion`) non (JOURNAL 2026-10-07).", "banned": ["pageview", "hit"] }
   ],
 
   "verbs": [

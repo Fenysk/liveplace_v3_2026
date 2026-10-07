@@ -32,6 +32,18 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §5.1 : l'audience compte les comptes, joueurs et streamers distincts par HyperLogLog, sans garder qui
+
+**Contexte.** L'audience du suivi d'activité (cahier des charges dédié, §3) veut des comptes, joueurs et streamers distincts sur le jour et sur 30 jours, alors que l'historique ne garde aucun identifiant (§4 du même document).
+**Décision.** Un HyperLogLog par jour de Paris et par chiffre sous `activity:` (`PFADD`, `PFCOUNT` sur plusieurs clés pour les 30 jours), gardé 31 jours ; le gateway y verse les ensembles tenus en mémoire à chaque minute, et toutes les 2 s tant que le développeur regarde (sans quoi les distincts retarderaient d'une minute sur les visites), jamais à chaque pose ni à chaque connexion. Les points de l'historique gagnent `visits`, `phoneVisits` et `visitMinutes` (sommes) ; un point d'avant lit 0. Les frames serveur `activity` et `activityHistory` gagnent des champs : les pages d'avant les ignorent (`z.object`), `PROTOCOL_VERSION` ne change pas.
+**Renoncement.** Pas de `SET` d'identifiants, même expirant (on pourrait y relire qui) ; pas de distincts par heure ni par minute (une clé de plus par heure, pour des courbes que le pic des personnes approche déjà).
+
+## 2026-10-07 — Lexique : `visit`
+
+**Contexte.** L'audience compte des pages du jeu ouvertes ; aucun mot du lexique ne les nomme, et `session` est réservé au cookie.
+**Décision.** `visit` : une page du jeu ouverte, hors vue OBS ; un rechargement en fait une nouvelle, une reprise de la même page (`hello` avec `lastVersion`) non. Bannis : `pageview`, `hit`.
+**Renoncement.** Pas de mot pour le temps passé : `visitMinutes` le dit.
+
 ## 2026-10-06 — Écart §10.3 et §11.5 : le développeur est nommé dans `domain`, et le gateway lit `BETA_LABEL`
 
 **Contexte.** Seul `fenysk` voit le suivi d'activité, dans chaque environnement ; en production seulement, ses onglets ne comptent pas (cahier des charges du suivi d'activité, §1).

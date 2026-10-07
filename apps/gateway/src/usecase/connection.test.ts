@@ -51,6 +51,15 @@ const meta: CanvasMeta = {
 const session: Session = { userId: "user-1", login: "user1", displayName: "User 1" };
 const developer: Session = { userId: DEVELOPER_USER_ID, login: "fenysk", displayName: "Fenysk" };
 
+const noAudience = {
+  visits: 0,
+  phoneVisits: 0,
+  visitMinutes: 0,
+  activeAccounts: 0,
+  activePlayers: 0,
+  activeStreamers: 0,
+};
+
 // Le suivi d'activité garde ses nombres ailleurs : ici, il n'y a rien à relire (écart §5.1, JOURNAL 2026-10-06).
 const activityStore: ActivityStore = {
   storeActivityMinute: async () => undefined,
@@ -58,6 +67,7 @@ const activityStore: ActivityStore = {
   listActivityHistory: async () => [],
   listCanvasPixels: async () => [],
   getDaySignups: async () => ({ total: 0, byDiscoveredViaUserId: new Map() }),
+  getAudience: async () => ({ today: noAudience, month: noAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
 };
 const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
@@ -1514,6 +1524,24 @@ describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", ()
       [session.userId, ["desktop"]],
     ]);
     expect(after).toMatchObject({ t: "activity", now: { people: 1 } });
+  });
+
+  // Compte une visite à un hello sans lastVersion, et aucune à une reprise ni dans la vue OBS (JOURNAL 2026-10-07)
+  it("counts a visit at a hello without lastVersion, and none at a resumption or in the OBS view", async () => {
+    const context = setup();
+    const watcher = context.open(developer, "phone");
+    await watcher.connection.receive(hello());
+    await watcher.connection.receive(watch);
+    await context.connection.receive(hello());
+    await context.open(session).connection.receive(hello({ lastVersion: 3 }));
+    await context.open(session).connection.receive(hello({ mode: "obs" }));
+
+    await context.activity.tick();
+
+    expect(watcher.sent.at(-1)).toMatchObject({
+      t: "activity",
+      audience: { today: { visits: 2, phoneVisits: 1 }, month: { visits: 2, phoneVisits: 1 } },
+    });
   });
 
   // Ne lui envoie plus rien une fois sa page fermée

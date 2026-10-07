@@ -13,11 +13,12 @@ import { useMemo, useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import { Button } from "../design/button";
 import { CanvasActivityCard } from "../design/canvas-activity-card";
+import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import { TimeCharts } from "../design/time-charts";
-import { toCanvasActivityCard } from "../developer/activity-labels";
+import { AUDIENCE_COLUMNS, toAudienceRows, toCanvasActivityCard } from "../developer/activity-labels";
 import { ActivitySection } from "../developer/activity-section";
-import { CHART_LINES, toActivitySlots } from "../developer/activity-slots";
+import { chartLinesFor, toActivitySlots } from "../developer/activity-slots";
 import { DeveloperWindow } from "../developer/developer-window";
 import { noop, SAMPLE_BROKEN_PHOTO, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtures";
 import { Specimen, SpecimenSection } from "./specimen-section";
@@ -43,6 +44,17 @@ const samplePoints = (period: ActivityPeriod, nowMs: number): ActivityPoint[] =>
       streamed: index % 300 < 120 ? 2 : 1,
       pixels: Math.round(45 + 40 * Math.sin(index / 40) + (index % 11) * 3),
       signups: index % 97 === 0 ? 1 : 0,
+      visits: Math.round(2 + 2 * Math.sin(index / 70) + (index % 3)),
+      phoneVisits: index % 3,
+      visitMinutes: Math.round(12 + 9 * Math.sin(index / 50) + (index % 7)),
+      // Les distincts ne se gardent que par jour : Tout seulement
+      ...(period === "all"
+        ? {
+            activeAccounts: Math.round(14 + 6 * Math.sin(index / 20) + (index % 4)),
+            activePlayers: Math.round(8 + 4 * Math.sin(index / 25) + (index % 3)),
+            activeStreamers: index % 30 < 12 ? 3 : 2,
+          }
+        : {}),
     }));
 };
 
@@ -101,9 +113,36 @@ const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
   },
 ];
 
+const NO_AUDIENCE = {
+  visits: 0,
+  phoneVisits: 0,
+  visitMinutes: 0,
+  activeAccounts: 0,
+  activePlayers: 0,
+  activeStreamers: 0,
+};
+
 const sampleFrame = (nowMs: number): ActivityFrame => ({
   t: "activity",
   now: { people: 6, guests: 3, streamed: 1, pixels: 87, signups: 3 },
+  audience: {
+    today: {
+      visits: 38,
+      phoneVisits: 19,
+      visitMinutes: 200,
+      activeAccounts: 14,
+      activePlayers: 9,
+      activeStreamers: 3,
+    },
+    month: {
+      visits: 1214,
+      phoneVisits: 497,
+      visitMinutes: 5461,
+      activeAccounts: 212,
+      activePlayers: 131,
+      activeStreamers: 11,
+    },
+  },
   canvases: sampleCanvases(nowMs),
 });
 
@@ -160,6 +199,7 @@ export const DeveloperSection = () => {
   const [nowMs] = useState(() => Date.now());
   const [kalyss, guestsOnly, hotOnly] = sampleCanvases(nowMs);
   const daySlots = toActivitySlots(samplePoints("day", nowMs), "day", nowMs);
+  const allSlots = toActivitySlots(samplePoints("all", nowMs), "all", nowMs);
   return (
     <section className="design-section" aria-labelledby="design-developer">
       <h2 id="design-developer" className="lp-type-heading">
@@ -213,6 +253,30 @@ export const DeveloperSection = () => {
       </SpecimenSection>
 
       <SpecimenSection
+        title="StatTable"
+        note="Un tableau de chiffres : une ligne par chiffre, une colonne par période, une précision sous une valeur. Sur mobile, il garde ses colonnes."
+      >
+        <Specimen caption="L'audience : aujourd'hui et 30 jours">
+          <div className="design-window-box">
+            <StatTable
+              caption="L'audience d'aujourd'hui et des 30 derniers jours"
+              columns={AUDIENCE_COLUMNS}
+              rows={toAudienceRows(sampleFrame(nowMs).audience)}
+            />
+          </div>
+        </Specimen>
+        <Specimen caption="Sans visite : la durée moyenne n'existe pas, un tiret">
+          <div className="design-window-box">
+            <StatTable
+              caption="L'audience d'un jour sans visite"
+              columns={AUDIENCE_COLUMNS}
+              rows={toAudienceRows({ today: NO_AUDIENCE, month: NO_AUDIENCE })}
+            />
+          </div>
+        </Specimen>
+      </SpecimenSection>
+
+      <SpecimenSection
         title="CanvasActivityCard"
         note="Une ligne par canvas, une carte sur mobile. Le chevron déplie qui est dessus."
       >
@@ -244,13 +308,26 @@ export const DeveloperSection = () => {
       >
         <Specimen caption="24 h, un point par minute, un trou de 40 min">
           <div className="design-window-box">
-            <TimeCharts lines={CHART_LINES} slots={daySlots} emptyText="Aucun point sur cette période." />
+            <TimeCharts
+              lines={chartLinesFor("day")}
+              slots={daySlots}
+              emptyText="Aucun point sur cette période."
+            />
+          </div>
+        </Specimen>
+        <Specimen caption="Tout, un point par jour : trois courbes de plus, les comptes, joueurs et streamers actifs">
+          <div className="design-window-box">
+            <TimeCharts
+              lines={chartLinesFor("all")}
+              slots={allSlots}
+              emptyText="Aucun point sur cette période."
+            />
           </div>
         </Specimen>
         <Specimen caption="Une autre période se charge : les courbes d'avant, grisées">
           <div className="design-window-box">
             <TimeCharts
-              lines={CHART_LINES}
+              lines={chartLinesFor("day")}
               slots={daySlots}
               emptyText="Aucun point sur cette période."
               isLoading
@@ -259,7 +336,11 @@ export const DeveloperSection = () => {
         </Specimen>
         <Specimen caption="Aucun point sur la période">
           <div className="design-window-box">
-            <TimeCharts lines={CHART_LINES} slots={[null, null]} emptyText="Aucun point sur cette période." />
+            <TimeCharts
+              lines={chartLinesFor("day")}
+              slots={[null, null]}
+              emptyText="Aucun point sur cette période."
+            />
           </div>
         </Specimen>
       </SpecimenSection>
