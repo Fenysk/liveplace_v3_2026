@@ -1,7 +1,9 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  ARCHIVE_NAME_MAX_LENGTH,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
+  CANVAS_STATUSES,
   CANVAS_WIDTH,
   CELL_STRIDE,
   type CellKey,
@@ -13,10 +15,17 @@ import {
   GAUGE_MAX_CEILING,
   GAUGE_MAX_START,
   type GaugeParams,
+  generateLinkCode,
   isCanvasSize,
   isDeveloper,
   isGaugeLimits,
+  isLinkCode,
   isObsDelayStep,
+  LINK_CODE_ALPHABET,
+  LINK_CODE_LENGTH,
+  MAX_ARCHIVES,
+  OBS_BACKGROUND,
+  OBS_BACKGROUNDS,
   OBS_DELAY_MS,
   OBS_DELAY_STEPS_MS,
   PALETTE,
@@ -30,6 +39,7 @@ import {
   type StateOffset,
   TRANSPARENT_COLOR_INDEX,
   toActivityPointStarts,
+  toArchiveName,
   toCell,
   toCellKey,
   toParisDay,
@@ -337,6 +347,14 @@ describe("the canvas sizes (CDC 2026 §1)", () => {
   });
 });
 
+describe("the OBS backgrounds (CDC 2026 §1)", () => {
+  // Transparent par défaut, puis noir et blanc, dans l'ordre où le réglage les montre
+  it("lists transparent, black and white, transparent being the default", () => {
+    expect(OBS_BACKGROUNDS).toEqual(["transparent", "black", "white"]);
+    expect(OBS_BACKGROUND).toBe("transparent");
+  });
+});
+
 describe("the OBS delay steps (JOURNAL 2026-09-25)", () => {
   // Part de zéro, monte jusqu'à 10 min, et le défaut de 10 s en est un
   it("goes from none up to 10 minutes, the 10 s default being one of them", () => {
@@ -352,6 +370,80 @@ describe("the OBS delay steps (JOURNAL 2026-09-25)", () => {
     expect(isObsDelayStep(7_000)).toBe(false);
     expect(isObsDelayStep(-5_000)).toBe(false);
     expect(isObsDelayStep(20 * 60_000)).toBe(false);
+  });
+});
+
+describe("the archives (Écart §15, JOURNAL 2026-10-06)", () => {
+  // Un canvas se dit en trois statuts, et un streamer garde cinq archives au plus
+  it("speaks of three statuses, and an owner keeps five archives at most", () => {
+    expect(CANVAS_STATUSES).toEqual(["archived", "active", "discarded"]);
+    expect(MAX_ARCHIVES).toBe(5);
+  });
+
+  // L'alphabet est du base58 : 58 caractères distincts, sans 0, O, I ni l
+  it("draws from base58: 58 distinct characters, without 0, O, I nor l", () => {
+    expect(LINK_CODE_ALPHABET).toHaveLength(58);
+    expect(new Set(LINK_CODE_ALPHABET).size).toBe(58);
+    for (const confusing of ["0", "O", "I", "l"]) expect(LINK_CODE_ALPHABET).not.toContain(confusing);
+  });
+
+  // Tire 10 caractères de l'alphabet
+  it("draws 10 characters of the alphabet", () => {
+    const code = generateLinkCode((size) => crypto.getRandomValues(new Uint8Array(size)));
+
+    expect(code).toHaveLength(LINK_CODE_LENGTH);
+    expect([...code].every((character) => LINK_CODE_ALPHABET.includes(character))).toBe(true);
+  });
+
+  // Rejette les octets de 232 et plus : leur reste (modulo 58) favoriserait les premiers caractères
+  it("rejects bytes from 232 up, whose remainder would favour the first characters", () => {
+    const bytes = [232, 233, 255, 0, 1, 57, 58, 115, 116, 231, 173, 3, 4];
+
+    const code = generateLinkCode((size) => Uint8Array.from(bytes.splice(0, size)));
+
+    // 232, 233 et 255 sautent ; 0 → « 1 », 1 → « 2 », 57 → « z », 58 → « 1 », 115 → « z », 116 → « 1 », 231 → « z »,
+    // 173 → « z », 3 → « 4 », 4 → « 5 »
+    expect(code).toBe("12z1z1zz45");
+  });
+
+  // Redemande des octets tant qu'il en manque
+  it("asks for more bytes as long as some are missing", () => {
+    const batches = [
+      [240, 250],
+      [5, 6, 7],
+      [8, 9, 10, 11, 12, 13, 14],
+    ];
+
+    const code = generateLinkCode(() => Uint8Array.from(batches.shift() ?? []));
+
+    expect(code).toBe("6789ABCDEF");
+  });
+
+  // Ne reconnaît un code que de 10 caractères de l'alphabet
+  it("recognises a code only when it has 10 characters of the alphabet", () => {
+    expect(isLinkCode("3mAqXz9RbK")).toBe(true);
+    expect(isLinkCode("3mAqXz9Rb")).toBe(false);
+    expect(isLinkCode("3mAqXz9RbKx")).toBe(false);
+    expect(isLinkCode("3mAqXz9Rb0")).toBe(false);
+    expect(isLinkCode("3mAqXz9RbO")).toBe(false);
+    expect(isLinkCode("3mAqXz9Rb/")).toBe(false);
+    expect(isLinkCode("")).toBe(false);
+  });
+
+  // Le nom d'une archive est nettoyé : sans espace en trop, sans caractère de contrôle, 40 caractères au plus
+  it("cleans an archive name: no extra spaces, no control characters, 40 characters at most", () => {
+    expect(toArchiveName("  Fête du 14  ")).toBe("Fête du 14");
+    expect(toArchiveName("Fête \n du\t14")).toBe("Fête du 14");
+    expect(toArchiveName("a".repeat(60))).toBe("a".repeat(ARCHIVE_NAME_MAX_LENGTH));
+    expect(toArchiveName(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
+  });
+
+  // Un nom vide ne donne aucun nom, et un caractère hors du plan de base n'est jamais coupé en deux
+  it("gives no name for an empty one, and never cuts a character outside the basic plane in two", () => {
+    expect(toArchiveName("")).toBeUndefined();
+    expect(toArchiveName("   ")).toBeUndefined();
+    expect(toArchiveName("\u0000\u0007")).toBeUndefined();
+    expect(toArchiveName("🎨".repeat(41))).toBe("🎨".repeat(ARCHIVE_NAME_MAX_LENGTH));
   });
 });
 

@@ -5,9 +5,22 @@ local userId, requestId = ARGV[1], ARGV[2]
 local nowMs, growthFactor = tonumber(ARGV[3]), tonumber(ARGV[4])
 local gaugeTtlSeconds, reqTtlSeconds = ARGV[5], ARGV[6]
 
-local meta = redis.call("HMGET", metaKey, "ready", "gaugeMaxStart", "gaugeMaxCeiling", "refillMs", "refillCharges")
+-- Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+local meta = redis.call(
+  "HMGET",
+  metaKey,
+  "ready",
+  "gaugeMaxStart",
+  "gaugeMaxCeiling",
+  "refillMs",
+  "refillCharges",
+  "archivedAt"
+)
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
+end
+if meta[6] then
+  return { "canvas_archived" }
 end
 local limits = { start = tonumber(meta[2]), ceiling = tonumber(meta[3]) }
 local refillMs, refillCharges = tonumber(meta[4]), tonumber(meta[5])

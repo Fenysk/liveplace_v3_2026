@@ -3,22 +3,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../state/canvas-store";
-import { createDraftStore, type DraftClock, type DraftStore } from "../state/draft-store";
+import { createDraftStore, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
 import { type AccountSection, AccountWindow, SETTINGS_SECTION } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
+import { ArchivesTab } from "../ui/archive/archives-tab";
+import { createOwnSwitchTracker } from "../ui/archive/own-switch";
 import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
+import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
 import type { ProfileUser } from "../ui/design/profile";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DeveloperWindow } from "../ui/developer/developer-window";
 import { LiveActivitySection } from "../ui/developer/live-activity-section";
 import { useDeveloperWindow } from "../ui/developer/use-developer-window";
+import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
@@ -38,14 +42,8 @@ import { useScoreboardRows } from "../ui/scoreboard/use-scoreboard";
 import { useScoreboardCollapse } from "../ui/scoreboard/use-scoreboard-collapse";
 import { CanvasNotFound, noStoreHeaders, resolveGameCanvasPage } from "./-canvas-page";
 
-// Lu à chaque accès : dans une fenêtre qui refuse le stockage, l'accès lui-même lève (le brouillon l'attrape).
-const getBrowserStorage = () => window.localStorage;
-const browserClock: DraftClock = {
-  now: () => Date.now(),
-  wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};
-
-type Stores = { canvas: CanvasStore; draft: DraftStore };
+// `canvasId` : à quel canvas ces stores sont ouverts. La page en change quand le streamer archive (Écart §15, JOURNAL 2026-10-06).
+type Stores = { canvasId: string; canvas: CanvasStore; draft: DraftStore };
 
 // Avant les stores (rendu serveur, puis le temps d'ouvrir le WebSocket), la pill Dessin est déjà là, en connexion.
 const doNothing = (): void => undefined;
@@ -78,10 +76,12 @@ type WindowState = { isOpen: boolean; sectionId: AccountSection };
 const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePillsProps) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
+  // Écart §15 (JOURNAL 2026-10-06) : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
+  const [switchTracker] = useState(createOwnSwitchTracker);
   const draft = useDraftPillProps(stores, login, signingIn);
   const moderation = useModeration(stores.canvas);
   const reporting = useReport(stores.canvas);
-  useCanvasToasts(stores);
+  useCanvasToasts(stores, switchTracker, owner.displayName);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const banned = useBannedWindowProps(stores.canvas);
   const developer = useDeveloperWindow(stores.canvas); // écart §10.3 (JOURNAL 2026-10-06) : le développeur seul
@@ -133,6 +133,16 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
           }
           obsTab={isOwner ? <ObsTab canvas={stores.canvas} login={login} /> : undefined}
           canvasTab={isOwner ? <CanvasTab canvas={stores.canvas} /> : undefined}
+          canvasesTab={
+            isOwner ? (
+              <ArchivesTab
+                key={stores.canvasId}
+                canvas={stores.canvas}
+                login={login}
+                tracker={switchTracker}
+              />
+            ) : undefined
+          }
           scoreboardTab={isCompact ? <ScoreboardList rows={scoreboard} /> : undefined}
         />
       )}
@@ -160,6 +170,8 @@ const GamePage = () => {
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
+  // Écart §15 (JOURNAL 2026-10-06) : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
+  useFollowActiveCanvas(stores?.canvas);
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
@@ -167,7 +179,7 @@ const GamePage = () => {
     if (isObsView()) return;
     const canvas = openCanvas(canvasId, "ui");
     const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock);
-    setStores({ canvas, draft });
+    setStores({ canvasId, canvas, draft });
     return () => {
       draft.dispose();
       canvas.close();
@@ -182,7 +194,7 @@ const GamePage = () => {
   return (
     <main className="lp-game">
       <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
-      {stores && (
+      {stores?.canvasId === canvasId && (
         <PixelCanvas
           store={stores.canvas}
           draftStore={stores.draft}

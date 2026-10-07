@@ -151,13 +151,16 @@ describe("protocol frames", () => {
     });
   });
 
-  // Refuse une page du protocole 11 : elle se recharge pour reprendre le protocole du moment, 13 depuis l'activité
-  // (écart §4.3, JOURNAL 2026-10-06)
-  it("refuses a page of protocol 11, which reloads to take the current protocol", () => {
+  // Refuse une page du protocole 11, 12 ou 13 : elle se recharge pour reprendre le protocole du moment, 14 depuis le
+  // canvas archivé (écart §4.3, JOURNAL 2026-10-06)
+  it("refuses a page of protocol 11, 12 or 13, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
 
     expect(hello(11).ok).toBe(false);
+    expect(hello(12).ok).toBe(false);
+    expect(hello(13).ok).toBe(false);
+    expect(hello(14).ok).toBe(true);
     expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
@@ -252,6 +255,96 @@ describe("protocol frames", () => {
   });
 });
 
+// Protocole 14 : le fond noir de la vue OBS, à côté du transparent et du blanc
+describe("protocol 14: the OBS background", () => {
+  const params = {
+    gaugeMaxStart: 10,
+    gaugeMaxCeiling: 150,
+    refillMs: 10_000,
+    refillCharges: 1,
+    obsDelayMs: 5000,
+  };
+  const welcomeWith = (obsBackground: string) => ({
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: { ...params, obsBackground },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  });
+
+  // Le noir se demande, se confirme et se dit dans le welcome, comme le blanc ; une autre couleur est refusée
+  it("asks for black, confirms it and tells it in the welcome like white, and refuses another color", () => {
+    for (const obsBackground of ["transparent", "black", "white"]) {
+      expect(decodeClientFrame({ t: "setObsBackground", requestId: "r", obsBackground }).ok).toBe(true);
+      expect(decodeServerFrame({ t: "obsBackground", obsBackground }).ok).toBe(true);
+      expect(decodeServerFrame(welcomeWith(obsBackground)).ok).toBe(true);
+    }
+    expect(decodeClientFrame({ t: "setObsBackground", requestId: "r", obsBackground: "red" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "obsBackground", obsBackground: "red" }).ok).toBe(false);
+    expect(decodeServerFrame(welcomeWith("red")).ok).toBe(false);
+  });
+});
+
+// Protocole 14 (Écart §15, JOURNAL 2026-10-06) : le welcome dit l'archive, et une frame annonce le statut du canvas
+describe("protocol 14: the archive", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  };
+
+  // Refuse un hello resté au protocole 13, celui de l'activité
+  it("refuses a hello still on protocol 13", () => {
+    const hello = { t: "hello", protocolVersion: 13, canvasId: "abc123", mode: "ui" };
+
+    expect(decodeClientFrame(hello).ok).toBe(false);
+    expect(decodeClientFrame({ ...hello, protocolVersion: 14 }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBe(14);
+  });
+
+  // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
+  it("keeps the archive date in a welcome, and accepts a welcome without one", () => {
+    const archived = { ...welcome, canvas: { ...welcome.canvas, archivedAt: 1_700_000_000_000 } };
+
+    expect(decodeServerFrame(archived)).toEqual({ ok: true, value: archived });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+    expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, archivedAt: "hier" } }).ok).toBe(
+      false,
+    );
+  });
+
+  // Annonce un canvas archivé, redevenu actif ou supprimé, et rien d'autre qu'un statut
+  it("announces a canvas archived, active again or discarded, and nothing but a status", () => {
+    for (const status of ["archived", "active", "discarded"])
+      expect(decodeServerFrame({ t: "canvasStatus", status })).toEqual({
+        ok: true,
+        value: { t: "canvasStatus", status },
+      });
+
+    expect(decodeServerFrame({ t: "canvasStatus", status: "frozen" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "canvasStatus" }).ok).toBe(false);
+  });
+
+  // Nomme l'écriture refusée sur une archive : le code, et sa requête quand elle en a une
+  it("names a write refused on an archive: the code, and its request when it has one", () => {
+    const refused = { t: "error", code: "canvas_archived", requestId: "place-1" };
+
+    expect(decodeServerFrame(refused)).toEqual({ ok: true, value: refused });
+    expect(decodeServerFrame({ t: "error", code: "canvas_archived" }).ok).toBe(true);
+  });
+});
+
 // JOURNAL 2026-09-29 (audit de sécurité §4) : une frame du client n'a que les clés de son schéma.
 describe("strict client frames", () => {
   const hello = { t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId: "abc123", mode: "ui" };
@@ -308,6 +401,7 @@ describe("strict client frames", () => {
       { t: "setModerator", requestId: "r", userId: "u1", isModerator: true },
       { t: "setObsDelay", requestId: "r", obsDelayMs: 10_000 },
       { t: "setObsBackground", requestId: "r", obsBackground: "white" },
+      { t: "setObsBackground", requestId: "r", obsBackground: "black" },
       report,
       { t: "listAuthorPixels", requestId: "r", x: 0, y: 0, placementId: "42" },
       { t: "listReports", requestId: "r" },
@@ -349,9 +443,9 @@ describe("activity frames", () => {
   };
   const point = { at: 60_000, people: 3, streamed: 1, pixels: 40, signups: 0 };
 
-  // Passe au protocole 13, après le 12 du classement : une page en 12 se recharge
-  it("is protocol 13, after the scoreboard's 12: a page in 12 reloads", () => {
-    expect(PROTOCOL_VERSION).toBe(13);
+  // Passe au protocole 13, après le 12 du classement (le 14 des archives vient ensuite) : une page en 12 se recharge
+  it("is protocol 13 or later, after the scoreboard's 12: a page in 12 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(13);
     expect(decodeClientFrame({ t: "hello", protocolVersion: 12, canvasId: "c1", mode: "ui" }).ok).toBe(false);
   });
 

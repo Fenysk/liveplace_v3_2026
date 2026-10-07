@@ -1,8 +1,9 @@
 // Les dépendances du serveur du web, construites une fois (§3.3). Jamais importé par le navigateur : voir `start.ts`.
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import { generateLinkCode } from "@liveplace/domain";
 import { createDurableStore } from "@liveplace/durable";
-import { createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
+import { createArchiveWrites, createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionSigner, createSessionVerifier } from "../infra/session";
 import { createTwitchAuth, createTwitchEventSub, createTwitchWebhook } from "../infra/twitch";
@@ -21,6 +22,7 @@ const buildServerDeps = () => {
     durable: createDurableStore(config.convexUrl, config.convexServiceKey),
     redis: createSignInWrites(redis),
     twitchWrites: createTwitchWrites(redis), // JOURNAL 2026-09-27
+    archiveWrites: createArchiveWrites(redis), // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub: createTwitchEventSub({
       clientId: config.twitchClientId,
@@ -33,6 +35,8 @@ const buildServerDeps = () => {
     signer: createSessionSigner(config.sessionSecret),
     verifier: createSessionVerifier(config.sessionSecret), // Écart §10.2 (JOURNAL 2026-10-06) : l'affichage de `/{login}`
     randomCanvasId: randomUUID,
+    // Écart §10.3 (JOURNAL 2026-10-06) : le code d'une archive, tiré par le web, sans biais de modulo.
+    randomLinkCode: () => generateLinkCode((size) => randomBytes(size)),
     publicUrl: config.publicUrl, // les en-têtes de sécurité en tirent HTTPS et l'hôte du WebSocket (JOURNAL 2026-09-29)
     // Derrière Traefik, la requête arrive en http : c'est l'URL publique qui dit si le site est en https.
     isSecure: config.publicUrl.startsWith("https://"),

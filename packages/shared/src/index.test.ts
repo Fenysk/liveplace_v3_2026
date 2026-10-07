@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { cookieValue, serializeCookie } from "./index";
+import { cookieValue, fromBase64, serializeCookie, toBase64 } from "./index";
+
+describe("toBase64 and fromBase64 (Écart §15, JOURNAL 2026-10-06)", () => {
+  // Écrit les octets en base64, comme tout le monde le fait
+  it("writes bytes in base64, as everyone does", () => {
+    expect(toBase64(Uint8Array.from([104, 105]))).toBe("aGk=");
+    expect(toBase64(new Uint8Array(0))).toBe("");
+    expect(toBase64(Uint8Array.from([255, 254, 253]))).toBe("//79");
+  });
+
+  // Rend les mêmes octets, sur tous les octets possibles
+  it("gives the same bytes back, over every possible byte", () => {
+    const every = Uint8Array.from({ length: 256 }, (_, byte) => byte);
+
+    expect(fromBase64(toBase64(every))).toEqual(every);
+    expect(fromBase64("")).toEqual(new Uint8Array(0));
+  });
+
+  // Tient sur un grand canvas : 256 × 256 octets, sans faire déborder la pile
+  it("holds on a large canvas: 256 × 256 bytes, without overflowing the stack", () => {
+    const large = Uint8Array.from({ length: 256 * 256 }, (_, index) => index % 251);
+
+    expect(fromBase64(toBase64(large))).toEqual(large);
+  });
+});
 
 describe("cookieValue", () => {
   // Retrouve la valeur d'un cookie parmi les autres

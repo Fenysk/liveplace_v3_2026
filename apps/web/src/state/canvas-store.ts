@@ -2,6 +2,7 @@
 
 import {
   type ActivityPeriod,
+  type CanvasStatus,
   type GaugeLimits,
   type ObsBackground,
   type Role,
@@ -82,6 +83,10 @@ export type CanvasView = {
   role?: Role;
   ownerId?: string; // le streamer : jamais modéré sur son canvas (JOURNAL 2026-09-25)
   isBanned: boolean; // lecture seule (§10.2), mis par `banned`, retiré par `unbanned`
+  // Écart §15 (JOURNAL 2026-10-06) : le canvas est une archive, lecture seule pour tous. Le `welcome` le dit, la frame
+  // `canvasStatus` le change, et une écriture refusée par `canvas_archived` l'apprend. `isDiscarded` : il a été supprimé.
+  isArchived: boolean;
+  isDiscarded: boolean;
   userId?: string; // absent pour un invité
   login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
@@ -172,6 +177,10 @@ const toModeratorList = (reply: ReplyFrame): ModeratorList | undefined =>
     ? { users: reply.users, ...(reply.twitchSync ? { twitchSync: reply.twitchSync } : {}) }
     : undefined;
 
+// Écart §15 (JOURNAL 2026-10-06) : ce que dit la frame `canvasStatus` du canvas ouvert.
+const toStatusView = (status: CanvasStatus): Partial<CanvasView> =>
+  status === "discarded" ? { isDiscarded: true } : { isArchived: status === "archived", isDiscarded: false };
+
 export function createCanvasStore(
   canvasId: string,
   transport: Transport,
@@ -188,6 +197,8 @@ export function createCanvasStore(
     lastError: null,
     inspection: null,
     isBanned: false,
+    isArchived: false,
+    isDiscarded: false,
     pixels: new Uint8Array(0),
   };
   const listeners = new Set<() => void>();
@@ -200,6 +211,9 @@ export function createCanvasStore(
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
+  // Écart §15 (JOURNAL 2026-10-06) : fermé par la page qui change de canvas, le socket qui tombe ensuite
+  // n'est pas une coupure : rien ne reprendra, et rien ne l'annonce.
+  let isClosedByPage = false;
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
 
   const emit = (arrival: Arrival): void => {
@@ -314,6 +328,7 @@ export function createCanvasStore(
       palette: frame.palette,
       version: frame.version,
       role,
+      isArchived: frame.canvas.archivedAt !== undefined,
       params: frame.params,
       gauge: frame.gauge ?? null,
       ...(userId ? { userId } : {}),
@@ -354,6 +369,14 @@ export function createCanvasStore(
     if (code !== "protocol_version") return;
     transport.close();
     publish({ status: "closed" });
+  };
+
+  // Écart §15 (JOURNAL 2026-10-06) : une écriture refusée parce que le canvas est archivé vaut pour tout ce qui attend.
+  // Pas de `lastError` : ce n'est pas un refus à montrer, la page va suivre le canvas actif.
+  const archive = (): void => {
+    settleAllPending({ ok: false, error: "canvas_archived" });
+    failAllRequests("canvas_archived");
+    publish({ isArchived: true });
   };
 
   // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle.
@@ -439,8 +462,12 @@ export function createCanvasStore(
       case "gaugeLimits":
         takeSetting(frame);
         break;
+      case "canvasStatus":
+        publish(toStatusView(frame.status));
+        break;
       case "error":
-        if (frame.requestId) refuseRequest(frame.requestId, frame.code);
+        if (frame.code === "canvas_archived") archive();
+        else if (frame.requestId) refuseRequest(frame.requestId, frame.code);
         else refuse(frame.code);
         break;
       default:
@@ -467,6 +494,8 @@ export function createCanvasStore(
     // Les lots attendent la reprise (JOURNAL 2026-09-25) ; les modérations et les lectures échouent.
     onClose: () => {
       failAllRequests("closed");
+      // Écart §15 (JOURNAL 2026-10-06) : fermé par la page, le store n'annonce rien : ni reprise, ni classement effacé.
+      if (isClosedByPage) return;
       if (view.status !== "closed") publish({ status: "reconnecting" });
       // Après une coupure, rien n'est sûr : la page efface son classement, et le gateway lui renvoie le sien.
       if (view.scoreboard) publish({ scoreboard: undefined });
@@ -570,6 +599,9 @@ export function createCanvasStore(
       activityListeners.add(listener);
       return () => activityListeners.delete(listener);
     },
-    close: () => transport.close(),
+    close() {
+      isClosedByPage = true;
+      transport.close();
+    },
   };
 }

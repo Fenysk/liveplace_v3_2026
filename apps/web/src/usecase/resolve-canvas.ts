@@ -12,6 +12,13 @@ export type CanvasVisit = { verifier: SessionVerifier; cookieHeader: string | un
 // `isOwnerSession` : pour l'affichage seulement, le gateway décide du rôle (§10.3). Absent sans `CanvasVisit`.
 export type ResolvedCanvas = { canvasId: string; owner: CanvasOwner; isOwnerSession?: boolean };
 
+// Le profil de la pill Canvas, sans photo quand Twitch n'en a pas donné.
+export const toCanvasOwner = ({ displayName, login, avatarUrl }: User): CanvasOwner => ({
+  displayName,
+  login,
+  ...(avatarUrl ? { avatarUrl } : {}),
+});
+
 // Le gateway décide du rôle (§10.3) : ici, une erreur de vérification donne un invité, jamais une page cassée.
 async function isOwnerSession({ verifier, cookieHeader }: CanvasVisit, ownerId: string): Promise<boolean> {
   try {
@@ -23,7 +30,7 @@ async function isOwnerSession({ verifier, cookieHeader }: CanvasVisit, ownerId: 
 }
 
 export async function resolveCanvas(
-  durable: DurableStore,
+  durable: Pick<DurableStore, "getUserByLogin" | "getActiveCanvasForOwner">,
   login: string,
   visit?: CanvasVisit,
 ): Promise<ResolvedCanvas | null> {
@@ -31,10 +38,9 @@ export async function resolveCanvas(
   if (!owner) return null;
   const canvas = await durable.getActiveCanvasForOwner(owner.userId);
   if (!canvas) return null;
-  const { displayName, avatarUrl } = owner;
   return {
     canvasId: canvas.canvasId,
-    owner: { displayName, login: owner.login, ...(avatarUrl ? { avatarUrl } : {}) },
+    owner: toCanvasOwner(owner),
     ...(visit ? { isOwnerSession: await isOwnerSession(visit, owner.userId) } : {}),
   };
 }

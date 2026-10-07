@@ -102,9 +102,11 @@ export function createDraftStore(
     const bounds = { width, height, paletteSize: palette.length };
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
   };
-  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé.
-  const leaveIfBanned = (): void => {
-    if (canvas.getView().isBanned && view.mode === "draft") leaveDraftMode();
+  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. Écart §15 (JOURNAL 2026-10-06) : une archive aussi,
+  // personne n'y pose ; le brouillon reste rangé sous ce canvas et ne suit pas sur le nouveau.
+  const leaveIfReadOnly = (): void => {
+    const { isBanned, isArchived } = canvas.getView();
+    if ((isBanned || isArchived) && view.mode === "draft") leaveDraftMode();
   };
   // §5.3 : le canvas a rétréci, ce qui sort du cadre quitte le brouillon.
   const fitToCanvas = (): void => {
@@ -113,7 +115,7 @@ export function createDraftStore(
   };
   const unsubscribe = canvas.subscribe(() => {
     applySavedDraft();
-    leaveIfBanned();
+    leaveIfReadOnly();
     fitToCanvas();
   });
   applySavedDraft();
@@ -169,8 +171,8 @@ export function createDraftStore(
   };
 
   const submit = async (): Promise<void> => {
-    const { status, isBanned } = canvas.getView();
-    if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned) return;
+    const { status, isBanned, isArchived } = canvas.getView();
+    if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned || isArchived) return;
     publish({ isSending: true });
     try {
       await sendBatches();
@@ -188,8 +190,8 @@ export function createDraftStore(
     },
     getView: () => view,
     enterDraftMode() {
-      const { userId, isBanned } = canvas.getView();
-      if (isBanned) return;
+      const { userId, isBanned, isArchived } = canvas.getView();
+      if (isBanned || isArchived) return;
       // Un invité n'entre jamais en Dessin : la pill Dessin lui montre déjà l'invitation (CDC 2026).
       if (userId && !view.isSending) publish({ mode: "draft" });
     },

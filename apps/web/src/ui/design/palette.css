@@ -43,11 +43,22 @@
 
 /* Le damier du pixel transparent, fait des deux teintes du canvas */
 .lp-swatch--eraser,
+.lp-swatch.is-transparent,
 .lp-color-chip i.is-transparent,
 .lp-current-color i.is-transparent {
   background:
     conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
     0 / 10px 10px;
+}
+
+/* Les teintes d'un choix de couleur (Écart §15, JOURNAL 2026-10-06) : une classe par teinte, jamais un `style`, que la CSP
+   de production bloque dans le HTML du serveur. Le vrai noir et le vrai blanc du PNG viennent de tokens.css. */
+.lp-swatch--png-black {
+  background: var(--png-black);
+}
+
+.lp-swatch--png-white {
+  background: var(--png-white);
 }
 
 .lp-swatch--eraser {
@@ -73,6 +84,23 @@
   width: var(--control-size);
   height: var(--control-size);
   border-radius: var(--radius-pill);
+}
+
+/* Un choix de couleur (Écart §15, JOURNAL 2026-10-06) : les pastilles de la palette en une rangée, chacune sous son
+   nom. Posé après la variante au doigt : il en garde les pastilles rondes, et refait les colonnes. */
+.lp-palette--choice {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: start;
+  gap: var(--space-4);
+}
+
+.lp-swatch-option {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
 }
 
 /* Les couleurs récentes, plus discrètes que les contrôles : de la taille de la pastille de la couleur actuelle */

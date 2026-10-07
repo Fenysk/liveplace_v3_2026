@@ -1,11 +1,12 @@
-// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : la taille choisie, sa confirmation, puis la demande
-// au gateway. La nouvelle taille arrive d'elle-même, par un `welcome` et un snapshot, à toutes les pages.
+// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le nom du canvas, la taille choisie, sa confirmation,
+// puis la demande au gateway. La nouvelle taille arrive d'elle-même, par un `welcome` et un snapshot, à toutes les pages.
 
 import { useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import { CanvasSettings, type ResizeStatus, ResizeWindow } from "./canvas-settings";
 import { listOutsidePixels, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
+import { useCanvasName } from "./use-canvas-name";
 
 type CanvasTabProps = { canvas: CanvasStore };
 
@@ -21,6 +22,7 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const chosen = toCanvasSize(choice);
   const toast = useToast();
+  const name = useCanvasName();
 
   const confirm = () => {
     setStatus("running");
@@ -35,6 +37,7 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
   return (
     <>
       <CanvasSettings
+        name={name}
         current={current}
         choice={choice}
         chosen={chosen}

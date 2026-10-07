@@ -1,0 +1,32 @@
+/* Un champ de texte (Écart §15, JOURNAL 2026-10-06) : aussi haut qu'un contrôle, sur le fond des contrôles */
+
+.lp-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lp-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--control-size);
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+  color: var(--ink);
+}
+
+.lp-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.lp-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.lp-input:disabled {
+  opacity: 0.5;
+}

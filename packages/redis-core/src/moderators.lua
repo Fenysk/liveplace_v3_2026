@@ -4,9 +4,13 @@
 local metaKey, modsKey, twitchKey, liveplaceKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
 local liveChannel, userId, source, isModerator = ARGV[1], ARGV[2], ARGV[3], ARGV[4] == "1"
 
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId")
+-- Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "archivedAt")
 if meta[1] ~= "1" then
   return "canvas_not_found"
+end
+if meta[3] then
+  return "canvas_archived"
 end
 -- Le streamer a déjà tous les droits sur son canvas : il n'en est jamais modérateur.
 if userId == meta[2] then

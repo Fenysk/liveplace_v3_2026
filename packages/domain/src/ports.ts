@@ -6,6 +6,7 @@ import type {
   ActivityPeriod,
   CanvasMeta,
   CanvasSize,
+  CanvasStatus,
   GaugeLimits,
   ObsBackground,
   Session,
@@ -124,10 +125,15 @@ export type LiveControl =
   | { t: "obsBackground"; obsBackground: ObsBackground } // JOURNAL 2026-09-29
   | ({ t: "gaugeLimits" } & GaugeLimits) // chaque page reçoit sa jauge recalculée (JOURNAL 2026-09-30)
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
-  | { t: "resize" }; // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
+  | { t: "resize" } // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
+  | { t: "canvasStatus"; status: CanvasStatus }; // publié par le web : archivé, redevenu actif, supprimé (Écart §15, JOURNAL 2026-10-06)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
+
+// Écart §15 (JOURNAL 2026-10-06) : pourquoi un script ne sert pas un canvas. Absent ou pas prêt ; ou archivé, et il
+// ne reçoit plus aucune écriture : le gateway le dit à la page par l'erreur `canvas_archived`.
+export type CanvasRefusal = "canvas_not_found" | "canvas_archived";
 
 export interface CanvasCore {
   createCanvas(canvasId: string, meta: CanvasMeta): Promise<void>;
@@ -141,23 +147,20 @@ export interface CanvasCore {
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   // §5.6 : lue sans être écrite, pour le `welcome`.
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
-  place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">>;
+  place(canvasId: string, placement: Placement): Promise<Result<AckFrame, CanvasRefusal>>;
   // JOURNAL 2026-09-30 : un +1 de jauge max, idempotent par `requestId` comme la pose.
-  claimGauge(canvasId: string, claim: GaugeClaim): Promise<Result<AckFrame, "canvas_not_found">>;
+  claimGauge(canvasId: string, claim: GaugeClaim): Promise<Result<AckFrame, CanvasRefusal>>;
   inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null>; // `null` : personne n'a posé ici
   moderate(
     canvasId: string,
     moderation: Moderation,
-  ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">>;
+  ): Promise<Result<ModerationSlice, CanvasRefusal | "forbidden">>;
   // §5.6 : l'état banni au `hello`, les pixels d'un auteur, et les bannis.
   isBanned(canvasId: string, userId: string): Promise<boolean>;
   listPixels(canvasId: string, userId: string): Promise<AuthoredPixel[]>; // un banni : sa preuve (§5.1)
   listBans(canvasId: string): Promise<BannedUser[]>;
   // §5.4 : `changed`, la case ne montre plus cette pose ; `forbidden`, elle ne se signale pas.
-  report(
-    canvasId: string,
-    report: Report,
-  ): Promise<Result<void, "canvas_not_found" | "changed" | "forbidden">>;
+  report(canvasId: string, report: Report): Promise<Result<void, CanvasRefusal | "changed" | "forbidden">>;
   canReport(canvasId: string, placement: PlacementRef, reporterId: string): Promise<boolean>; // ni signalée par lui, ni rétablie, ni lui banni
   listReports(canvasId: string): Promise<ReportedPlacement[]>; // du plus ancien signalement au plus récent
   // §4.3 : les pixels de l'auteur de la pose en (x, y). `null` : la case a changé.
@@ -177,7 +180,7 @@ export interface CanvasCore {
   resizeCanvas(
     canvasId: string,
     resize: CanvasSize & { by: string },
-  ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
+  ): Promise<Result<void, CanvasRefusal | "forbidden">>;
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
   listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;
   // Le `recent` de la vue OBS (§9.5) : les événements depuis `sinceMs`, du plus ancien au plus récent, 2000 au plus.
@@ -187,12 +190,11 @@ export interface CanvasCore {
   setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
   setGaugeLimits(canvasId: string, limits: GaugeLimits): Promise<void>; // JOURNAL 2026-09-30, comme le délai
   // §5.1 : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
-  setModerator(
-    canvasId: string,
-    change: ModeratorRole,
-  ): Promise<Result<void, "canvas_not_found" | "forbidden">>;
+  setModerator(canvasId: string, change: ModeratorRole): Promise<Result<void, CanvasRefusal | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
   getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
+  // Écart §15 (JOURNAL 2026-10-06) : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.
+  copyTwitchUsers(fromCanvasId: string, toCanvasId: string, userIds: readonly string[]): Promise<void>;
   // `null` : pas modérateur. Pour la pill Inspection du streamer (JOURNAL 2026-09-27).
   getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
@@ -237,8 +239,76 @@ export interface SignupWrites {
   storeSignup(signup: Signup): Promise<void>;
 }
 
+// Le verrou d'un propriétaire, pris pour la durée d'un changement de canvas actif : `holderId` ne se rend qu'à qui l'a pris.
+export type OwnerLock = { ownerId: string; holderId: string };
+
+// L'image d'un canvas, pour sa miniature : un octet par case, l'index de palette.
+export type CanvasImage = { width: number; height: number; state: Uint8Array };
+
+// Écart §15 (JOURNAL 2026-10-06) : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas. Jamais un
+// pixel, donc jamais de script (§2). L'ordre des appels est celui de l'usecase : il fait l'opération fiable.
+export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
+  // Un seul changement à la fois par propriétaire (double clic, deux onglets). `null` : un autre est en cours.
+  acquireOwnerLock(ownerId: string): Promise<OwnerLock | null>;
+  releaseOwnerLock(lock: OwnerLock): Promise<void>;
+  // Le canvas qui entre : `meta`, `state` vide et version 0, sans `ready` : personne ne le sert encore.
+  prepareCanvas(canvasId: string, meta: CanvasMeta): Promise<void>;
+  markReady(canvasId: string): Promise<void>;
+  // Un seul `HSET` : dès lors, aucun script n'écrit plus sur ce canvas, et `successorId` dit où suivre.
+  markArchived(canvasId: string, archived: { archivedAt: Timestamp; successorId: string }): Promise<void>;
+  markActive(canvasId: string): Promise<void>; // retire `archivedAt` et `successorId`
+  setSuccessor(canvasId: string, successorId: string | null): Promise<void>; // `null` : plus de successeur
+  // Ce que les canvas du streamer partagent, recopié du sortant vers l'entrant en REMPLAÇANT le sien : bannis et leurs
+  // preuves, modérateurs, noms Twitch, et dans `meta` le délai, le fond et la synchro Twitch. Le classement de l'entrant
+  // reste le sien, mais suit ses nouveaux bannis : un banni en sort, un débanni y revient (règle de moderate.lua).
+  copyShared(fromCanvasId: string, toCanvasId: string): Promise<void>;
+  // « Garder » : la progression de l'entrant devient celle du sortant, effacée puis recopiée. Jamais `gauge:*`.
+  copyProgress(fromCanvasId: string, toCanvasId: string): Promise<void>;
+  // Classés sans suite : `reported`, `reports:*` et `offstream` vidés ; `approved` reste.
+  settleReports(canvasId: string): Promise<void>;
+  publishStatus(canvasId: string, status: CanvasStatus): Promise<void>;
+  discardCanvas(canvasId: string): Promise<void>; // toutes les clés `cv:<id>:*`
+  getCanvasImage(canvasId: string): Promise<CanvasImage | null>;
+}
+
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
+
+// Écart §15 (JOURNAL 2026-10-06) : le canvas actif d'un propriétaire. Son nom et son code ne viennent que d'une archive rouverte.
+export type ActiveCanvas = OwnedCanvas & { createdAt: Timestamp; name?: string; linkCode?: string };
+
+// Une archive : son lien est `/{login}/archives/{linkCode}`, et rien d'autre ne la désigne aux yeux d'un public.
+export type Archive = OwnedCanvas & {
+  createdAt: Timestamp;
+  archivedAt: Timestamp;
+  linkCode: string;
+  name?: string;
+};
+
+export type OwnerCanvases = { active: ActiveCanvas | null; archives: Archive[] }; // archives : dans un ordre quelconque
+
+// Ce qu'un code de lien désigne : une archive, ou le canvas actif qui l'a gardé après une réouverture.
+export type LinkedCanvas = { status: "active" } | { status: "archived"; archive: Archive };
+
+// Archiver : le sortant (`outgoingId`, l'actif) devient une archive, l'entrant naît actif. `archivedAt` est aussi la
+// naissance de l'entrant ; `linkCode` ne sert que si le sortant n'en a pas déjà un ; sans `name`, l'archive n'en a pas.
+export type ArchiveInput = {
+  ownerId: string;
+  outgoingId: string;
+  incoming: OwnedCanvas;
+  archivedAt: Timestamp;
+  linkCode: string;
+  name?: string;
+};
+
+// Rouvrir : l'actif (`outgoingId`) devient une archive, `reopenedId` redevient actif, avec son code et son nom.
+export type ReopenInput = {
+  ownerId: string;
+  outgoingId: string;
+  reopenedId: string;
+  archivedAt: Timestamp;
+  linkCode: string;
+};
 
 // Ce que Twitch rend à la connexion : l'utilisateur, et son e-mail quand il en a un (JOURNAL 2026-09-27).
 // L'e-mail ne va qu'à Convex : ni dans la session, ni dans le miroir `user:`.
@@ -252,6 +322,20 @@ export interface DurableStore {
   // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
   ensureCanvasForOwner(ownerId: string, candidate: OwnedCanvas): Promise<string>;
   getActiveCanvasForOwner(ownerId: string): Promise<OwnedCanvas | null>;
+  // Écart §15 (JOURNAL 2026-10-06) : le canvas actif et les archives de ce propriétaire.
+  listCanvasesForOwner(ownerId: string): Promise<OwnerCanvases>;
+  // Une transaction. Refus : `not_active`, le sortant n'est pas l'actif de ce propriétaire ; `archives_full`, il a déjà
+  // MAX_ARCHIVES archives.
+  archiveActiveCanvas(archiving: ArchiveInput): Promise<Result<void, "not_active" | "archives_full">>;
+  // Une transaction. Refus : `not_active`, ou `not_archive` : ce n'est pas une archive de ce propriétaire.
+  reopenArchive(reopening: ReopenInput): Promise<Result<void, "not_active" | "not_archive">>;
+  // Le nom du canvas actif seulement : `not_active` si `canvasId` n'est pas l'actif de ce propriétaire. Sans `name`, le
+  // canvas n'en a plus.
+  renameActiveCanvas(ownerId: string, canvasId: string, name?: string): Promise<Result<void, "not_active">>;
+  // Jamais le canvas actif, jamais celui d'un autre propriétaire : `not_archive`.
+  discardArchive(ownerId: string, canvasId: string): Promise<Result<void, "not_archive">>;
+  // `null` : aucun canvas de ce propriétaire n'a ce code. Rendu sans session : le lien suffit à voir une archive.
+  getArchiveByLinkCode(ownerId: string, linkCode: string): Promise<LinkedCanvas | null>;
 }
 
 // `null` = invité (§10.2).

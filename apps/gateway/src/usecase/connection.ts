@@ -2,6 +2,7 @@
 
 import {
   type CanvasMeta,
+  type CanvasStatus,
   canModerate,
   type Device,
   PALETTE,
@@ -56,8 +57,9 @@ type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
-// Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, ou les signalements en
-// attente et les listes périmées pour qui modère, et le classement (JOURNAL 2026-09-28, 2026-10-06).
+// Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
+// attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), ou le statut du
+// canvas (Écart §15, JOURNAL 2026-10-06).
 type ControlFrame = Extract<
   ServerFrame,
   {
@@ -69,7 +71,8 @@ type ControlFrame = Extract<
       | "gaugeLimits"
       | "reportCount"
       | "staleList"
-      | "scoreboard";
+      | "scoreboard"
+      | "canvasStatus";
   }
 >;
 
@@ -82,6 +85,7 @@ type Arrival = { version: number; coveredVersion: number } & (
 
 // `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
 // §10.3 : le rôle se relit en direct, d'où `ownerId`.
+// Écart §15 (JOURNAL 2026-10-06) : `isArchived`, plus aucune écriture ; la connexion reste ouverte, pour qu'on y regarde.
 type ReadyState = {
   status: "ready";
   canvasId: string;
@@ -90,6 +94,7 @@ type ReadyState = {
   width: number;
   height: number;
   role: Role;
+  isArchived: boolean;
 };
 // `isRoleStale` : un `ctl` `role` est tombé pendant l'arrivée, le rôle lu au `hello` a pu vieillir.
 // `isSizeStale` : un `ctl` `resize` aussi, la taille lue au `hello` a pu changer (JOURNAL 2026-09-29).
@@ -108,8 +113,9 @@ type State =
   | ReadyState;
 
 export type ConnectionDeps = {
-  // Tout le noyau, sauf ce qu'écrit le web à la connexion et l'abonnement, que tient `broadcast`.
-  core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe">;
+  // Tout le noyau, sauf ce qu'écrit le web à la connexion, l'abonnement que tient `broadcast`, et ce que suivent les
+  // actions Twitch (`twitch-commands.ts`).
+  core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe" | "copyTwitchUsers">;
   broadcast: Broadcast;
   activity: Omit<Activity, "tick" | "start">; // écart §4.3 (JOURNAL 2026-10-06) : le gateway décide, et ne dit rien aux autres
   now: () => Timestamp;
@@ -141,6 +147,14 @@ const youOf = ({ userId, login, displayName, avatarUrl }: Session) => ({
 
 const withoutUserId = ({ userId, ...entry }: InspectEntry): InspectEntry => entry;
 
+// Le statut le plus récent l'emporte sur ce que `meta` disait au `hello` ; `discarded` n'y change rien : le canvas part.
+const isArchivedAfter = (status: CanvasStatus | undefined, wasArchived: boolean): boolean =>
+  status === undefined || status === "discarded" ? wasArchived : status === "archived";
+
+// Un statut tombé pendant l'arrivée est plus récent que le `meta` lu avant elle.
+const lastStatusOf = (controls: readonly ControlFrame[]): CanvasStatus | undefined =>
+  controls.flatMap((control) => (control.t === "canvasStatus" ? [control.status] : [])).at(-1);
+
 const buildWelcome = (
   canvasId: string,
   meta: CanvasMeta,
@@ -150,7 +164,13 @@ const buildWelcome = (
   gauge: AckFrame["gauge"] | null,
 ): WelcomeFrame => ({
   t: "welcome",
-  canvas: { canvasId, width: meta.width, height: meta.height, ownerId: meta.ownerId },
+  canvas: {
+    canvasId,
+    width: meta.width,
+    height: meta.height,
+    ownerId: meta.ownerId,
+    ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
+  },
   params: {
     gaugeMaxStart: meta.gaugeMaxStart,
     gaugeMaxCeiling: meta.gaugeMaxCeiling,
@@ -175,6 +195,7 @@ const controlFrameOf = (
   if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
   if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
   if (control.t === "reports") return canModerate(role) ? { t: "reportCount", count: control.count } : null;
+  if (control.t === "canvasStatus") return { t: "canvasStatus", status: control.status };
   return control.userId === session?.userId ? { t: control.t } : null;
 };
 
@@ -203,9 +224,9 @@ export function createConnection(
     else if (state.status === "ready") socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
   };
 
-  // §10.3 : ses droits ont changé, le rôle se relit et la page l'apprend.
+  // §10.3 : ses droits ont changé, le rôle se relit et la page l'apprend. Sur une archive, plus personne ne modère.
   const refreshRole = async (): Promise<void> => {
-    if (state.status !== "ready" || !session) return;
+    if (state.status !== "ready" || state.isArchived || !session) return;
     const ready = state;
     const isModerator = await deps.core.isModerator(ready.canvasId, session.userId);
     const role = roleFor(session, ready, isModerator);
@@ -242,9 +263,14 @@ export function createConnection(
     if (frame) deliverControl(frame);
   };
 
+  // Écart §15 (JOURNAL 2026-10-06) : le statut du canvas dit aussi si la connexion accepte encore des écritures.
   const deliverControl = (frame: ControlFrame): void => {
     if (state.status === "joining") state.pendingControls.push(frame);
-    else if (state.status === "ready") socket.sendFrame(frame);
+    else if (state.status === "ready") {
+      if (frame.t === "canvasStatus")
+        state = { ...state, isArchived: isArchivedAfter(frame.status, state.isArchived) };
+      socket.sendFrame(frame);
+    }
   };
 
   // JOURNAL 2026-10-06 : le classement de cette page, jamais en vue OBS.
@@ -358,6 +384,17 @@ export function createConnection(
     await arrive(frame, meta, role, gauge, scoreboard);
   };
 
+  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente.
+  // Écart §15 (JOURNAL 2026-10-06) : une archive n'en a pas à dire, personne n'y pose.
+  const getArrivalParts = (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
+    const isArchived = meta.archivedAt !== undefined;
+    return Promise.all([
+      getArrival(frame, meta),
+      session && !isArchived ? deps.core.isBanned(frame.canvasId, session.userId) : false,
+      canModerate(role) && !isArchived ? deps.core.getReportCount(frame.canvasId) : null,
+    ]);
+  };
+
   // Le `welcome`, le snapshot (ou le resync), puis ce qui est tombé entre-temps.
   const arrive = async (
     frame: HelloFrame,
@@ -367,11 +404,7 @@ export function createConnection(
     scoreboard: ScoreboardFrame | null,
   ) => {
     const { canvasId } = frame;
-    const [arrival, wasBanned, reportCount] = await Promise.all([
-      getArrival(frame, meta),
-      session ? deps.core.isBanned(canvasId, session.userId) : false,
-      canModerate(role) ? deps.core.getReportCount(canvasId) : null,
-    ]);
+    const [arrival, wasBanned, reportCount] = await getArrivalParts(frame, meta, role);
 
     sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge));
     sendAfterArrival(reportCount, scoreboard);
@@ -388,6 +421,7 @@ export function createConnection(
       width: meta.width,
       height: meta.height,
       role,
+      isArchived: isArchivedAfter(lastStatusOf(held.pendingControls), meta.archivedAt !== undefined),
     };
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
@@ -402,7 +436,7 @@ export function createConnection(
     startJoining(canvasId, mode, role);
     const meta = await deps.core.getCanvas(canvasId);
     if (!meta) return refuse("canvas_not_found");
-    const gauge = session ? await deps.core.getGauge(canvasId, session.userId, deps.now()) : null;
+    const gauge = await getGaugeFor(canvasId, meta);
     await arrive({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode }, meta, role, gauge, null);
   };
 
@@ -411,10 +445,17 @@ export function createConnection(
     else void rearrive().catch((error: unknown) => console.error("nouvelle taille non reprise", error));
   };
 
+  // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas, ni une archive (Écart §15, JOURNAL 2026-10-06) : personne n'y pose.
+  const getGaugeFor = async (canvasId: string, meta: CanvasMeta): Promise<AckFrame["gauge"] | null> =>
+    session && meta.archivedAt === undefined
+      ? deps.core.getGauge(canvasId, session.userId, deps.now())
+      : null;
+
   // JOURNAL 2026-10-06 : le classement à l'arrivée, lu avant de s'abonner comme la jauge, donc plus ancien que tout ce
-  // qui tombe ensuite. Rien en vue OBS, rien non plus sans pose : une page qui se coupe efface le sien.
-  const getScoreboardFrame = async ({ canvasId, mode }: HelloFrame) => {
-    if (mode === "obs") return null;
+  // qui tombe ensuite. Rien en vue OBS, rien non plus sans pose : une page qui se coupe efface le sien. Écart §15
+  // (JOURNAL 2026-10-06) : ni sur une archive, qui n'en montre pas et n'a rien à lire.
+  const getScoreboardFrame = async ({ canvasId, mode }: HelloFrame, meta: CanvasMeta) => {
+    if (mode === "obs" || meta.archivedAt !== undefined) return null;
     const [top, ranks] = await Promise.all([
       deps.core.listScoreboard(canvasId),
       deps.core.listScoreboardRanks(canvasId, session ? [session.userId] : []),
@@ -427,12 +468,18 @@ export function createConnection(
     const meta = await deps.core.getCanvas(frame.canvasId);
     if (!meta) return refuse("canvas_not_found");
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
-    // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas.
     const [gauge, scoreboard] = await Promise.all([
-      session ? deps.core.getGauge(frame.canvasId, session.userId, deps.now()) : null,
-      getScoreboardFrame(frame),
+      getGaugeFor(frame.canvasId, meta),
+      getScoreboardFrame(frame, meta),
     ]);
     await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge, scoreboard);
+  };
+
+  // Écart §15 (JOURNAL 2026-10-06) : une archive refuse sans fermer la connexion. Un script qui la refuse apprend aussi
+  // à la connexion qu'elle en est une : le gateway n'a pas encore reçu le statut.
+  const refuseArchived = (requestId: string): void => {
+    if (state.status === "ready") state = { ...state, isArchived: true };
+    socket.sendFrame({ t: "error", code: "canvas_archived", requestId });
   };
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
@@ -445,7 +492,8 @@ export function createConnection(
       nowMs: deps.now(),
       pixels: frame.pixels,
     });
-    if (!result.ok) return refuse("canvas_not_found");
+    if (!result.ok)
+      return result.error === "canvas_archived" ? refuseArchived(frame.requestId) : refuse(result.error);
     deps.activity.countPixels(canvasId, session.userId, result.value.accepted);
     socket.sendFrame(result.value);
   };
@@ -458,7 +506,8 @@ export function createConnection(
       requestId,
       nowMs: deps.now(),
     });
-    if (!result.ok) return refuse("canvas_not_found");
+    if (!result.ok)
+      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuse(result.error);
     socket.sendFrame(result.value);
   };
 
@@ -482,6 +531,8 @@ export function createConnection(
   // Ce que ce rôle voit de l'auteur : sans identifiant hors modération. JOURNAL 2026-09-27 : le streamer apprend en
   // plus s'il est modérateur, pour le nommer ou le retirer.
   const entryFor = async (inspected: InspectEntry, ready: ReadyState): Promise<InspectEntry> => {
+    // Écart §15 (JOURNAL 2026-10-06) : sur une archive, ni identifiant, ni signalement, ni origine : personne n'y modère.
+    if (ready.isArchived) return withoutUserId(inspected);
     const found = session ? { ...inspected, canReport: await canReport(inspected, ready) } : inspected;
     if (!canModerate(ready.role)) return withoutUserId(found);
     if (ready.role !== "owner" || !found.userId) return found;
@@ -507,7 +558,10 @@ export function createConnection(
     moderation: Omit<Moderation, "nowMs">,
   ) => {
     const result = await deps.core.moderate(canvasId, { ...moderation, nowMs: deps.now() });
-    if (!result.ok) return result.error === "forbidden" ? forbid() : refuse(result.error);
+    if (!result.ok) {
+      if (result.error === "forbidden") return forbid();
+      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuse(result.error);
+    }
     const { version, cells, isDone } = result.value;
     socket.sendFrame({ t: "moderated", requestId, version, cells, done: isDone });
     if (!isDone) await moderateSlices(canvasId, requestId, { ...moderation, slice: "next" });
@@ -544,7 +598,7 @@ export function createConnection(
   const setModerator = async ({ requestId, userId, isModerator }: SetModeratorFrame, ready: ReadyState) => {
     if (ready.role !== "owner") return forbid();
     const result = await deps.core.setModerator(ready.canvasId, { userId, source: "liveplace", isModerator });
-    if (!result.ok) return forbid();
+    if (!result.ok) return result.error === "canvas_archived" ? refuseArchived(requestId) : forbid();
     await listModerators(requestId, ready);
   };
 
@@ -563,6 +617,7 @@ export function createConnection(
       nowMs: deps.now(),
     });
     if (result.ok) return socket.sendFrame({ t: "reported", requestId });
+    if (result.error === "canvas_archived") return refuseArchived(requestId);
     if (result.error === "canvas_not_found") return refuse("canvas_not_found");
     socket.sendFrame({ t: "error", code: "forbidden", requestId });
   };
@@ -587,6 +642,7 @@ export function createConnection(
       ready.role === "owner" && session
         ? await deps.core.resizeCanvas(ready.canvasId, { by: session.userId, width, height })
         : null;
+    if (result && !result.ok && result.error === "canvas_archived") return refuseArchived(requestId);
     if (!result?.ok) return socket.sendFrame({ t: "error", code: "forbidden", requestId });
     socket.sendFrame({ t: "resized", requestId });
   };
@@ -625,6 +681,16 @@ export function createConnection(
 
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
+    // Écart §15 (JOURNAL 2026-10-06) : une archive se regarde (`inspect`) et se tient en vie (`ping`) ; le reste est refusé,
+    // sauf le suivi d'activité (écart §4.2), qui ne touche pas au canvas.
+    if (
+      ready.isArchived &&
+      frame.t !== "inspect" &&
+      frame.t !== "ping" &&
+      frame.t !== "watchActivity" &&
+      frame.t !== "listActivityHistory"
+    )
+      return refuseArchived(frame.requestId);
     switch (frame.t) {
       case "place":
         return placePixels(frame, ready.canvasId);

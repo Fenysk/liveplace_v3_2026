@@ -9,6 +9,7 @@ import {
   GAUGE_GROWTH_FACTOR,
   type GaugeLimits,
   OBS_BACKGROUND,
+  OBS_BACKGROUNDS,
   PALETTE,
   playerGaugeMax,
   refillGauge,
@@ -24,6 +25,7 @@ import type {
   AuthoredPixel,
   BannedUser,
   CanvasCore,
+  CanvasRefusal,
   InspectEntry,
   LiveMessage,
   Moderation,
@@ -112,6 +114,10 @@ const placementArgsOf = (action: Moderation["action"]): [string, number | "", nu
   return [action.placementId, action.range?.from ?? "", action.range?.to ?? ""];
 };
 
+// Un script qui ne sert pas le canvas le dit par son statut : absent, pas prêt (§5.5), ou archivé (Écart §15, JOURNAL 2026-10-06).
+const isRefusal = (status: string): status is CanvasRefusal =>
+  status === "canvas_not_found" || status === "canvas_archived";
+
 const metaText = (fields: Record<string, string>, field: string): string => {
   const value = fields[field];
   if (value === undefined) throw new Error(`meta.${field} absent`);
@@ -123,6 +129,28 @@ const metaNumber = (fields: Record<string, string>, field: string): number => {
   if (!Number.isFinite(value)) throw new Error(`meta.${field} n'est pas un nombre`);
   return value;
 };
+
+// `null` tant que `ready` n'est pas à 1 : on ne sert jamais un canvas en cours de restore (§5.5).
+// Écart §15 (JOURNAL 2026-10-06) : une archive reste prête et se sert ; `archivedAt` la dit, `successorId` où suivre.
+export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<CanvasMeta | null> {
+  const fields = await redis.hgetall(buildCanvasKeys(canvasId).meta);
+  if (fields.ready !== "1") return null;
+  return {
+    ownerId: metaText(fields, "ownerId"),
+    width: metaNumber(fields, "width"),
+    height: metaNumber(fields, "height"),
+    gaugeMaxStart: metaNumber(fields, "gaugeMaxStart"),
+    gaugeMaxCeiling: metaNumber(fields, "gaugeMaxCeiling"),
+    refillMs: metaNumber(fields, "refillMs"),
+    refillCharges: metaNumber(fields, "refillCharges"),
+    obsDelayMs: metaNumber(fields, "obsDelayMs"),
+    // CDC 2026 §1 : absent sur un canvas d'avant, ou d'une valeur inconnue, donc transparent.
+    obsBackground:
+      OBS_BACKGROUNDS.find((background) => background === fields.obsBackground) ?? OBS_BACKGROUND,
+    ...(fields.archivedAt === undefined ? {} : { archivedAt: metaNumber(fields, "archivedAt") }),
+    ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
+  };
+}
 
 // Une entrée du stream : ses champs à plat, dont `e`, l'événement écrit par nos scripts Lua (§5.2).
 const eventOf = (fields: string[]): Event => {
@@ -356,23 +384,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     createCanvas,
     setUser,
 
-    // `null` tant que `ready` n'est pas à 1 : on ne sert jamais un canvas en cours de restore (§5.5).
-    async getCanvas(canvasId: string): Promise<CanvasMeta | null> {
-      const fields = await redis.hgetall(buildCanvasKeys(canvasId).meta);
-      if (fields.ready !== "1") return null;
-      return {
-        ownerId: metaText(fields, "ownerId"),
-        width: metaNumber(fields, "width"),
-        height: metaNumber(fields, "height"),
-        gaugeMaxStart: metaNumber(fields, "gaugeMaxStart"),
-        gaugeMaxCeiling: metaNumber(fields, "gaugeMaxCeiling"),
-        refillMs: metaNumber(fields, "refillMs"),
-        refillCharges: metaNumber(fields, "refillCharges"),
-        obsDelayMs: metaNumber(fields, "obsDelayMs"),
-        // CDC 2026 §1 : absent sur un canvas d'avant, donc transparent.
-        obsBackground: fields.obsBackground === "white" ? "white" : OBS_BACKGROUND,
-      };
-    },
+    getCanvas: (canvasId: string): Promise<CanvasMeta | null> => getCanvasMeta(redis, canvasId),
 
     async isModerator(canvasId: string, userId: string): Promise<boolean> {
       return (await redis.sismember(buildCanvasKeys(canvasId).mods, userId)) === 1;
@@ -420,7 +432,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     },
 
     // L'ordre des arguments est celui que lit place.lua.
-    async place(canvasId: string, placement: Placement): Promise<Result<AckFrame, "canvas_not_found">> {
+    async place(canvasId: string, placement: Placement): Promise<Result<AckFrame, CanvasRefusal>> {
       const { userId, requestId, placementId, nowMs, pixels } = placement;
       const keys = buildCanvasKeys(canvasId);
       const [status, ack] = await redis.place(
@@ -458,7 +470,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         TRANSPARENT_COLOR_INDEX,
         ...pixels.flatMap(({ x, y, colorIndex }) => [x, y, colorIndex]),
       );
-      if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
+      if (isRefusal(status)) return { ok: false, error: status };
       const frame = decodeServerFrame(JSON.parse(ack ?? "null"));
       if (frame.ok && frame.value.t === "ack") return { ok: true, value: frame.value };
       throw new Error(`place.lua a renvoyé un ack invalide : ${ack}`);
@@ -480,7 +492,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         GAUGE_TTL_SECONDS,
         REQ_TTL_SECONDS,
       );
-      if (status === "canvas_not_found") return { ok: false, error: "canvas_not_found" };
+      if (isRefusal(status)) return { ok: false, error: status };
       const frame = decodeServerFrame(JSON.parse(ack ?? "null"));
       if (frame.ok && frame.value.t === "ack") return { ok: true, value: frame.value };
       throw new Error(`claim.lua a renvoyé un ack invalide : ${ack}`);
@@ -508,7 +520,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     async moderate(
       canvasId: string,
       { by, nowMs, action: moderation, slice, source = "liveplace" }: Moderation,
-    ): Promise<Result<ModerationSlice, "canvas_not_found" | "forbidden">> {
+    ): Promise<Result<ModerationSlice, CanvasRefusal | "forbidden">> {
       const keys = buildCanvasKeys(canvasId);
       const { action, target } = moderation;
       const [placementId, rangeFrom, rangeTo] = placementArgsOf(moderation);
@@ -551,7 +563,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.reportsPrefix,
         RECENTLY_CLEARED_TTL_SECONDS,
       );
-      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)
         throw new Error(`moderate.lua a renvoyé une réponse invalide : ${status}`);
       return { ok: true, value: { version, cells, isDone: isDone === 1 } };
@@ -619,7 +631,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         range?.to ?? "",
       );
       if (status === "reported") return { ok: true, value: undefined };
-      if (status === "canvas_not_found" || status === "changed" || status === "forbidden")
+      if (isRefusal(status) || status === "changed" || status === "forbidden")
         return { ok: false, error: status };
       throw new Error(`report.lua a renvoyé une réponse invalide : ${status}`);
     },
@@ -697,7 +709,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         CELL_STRIDE,
       );
       if (status === "resized") return { ok: true, value: undefined };
-      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
       throw new Error(`resize.lua a renvoyé une réponse invalide : ${status}`);
     },
 
@@ -775,7 +787,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         source,
         isModerator ? 1 : 0,
       );
-      if (status === "canvas_not_found" || status === "forbidden") return { ok: false, error: status };
+      if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
       if (status !== "ok") throw new Error(`moderators.lua a renvoyé une réponse invalide : ${status}`);
       return { ok: true, value: undefined };
     },
@@ -819,6 +831,18 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       );
       if ((status !== "ok" && status !== "revoked") || !syncedAt) return null;
       return { status, syncedAt: Number(syncedAt) };
+    },
+
+    // Écart §15 (JOURNAL 2026-10-06) : `HSETNX`, ce que le successeur sait déjà de cette personne reste.
+    async copyTwitchUsers(fromCanvasId, toCanvasId, userIds) {
+      if (userIds.length === 0) return;
+      const names = await redis.hmget(buildCanvasKeys(fromCanvasId).twitchUsers, ...userIds);
+      const transaction = redis.multi();
+      for (const [index, userId] of userIds.entries()) {
+        const name = names[index];
+        if (name) transaction.hsetnx(buildCanvasKeys(toCanvasId).twitchUsers, userId, name);
+      }
+      await transaction.exec();
     },
 
     // L'ID du stream est la version (§5.2) : un XRANGE direct. Toute version a son entrée, donc un trou veut dire un trim.

@@ -5,10 +5,13 @@ local metaKey, stateKey, versionKey = KEYS[1], KEYS[2], KEYS[3]
 local histPrefix, liveChannel, by = ARGV[1], ARGV[2], ARGV[3]
 local width, height, cellStride = tonumber(ARGV[4]), tonumber(ARGV[5]), tonumber(ARGV[6])
 
--- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi.
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height")
+-- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
+end
+if meta[5] then
+  return { "canvas_archived" }
 end
 if by ~= meta[2] then
   return { "forbidden" }

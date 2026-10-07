@@ -1,0 +1,100 @@
+/* Les lignes de la section « Archives » et le bandeau d'une archive (Écart §15, JOURNAL 2026-10-06) */
+
+/* Les archives, une ligne chacune, séparées par un filet fin */
+.lp-canvas-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-canvas-list > li + li {
+  border-top: 1px solid var(--chip);
+  padding-top: var(--space-3);
+}
+
+/* Le canvas dans sa ligne : sa miniature à gauche, son titre et sa légende à sa droite. Dans `WindowRow`, il prend la
+   place qui reste, et ses actions passent dessous sur mobile. */
+.lp-canvas-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--control-size);
+}
+
+.lp-canvas-thumb {
+  flex: none;
+  box-sizing: border-box;
+  width: 48px;
+}
+
+/* La miniature manque : le damier, à la place */
+.lp-canvas-thumb--empty {
+  aspect-ratio: 1;
+  border: 1px solid var(--canvas-border);
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 16px 16px;
+}
+
+.lp-canvas-text {
+  min-width: 0;
+  display: grid;
+}
+
+.lp-canvas-title {
+  overflow-wrap: anywhere;
+}
+
+/* L'icône d'ouverture : juste après le titre, petite et discrète */
+.lp-canvas-open {
+  width: 14px;
+  height: 14px;
+  margin-left: var(--space-2);
+  vertical-align: -2px;
+  color: var(--muted);
+}
+
+/* Une archive : la miniature et le titre ne font qu'un lien */
+.lp-canvas-link {
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+}
+
+.lp-canvas-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* Le survol, seulement avec une souris : le titre se souligne, comme un lien */
+@media (hover: hover) {
+  .lp-canvas-link:hover .lp-canvas-title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .lp-canvas-link:hover .lp-canvas-open {
+    color: var(--ink);
+  }
+}
+
+/* Le bandeau d'une archive prend la place de la pill Canvas : sur mobile, il laisse sa place à la pill Compte */
+.lp-archive-banner {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .lp-archive-banner {
+    max-width: calc(100vw - 148px);
+  }
+
+  .lp-archive-banner .lp-row {
+    flex-wrap: wrap;
+  }
+}

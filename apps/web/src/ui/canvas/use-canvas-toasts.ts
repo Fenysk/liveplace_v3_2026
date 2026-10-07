@@ -1,26 +1,41 @@
-// Les toasts de la page (CDC 2026, Toasts) : la connexion perdue puis revenue, et les pixels
-// d'un envoi que le serveur a refusés, gardés dans le brouillon.
+// Les toasts de la page (CDC 2026, Toasts) : la connexion perdue puis revenue, les pixels
+// d'un envoi que le serveur a refusés, gardés dans le brouillon, et le streamer qui change de canvas
+// (Écart §15, JOURNAL 2026-10-06).
 
 import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
+import type { OwnSwitchTracker } from "../archive/own-switch";
 import { useToast } from "../design/toast";
+import { connectionToast } from "./connection-toast";
+import { switchToast } from "./switch-toast";
 
 const refusedLabel = (count: number): string =>
   count === 1
     ? "1 pixel refusé : il reste dans le brouillon."
     : `${count.toLocaleString("fr-FR")} pixels refusés : ils restent dans le brouillon.`;
 
-export function useCanvasToasts({ canvas, draft }: { canvas: CanvasStore; draft: DraftStore }): void {
+// `ownerName` : le nom affiché du streamer, que le toast d'un changement de canvas dit.
+export function useCanvasToasts(
+  { canvas, draft }: { canvas: CanvasStore; draft: DraftStore },
+  tracker: OwnSwitchTracker,
+  ownerName: string,
+): void {
   const toast = useToast();
   useEffect(() => {
-    let status = canvas.getView().status;
+    let seen = canvas.getView();
     const onCanvas = () => {
-      const next = canvas.getView().status;
-      if (status === "live" && next === "reconnecting")
-        toast("error", "Connexion perdue : la page se reconnecte.");
-      if (status === "reconnecting" && next === "live") toast("success", "Reconnecté");
-      status = next;
+      const next = canvas.getView();
+      const connection = connectionToast(seen, next);
+      if (connection) toast(connection.tone, connection.text);
+      // Le brouillon se lit ici, à l'instant de la bascule : la page ferme ce store un peu après.
+      const switched = switchToast(seen, next, {
+        hasAskedHere: tracker.isRecent(Date.now()),
+        ownerName,
+        draftSize: draft.getView().draft.size,
+      });
+      if (switched) toast("success", switched);
+      seen = next;
     };
     // Un envoi fini, en ligne et sans ban, qui laisse des pixels : le serveur les a refusés (jauge, taille).
     let wasSending = draft.getView().isSending;
@@ -37,5 +52,5 @@ export function useCanvasToasts({ canvas, draft }: { canvas: CanvasStore; draft:
       unsubscribeCanvas();
       unsubscribeDraft();
     };
-  }, [canvas, draft, toast]);
+  }, [canvas, draft, toast, tracker, ownerName]);
 }

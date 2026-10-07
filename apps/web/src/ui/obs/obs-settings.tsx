@@ -1,11 +1,20 @@
 // La section Vue OBS de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-25), pour le streamer : l'adresse à copier, la
-// marche à suivre, et le délai. L'affichage seul, nourri par `ObsTab`.
+// marche à suivre, le délai, et le fond. L'affichage seul, nourri par `ObsTab`.
 
 import { OBS_DELAY_STEPS_MS, type ObsBackground } from "@liveplace/domain";
-import { Checkbox } from "../design/checkbox";
 import { CopyButton } from "../design/copy-button";
+import { SwatchChoice, type SwatchOption } from "../design/palette";
 import { Slider, type SliderStep } from "../design/slider";
+import { OBS_BACKGROUND_LABELS } from "./obs-background";
 import { obsDelayLabel } from "./obs-delay-label";
+
+// Le clavier de couleurs du PNG : transparent sur son damier, le noir et le blanc par leur teinte, les mêmes vrais noir et
+// blanc que ceux de la vue OBS (tokens.css).
+const BACKGROUND_OPTIONS: readonly SwatchOption<ObsBackground>[] = [
+  { value: "transparent", label: OBS_BACKGROUND_LABELS.transparent },
+  { value: "black", label: OBS_BACKGROUND_LABELS.black, tone: "png-black" },
+  { value: "white", label: OBS_BACKGROUND_LABELS.white, tone: "png-white" },
+];
 
 const DELAY_STEPS: readonly SliderStep[] = OBS_DELAY_STEPS_MS.map((value) => ({
   value,
@@ -19,6 +28,7 @@ type ObsSettingsProps = {
   onPickDelay: (obsDelayMs: number) => void;
   obsBackground: ObsBackground;
   onPickBackground: (obsBackground: ObsBackground) => void; // JOURNAL 2026-09-29
+  isTouch?: boolean; // écran étroit ou tactile : les pastilles du fond sont rondes, de la taille d'un contrôle
 };
 
 export const ObsSettings = ({
@@ -28,6 +38,7 @@ export const ObsSettings = ({
   onPickDelay,
   obsBackground,
   onPickBackground,
+  isTouch = false,
 }: ObsSettingsProps) => (
   <>
     <div className="lp-setting">
@@ -45,12 +56,17 @@ export const ObsSettings = ({
       </p>
     </div>
     <div className="lp-setting">
-      <Checkbox
-        label="Fond transparent"
-        isChecked={obsBackground === "transparent"}
-        onToggle={(isTransparent) => onPickBackground(isTransparent ? "transparent" : "white")}
+      <SwatchChoice
+        label="Fond de la vue OBS"
+        options={BACKGROUND_OPTIONS}
+        value={obsBackground}
+        onSelect={onPickBackground}
+        isTouch={isTouch}
       />
-      <p className="lp-type-caption lp-muted">Décoché, le canvas se pose sur un fond blanc dans le stream.</p>
+      <p className="lp-type-caption lp-muted">
+        Transparent, le stream montre ce qu'il y a derrière les pixels. Noir ou blanc, le canvas se pose sur
+        ce fond.
+      </p>
     </div>
   </>
 );

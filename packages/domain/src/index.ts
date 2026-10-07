@@ -135,10 +135,56 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     height: number;
     obsDelayMs: number;
     obsBackground: ObsBackground;
+    // Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus aucune écriture ; `successorId` est le canvas qui l'a remplacée.
+    archivedAt?: Timestamp;
+    successorId?: string;
   };
 
-// CDC 2026 §1 : le fond de la vue OBS. Transparent par défaut, et sur un canvas d'avant.
-export const OBS_BACKGROUNDS = ["transparent", "white"] as const;
+// Écart §15 (JOURNAL 2026-10-06) : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.
+export const CANVAS_STATUSES = ["archived", "active", "discarded"] as const;
+export type CanvasStatus = (typeof CANVAS_STATUSES)[number];
+
+// Écart §15 (JOURNAL 2026-10-06) : un canvas actif, et au plus cinq archives.
+export const MAX_ARCHIVES = 5;
+export const ARCHIVE_NAME_MAX_LENGTH = 40;
+
+// base58, sans les caractères qu'on confond (0, O, I, l) : le code d'une archive dans son lien.
+export const LINK_CODE_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+export const LINK_CODE_LENGTH = 10;
+
+// Un octet de 232 et plus est rejeté, jamais replié : le reste de 256 par 58 favoriserait les premiers caractères.
+const LINK_CODE_BYTE_LIMIT = 256 - (256 % LINK_CODE_ALPHABET.length);
+
+// `randomBytes` rend autant d'octets qu'on lui en demande, au hasard (`crypto`) : le domaine ne l'importe pas.
+export function generateLinkCode(randomBytes: (size: number) => Uint8Array): string {
+  let code = "";
+  while (code.length < LINK_CODE_LENGTH) {
+    for (const byte of randomBytes(LINK_CODE_LENGTH)) {
+      if (byte < LINK_CODE_BYTE_LIMIT && code.length < LINK_CODE_LENGTH)
+        code += LINK_CODE_ALPHABET.charAt(byte % LINK_CODE_ALPHABET.length);
+    }
+  }
+  return code;
+}
+
+const LINK_CODE_PATTERN = new RegExp(`^[${LINK_CODE_ALPHABET}]{${LINK_CODE_LENGTH}}$`);
+
+export function isLinkCode(code: string): boolean {
+  return LINK_CODE_PATTERN.test(code);
+}
+
+// Le nom donné à l'archivage : libre et facultatif, nettoyé, vide = pas de nom. Coupé par caractères, jamais au milieu d'un.
+export function toArchiveName(raw: string): string | undefined {
+  const cleaned = raw
+    .replace(/\p{Cc}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const name = Array.from(cleaned).slice(0, ARCHIVE_NAME_MAX_LENGTH).join("").trim();
+  return name === "" ? undefined : name;
+}
+
+// CDC 2026 §1 : le fond de la vue OBS, transparent, noir ou blanc. Transparent par défaut, et sur un canvas d'avant.
+export const OBS_BACKGROUNDS = ["transparent", "black", "white"] as const;
 export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
 export const OBS_BACKGROUND: ObsBackground = "transparent";
 

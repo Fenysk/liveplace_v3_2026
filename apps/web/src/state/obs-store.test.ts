@@ -1,4 +1,4 @@
-import { PALETTE } from "@liveplace/domain";
+import { type ObsBackground, PALETTE } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
 import type { Arrival, CanvasView } from "./canvas-store";
 import { createObsStore, type ObsCanvas, type ObsClock } from "./obs-store";
@@ -26,6 +26,8 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   lastError: null,
   inspection: null,
   isBanned: false,
+  isArchived: false,
+  isDiscarded: false,
   pixels: new Uint8Array(16),
 });
 
@@ -70,13 +72,13 @@ const setup = () => {
     view = viewWithDelay(obsDelayMs);
     for (const listener of listeners) listener();
   };
-  const setWhite = () => {
+  const setBackground = (obsBackground: ObsBackground) => {
     const params = viewWithDelay(10_000).params;
-    if (params) view = { ...view, params: { ...params, obsBackground: "white" } };
+    if (params) view = { ...view, params: { ...params, obsBackground } };
     for (const listener of listeners) listener();
   };
   const store = createObsStore(canvas, obsClock);
-  return { store, advanceTo, arrive, setDelay, setWhite };
+  return { store, advanceTo, arrive, setDelay, setBackground };
 };
 
 const pose = (placedAt: number) => ({
@@ -120,13 +122,15 @@ describe("createObsStore (§9.5, JOURNAL 2026-09-25)", () => {
 
   // Prend un fond changé à chaud, sans rechargement (JOURNAL 2026-09-29)
   it("takes a background changed live, without a reload", () => {
-    const { store, arrive, setWhite } = setup();
+    const { store, arrive, setBackground } = setup();
     arrive({ kind: "snapshot", pixels: new Uint8Array(16), recent: null });
     expect(store.getView().background).toBe("transparent");
 
-    setWhite();
-
+    setBackground("white");
     expect(store.getView().background).toBe("white");
+
+    setBackground("black");
+    expect(store.getView().background).toBe("black");
   });
 
   // N'est prête qu'après son premier snapshot

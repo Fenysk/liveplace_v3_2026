@@ -17,6 +17,9 @@
 @import "./copy-button.css";
 @import "./slider.css";
 @import "./checkbox.css";
+@import "./text-field.css";
+@import "./choice-list.css";
+@import "./canvas-card.css";
 @import "./toast.css";
 @import "./scoreboard.css";
 @import "./stat-tile.css";

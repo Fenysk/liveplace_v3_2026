@@ -4,6 +4,7 @@ import {
   type Device,
   defaultCanvasMeta,
   type GaugeLimits,
+  type ObsBackground,
   type Session,
 } from "@liveplace/domain";
 import type {
@@ -159,15 +160,21 @@ type SetupOptions = {
   reportCount?: number; // ce que rend `getReportCount`
   canReport?: boolean; // ce que rend `canReport`
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
+  archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
+  isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
 };
+
+// Ce que répond un script à qui écrit sur une archive.
+const archivedRefusal = { ok: false as const, error: "canvas_archived" as const };
 
 const setup = (options: SetupOptions = {}) => {
   const placements: Placement[] = [];
   const inspected: { x: number; y: number }[] = [];
   const moderations: Moderation[] = [];
   const listedPixels: string[] = [];
+  const scoreboardReads: string[] = []; // les canvas dont le classement a été lu
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
   const obsBackgrounds: string[] = [];
@@ -177,7 +184,9 @@ const setup = (options: SetupOptions = {}) => {
   const reports: Report[] = [];
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
-  let currentMeta = meta; // `resizeCanvas` la change, comme resize.lua
+  // `resizeCanvas` la change, comme resize.lua
+  let currentMeta: CanvasMeta =
+    options.archivedAt === undefined ? meta : { ...meta, archivedAt: options.archivedAt };
   const core = {
     async getCanvas(asked: string) {
       return asked === canvasId ? currentMeta : null;
@@ -201,10 +210,11 @@ const setup = (options: SetupOptions = {}) => {
     },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
-      return { ok: true as const, value: ack };
+      return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: ack };
     },
     async moderate(_asked: string, moderation: Moderation) {
       moderations.push(moderation);
+      if (options.isRefusedByScripts) return archivedRefusal;
       const slice = options.slices?.[moderations.length - 1] ?? { version: 9, cells: 0, isDone: true };
       return { ok: true as const, value: slice };
     },
@@ -234,11 +244,12 @@ const setup = (options: SetupOptions = {}) => {
     async setObsDelay(_asked: string, obsDelayMs: number) {
       obsDelays.push(obsDelayMs);
     },
-    async setObsBackground(_asked: string, obsBackground: "transparent" | "white") {
+    async setObsBackground(_asked: string, obsBackground: ObsBackground) {
       obsBackgrounds.push(obsBackground);
     },
     async claimGauge(_asked: string, claim: GaugeClaim) {
       claims.push(claim);
+      if (options.isRefusedByScripts) return archivedRefusal;
       return { ok: true as const, value: { ...ack, requestId: claim.requestId } };
     },
     async setGaugeLimits(_asked: string, limits: GaugeLimits) {
@@ -246,13 +257,14 @@ const setup = (options: SetupOptions = {}) => {
     },
     async setModerator(_asked: string, role: ModeratorRole) {
       namedModerators.push(role);
-      return { ok: true as const, value: undefined };
+      return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: undefined };
     },
     async getModeratorOrigin() {
       return roles.isModerator ? { isFromTwitch: true, isNamedHere: false } : null;
     },
     async report(_asked: string, sent: Report) {
       reports.push(sent);
+      if (options.isRefusedByScripts) return archivedRefusal;
       return options.report ?? { ok: true as const, value: undefined };
     },
     async canReport() {
@@ -267,13 +279,15 @@ const setup = (options: SetupOptions = {}) => {
     async listOffStreamCells() {
       return options.offStream ?? [];
     },
-    async listScoreboard() {
+    async listScoreboard(asked: string) {
+      scoreboardReads.push(asked);
       return options.scoreboard ?? [];
     },
     async listScoreboardRanks(_asked: string, userIds: readonly string[]) {
       return new Map([...(options.ranks ?? [])].filter(([userId]) => userIds.includes(userId)));
     },
     async resizeCanvas(_asked: string, { width, height }: { width: number; height: number }) {
+      if (options.isRefusedByScripts) return archivedRefusal;
       currentMeta = { ...currentMeta, width, height };
       return { ok: true as const, value: undefined };
     },
@@ -334,6 +348,7 @@ const setup = (options: SetupOptions = {}) => {
     inspected,
     moderations,
     listedPixels,
+    scoreboardReads,
     recentSince,
     obsDelays,
     obsBackgrounds,
@@ -980,6 +995,18 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
   });
 
+  // Le fond noir passe comme le blanc : le streamer le demande, le cœur l'écrit
+  it("passes the black OBS background the owner asks for, like white", async () => {
+    const context = setup({ session: owner });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(
+      JSON.stringify({ t: "setObsBackground", requestId: "bg-2", obsBackground: "black" }),
+    );
+
+    expect(context.obsBackgrounds).toEqual(["black"]);
+  });
+
   // Ne laisse que le streamer régler les bornes de la jauge, et donne à chaque compte sa jauge recalculée (JOURNAL 2026-09-30)
   it("lets only the owner set the gauge limits, and gives every account its recomputed gauge", async () => {
     const context = setup({ session: owner });
@@ -1204,6 +1231,236 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
     }
     await other.connection.receive(inspect(63, 35));
     expect(context.inspected).toEqual([{ x: 63, y: 35 }]);
+  });
+});
+
+describe("the status of the canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+  // Annonce le statut du canvas à toutes ses pages, page et vue OBS, invité compris
+  it("announces the status of the canvas to every page of it, OBS view and guest included", async () => {
+    const context = setup({ session: owner });
+    const obs = context.open(null);
+    const guest = context.open(null);
+    await context.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    await guest.connection.receive(hello());
+
+    context.control({ t: "canvasStatus", status: "archived" });
+
+    for (const opened of [context, obs, guest])
+      expect(opened.sent.at(-1)).toEqual({ t: "canvasStatus", status: "archived" });
+  });
+
+  // Garde un statut tombé pendant l'arrivée, et l'envoie après le welcome
+  it("holds a status that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "canvasStatus", status: "active" });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "canvasStatus",
+    ]);
+  });
+});
+
+describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () => {
+  const archivedAt = now - 86_400_000;
+  const frames = {
+    place: JSON.parse(place()),
+    claimGauge: { t: "claimGauge", requestId: "claim-1" },
+    moderate: JSON.parse(moderate("ban")),
+    setModerator: { t: "setModerator", requestId: "moderator-1", userId: "user-2", isModerator: true },
+    report: { t: "report", requestId: "report-1", x: 1, y: 2, placementId: "puser2001" },
+    resizeCanvas: { t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 },
+    setObsDelay: { t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 },
+    setObsBackground: { t: "setObsBackground", requestId: "background-1", obsBackground: "white" },
+    setGaugeLimits: { t: "setGaugeLimits", requestId: "limits-1", gaugeMaxStart: 20, gaugeMaxCeiling: 40 },
+    listBans: { t: "listBans", requestId: "bans-1" },
+    listModerators: { t: "listModerators", requestId: "moderators-1" },
+    listReports: { t: "listReports", requestId: "reports-1" },
+    listPixels: { t: "listPixels", requestId: "pixels-1", userId: "user-2" },
+    listAuthorPixels: { t: "listAuthorPixels", requestId: "author-1", x: 1, y: 2, placementId: "puser2001" },
+  };
+
+  // Répond au hello d'une archive par un welcome qui le dit, puis le snapshot : ni jauge, ni ban, ni signalements
+  it("answers the hello of an archive with a welcome that says so, then the snapshot: no gauge, ban nor reports", async () => {
+    const { connection, sent } = setup({ session: owner, archivedAt, isBanned: true, reportCount: 4 });
+
+    await connection.receive(hello());
+
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+    expect(sent[0]).toMatchObject({ t: "welcome", canvas: { canvasId, archivedAt }, you: { role: "owner" } });
+    expect(sent[0]).not.toHaveProperty("gauge");
+  });
+
+  // Ne dit rien du classement à une archive, même là où des scores existent, et ne le lit pas : elle n'en montre aucun
+  it("says nothing of the scoreboard to an archive, even where scores exist, and does not read it", async () => {
+    const ranks = new Map([[owner.userId, { rank: 1, pixels: 9 }]]);
+    const context = setup({
+      session: owner,
+      archivedAt,
+      scoreboard: [{ login: "ada", displayName: "Ada", pixels: 9 }],
+      ranks,
+    });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+    ]);
+    expect(context.scoreboardReads).toEqual([]);
+    expect(context.closed).toEqual([]);
+  });
+
+  // Refuse sur une archive chaque écriture et chaque liste par `canvas_archived`, sans fermer ni toucher au noyau
+  it("refuses on an archive every write and every list with canvas_archived, without closing nor touching the core", async () => {
+    const context = setup({ session: owner, archivedAt });
+    await context.connection.receive(hello());
+
+    for (const frame of Object.values(frames)) {
+      await context.connection.receive(JSON.stringify(frame));
+      expect(context.sent.at(-1)).toEqual({
+        t: "error",
+        code: "canvas_archived",
+        requestId: frame.requestId,
+      });
+    }
+
+    expect(context.closed).toEqual([]);
+    expect([
+      context.placements,
+      context.claims,
+      context.moderations,
+      context.namedModerators,
+      context.reports,
+      context.obsDelays,
+      context.obsBackgrounds,
+      context.gaugeLimits,
+      context.listedPixels,
+    ]).toEqual([[], [], [], [], [], [], [], [], []]);
+  });
+
+  // Laisse l'inspection et le ping : une archive se regarde, et la connexion reste en vie
+  it("keeps inspection and ping: an archive can be looked at, and the connection stays alive", async () => {
+    const context = setup({ session: owner, archivedAt });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(inspect(1, 2));
+    await context.connection.receive(JSON.stringify({ t: "ping" }));
+
+    expect(context.sent.at(-2)).toMatchObject({ t: "inspected", x: 1, y: 2, entry: { login: "user2" } });
+    expect(context.sent.at(-1)).toEqual({ t: "pong" });
+  });
+
+  // Laisse le suivi d'activité du développeur : il ne touche pas au canvas, et l'archive qu'il regarde y figure
+  it("keeps the activity of the developer, which does not touch the canvas, and lists the archive in it", async () => {
+    const { connection, sent, activity } = setup({ session: developer, archivedAt });
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "watchActivity", isWatching: true }));
+    await connection.receive(
+      JSON.stringify({ t: "listActivityHistory", requestId: "history-1", period: "day" }),
+    );
+    await activity.tick();
+
+    expect(sent.some((frame) => "t" in frame && frame.t === "error")).toBe(false);
+    expect(sent.at(-2)).toEqual({ t: "activityHistory", requestId: "history-1", points: [] });
+    expect(sent.at(-1)).toMatchObject({ t: "activity", canvases: [{ canvasId }] });
+  });
+
+  // Une inspection d'archive ne donne ni l'identifiant de l'auteur, ni le droit de signaler, ni l'origine du modérateur
+  it("gives an archive inspection no author id, no right to report and no moderator origin, whoever looks", async () => {
+    const asOwner = setup({ session: owner, archivedAt, isModerator: true });
+    const asViewer = setup({ archivedAt });
+    for (const { connection } of [asOwner, asViewer]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    for (const { sent } of [asOwner, asViewer])
+      expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 1, y: 2, entry: publicEntry });
+  });
+
+  // Suit le statut : archivé, la connexion n'accepte plus d'écriture ; redevenu actif, elle les accepte de nouveau
+  it("follows the status: archived, the connection accepts no write; active again, it accepts them again", async () => {
+    const context = setup();
+    await context.connection.receive(hello());
+
+    context.control({ t: "canvasStatus", status: "archived" });
+    await context.connection.receive(place());
+    const whileArchived = [...context.placements];
+    context.control({ t: "canvasStatus", status: "active" });
+    await context.connection.receive(place());
+
+    expect(context.sent.at(-3)).toEqual({ t: "error", code: "canvas_archived", requestId: ack.requestId });
+    expect(whileArchived).toEqual([]);
+    expect(context.sent.at(-1)).toEqual(ack);
+    expect(context.placements).toHaveLength(1);
+  });
+
+  // Un statut « archivé » tombé pendant l'arrivée vaut aussi pour la suite : le `welcome` lu avant disait actif
+  it("lets an archived status landing during the arrival count afterwards: the welcome read before said active", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "canvasStatus", status: "archived" });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(place());
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "canvas_archived", requestId: ack.requestId });
+    expect(context.placements).toEqual([]);
+  });
+
+  // Rend à la page l'archivage qu'un script lui apprend (une course avec l'archivage), puis refuse le reste sans le noyau
+  describe("when a script refuses, a race with the archiving", () => {
+    for (const name of [
+      "place",
+      "claimGauge",
+      "moderate",
+      "setModerator",
+      "report",
+      "resizeCanvas",
+    ] as const) {
+      // Le noyau dit `canvas_archived` : la page l'apprend par l'erreur de sa requête, sans fermeture
+      it(`hands ${name} to the page as canvas_archived, without closing, and refuses the next write without the core`, async () => {
+        const context = setup({ session: owner, isRefusedByScripts: true });
+        await context.connection.receive(hello());
+        const frame = frames[name];
+
+        await context.connection.receive(JSON.stringify(frame));
+        const callsAfterFirst = context.placements.length;
+        await context.connection.receive(place());
+
+        expect(context.sent.at(-2)).toEqual({
+          t: "error",
+          code: "canvas_archived",
+          requestId: frame.requestId,
+        });
+        expect(context.sent.at(-1)).toEqual({
+          t: "error",
+          code: "canvas_archived",
+          requestId: ack.requestId,
+        });
+        expect(context.placements).toHaveLength(callsAfterFirst);
+        expect(context.closed).toEqual([]);
+      });
+    }
+  });
+
+  // Ne relit pas le rôle sur une archive : plus personne n'y modère
+  it("does not re-read the role on an archive: nobody moderates there any more", async () => {
+    const context = setup({ archivedAt });
+    await context.connection.receive(hello());
+
+    context.roles.isModerator = true;
+    context.control({ t: "role", userId: session.userId });
+    await flush();
+
+    expect(context.sent.filter((frame) => "t" in frame && frame.t === "role")).toEqual([]);
   });
 });
 

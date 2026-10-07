@@ -428,6 +428,34 @@ describe("getCanvas (§6.1)", () => {
 
     expect(await core.getCanvas(canvasId)).toEqual(meta);
   });
+
+  // Rend la date d'archivage et le successeur d'une archive, qui reste prête et se sert (Écart §15, JOURNAL 2026-10-06)
+  it("gives the archive date and the successor of an archive, which stays ready and served", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    await redis.hset(buildCanvasKeys(canvasId).meta, {
+      archivedAt: 1_700_000_000_000,
+      successorId: "next-1",
+    });
+
+    expect(await core.getCanvas(canvasId)).toEqual({
+      ...meta,
+      archivedAt: 1_700_000_000_000,
+      successorId: "next-1",
+    });
+  });
+
+  // Une archive rouverte en cours de route : sa date, sans successeur
+  it("gives the date without a successor for an archive being reopened", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    await redis.hset(buildCanvasKeys(canvasId).meta, { archivedAt: 1_700_000_000_000 });
+
+    const found = await core.getCanvas(canvasId);
+
+    expect(found).toEqual({ ...meta, archivedAt: 1_700_000_000_000 });
+    expect(found).not.toHaveProperty("successorId");
+  });
 });
 
 describe("isModerator (§6.1)", () => {
@@ -760,5 +788,22 @@ describe("setObsDelay (JOURNAL 2026-09-25)", () => {
 
     expect((await core.getCanvas(canvasId))?.obsBackground).toBe("white");
     expect(received).toEqual([{ ctl: { t: "obsBackground", obsBackground: "white" } }]);
+  });
+
+  // Le fond noir s'écrit et se relit comme le blanc ; une valeur inconnue dans meta redevient transparente
+  it("writes and reads the black background like the white one; an unknown value in meta is transparent", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    await core.setObsBackground(canvasId, "black");
+    await delay(100);
+    await unsubscribe();
+
+    expect((await core.getCanvas(canvasId))?.obsBackground).toBe("black");
+    expect(received).toEqual([{ ctl: { t: "obsBackground", obsBackground: "black" } }]);
+    await redis.hset(buildCanvasKeys(canvasId).meta, "obsBackground", "red");
+    expect((await core.getCanvas(canvasId))?.obsBackground).toBe("transparent");
   });
 });

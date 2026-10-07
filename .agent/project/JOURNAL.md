@@ -86,6 +86,24 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 **Décision.** Le gateway dérive de ces `ctl` déjà publiés (aucun script, aucun port ne change) une frame `staleList` (`bans` ou `moderators`) pour chaque socket qui modère ; le store la relaie, et la redit pour les deux listes à chaque reprise de la socket ; l'onglet relit la liste, une lecture à la fois. `PROTOCOL_VERSION` passe à 11 : les pages ouvertes se rechargent au déploiement.
 **Renoncement.** Pas de nouveau `ctl` dans les scripts Lua (le cœur et le worker y touchent, et un test de script de plus) ; pas de liste poussée dans la frame (le gateway n'a pas à relire les bannis à chaque ban) ; pas de relecture par minuterie.
 
+## 2026-10-06 — Écart §15 : un canvas actif et cinq archives, sans `reset`, et ce qui est commun se recopie d'un canvas à l'autre
+
+**Contexte.** Le cahier des charges « Plusieurs canvas » (06/10) fait archiver le canvas actif pour repartir sur un canvas vide, et rouvrir une archive. Le §15 prévoyait un `reset` (un `kind` de plus), et seule la résolution de `/{login}` devait changer.
+**Décision.** Pas de `reset` : archiver fige le canvas (`archivedAt`, dans `meta` et dans Convex) et en crée un vide ; rouvrir échange une archive et le canvas actif. Les scripts qui écrivent refusent un canvas archivé. Bannis (origines et preuves), modérateurs, noms Twitch, synchro Twitch, délai et fond OBS sont recopiés du canvas qui sort vers celui qui entre, et remplacent les siens ; une action Twitch tombée sur un canvas archivé suit `successorId`. Le lien d'une archive porte un code de 10 caractères tiré par le web. Protocole 14 : le `welcome` dit l'archive, une frame annonce le changement de canvas actif.
+**Renoncement.** Bannis et modérateurs rangés sous le streamer, sans copie : leurs clés sortiraient de `cv:<canvasId>:` (§5.1, le passage en cluster), le worker devrait sauvegarder une seconde unité, et la prod migrer ; à reprendre plus tard. Le `canvasId` dans le lien : tous ceux qui ont joué sur le canvas l'ont vu passer.
+
+## 2026-10-06 — Écart §10.3 : le web archive, rouvre et supprime un canvas, après avoir vérifié le cookie du streamer
+
+**Contexte.** Le canvas actif se lit dans Convex, où le gateway ne va jamais (§8.2) ; jusqu'ici, le web affichait et le gateway décidait (§10.3).
+**Décision.** Ces trois actions sont des fonctions serveur `POST` du web : il vérifie `lp_session` avec le vérificateur de l'Écart §10.2, le streamer est celui de la session, puis il écrit dans Convex et dans Redis et prévient les pages par le canal `live` du canvas.
+**Renoncement.** Ni Convex ouvert au gateway, ni relais entre le gateway et le web : une clé de plus à garder, ou une pièce de plus qui peut tomber.
+
+## 2026-10-06 — Le lexique réserve « archive » au canvas archivé, et bannit `reset`
+
+**Contexte.** Dans le plan, « archive » nommait aussi l'historique des poses que le worker range dans Convex : deux concepts pour un mot.
+**Décision.** `lexique.json` gagne le nom `archive` (un canvas figé, en lecture seule, que son streamer peut rouvrir), les verbes `archive` (`reset` banni, comme dans le cahier des charges) et `reopen`. L'historique des poses garde `chunk` et « drainer » (§7.1), jamais `archive`, et les définitions d'`event`, `version` et `chunk` le disent.
+**Renoncement.** Pas de mot à part pour le code (`freeze`…) : le code parle comme le cahier des charges.
+
 ## 2026-10-06 — Écart §10.2 : le web vérifie aussi le cookie de session, pour que `/{login}` arrive avec la bonne pill dès le premier octet
 
 **Contexte.** Le rôle `owner` n'arrive qu'au `hello` du gateway : le streamer voyait d'abord la pill Canvas, qui disparaissait ensuite. Le web ne faisait que signer `lp_session`, seul le gateway la vérifiait.

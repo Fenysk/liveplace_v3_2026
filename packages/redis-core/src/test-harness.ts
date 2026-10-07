@@ -29,7 +29,7 @@ export function createRedisHarness() {
 
   afterAll(async () => {
     const found: string[] = [];
-    for (const prefix of ["cv", "user", "activity"])
+    for (const prefix of ["cv", "user", "lock:owner", "activity"])
       for await (const names of redis.scanStream({ match: `${prefix}:${runId}-*`, count: 1000 }))
         found.push(...names);
     if (found.length > 0) await redis.del(...found);

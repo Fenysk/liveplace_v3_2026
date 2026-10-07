@@ -19,7 +19,7 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_login", ["login"]),
 
-  // `canvasId` est opaque (D-14) : un propriétaire a exactement un canvas actif.
+  // `canvasId` est opaque (D-14) : un propriétaire a exactement un canvas actif, et au plus cinq archives.
   canvases: defineTable({
     canvasId: v.string(),
     ownerId: v.string(),
@@ -29,6 +29,11 @@ export default defineSchema({
     createdAt: v.number(),
     purgedBeforeVersion: v.number(), // curseur de purge du worker (D-18), 0 à la création
     purgedBeforeTs: v.number(),
+    // Écart §15 (JOURNAL 2026-10-06) : ajoutés, jamais requis, pour les canvas d'avant. Le code et le nom survivent à
+    // une réouverture ; la date d'archivage non.
+    archivedAt: v.optional(v.number()),
+    name: v.optional(v.string()),
+    linkCode: v.optional(v.string()),
   })
     .index("by_canvasId", ["canvasId"])
     .index("by_owner_active", ["ownerId", "isActive"]),

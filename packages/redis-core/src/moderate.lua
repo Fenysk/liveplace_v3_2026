@@ -21,10 +21,13 @@ local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(A
 local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
 local placement = target .. ":" .. placementId
 
--- 0. Canvas prêt. §5.5, comme place.lua.
-local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height")
+-- 0. Canvas prêt. §5.5, comme place.lua. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height", "archivedAt")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
+end
+if meta[5] then
+  return { "canvas_archived" }
 end
 local width, ownerId, height = tonumber(meta[2]), meta[3], tonumber(meta[4])
 

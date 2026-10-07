@@ -12,10 +12,11 @@ const owner: User = {
 const canvas: OwnedCanvas = { canvasId: "opaque-canvas", width: 256, height: 256 };
 
 // Un double qui ne connaît qu'un propriétaire, avec ou sans canvas actif.
-const durableWith = (activeCanvas: OwnedCanvas | null, user: User = owner): DurableStore => ({
-  upsertUserFromTwitch: async () => undefined,
+const durableWith = (
+  activeCanvas: OwnedCanvas | null,
+  user: User = owner,
+): Pick<DurableStore, "getUserByLogin" | "getActiveCanvasForOwner"> => ({
   getUserByLogin: async (login) => (login === user.login ? user : null),
-  ensureCanvasForOwner: async () => canvas.canvasId,
   getActiveCanvasForOwner: async (ownerId) => (ownerId === owner.userId ? activeCanvas : null),
 });
 

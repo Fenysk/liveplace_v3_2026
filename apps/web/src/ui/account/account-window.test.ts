@@ -59,6 +59,24 @@ describe("les sections de la fenêtre (CDC 2026, Fenêtre)", () => {
     expect(sectionsOf(renderWindow(OWNER_TABS))).toEqual(["Canvas", "Vue OBS", "Modération", "Mon compte"]);
   });
 
+  // Le streamer a aussi Archives, juste après Canvas (Écart §15, JOURNAL 2026-10-06) ; lui seul
+  it("lists Archives right after Canvas for the owner, and for the owner alone", () => {
+    const withCanvases = { ...OWNER_TABS, canvasesTab: tab("contenu de la section Archives") };
+
+    expect(sectionsOf(renderWindow(withCanvases))).toEqual([
+      "Canvas",
+      "Archives",
+      "Vue OBS",
+      "Modération",
+      "Mon compte",
+    ]);
+    expect(renderWindow({ ...withCanvases, sectionId: "canvases" })).toContain(
+      "contenu de la section Archives",
+    );
+    expect(sectionsOf(renderWindow({ moderationTab: OWNER_TABS.moderationTab }))).not.toContain("Archives");
+    expect(sectionsOf(renderWindow())).not.toContain("Archives");
+  });
+
   // Qui modère sans posséder le canvas : Modération et Mon compte
   it("lists Modération and Mon compte for a moderator", () => {
     expect(sectionsOf(renderWindow({ moderationTab: OWNER_TABS.moderationTab }))).toEqual([

@@ -43,7 +43,7 @@ setInterval(() => {
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
-  { core, now: Date.now },
+  { core, now: Date.now, wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
   createTwitchCommandQueue(new Redis(config.redisUrl)),
   () => isRunning,
 ).catch((error: unknown) => {

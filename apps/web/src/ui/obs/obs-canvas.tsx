@@ -1,9 +1,10 @@
-// La surface de la vue OBS (CDC 2026, Vue OBS) : les pixels seuls, sur fond transparent. Le canvas remplit la source
+// La surface de la vue OBS (CDC 2026, Vue OBS) : les pixels seuls, sur fond transparent, noir ou blanc. Le canvas remplit la source
 // sans se déformer, centré : une case peut faire 4 px et sa voisine 5 px (JOURNAL 2026-09-25). Ni geste, ni curseur.
 
 import { useEffect, useRef } from "react";
 import type { ObsStore, ObsView } from "../../state/obs-store";
 import { createCanvasImage } from "../canvas/canvas-image";
+import { obsFillStyle } from "./obs-background";
 
 type ObsCanvasProps = { store: ObsStore };
 
@@ -44,11 +45,10 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
       const { width, height } = sizeSurface(element);
       const { left, top, width: drawnWidth, height: drawnHeight } = fitRect({ width, height }, view);
       context.clearRect(0, 0, width, height);
-      // CDC 2026 §1 : le fond blanc, sous les pixels, dans le cadre du canvas seulement.
-      context.fillStyle =
-        view.background === "white"
-          ? getComputedStyle(element).getPropertyValue("--obs-white")
-          : "transparent";
+      // CDC 2026 §1 : le fond noir ou blanc, sous les pixels, dans le cadre du canvas seulement.
+      context.fillStyle = obsFillStyle(view.background, (property) =>
+        getComputedStyle(element).getPropertyValue(property),
+      );
       context.fillRect(left, top, drawnWidth, drawnHeight);
       context.imageSmoothingEnabled = false;
       context.drawImage(image.source, left, top, drawnWidth, drawnHeight);

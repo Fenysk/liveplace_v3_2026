@@ -725,6 +725,121 @@ describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
   });
 });
 
+describe("an archive, and the status of a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+  const archivedWelcome: ServerFrame = {
+    ...welcome,
+    canvas: { canvasId: "canvas-1", width, height: 4, ownerId: "owner-1", archivedAt: now - 1000 },
+  };
+
+  // Le welcome dit si le canvas est une archive : la page du jeu et celle d'une archive en décident
+  it("takes from the welcome whether the canvas is an archive", () => {
+    const active = setup();
+    const archive = setup({ isWelcomed: false });
+    archive.receive(archivedWelcome);
+
+    expect(active.store.getView()).toMatchObject({ isArchived: false, isDiscarded: false });
+    expect(archive.store.getView()).toMatchObject({ isArchived: true, isDiscarded: false, status: "live" });
+  });
+
+  // La frame de statut archive le canvas, le rend actif de nouveau, ou le dit supprimé
+  it("follows the status frame: archived, active again, or discarded", () => {
+    const { store, receive } = setup();
+
+    receive({ t: "canvasStatus", status: "archived" });
+    expect(store.getView().isArchived).toBe(true);
+
+    receive({ t: "canvasStatus", status: "active" });
+    expect(store.getView()).toMatchObject({ isArchived: false, isDiscarded: false });
+
+    receive({ t: "canvasStatus", status: "discarded" });
+    expect(store.getView().isDiscarded).toBe(true);
+  });
+
+  // Un welcome redonne ce que le gateway dit du canvas, après une coupure par exemple
+  it("takes back what the gateway says at the next welcome", () => {
+    const { store, receive } = setup();
+    receive({ t: "canvasStatus", status: "archived" });
+
+    receive(welcome);
+
+    expect(store.getView().isArchived).toBe(false);
+  });
+
+  // Une écriture refusée parce que le canvas est archivé : la page l'apprend, sans refus affiché ni connexion fermée
+  it("learns the canvas is archived from a refused write, with no refusal shown and nothing closed", () => {
+    const { store, receive, transportState } = setup();
+
+    receive({ t: "error", code: "canvas_archived", requestId: "request-1" });
+
+    expect(store.getView()).toMatchObject({ isArchived: true, lastError: null, status: "live" });
+    expect(transportState.isClosed).toBe(false);
+  });
+
+  // Les poses en cours échouent avec ce code, et leurs pixels reprennent leur couleur
+  it("fails the batches in flight with that code, giving their pixels their colour back", async () => {
+    const { store, receive, lastPlace, pixelAt } = setup();
+    const placed = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const frame = lastPlace();
+    expect(pixelAt(1, 2)).toBe(5);
+
+    receive({ t: "error", code: "canvas_archived", requestId: frame.requestId });
+
+    expect(await placed).toEqual({ ok: false, error: "canvas_archived" });
+    expect(pixelAt(1, 2)).toBe(0);
+  });
+
+  // Les requêtes en attente (liste, signalement) échouent avec ce code aussi
+  it("fails the pending requests with that code too", async () => {
+    const { store, receive, sent } = setup();
+    const listing = store.listBans();
+    const frame = sent.at(-1);
+    if (frame?.t !== "listBans") throw new Error("aucune frame listBans envoyée");
+
+    receive({ t: "error", code: "canvas_archived", requestId: frame.requestId });
+
+    expect(await listing).toEqual({ ok: false, error: "canvas_archived" });
+  });
+
+  // Sans requestId non plus : une erreur du même code vaut pour tout ce qui attend
+  it("fails everything that waits on an error of that code without a request id too", async () => {
+    const { store, receive, lastPlace } = setup();
+    const placed = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    lastPlace();
+
+    receive({ t: "error", code: "canvas_archived" });
+
+    expect(await placed).toEqual({ ok: false, error: "canvas_archived" });
+    expect(store.getView().isArchived).toBe(true);
+  });
+});
+
+describe("a store the page closes (Écart §15, JOURNAL 2026-10-06)", () => {
+  // La page change de canvas : elle ferme son store, et le socket qui tombe ensuite n'est pas une coupure, rien ne reprendra
+  it("announces no reconnection when the socket drops after close(), as nothing will reconnect", () => {
+    const { store, close: dropSocket, transportState } = setup();
+    const statuses: string[] = [];
+    store.subscribe(() => statuses.push(store.getView().status));
+
+    store.close();
+    dropSocket();
+
+    expect(transportState.isClosed).toBe(true);
+    expect(statuses).not.toContain("reconnecting");
+    expect(store.getView().status).not.toBe("reconnecting");
+  });
+
+  // Ce qui attendait une réponse échoue quand même : ses promesses se règlent
+  it("still fails what waited for an answer when the socket drops after close()", async () => {
+    const { store, close: dropSocket } = setup();
+    const listing = store.listBans();
+
+    store.close();
+    dropSocket();
+
+    expect(await listing).toEqual({ ok: false, error: "closed" });
+  });
+});
+
 describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () => {
   const activity: ServerFrame = {
     t: "activity",

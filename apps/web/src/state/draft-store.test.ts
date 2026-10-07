@@ -27,6 +27,8 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   lastError: null,
   inspection: null,
   isBanned: false,
+  isArchived: false,
+  isDiscarded: false,
   pixels: new Uint8Array(256 * 4).fill(9),
   ...overrides,
 });
@@ -495,5 +497,47 @@ describe("createDraftStore — Retour arrière (CDC 2026, raccourcis)", () => {
     store.discardCell(1, 1);
 
     expect(cells()).toEqual([{ x: 1, y: 1, colorIndex: 1 }]);
+  });
+});
+
+describe("createDraftStore — an archive (Écart §15, JOURNAL 2026-10-06)", () => {
+  // N'entre jamais en Dessin sur une archive, quel que soit le raccourci, et n'envoie rien
+  it("never enters draft mode on an archive, whatever the shortcut, and sends nothing", async () => {
+    const { store, sentBatches } = setup({ view: liveView({ isArchived: true }) });
+
+    store.enterDraftMode();
+    store.toggleCell(1, 1);
+    await store.submit();
+
+    expect(store.getView()).toMatchObject({ mode: "view" });
+    expect(sentBatches).toEqual([]);
+  });
+
+  // Sort du Dessin quand le canvas devient archive, garde son brouillon, et n'envoie rien
+  it("leaves draft mode when the canvas turns into an archive, keeps the draft, and sends nothing", async () => {
+    const { store, sentBatches, setCanvasView, cells, entries } = setup();
+    store.enterDraftMode();
+    store.toggleCell(1, 1);
+    store.toggleCell(2, 1);
+
+    setCanvasView(liveView({ isArchived: true }));
+    store.enterDraftMode();
+    await store.submit();
+
+    expect(store.getView().mode).toBe("view");
+    expect(sentBatches).toEqual([]);
+    expect(cells()).toHaveLength(2);
+    // Il reste rangé sous le canvas qui s'est archivé : il ne suit pas le streamer sur le nouveau.
+    expect(entries.get("liveplace:draft:canvas-1:user-1")).toBeDefined();
+  });
+
+  // Reprend la main si le canvas redevient actif
+  it("can enter draft mode again once the canvas is active again", () => {
+    const { store, setCanvasView } = setup({ view: liveView({ isArchived: true }) });
+
+    setCanvasView(liveView({ isArchived: false }));
+    store.enterDraftMode();
+
+    expect(store.getView().mode).toBe("draft");
   });
 });

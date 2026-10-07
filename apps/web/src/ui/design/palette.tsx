@@ -6,6 +6,7 @@ import { ChevronUp, Eraser } from "lucide-react";
 import type { ReactNode } from "react";
 import { blurAfterClick } from "./button";
 import { classNames } from "./class-names";
+import type { SwatchTone } from "./swatch-tones";
 
 type PaletteProps = {
   palette: readonly string[]; // indexée par `colorIndex`, le transparent en 0
@@ -70,6 +71,48 @@ export const CurrentColorButton = ({ color, onPress }: CurrentColorButtonProps) 
     <i className={classNames(!color && "is-transparent")} style={color ? { background: color } : undefined} />
     <ChevronUp aria-hidden="true" />
   </button>
+);
+
+// Un choix de couleur au clavier de la palette (Écart §15, JOURNAL 2026-10-06) : les mêmes pastilles, chacune sous son nom.
+// Sans `tone`, la pastille est le damier du pixel transparent. Aucune n'est choisie d'avance : `value` à `null`.
+// Une teinte est une classe de palette.css, jamais un `style` (swatch-tones.ts).
+export type SwatchOption<Value extends string> = { value: Value; label: string; tone?: SwatchTone };
+
+type SwatchChoiceProps<Value extends string> = {
+  label: string; // le nom du groupe
+  options: readonly SwatchOption<Value>[];
+  value: Value | null;
+  onSelect: (value: Value) => void;
+  isTouch?: boolean; // pastilles rondes de la taille d'un contrôle
+};
+
+export const SwatchChoice = <Value extends string>({
+  label,
+  options,
+  value,
+  onSelect,
+  isTouch = false,
+}: SwatchChoiceProps<Value>) => (
+  <fieldset className="lp-choices">
+    <legend className="lp-type-body">{label}</legend>
+    <div className={classNames("lp-palette lp-palette--choice", isTouch && "lp-palette--touch")}>
+      {options.map(({ value: optionValue, label: optionLabel, tone }) => (
+        <label key={optionValue} className="lp-swatch-option">
+          <button
+            type="button"
+            className={classNames("lp-swatch", tone ? `lp-swatch--${tone}` : "is-transparent")}
+            title={optionLabel}
+            aria-label={optionLabel}
+            aria-pressed={optionValue === value}
+            onClick={blurAfterClick(() => onSelect(optionValue))}
+          />
+          <span className="lp-type-body" aria-hidden="true">
+            {optionLabel}
+          </span>
+        </label>
+      ))}
+    </div>
+  </fieldset>
 );
 
 // Sur mobile, la rangée des couleurs récentes, à côté de la couleur actuelle : toucher une case l'échange avec elle.

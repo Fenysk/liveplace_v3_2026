@@ -22,7 +22,7 @@ local function encodeAck(ack)
   return (string.gsub(cjson.encode(ack), '"rejected":{}', '"rejected":[]'))
 end
 
--- 0. Canvas prêt. §5.5 : le script ne se fie pas au seul gateway.
+-- 0. Canvas prêt. §5.5 : le script ne se fie pas au seul gateway. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
 local meta = redis.call(
   "HMGET",
   metaKey,
@@ -32,10 +32,14 @@ local meta = redis.call(
   "gaugeMaxStart",
   "gaugeMaxCeiling",
   "refillMs",
-  "refillCharges"
+  "refillCharges",
+  "archivedAt"
 )
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
+end
+if meta[8] then
+  return { "canvas_archived" }
 end
 local width, height = tonumber(meta[2]), tonumber(meta[3])
 local limits = { start = tonumber(meta[4]), ceiling = tonumber(meta[5]) }

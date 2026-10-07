@@ -94,8 +94,14 @@
   --pill-opacity: 92%;
   --pill-blur: 16px;
 
-  /* Le fond blanc de la vue OBS, le même dans les deux thèmes : c'est celui du stream (JOURNAL 2026-09-29) */
+  /* Le fond noir et le fond blanc de la vue OBS, les mêmes dans les deux thèmes : ce sont ceux du stream (JOURNAL 2026-09-29) */
+  --obs-black: #000000;
   --obs-white: #ffffff;
+
+  /* Les fonds du PNG qu'on télécharge : du vrai noir et du vrai blanc, les mêmes dans les deux thèmes
+     (Écart §15, JOURNAL 2026-10-06) */
+  --png-black: #000000;
+  --png-white: #ffffff;
 
   /* Les couleurs de marque de Twitch, les mêmes dans les deux thèmes : Se connecter seulement */
   --twitch: #9146ff;

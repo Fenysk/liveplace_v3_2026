@@ -10,10 +10,13 @@ local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[9]), tonumber(A
 -- Vides sans plage : la pose seule.
 local rangeFrom, rangeTo = tonumber(ARGV[13]), tonumber(ARGV[14])
 
--- 0. Canvas prêt, comme place.lua.
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height")
+-- 0. Canvas prêt, comme place.lua. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt")
 if meta[1] ~= "1" then
   return "canvas_not_found"
+end
+if meta[5] then
+  return "canvas_archived"
 end
 
 -- 1. La case montre encore cette pose : le signaleur vise ce qu'il a inspecté, jamais ce qui l'a recouvert depuis.

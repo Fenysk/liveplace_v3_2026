@@ -5,6 +5,8 @@ import { OBS_BACKGROUND, OBS_DELAY_MS, type ObsBackground } from "@liveplace/dom
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
+import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import { backgroundSavedToast } from "./obs-background";
 import { obsDelayLabel } from "./obs-delay-label";
 import { ObsSettings } from "./obs-settings";
 
@@ -19,7 +21,7 @@ const useObsBackground = (canvas: CanvasStore) => {
   useEffect(() => {
     if (requested !== confirmed) return;
     setRequested(null);
-    toast("success", `Fond enregistré : ${confirmed === "white" ? "blanc" : "transparent"}`);
+    toast("success", backgroundSavedToast(confirmed));
   }, [requested, confirmed, toast]);
   return {
     obsBackground: requested ?? confirmed,
@@ -44,6 +46,7 @@ export const ObsTab = ({ canvas, login }: ObsTabProps) => {
   // Montée seulement quand la fenêtre s'ouvre sur cette section : toujours dans le navigateur.
   const url = `${window.location.origin}/${login}`;
   const background = useObsBackground(canvas);
+  const isTouch = useMediaQuery(COMPACT_SCREEN_QUERY);
   return (
     <ObsSettings
       address={url.replace(/^https?:\/\//, "")}
@@ -54,6 +57,7 @@ export const ObsTab = ({ canvas, login }: ObsTabProps) => {
         canvas.setObsDelay(obsDelayMs);
       }}
       {...background}
+      isTouch={isTouch}
     />
   );
 };

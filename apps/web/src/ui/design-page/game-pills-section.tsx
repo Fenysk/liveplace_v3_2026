@@ -6,12 +6,15 @@ import {
   type GaugeLimits,
   type ObsBackground,
   PALETTE,
+  toArchiveName,
 } from "@liveplace/domain";
 import { useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { CanvasPill } from "../canvas/canvas-pill";
 import {
+  type CanvasNameField,
+  CanvasNameSettings,
   CanvasSettings,
   CeilingWindow,
   GaugeSettings,
@@ -24,6 +27,7 @@ import { ViewportPill } from "../canvas/viewport-pill";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
 import { SignInButton, SignInNote } from "../design/twitch";
+import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { pickTheme, useThemeChoice } from "../design/use-theme";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
@@ -236,9 +240,39 @@ const VIEWPORT_SPECIMENS: readonly { caption: string; framing: Framing; isCompac
   { caption: "Mobile, la vue a bougé", framing: { zoomPercent: 180, isArrival: false }, isCompact: true },
 ];
 
-// La section Canvas : le format et la taille se choisissent ; Changer la taille ouvre la confirmation, qui montre ce
-// qui sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256).
+// Le champ du nom : on écrit, et en le quittant (ou par Entrée) le nom est nettoyé, comme celui qui s'enregistre.
+const useNameField = (
+  initial: string,
+  status: CanvasNameField["status"] = "ready",
+  isSaving = false,
+): CanvasNameField => {
+  const [value, setValue] = useState(initial);
+  return { status, value, isSaving, onInput: setValue, onCommit: () => setValue(toArchiveName(value) ?? "") };
+};
+
+const NameSpecimen = ({
+  caption,
+  ...field
+}: {
+  caption: string;
+  initial: string;
+  status?: CanvasNameField["status"];
+  isSaving?: boolean;
+}) => {
+  const name = useNameField(field.initial, field.status, field.isSaving);
+  return (
+    <Specimen caption={caption}>
+      <div className="design-window-box design-window-box--full">
+        <CanvasNameSettings name={name} />
+      </div>
+    </Specimen>
+  );
+};
+
+// La section Canvas : le nom du canvas, puis le format et la taille ; Changer la taille ouvre la confirmation, qui montre
+// ce qui sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256).
 const CanvasSettingsSpecimen = () => {
+  const name = useNameField("");
   const [choice, setChoice] = useState<SizeChoice>({ format: "1:1", sizeIndex: 1 });
   const [isConfirming, setIsConfirming] = useState(false);
   const [status, setStatus] = useState<ResizeStatus>("idle");
@@ -246,9 +280,10 @@ const CanvasSettingsSpecimen = () => {
   const chosen = toCanvasSize(choice);
   const outside = SAMPLE_DRAWING.filter(({ x, y }) => x >= chosen.width || y >= chosen.height);
   return (
-    <Specimen caption="Un format, puis Petit, Moyen ou Grand ; la confirmation montre ce qui sort du cadre">
+    <Specimen caption="Le nom du canvas, vide, puis un format, Petit, Moyen ou Grand ; la confirmation montre ce qui sort du cadre">
       <div className="design-window-box">
         <CanvasSettings
+          name={name}
           current={current}
           choice={choice}
           chosen={chosen}
@@ -307,8 +342,9 @@ const GaugeSettingsSpecimen = () => {
 const ObsSettingsSpecimen = () => {
   const [obsDelayMs, setObsDelayMs] = useState(10_000);
   const [obsBackground, setObsBackground] = useState<ObsBackground>("transparent");
+  const isTouch = useMediaQuery(COMPACT_SCREEN_QUERY);
   return (
-    <Specimen caption="L'adresse, la marche à suivre, le délai et le fond">
+    <Specimen caption="L'adresse, la marche à suivre, le délai et le fond : un réglage, la valeur actuelle est toujours choisie">
       <div className="design-window-box">
         <ObsSettings
           address="liveplace.tv/kalyss"
@@ -317,6 +353,7 @@ const ObsSettingsSpecimen = () => {
           onPickDelay={setObsDelayMs}
           obsBackground={obsBackground}
           onPickBackground={setObsBackground}
+          isTouch={isTouch}
         />
       </div>
     </Specimen>
@@ -416,15 +453,29 @@ export const GamePillsSection = () => {
 
       <SpecimenSection
         title="Fenêtre, section Canvas"
-        note="Pour le streamer : la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
+        note="Pour le streamer : le nom du canvas, qui s'enregistre quand le champ perd le focus, la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
       >
         <CanvasSettingsSpecimen />
+        <NameSpecimen
+          caption="Le nom du canvas rempli : enregistré en quittant le champ, sans bouton"
+          initial="Pixel war de la rentrée"
+        />
+        <NameSpecimen
+          caption="Le nom s'enregistre : le champ attend la réponse"
+          initial="Pixel war de la rentrée"
+          isSaving
+        />
+        <NameSpecimen
+          caption="Le nom ne se lit pas : le champ reste fermé, et le dit"
+          initial=""
+          status="unavailable"
+        />
         <GaugeSettingsSpecimen />
       </SpecimenSection>
 
       <SpecimenSection
         title="Fenêtre, section Vue OBS"
-        note="Pour le streamer : l'adresse, la marche à suivre, le délai."
+        note="Pour le streamer : l'adresse, la marche à suivre, le délai, et le fond de la vue, Transparent, Noir ou Blanc."
       >
         <ObsSettingsSpecimen />
       </SpecimenSection>

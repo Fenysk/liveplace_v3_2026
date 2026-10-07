@@ -178,6 +178,23 @@
   width: 100%;
 }
 
+/* Le contenu d'une fenêtre sur mobile : ce que `@media (max-width: 640px)` fait au vrai écran (tokens.css, window.css) */
+.design-phone-box--window {
+  --control-size: var(--control-size-touch);
+}
+
+.design-phone-box--window .lp-window-row--profile {
+  flex-wrap: wrap;
+}
+
+.design-phone-box--window .lp-window-row--profile > :first-child {
+  flex-basis: 100%;
+}
+
+.design-phone-box--window .lp-window-row--profile > :not(:first-child) {
+  margin-left: auto;
+}
+
 /* Un aperçu de pixels à la largeur d'une petite fenêtre */
 .design-preview-box {
   width: 320px;
@@ -189,6 +206,12 @@
   display: grid;
   gap: var(--space-4);
   width: min(520px, 100%);
+}
+
+/* La largeur de la fenêtre même quand l'exemple est court : un champ y prend toute la place */
+.design-window-box--full {
+  width: 520px;
+  max-width: 100%;
 }
 
 /* Des boutons de démonstration : ils passent à la ligne sur un téléphone */

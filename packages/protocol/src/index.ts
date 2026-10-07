@@ -2,6 +2,7 @@
 
 import {
   ACTIVITY_PERIODS,
+  CANVAS_STATUSES,
   DEVICES,
   isCanvasSize,
   isGaugeLimits,
@@ -26,7 +27,9 @@ import { z } from "zod";
 // 11 : une liste de l'onglet Modération se périme en direct, frame `staleList` (JOURNAL 2026-10-06).
 // 12 : le classement du canvas et la place de chaque page, frame `scoreboard` (JOURNAL 2026-10-06).
 // 13 : le développeur suit l'activité, `watchActivity`, `listActivityHistory`, `activity`, `activityHistory` (JOURNAL 2026-10-06).
-export const PROTOCOL_VERSION = 13;
+// 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (Écart §15, JOURNAL 2026-10-06), et le fond
+// noir de la vue OBS.
+export const PROTOCOL_VERSION = 14;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -154,6 +157,7 @@ const ErrorCodeSchema = z.enum([
   "rate_limited",
   "invalid_frame",
   "canvas_not_found",
+  "canvas_archived", // Écart §15 (JOURNAL 2026-10-06) : une écriture sur une archive, refusée sans fermer la connexion
   "server_full",
 ]);
 
@@ -342,6 +346,7 @@ const WelcomeFrameSchema = z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     ownerId: UserIdSchema,
+    archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
@@ -528,6 +533,10 @@ const GaugeLimitsFrameSchema = z.object({
   gaugeMaxCeiling: z.number().int().positive(),
 });
 
+// Écart §15 (JOURNAL 2026-10-06), à toutes les pages du canvas : archivé, la page du jeu et la vue OBS relisent le canvas
+// actif ; redevenu actif, une page d'archive part sur `/{login}` ; supprimé, elle montre l'introuvable.
+const CanvasStatusFrameSchema = z.object({ t: z.literal("canvasStatus"), status: z.enum(CANVAS_STATUSES) });
+
 // Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, pour le développeur seul.
 const CountSchema = z.number().int().nonnegative();
 
@@ -612,6 +621,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   ReportCountFrameSchema,
   StaleListFrameSchema,
   ScoreboardFrameSchema,
+  CanvasStatusFrameSchema,
   ActivityFrameSchema,
   ActivityHistoryFrameSchema,
   ErrorFrameSchema,

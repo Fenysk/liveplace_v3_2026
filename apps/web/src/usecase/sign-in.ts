@@ -11,7 +11,11 @@ import type {
 
 export type SignInDeps = {
   twitch: TwitchAuth;
-  durable: DurableStore;
+  // Les comptes et le canvas actif : la connexion ne touche jamais aux archives.
+  durable: Pick<
+    DurableStore,
+    "upsertUserFromTwitch" | "getUserByLogin" | "ensureCanvasForOwner" | "getActiveCanvasForOwner"
+  >;
   redis: SignInWrites;
   signer: SessionSigner;
   randomCanvasId: () => string;
@@ -22,7 +26,7 @@ export type SignInResult = { signedSession: string; login: string };
 
 // §8.1 : le streamer dont la page a lancé la connexion. Jamais soi-même, rien depuis l'accueil.
 const getDiscoveredViaUserId = async (
-  durable: DurableStore,
+  durable: Pick<DurableStore, "getUserByLogin">,
   user: User,
   returnPath: string | null,
 ): Promise<string | undefined> => {

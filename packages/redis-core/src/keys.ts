@@ -46,6 +46,7 @@ export function buildCanvasKeys(canvasId: string) {
   const clearingPrefix = `${prefix}clearing:`;
   const reportsPrefix = `${prefix}reports:`;
   return {
+    prefix,
     meta: `${prefix}meta`,
     state: `${prefix}state`,
     version: `${prefix}version`,
@@ -91,6 +92,14 @@ export function buildCanvasKeys(canvasId: string) {
 // Sans EXPIRE : `inspect` perdrait le nom d'un auteur inactif.
 export function userKey(userId: string): string {
   return `user:${userId}`;
+}
+
+// Écart §15 (JOURNAL 2026-10-06) : le verrou d'un propriétaire, pris par le web le temps d'un changement de canvas actif.
+// Il expire de lui-même : un web tombé en plein changement ne bloque personne plus de 30 s.
+export const OWNER_LOCK_TTL_MS = 30_000;
+
+export function ownerLockKey(ownerId: string): string {
+  return `lock:owner:${ownerId}`;
 }
 
 // Écart §5.1 (JOURNAL 2026-10-06) : l'activité, des nombres seulement. Un autre préfixe isole les clés d'un test.
