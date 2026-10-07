@@ -14,6 +14,7 @@ import { createOwnSwitchTracker } from "../ui/archive/own-switch";
 import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
+import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
@@ -91,6 +92,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   const developer = useDeveloperWindow(stores.canvas); // écart §10.3 (JOURNAL 2026-10-06) : le développeur seul
   const scoreboard = useScoreboardRows(stores.canvas);
   const scoreboardCollapse = useScoreboardCollapse();
+  const ownerProfile = useOwnerProfile(stores.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
   const getRole = () => stores.canvas.getView().role;
   const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
   const isOwner = role === "owner";
@@ -101,7 +103,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   return (
     <>
       {/* Sur son canvas, le streamer n'a qu'une pill : la pill Compte porte ses Réglages. */}
-      {!isOwner && !isWaitingForOwner && <CanvasPill owner={owner} isCompact={isCompact} />}
+      {!isOwner && !isWaitingForOwner && <CanvasPill owner={ownerProfile} isCompact={isCompact} />}
       <AccountPill
         {...account}
         isCompact={isCompact}

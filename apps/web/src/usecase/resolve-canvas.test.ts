@@ -62,6 +62,54 @@ describe("resolveCanvas (§9.1, D-14)", () => {
   });
 });
 
+describe("resolveCanvas, le live du propriétaire (Écart §4, JOURNAL 2026-10-07)", () => {
+  const trackerOf = (twitchLive?: { category: string }) => {
+    const asked: string[] = [];
+    return {
+      asked,
+      tracker: {
+        getLive: async (ownerId: string) => {
+          asked.push(ownerId);
+          return twitchLive;
+        },
+      },
+    };
+  };
+
+  // Quand le propriétaire est en live, le profil de la pill Canvas le porte dès le rendu serveur
+  it("carries the owner's live in the profile, as soon as the server renders", async () => {
+    const { tracker, asked } = trackerOf({ category: "Art" });
+
+    const page = await resolveCanvas(durableWith(canvas), "fenysk", undefined, tracker);
+
+    expect(page?.owner).toEqual({
+      displayName: owner.displayName,
+      login: owner.login,
+      avatarUrl: owner.avatarUrl,
+      twitchLive: { category: "Art" },
+    });
+    expect(asked).toEqual([owner.userId]);
+  });
+
+  // Hors live, le profil ne porte aucune clé de live
+  it("leaves the live out of the profile when the owner is not live", async () => {
+    const { tracker } = trackerOf();
+
+    const page = await resolveCanvas(durableWith(canvas), "fenysk", undefined, tracker);
+
+    expect(page?.owner).not.toHaveProperty("twitchLive");
+  });
+
+  // Pour un pseudo sans canvas, ou sans suivi (la vue OBS), le live n'est pas demandé
+  it("does not ask for the live of a login without a canvas, nor without tracking", async () => {
+    const { tracker, asked } = trackerOf({ category: "Art" });
+
+    expect(await resolveCanvas(durableWith(null), "fenysk", undefined, tracker)).toBeNull();
+    expect((await resolveCanvas(durableWith(canvas), "fenysk"))?.owner).not.toHaveProperty("twitchLive");
+    expect(asked).toEqual([]);
+  });
+});
+
 describe("resolveCanvas, la session du visiteur (§10.2, JOURNAL 2026-10-06)", () => {
   const page = {
     canvasId: canvas.canvasId,

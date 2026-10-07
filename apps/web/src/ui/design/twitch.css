@@ -1,3 +1,113 @@
+/* Le bouton de la chaîne d'un compte en live (Écart §4, JOURNAL 2026-10-07) : teinté du violet de Twitch, le logo puis la
+   catégorie du stream. Il se pose sur la base `.lp-btn` (button.css), importée avant ce fichier. */
+.lp-btn--live {
+  padding: 0 14px 0 11px;
+  background: var(--twitch-live-bg);
+  color: var(--twitch-live-ink);
+  animation: lp-live-in var(--lp-dur-fade) ease;
+}
+
+/* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
+@media (hover: hover) {
+  .lp-btn--live:hover {
+    background: var(--twitch-live-bg-hover);
+  }
+}
+
+/* La catégorie, coupée par « … » : plus courte sur l'écran étroit ou tactile, la même requête que --control-size */
+.lp-live-category {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .lp-live-category {
+    max-width: 64px;
+  }
+}
+
+.lp-twitch-live-glyph {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  color: var(--twitch);
+}
+
+/* Le rond de 6 px à l'angle du logo, détouré de 1,5 px de la couleur du fond du bouton */
+.lp-twitch-live-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--twitch);
+  box-shadow: 0 0 0 1.5px var(--twitch-live-bg);
+  transition: box-shadow var(--lp-dur-fast);
+}
+
+@media (hover: hover) {
+  .lp-btn--live:hover .lp-twitch-live-dot {
+    box-shadow: 0 0 0 1.5px var(--twitch-live-bg-hover);
+  }
+}
+
+/* Le glitch cligne des yeux : fermés ~130 ms toutes les 3,2 s, et aussitôt au survol de la souris (autre animation, donc
+   elle repart du début). Aucun JavaScript de minutage. */
+.lp-twitch-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lp-twitch-blink 3.2s infinite;
+}
+
+@media (hover: hover) {
+  .lp-btn--live:hover .lp-twitch-eye {
+    animation-name: lp-twitch-blink-hover;
+  }
+}
+
+@keyframes lp-twitch-blink {
+  0%,
+  96% {
+    transform: scaleY(1);
+  }
+  98% {
+    transform: scaleY(0.1);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes lp-twitch-blink-hover {
+  0% {
+    transform: scaleY(1);
+  }
+  2% {
+    transform: scaleY(0.1);
+  }
+  4%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes lp-live-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Mouvement réduit : le logo reste ouvert et violet, rien ne cligne */
+@media (prefers-reduced-motion: reduce) {
+  .lp-twitch-eye,
+  .lp-btn--live:hover .lp-twitch-eye {
+    animation: none;
+  }
+}
+
 /* La ligne sous chaque bouton Se connecter : discrète, centrée, jamais plus large que ce qu'elle accompagne. */
 
 .lp-sign-in-note {

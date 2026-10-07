@@ -69,6 +69,7 @@ import {
   toScorePixels,
   userKey,
 } from "./keys";
+import { getTwitchLiveState, listTwitchLives } from "./twitch-live";
 
 declare module "ioredis" {
   interface RedisCommander<Context> {
@@ -823,6 +824,12 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
       return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
     },
+
+    async getTwitchLive(userId) {
+      return (await getTwitchLiveState(redis, userId))?.twitchLive ?? null;
+    },
+
+    listTwitchLives: (userIds) => listTwitchLives(redis, userIds),
 
     // Écrit par le web dans `meta` (createTwitchWrites), lu ici pour l'onglet Modération (JOURNAL 2026-09-27).
     async getTwitchSync(canvasId: string): Promise<TwitchSync | null> {

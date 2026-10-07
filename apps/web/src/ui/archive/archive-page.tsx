@@ -13,6 +13,7 @@ import { useAccountPillProps } from "../account/use-account-pill";
 import { useSigningIn } from "../account/use-signing-in";
 import { useIsCanvasMissing } from "../canvas/canvas-missing";
 import { useIsCanvasDiscarded, useIsCanvasReopened } from "../canvas/canvas-status";
+import { useOwnerProfile } from "../canvas/owner-profile";
 import { PixelCanvas } from "../canvas/pixel-canvas";
 import { ToastProvider, useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
@@ -76,6 +77,7 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   const [isChoosing, setIsChoosing] = useState(false);
   const [background, setBackground] = useState<PngBackground | null>(null);
   const { owner, createdAt, archivedAt, theme } = archive;
+  const ownerProfile = useOwnerProfile(stores?.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
 
   // Le dessin visible, case par case : le même que celui de la page, agrandi sans lissage, sur le fond choisi.
   const download = async (choice: PngBackground): Promise<void> => {
@@ -110,7 +112,7 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   return (
     <>
       <ArchiveBanner
-        owner={owner}
+        owner={ownerProfile}
         title={bannerTitle({ displayName: owner.displayName, theme })}
         caption={bannerCaption({ displayName: owner.displayName, theme, createdAt, archivedAt })}
         isDownloading={isDownloading || !stores}

@@ -18,7 +18,7 @@ import { CopyButton } from "../design/copy-button";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
-import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
+import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
 import { SaturationFigure } from "../design/saturation-figure";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
@@ -104,12 +104,51 @@ const PROFILE_USERS = [
 ];
 const PROFILE_VARIANTS: readonly ProfileVariant[] = ["avatar", "name", "full"];
 
+// Écart §4 (JOURNAL 2026-10-07) : le bouton Twitch d'un compte en live, dans chacun de ses états.
+const PROFILE_LIVE_STATES: readonly {
+  name: string;
+  detail: string;
+  user: ProfileUser;
+  variant: ProfileVariant;
+}[] = [
+  {
+    name: "Hors live",
+    detail: "Le bouton fantôme avec le logo.",
+    user: SAMPLE_OWNER,
+    variant: "full",
+  },
+  {
+    name: "En live",
+    detail: "Le bouton se teinte, le logo prend un rond et cligne des yeux, la catégorie du stream s'écrit.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Art" } },
+    variant: "full",
+  },
+  {
+    name: "En live, sans catégorie",
+    detail: "Le texte « En live ».",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "" } },
+    variant: "full",
+  },
+  {
+    name: "Catégorie longue",
+    detail: "Coupée par « … » à 170 px, 64 px sur mobile.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Software and Game Development" } },
+    variant: "full",
+  },
+  {
+    name: "Compact, en live",
+    detail: "Sur mobile, sans logo hors live : en live, le bouton paraît quand même.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Just Chatting" } },
+    variant: "name",
+  },
+];
+
 export const ProfileEntry = () => (
   <Entry
     slug="avatar-et-profil"
     components={["Avatar", "Profile", "AvatarButton"]}
     file="ui/design/profile.tsx"
-    note="L'avatar et le nom mènent au canvas ; seule l'icône Twitch mène à la chaîne."
+    note="L'avatar et le nom mènent au canvas ; seul le bouton Twitch mène à la chaîne, et il dit quand la personne est en live."
   >
     <Block title="Avatar">
       {PROFILE_USERS.map(({ name, detail, user }) => (
@@ -123,6 +162,18 @@ export const ProfileEntry = () => (
         <StateRow key={variant} name={variant}>
           <Pill>
             <Profile user={SAMPLE_OWNER} variant={variant} />
+          </Pill>
+        </StateRow>
+      ))}
+    </Block>
+    <Block
+      title="Bouton Twitch"
+      note="Seules les personnes qui ont un compte LivePlace ont un statut. L'infobulle dit : « Kalyss est en live sur Twitch : Art »."
+    >
+      {PROFILE_LIVE_STATES.map(({ name, detail, user, variant }) => (
+        <StateRow key={name} name={name} detail={detail}>
+          <Pill>
+            <Profile user={user} variant={variant} />
           </Pill>
         </StateRow>
       ))}

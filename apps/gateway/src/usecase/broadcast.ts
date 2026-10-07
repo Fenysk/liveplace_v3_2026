@@ -1,7 +1,13 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
 import type { Timestamp } from "@liveplace/domain";
-import type { CanvasCore, LiveControl, ScoreboardRank, Unsubscribe } from "@liveplace/domain/ports";
+import type {
+  CanvasCore,
+  LiveControl,
+  ScoreboardRank,
+  TwitchLive,
+  Unsubscribe,
+} from "@liveplace/domain/ports";
 import type { Event, ServerFrame } from "@liveplace/protocol";
 import { conflate } from "./conflate";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
@@ -10,8 +16,10 @@ import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => void;
 // JOURNAL 2026-10-06 : le classement, au plus une fois par fenêtre ; la frame est celle de cette page.
 export type ScoreboardControl = { t: "scoreboard"; frame: ScoreboardFrame };
-// Un message de contrôle de moderate.lua (§5.4), ou le classement : ni tick ni conflation, il n'a aucune case.
-export type ControlMessage = LiveControl | ScoreboardControl;
+// Écart §4 (JOURNAL 2026-10-07) : le live d'un compte a changé ; chaque page décide s'il la regarde. Absent : plus en live.
+export type TwitchLiveControl = { t: "twitchLive"; userId: string; twitchLive?: TwitchLive };
+// Un message de contrôle de moderate.lua (§5.4), le classement ou un live : ni tick ni conflation, il n'a aucune case.
+export type ControlMessage = LiveControl | ScoreboardControl | TwitchLiveControl;
 export type ControlListener = (control: ControlMessage) => void;
 
 export interface Broadcast {
@@ -27,6 +35,8 @@ export interface Broadcast {
   // JOURNAL 2026-10-06 : une fenêtre du classement. Ne relit que les canvas où une pose, un ban ou un déban a eu lieu.
   tickScoreboard(): Promise<void>;
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
+  // Écart §4 (JOURNAL 2026-10-07) : un message de contrôle à toutes les pages jointes, tous canvas confondus.
+  announce(control: ControlMessage): void;
   // Écart §5.1 (JOURNAL 2026-10-07) : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
   countConnections(): { total: number; largestCanvas: number };
 }
@@ -216,6 +226,11 @@ export function createBroadcast(
 
     countAccounts(canvasId) {
       return accountIdsOf(canvases.get(canvasId)).size;
+    },
+
+    announce(control) {
+      for (const { listeners } of canvases.values())
+        for (const { onControl } of listeners.values()) onControl(control);
     },
 
     countConnections() {

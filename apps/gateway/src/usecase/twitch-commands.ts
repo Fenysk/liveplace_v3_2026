@@ -2,7 +2,14 @@
 // scripts, au nom du streamer et avec l'origine Twitch.
 
 import type { CanvasMeta, Timestamp } from "@liveplace/domain";
-import type { CanvasCore, Moderation, TwitchCommand, TwitchCommandQueue } from "@liveplace/domain/ports";
+import type {
+  CanvasCore,
+  CanvasTwitchCommand,
+  Moderation,
+  TwitchCommand,
+  TwitchCommandQueue,
+} from "@liveplace/domain/ports";
+import type { Broadcast } from "./broadcast";
 
 // Une attente bornée : à l'arrêt, la boucle ne retient pas le process plus longtemps.
 const WAIT_MS = 5000;
@@ -16,6 +23,7 @@ export type TwitchCommandsDeps = {
     CanvasCore,
     "getCanvas" | "moderate" | "setModerator" | "listModerators" | "listBans" | "copyTwitchUsers"
   >;
+  broadcast: Pick<Broadcast, "announce">; // Écart §4 (JOURNAL 2026-10-07) : le live d'un compte, à toutes les pages
   now: () => Timestamp;
   wait: (ms: number) => Promise<void>;
 };
@@ -42,7 +50,7 @@ const clearAll = async (
     result = orRestartIfArchived(await deps.core.moderate(canvasId, { ...moderation, slice: "next" }));
 };
 
-type OwnedCommand<Kind extends TwitchCommand["kind"]> = Extract<TwitchCommand, { kind: Kind }> & {
+type OwnedCommand<Kind extends CanvasTwitchCommand["kind"]> = Extract<CanvasTwitchCommand, { kind: Kind }> & {
   ownerId: string;
 };
 
@@ -117,10 +125,14 @@ const followToLiveCanvas = async (deps: TwitchCommandsDeps, from: string): Promi
   return { status: "lost" };
 };
 
-const userIdsOf = (command: TwitchCommand): readonly string[] =>
+const userIdsOf = (command: CanvasTwitchCommand): readonly string[] =>
   "userIds" in command ? command.userIds : [command.userId];
 
-const applyOn = async (deps: TwitchCommandsDeps, command: TwitchCommand, ownerId: string): Promise<void> => {
+const applyOn = async (
+  deps: TwitchCommandsDeps,
+  command: CanvasTwitchCommand,
+  ownerId: string,
+): Promise<void> => {
   switch (command.kind) {
     case "ban":
     case "unban":
@@ -135,10 +147,10 @@ const applyOn = async (deps: TwitchCommandsDeps, command: TwitchCommand, ownerId
   }
 };
 
-export async function applyTwitchCommand(
+const applyOnCanvas = async (
   deps: TwitchCommandsDeps,
-  command: TwitchCommand,
-): Promise<CommandOutcome> {
+  command: CanvasTwitchCommand,
+): Promise<CommandOutcome> => {
   let canvasId = command.canvasId;
   // Une course avec l'archivage (un script refuse) redemande le canvas : il a maintenant son successeur.
   for (let round = 0; round < FOLLOW_MAX_ATTEMPTS; round++) {
@@ -157,6 +169,19 @@ export async function applyTwitchCommand(
     }
   }
   return "lost";
+};
+
+export async function applyTwitchCommand(
+  deps: TwitchCommandsDeps,
+  command: TwitchCommand,
+): Promise<CommandOutcome> {
+  // Écart §4 (JOURNAL 2026-10-07) : un live n'a pas de canvas. Les pages du streamer et les connexions du compte le prennent.
+  if (command.kind === "twitchLive") {
+    const { userId, twitchLive } = command;
+    deps.broadcast.announce({ t: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) });
+    return "done";
+  }
+  return applyOnCanvas(deps, command);
 }
 
 // Une action qui échoue est journalisée puis acquittée : la file continue, et la synchro suivante la rattrape.

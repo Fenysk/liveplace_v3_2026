@@ -33,7 +33,8 @@ import { z } from "zod";
 // noir de la vue OBS.
 // 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
 // 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (Écart §4.3, JOURNAL 2026-10-07).
-export const PROTOCOL_VERSION = 16;
+// 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (Écart §4 et §10.1, JOURNAL 2026-10-07).
+export const PROTOCOL_VERSION = 17;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -142,12 +143,16 @@ const RejectedPixelSchema = z.object({
 // L'origine d'un rôle de modérateur : nommé sur Twitch, ici, ou les deux (JOURNAL 2026-09-27).
 const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
 
+// Écart §4.3 (JOURNAL 2026-10-07) : le live Twitch d'un compte ; `category` vide : le stream n'en a pas. Absent : hors live.
+const TwitchLiveSchema = z.object({ category: z.string() });
+
 const InspectEntrySchema = z.object({
   userId: UserIdSchema.optional(), // §4.3 : seulement pour qui modère
   moderatorOrigin: ModeratorOriginSchema.optional(), // pour le seul streamer, quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
+  twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : lu à l'inspection
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
   placementId: PlacementIdSchema, // §4.3 : la pose, pour la signaler ou la retirer
@@ -369,6 +374,7 @@ const WelcomeFrameSchema = z.object({
     height: z.number().int().positive(),
     ownerId: UserIdSchema,
     archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
+    ownerTwitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : le streamer est en live
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
@@ -386,6 +392,7 @@ const WelcomeFrameSchema = z.object({
     login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
     avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
+    twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : la personne connectée est en live
     role: RoleSchema,
   }),
   gauge: GaugeSchema.optional(),
@@ -564,6 +571,14 @@ const GaugeLimitsFrameSchema = z.object({
 // actif ; redevenu actif, une page d'archive part sur `/{login}` ; supprimé, elle montre l'introuvable.
 const CanvasStatusFrameSchema = z.object({ t: z.literal("canvasStatus"), status: z.enum(CANVAS_STATUSES) });
 
+// Écart §4.3 (JOURNAL 2026-10-07) : le live du streamer de la page ou de la personne connectée vient de changer.
+// `twitchLive` absent : plus en live.
+const TwitchLiveFrameSchema = z.object({
+  t: z.literal("twitchLive"),
+  userId: UserIdSchema,
+  twitchLive: TwitchLiveSchema.optional(),
+});
+
 // Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, pour le développeur seul.
 const CountSchema = z.number().int().nonnegative();
 
@@ -590,10 +605,11 @@ const ConnectedAccountSchema = ActivityUserSchema.extend({
   devices: z.array(z.enum(DEVICES)),
 });
 
-// `obsViews` au-dessus de zéro : le canvas est streamé. `heat` : ses pixels de la dernière heure.
+// `obsViews` au-dessus de zéro : le canvas est streamé. `heat` : ses pixels de la dernière heure. Le streamer porte son live
+// Twitch quand il en a un (Écart §4.3, JOURNAL 2026-10-07) ; les comptes connectés, eux, n'en portent pas.
 const ActivityCanvasSchema = z.object({
   canvasId: CanvasIdSchema,
-  owner: ActivityUserSchema,
+  owner: ActivityUserSchema.extend({ twitchLive: TwitchLiveSchema.optional() }),
   obsViews: CountSchema,
   people: CountSchema,
   guests: CountSchema,
@@ -762,6 +778,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   StaleListFrameSchema,
   ScoreboardFrameSchema,
   CanvasStatusFrameSchema,
+  TwitchLiveFrameSchema,
   ActivityFrameSchema,
   ActivityHistoryFrameSchema,
   CapacityFrameSchema,

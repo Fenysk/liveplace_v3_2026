@@ -34,6 +34,11 @@
   --scrim: rgba(16, 18, 28, 0.4);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
+  /* Le live Twitch (Écart §4, JOURNAL 2026-10-07) : le bouton de la chaîne, teinté du violet de Twitch sur la pill.
+     L'encre fonce par rapport au violet de marque : AA (4,5:1) sur le fond teinté, au survol compris. */
+  --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
+  --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
+  --twitch-live-ink: #6d28d9;
   /* Les anneaux du classement : un dégradé discret par place, plus soutenu sur le fond clair */
   --rank-gold-from: #c8901a;
   --rank-gold-to: #f2cf6b;
@@ -75,6 +80,9 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
+  --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
+  --twitch-live-ink: #bf94ff;
   --rank-gold-from: #e8b84a;
   --rank-gold-to: #f7e08a;
   --rank-silver-from: #b8bfcc;

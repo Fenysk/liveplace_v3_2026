@@ -12,7 +12,9 @@ const ArchiveParamsSchema = z.object({ login: z.string().min(1).max(100), code: 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
 const getArchivePage = createServerFn({ method: "GET" })
   .validator(ArchiveParamsSchema)
-  .handler(({ data, context }) => resolveArchive(context.deps.durable, data.login, data.code));
+  .handler(({ data, context }) =>
+    resolveArchive(context.deps.durable, data.login, data.code, context.deps.tracker),
+  );
 
 type ArchivePageLoaderArgs = { params: { login: string; code: string } };
 

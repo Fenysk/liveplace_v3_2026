@@ -7,7 +7,7 @@ import { type SignInDeps, type SignInResult, signInTwitchUser } from "./sign-in"
 
 export type TwitchSyncDeps = SignInDeps & {
   twitchWrites: TwitchWrites;
-  eventSub: TwitchEventSub;
+  eventSub: Pick<TwitchEventSub, "subscribeToModeration">;
   now: () => Timestamp;
 };
 

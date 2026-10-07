@@ -5,6 +5,7 @@ import type {
   SignedInUser,
   TwitchAuth,
   TwitchEventSub,
+  TwitchLiveSource,
   TwitchPurpose,
   TwitchUser,
   TwitchWebhook,
@@ -156,11 +157,25 @@ export function createTwitchAuth({ clientId, clientSecret, redirectUri }: Twitch
 
 const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // la règle de Twitch contre le rejeu
 
+// Écart §4 (JOURNAL 2026-10-07) : les types qui disent le live d'une chaîne, et la version de chacun.
+const LIVE_SUBSCRIPTIONS = [
+  { type: "stream.online", version: "1" },
+  { type: "stream.offline", version: "1" },
+  { type: "channel.update", version: "2" },
+];
+const LIVE_TYPES = LIVE_SUBSCRIPTIONS.map(({ type }) => type);
+
 const VerificationSchema = z.object({ challenge: z.string().min(1) });
 const RevocationSchema = z.object({
-  subscription: z.object({ condition: z.object({ broadcaster_user_id: z.string().min(1) }) }),
+  subscription: z.object({
+    type: z.string(),
+    condition: z.object({ broadcaster_user_id: z.string().min(1) }),
+  }),
 });
-const ChannelUserEventSchema = ModerationUserSchema.extend({ broadcaster_user_id: z.string().min(1) });
+const BroadcasterEventSchema = z.object({ broadcaster_user_id: z.string().min(1) });
+const StreamEventSchema = BroadcasterEventSchema.extend({ type: z.string() });
+const CategoryEventSchema = BroadcasterEventSchema.extend({ category_name: z.string().default("") });
+const ChannelUserEventSchema = ModerationUserSchema.extend(BroadcasterEventSchema.shape);
 const NotificationSchema = z.object({ subscription: z.object({ type: z.string() }), event: z.unknown() });
 
 // Une signature juste, à temps constant : une comparaison ordinaire laisse deviner la bonne octet par octet.
@@ -179,10 +194,27 @@ const toUser = (event: z.infer<typeof ChannelUserEventSchema>) => ({
   user: toTwitchUser(event),
 });
 
-// Un événement suivi : les bans et les modérateurs de la chaîne. Tout autre type est ignoré.
+// Un événement suivi : les bans et les modérateurs de la chaîne, et son live. Tout autre type est ignoré.
 const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
   const { subscription, event } = NotificationSchema.parse(body);
   switch (subscription.type) {
+    // Écart §4 (JOURNAL 2026-10-07) : seul un `type: live` allume le statut, jamais une rediffusion.
+    case "stream.online": {
+      const online = StreamEventSchema.parse(event);
+      return online.type === "live"
+        ? { kind: "online", broadcasterId: online.broadcaster_user_id }
+        : { kind: "ignored" };
+    }
+    case "stream.offline":
+      return { kind: "offline", broadcasterId: BroadcasterEventSchema.parse(event).broadcaster_user_id };
+    case "channel.update": {
+      const channel = CategoryEventSchema.parse(event);
+      return {
+        kind: "category",
+        broadcasterId: channel.broadcaster_user_id,
+        category: channel.category_name,
+      };
+    }
     case "channel.ban": {
       const ban = ChannelUserEventSchema.extend({ is_permanent: z.boolean() }).parse(event);
       return { kind: "ban", ...toUser(ban), isPermanent: ban.is_permanent };
@@ -201,6 +233,15 @@ const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
   }
 };
 
+// Écart §4 (JOURNAL 2026-10-07) : un abonnement de live retiré n'est jamais la synchro de modération révoquée.
+const toRevocationEvent = (body: unknown): TwitchWebhookEvent => {
+  const { subscription } = RevocationSchema.parse(body);
+  return {
+    kind: LIVE_TYPES.includes(subscription.type) ? "liveRevoked" : "revocation",
+    broadcasterId: subscription.condition.broadcaster_user_id,
+  };
+};
+
 export function createTwitchWebhook(secret: string): TwitchWebhook {
   return {
     read(message, nowMs) {
@@ -210,11 +251,7 @@ export function createTwitchWebhook(secret: string): TwitchWebhook {
       const body: unknown = JSON.parse(message.body);
       if (message.type === "webhook_callback_verification")
         return { kind: "verification", challenge: VerificationSchema.parse(body).challenge };
-      if (message.type === "revocation")
-        return {
-          kind: "revocation",
-          broadcasterId: RevocationSchema.parse(body).subscription.condition.broadcaster_user_id,
-        };
+      if (message.type === "revocation") return toRevocationEvent(body);
       return toNotificationEvent(body);
     },
   };
@@ -230,8 +267,11 @@ const MODERATION_TYPES = [
   "channel.moderator.add",
   "channel.moderator.remove",
 ];
+const MODERATION_SUBSCRIPTIONS = MODERATION_TYPES.map((type) => ({ type, version: "1" }));
 // Un abonnement dans un autre état (révoqué, échoué) ne livre plus rien : on en recrée un.
-const LIVE_STATUSES = new Set(["enabled", "webhook_callback_verification_pending"]);
+const ACTIVE_STATUSES = new Set(["enabled", "webhook_callback_verification_pending"]);
+// Écart §4 (JOURNAL 2026-10-07) : aucun appel à Twitch ne pend, sous le délai de 10 s qu'il laisse à un webhook.
+const TWITCH_TIMEOUT_MS = 4000;
 
 const AppGrantSchema = z.object({ access_token: z.string().min(1) });
 const SubscriptionsSchema = z.object({
@@ -245,22 +285,11 @@ const SubscriptionsSchema = z.object({
   ),
 });
 
-type TwitchEventSubOptions = {
-  clientId: string;
-  clientSecret: string;
-  callbackUrl: string;
-  secret: string;
-  isBeta: boolean;
-};
+type AppCredentials = { clientId: string; clientSecret: string };
 
-export function createTwitchEventSub({
-  clientId,
-  clientSecret,
-  callbackUrl,
-  secret,
-  isBeta,
-}: TwitchEventSubOptions): TwitchEventSub {
-  let appGrant: string | null = null; // gardé en mémoire seulement, redemandé quand Twitch le refuse
+// Un appel à l'API avec le jeton de l'application, redemandé une fois s'il a expiré. Le jeton reste en mémoire seulement.
+function createAppHelix({ clientId, clientSecret }: AppCredentials) {
+  let appGrant: string | null = null;
 
   const getAppGrant = async (): Promise<string> => {
     if (appGrant) return appGrant;
@@ -271,24 +300,41 @@ export function createTwitchEventSub({
         client_secret: clientSecret,
         grant_type: "client_credentials",
       }),
+      signal: AbortSignal.timeout(TWITCH_TIMEOUT_MS),
     });
     if (!answer.ok) throw new Error(`Twitch refuse le jeton de l'application (${answer.status})`);
     appGrant = AppGrantSchema.parse(await answer.json()).access_token;
     return appGrant;
   };
 
-  // Un appel à l'API avec le jeton de l'application, redemandé une fois s'il a expiré.
   const callHelix = async (url: string, init: RequestInit = {}, isRetry = false): Promise<Response> => {
     const headers = {
       ...init.headers,
       Authorization: `Bearer ${await getAppGrant()}`,
       "Client-Id": clientId,
     };
-    const answer = await fetch(url, { ...init, headers });
+    const answer = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(TWITCH_TIMEOUT_MS) });
     if (answer.status !== 401 || isRetry) return answer;
     appGrant = null;
     return callHelix(url, init, true);
   };
+
+  return callHelix;
+}
+
+type TwitchEventSubOptions = AppCredentials & {
+  callbackUrl: string;
+  secret: string;
+  isBeta: boolean;
+};
+
+export function createTwitchEventSub({
+  callbackUrl,
+  secret,
+  isBeta,
+  ...credentials
+}: TwitchEventSubOptions): TwitchEventSub {
+  const callHelix = createAppHelix(credentials);
 
   type Subscription = z.infer<typeof SubscriptionsSchema>["data"][number];
 
@@ -320,19 +366,23 @@ export function createTwitchEventSub({
     }
   };
 
-  const createMissing = async (broadcasterId: string, found: Subscription[]): Promise<void> => {
-    const live = new Set(
+  const createMissing = async (
+    broadcasterId: string,
+    found: Subscription[],
+    wanted: readonly { type: string; version: string }[],
+  ): Promise<void> => {
+    const active = new Set(
       found
-        .filter((one) => LIVE_STATUSES.has(one.status) && one.transport.callback === callbackUrl)
+        .filter((one) => ACTIVE_STATUSES.has(one.status) && one.transport.callback === callbackUrl)
         .map((one) => one.type),
     );
-    for (const type of MODERATION_TYPES.filter((wanted) => !live.has(wanted))) {
+    for (const { type, version } of wanted.filter(({ type: asked }) => !active.has(asked))) {
       const created = await callHelix(SUBSCRIPTIONS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          version: "1",
+          version,
           condition: { broadcaster_user_id: broadcasterId },
           transport: { method: "webhook", callback: callbackUrl, secret },
         }),
@@ -343,16 +393,60 @@ export function createTwitchEventSub({
     }
   };
 
+  // Les abonnements de la chaîne, ou `null` quand on ne s'abonne pas d'ici.
+  const listWhenAllowed = async (broadcasterId: string): Promise<Subscription[] | null> => {
+    const reason = skipReason();
+    if (!reason) return listSubscriptions(broadcasterId);
+    console.info(`EventSub sauté : ${reason}`, callbackUrl);
+    return null;
+  };
+
   return {
     async subscribeToModeration(broadcasterId) {
-      const reason = skipReason();
-      if (reason) {
-        console.info(`EventSub sauté : ${reason}`, callbackUrl);
-        return;
-      }
-      const found = await listSubscriptions(broadcasterId);
+      const found = await listWhenAllowed(broadcasterId);
+      if (!found) return;
       await clearElsewhere(found);
-      await createMissing(broadcasterId, found);
+      await createMissing(broadcasterId, found, MODERATION_SUBSCRIPTIONS);
+    },
+
+    // Écart §4 (JOURNAL 2026-10-07) : le live de la chaîne, avec les mêmes règles que la modération.
+    async subscribeToLive(broadcasterId) {
+      const found = await listWhenAllowed(broadcasterId);
+      if (found) await createMissing(broadcasterId, found, LIVE_SUBSCRIPTIONS);
+    },
+  };
+}
+
+// --- Le live d'une chaîne maintenant (Écart §4, JOURNAL 2026-10-07) : le filet des abonnements, avec le jeton de l'application ---
+
+const STREAMS_URL = "https://api.twitch.tv/helix/streams";
+const CHANNELS_URL = "https://api.twitch.tv/helix/channels";
+
+// `type` : « live » pour un stream en cours, vide quand Twitch n'a pas su le dire.
+const StreamsSchema = z.object({
+  data: z.array(z.object({ type: z.string(), game_name: z.string().default("") })),
+});
+const ChannelsSchema = z.object({ data: z.array(z.object({ game_name: z.string().default("") })) });
+
+export function createTwitchLiveSource(credentials: AppCredentials): TwitchLiveSource {
+  const callHelix = createAppHelix(credentials);
+
+  const getHelix = async (url: string, query: Record<string, string>): Promise<unknown> => {
+    const answer = await callHelix(`${url}?${new URLSearchParams(query)}`);
+    if (!answer.ok) throw new Error(`${new URL(url).pathname} refuse la requête (${answer.status})`);
+    return answer.json();
+  };
+
+  return {
+    async getLive(userId) {
+      const [stream] = StreamsSchema.parse(await getHelix(STREAMS_URL, { user_id: userId })).data;
+      return stream?.type === "live" ? { category: stream.game_name } : null;
+    },
+
+    // La catégorie de la chaîne, que l'événement `stream.online` ne porte pas.
+    async getCategory(userId) {
+      const [channel] = ChannelsSchema.parse(await getHelix(CHANNELS_URL, { broadcaster_id: userId })).data;
+      return channel?.game_name ?? "";
     },
   };
 }

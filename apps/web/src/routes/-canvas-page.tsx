@@ -17,10 +17,12 @@ const getCanvasPage = createServerFn({ method: "GET" })
 const getGameCanvasPage = createServerFn({ method: "GET" })
   .validator((login: string) => login)
   .handler(({ data: login, context }) =>
-    resolveCanvas(context.deps.durable, login, {
-      verifier: context.deps.verifier,
-      cookieHeader: getRequestHeader("cookie"),
-    }),
+    resolveCanvas(
+      context.deps.durable,
+      login,
+      { verifier: context.deps.verifier, cookieHeader: getRequestHeader("cookie") },
+      context.deps.tracker, // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, lu à Redis, jamais à Twitch
+    ),
   );
 
 const toPage = (page: ResolvedCanvas | null): ResolvedCanvas => {

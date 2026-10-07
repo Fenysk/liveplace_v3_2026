@@ -4,13 +4,20 @@
 // clic ouvre une petite fenêtre qui le dit plutôt que de naviguer, et la chaîne Twitch reste le seul lien qui mène
 // quelque part.
 
+import type { TwitchLive } from "@liveplace/domain/ports";
 import { useState } from "react";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
-import { TwitchGlyph } from "./twitch";
+import { TwitchGlyph, TwitchLiveGlyph } from "./twitch";
 import { SmallWindow } from "./window";
 
-export type ProfileUser = { displayName: string; login: string; avatarUrl?: string | undefined };
+// `twitchLive` (Écart §4, JOURNAL 2026-10-07) : la personne est en live ; le bouton de sa chaîne le dit. Absent : hors live.
+export type ProfileUser = {
+  displayName: string;
+  login: string;
+  avatarUrl?: string | undefined;
+  twitchLive?: TwitchLive | undefined;
+};
 
 // `avatar` : la photo seule. `name` : la photo et le nom. `full` : la photo, le nom et l'icône Twitch.
 export type ProfileVariant = "avatar" | "name" | "full";
@@ -38,6 +45,27 @@ export const Avatar = ({ displayName, avatarUrl, hasAccount = true }: AvatarProp
         />
       )}
     </span>
+  );
+};
+
+const LIVE_LABEL = "En live"; // sans catégorie
+
+// Le bouton de la chaîne d'un compte en live : le logo, puis la catégorie du stream. L'infobulle dit tout.
+const TwitchLiveLink = ({ user, twitchLive }: { user: ProfileUser; twitchLive: TwitchLive }) => {
+  const { category } = twitchLive;
+  const title = `${user.displayName} est en live sur Twitch${category ? ` : ${category}` : ""}`;
+  return (
+    <a
+      className="lp-btn lp-btn--live lp-type-caption"
+      href={`https://www.twitch.tv/${encodeURIComponent(user.login)}`}
+      title={title}
+      aria-label={title}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <TwitchLiveGlyph />
+      <span className="lp-live-category">{category || LIVE_LABEL}</span>
+    </a>
   );
 };
 
@@ -74,14 +102,19 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
           {inner}
         </button>
       )}
-      {(variant === "full" || !hasAccount) && (
-        <Button
-          icon={TwitchGlyph}
-          variant="ghost"
-          title={`Chaîne Twitch de ${user.displayName}`}
-          href={`https://www.twitch.tv/${encodeURIComponent(user.login)}`}
-          isNewTab
-        />
+      {/* Écart §4 (JOURNAL 2026-10-07) : en live, le bouton teinté paraît même sans logo (mobile) ; seule une personne avec compte l'est */}
+      {user.twitchLive && hasAccount ? (
+        <TwitchLiveLink user={user} twitchLive={user.twitchLive} />
+      ) : (
+        (variant === "full" || !hasAccount) && (
+          <Button
+            icon={TwitchGlyph}
+            variant="ghost"
+            title={`Chaîne Twitch de ${user.displayName}`}
+            href={`https://www.twitch.tv/${encodeURIComponent(user.login)}`}
+            isNewTab
+          />
+        )
       )}
       {!hasAccount && (
         <SmallWindow

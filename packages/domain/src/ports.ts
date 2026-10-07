@@ -84,13 +84,26 @@ export type ModeratorRole = { userId: string; source: ModerationSource; isModera
 // Le nom Twitch de quelqu'un qui n'a pas (encore) de compte LivePlace.
 export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
 
-// §2 : une action venue de Twitch. Le web la dépose, le gateway l'applique avec ses scripts.
-export type TwitchCommand =
+// Écart §4 et §10.1 (JOURNAL 2026-10-07) : le live Twitch en cours d'un compte, avec sa catégorie (vide : sans catégorie).
+// Absent : hors live.
+export type TwitchLive = NonNullable<Extract<ServerFrame, { t: "twitchLive" }>["twitchLive"]>;
+
+// Ce que le web garde par compte : son live, et l'heure de la dernière vérification chez Twitch.
+export type TwitchLiveState = { twitchLive?: TwitchLive; checkedAt: Timestamp };
+
+// §2 : une action venue de Twitch sur un canvas. Le web la dépose, le gateway l'applique avec ses scripts.
+export type CanvasTwitchCommand =
   | { kind: "ban" | "unban"; canvasId: string; userId: string }
   | { kind: "moderator"; canvasId: string; userId: string; isModerator: boolean }
   // La liste complète, à la synchro : ce qui manque s'ajoute, ce qui n'y est plus part, l'origine LivePlace reste.
   | { kind: "moderators"; canvasId: string; userIds: string[] }
   | { kind: "bans"; canvasId: string; userIds: string[] };
+
+// Écart §4 (JOURNAL 2026-10-07) : le live d'un compte a changé ; le gateway le dit à ses pages. Sans canvas : il vaut
+// pour toutes les pages du streamer et pour les connexions de ce compte.
+export type TwitchLiveCommand = { kind: "twitchLive"; userId: string; twitchLive?: TwitchLive };
+
+export type TwitchCommand = CanvasTwitchCommand | TwitchLiveCommand;
 
 // L'état de la synchro d'un canvas : faite, ou à refaire parce que le streamer a retiré ses droits chez Twitch.
 export type TwitchSync = NonNullable<Extract<ServerFrame, { t: "moderators" }>["twitchSync"]>;
@@ -106,6 +119,17 @@ export interface TwitchWrites {
 export interface TwitchCommandQueue {
   listTwitchCommands(blockMs: number): Promise<{ id: string; command: TwitchCommand }[]>;
   ackTwitchCommand(id: string): Promise<void>;
+}
+
+// Écart §4 (JOURNAL 2026-10-07) : les comptes que LivePlace connaît (le miroir `user:`), que le web suit tous à son démarrage.
+export interface AccountList {
+  listAccountIds(): Promise<string[]>;
+}
+
+// Écart §4 (JOURNAL 2026-10-07) : l'état de live de chaque compte, écrit par le web ; le gateway le lit par `getTwitchLive`.
+export interface TwitchLiveStore {
+  getTwitchLiveState(userId: string): Promise<TwitchLiveState | null>; // `null` : aucun état connu
+  setTwitchLiveState(userId: string, state: TwitchLiveState): Promise<void>;
 }
 
 // §4.3 : une ligne du classement d'un canvas, et la place d'un joueur dans ce classement (JOURNAL 2026-10-06).
@@ -195,6 +219,9 @@ export interface CanvasCore {
   setModerator(canvasId: string, change: ModeratorRole): Promise<Result<void, CanvasRefusal | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
   getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
+  getTwitchLive(userId: string): Promise<TwitchLive | null>; // Écart §4 (JOURNAL 2026-10-07) ; `null` : hors live, ou inconnu
+  // Une seule lecture pour tous ces comptes (l'activité du développeur) : seuls ceux en live ont une entrée.
+  listTwitchLives(userIds: readonly string[]): Promise<Map<string, TwitchLive>>;
   // Écart §15 (JOURNAL 2026-10-06) : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.
   copyTwitchUsers(fromCanvasId: string, toCanvasId: string, userIds: readonly string[]): Promise<void>;
   // `null` : pas modérateur. Pour la pill Inspection du streamer (JOURNAL 2026-09-27).
@@ -512,6 +539,12 @@ export type TwitchWebhookMessage = {
   body: string;
 };
 
+// Écart §4 et §10.1 (JOURNAL 2026-10-07) : ce que Twitch dit du live d'une chaîne. `online` : seulement un live, jamais une
+// rediffusion. `liveRevoked` : un abonnement de live retiré, qui ne touche pas à la synchro de modération.
+export type TwitchLiveEvent =
+  | { kind: "online" | "offline" | "liveRevoked"; broadcasterId: string }
+  | { kind: "category"; broadcasterId: string; category: string };
+
 // Ce qu'il veut dire, une fois sa signature et son heure vérifiées. `ignored` : un type qu'on ne suit pas.
 export type TwitchWebhookEvent =
   | { kind: "verification"; challenge: string }
@@ -519,6 +552,7 @@ export type TwitchWebhookEvent =
   | { kind: "ban"; broadcasterId: string; user: TwitchUser; isPermanent: boolean }
   | { kind: "unban"; broadcasterId: string; user: TwitchUser }
   | { kind: "moderator"; broadcasterId: string; user: TwitchUser; isModerator: boolean }
+  | TwitchLiveEvent
   | { kind: "ignored" };
 
 // `null` : pas signé par notre secret, ou plus vieux que 10 minutes. On n'en fait rien.
@@ -529,6 +563,13 @@ export interface TwitchWebhook {
 // §10.1 : les abonnements EventSub d'une chaîne, pris avec le jeton de l'application.
 export interface TwitchEventSub {
   subscribeToModeration(broadcasterId: string): Promise<void>;
+  subscribeToLive(broadcasterId: string): Promise<void>; // Écart §4 (JOURNAL 2026-10-07)
+}
+
+// Écart §4 (JOURNAL 2026-10-07) : ce que Twitch dit d'une chaîne maintenant, avec le jeton de l'application.
+export interface TwitchLiveSource {
+  getLive(userId: string): Promise<TwitchLive | null>; // `helix/streams` : `null` hors live
+  getCategory(userId: string): Promise<string>; // `helix/channels` : la catégorie de la chaîne, vide si elle n'en a pas
 }
 
 // Twitch (§10.1) : le token ne sort jamais de l'adaptateur, il n'est ni gardé ni logué.

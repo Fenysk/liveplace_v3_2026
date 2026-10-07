@@ -22,6 +22,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
   const mirrored: object[] = [];
   const signed: object[] = [];
   const signups: Signup[] = [];
+  const tracked: string[] = [];
   const known = [user, owner];
   const deps: SignInDeps = {
     twitch: {
@@ -59,11 +60,17 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
         return "signed-session";
       },
     },
+    tracker: {
+      track: (trackedUserId) => {
+        tracked.push(trackedUserId);
+      },
+    },
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };
   return {
     deps,
+    tracked,
     activeCanvasReads,
     createdCanvases,
     mirroredUsers,
@@ -94,6 +101,18 @@ describe("completeSignIn (§10.1)", () => {
     expect(mirroredUsers).toEqual([user.userId]);
     expect(signedUsers).toEqual([user.userId]);
     expect(result).toEqual({ signedSession: "signed-session", login: user.login });
+  });
+
+  // À chaque connexion, le live Twitch du compte est suivi (écart §4 et §10.1, JOURNAL 2026-10-07)
+  it("has the account's Twitch live tracked at each sign-in, new account or not", async () => {
+    const first = doubles("random-candidate");
+    const later = doubles("existing-canvas");
+
+    await completeSignIn(first.deps, "code", null);
+    await completeSignIn(later.deps, "code", "/benitoad");
+
+    expect(first.tracked).toEqual([user.userId]);
+    expect(later.tracked).toEqual([user.userId]);
   });
 
   // Garde l'e-mail pour Convex seulement : jamais dans le miroir Redis ni dans la session (écart §10.1, JOURNAL 2026-09-27)

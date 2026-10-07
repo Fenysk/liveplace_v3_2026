@@ -94,6 +94,12 @@ export function userKey(userId: string): string {
   return `user:${userId}`;
 }
 
+// Écart §4 (JOURNAL 2026-10-07) : le live Twitch d'un compte, un HASH `checkedAt` et, en live seulement, `category`.
+// Sans EXPIRE : « hors live » est un état connu, et le web revérifie celui qui date.
+export function twitchLiveKey(userId: string): string {
+  return `twitch:live:${userId}`;
+}
+
 // Écart §15 (JOURNAL 2026-10-06) : le verrou d'un propriétaire, pris par le web le temps d'un changement de canvas actif.
 // Il expire de lui-même : un web tombé en plein changement ne bloque personne plus de 30 s.
 export const OWNER_LOCK_TTL_MS = 30_000;

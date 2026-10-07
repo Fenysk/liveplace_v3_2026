@@ -3,7 +3,8 @@
 
 import { isLinkCode, type Timestamp } from "@liveplace/domain";
 import type { DurableStore } from "@liveplace/domain/ports";
-import { type CanvasOwner, toCanvasOwner } from "./resolve-canvas";
+import { type CanvasOwner, getCanvasOwner, toCanvasOwner } from "./resolve-canvas";
+import type { TwitchLiveTracker } from "./twitch-live";
 
 // De quoi montrer le bandeau : ses dates, et son thème s'il en a un.
 export type ResolvedArchive = {
@@ -25,6 +26,7 @@ export async function resolveArchive(
   durable: Pick<DurableStore, "getUserByLogin" | "getArchiveByLinkCode">,
   login: string,
   code: string,
+  tracker?: Pick<TwitchLiveTracker, "getLive">,
 ): Promise<ArchivePage | null> {
   const owner = await durable.getUserByLogin(login.toLowerCase());
   if (!owner) return null;
@@ -35,6 +37,12 @@ export async function resolveArchive(
   const { canvasId, createdAt, archivedAt, theme } = linked.archive;
   return {
     status: "archived",
-    archive: { canvasId, owner: toCanvasOwner(owner), createdAt, archivedAt, ...(theme ? { theme } : {}) },
+    archive: {
+      canvasId,
+      owner: await getCanvasOwner(owner, tracker),
+      createdAt,
+      archivedAt,
+      ...(theme ? { theme } : {}),
+    },
   };
 }

@@ -22,6 +22,7 @@ import type {
   LiveControl,
   Moderation,
   OffStreamCell,
+  TwitchLive,
 } from "@liveplace/domain/ports";
 import {
   type CellsFrame,
@@ -31,7 +32,14 @@ import {
   type ServerFrame,
 } from "@liveplace/protocol";
 import type { Activity, ActivityMember } from "./activity";
-import type { Broadcast, CellsListener, ControlListener, ScoreboardControl } from "./broadcast";
+import type {
+  Broadcast,
+  CellsListener,
+  ControlListener,
+  ControlMessage,
+  ScoreboardControl,
+  TwitchLiveControl,
+} from "./broadcast";
 import type { Capacity } from "./capacity";
 import { toCellsFrame } from "./cells-frame";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
@@ -60,8 +68,8 @@ type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" 
 type ListCapacityHistoryFrame = Extract<ClientFrame, { t: "listCapacityHistory" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
-// attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), ou le statut du
-// canvas (Écart §15, JOURNAL 2026-10-06).
+// attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), le statut du
+// canvas (Écart §15, JOURNAL 2026-10-06), ou le live du streamer ou de cette personne (Écart §4, JOURNAL 2026-10-07).
 type ControlFrame = Extract<
   ServerFrame,
   {
@@ -75,9 +83,13 @@ type ControlFrame = Extract<
       | "staleList"
       | "scoreboard"
       | "canvasStatus"
-      | "theme";
+      | "theme"
+      | "twitchLive";
   }
 >;
+
+// Écart §4 (JOURNAL 2026-10-07) : le live du streamer du canvas et celui de la personne connectée.
+type TwitchLives = { owner: TwitchLive | null; you: TwitchLive | null };
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
 // `version` part dans le `welcome` ; `coveredVersion` est la dernière version déjà envoyée, pour dédupliquer (§6.1).
@@ -107,6 +119,7 @@ type State =
       status: "joining";
       canvasId: string;
       mode: HelloFrame["mode"];
+      ownerId: string; // le live d'un compte ne regarde que lui et ses pages (Écart §4, JOURNAL 2026-10-07)
       role: Role;
       pendingFrames: CellsFrame[];
       pendingControls: ControlFrame[];
@@ -166,6 +179,7 @@ const buildWelcome = (
   role: Role,
   session: Session | null,
   gauge: AckFrame["gauge"] | null,
+  lives: TwitchLives,
 ): WelcomeFrame => ({
   t: "welcome",
   canvas: {
@@ -174,6 +188,7 @@ const buildWelcome = (
     height: meta.height,
     ownerId: meta.ownerId,
     ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
+    ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
   },
   params: {
     gaugeMaxStart: meta.gaugeMaxStart,
@@ -186,22 +201,37 @@ const buildWelcome = (
   },
   palette: [...PALETTE],
   version,
-  you: session ? { ...youOf(session), role } : { role },
+  you: session ? { ...youOf(session), ...(lives.you ? { twitchLive: lives.you } : {}), role } : { role },
   ...(gauge ? { gauge } : {}),
 });
+
+// La page à qui un message de contrôle s'adresse : son rôle, son mode, et le streamer du canvas.
+type Page = { role: Role; mode: HelloFrame["mode"]; ownerId: string };
+
+// Écart §4 (JOURNAL 2026-10-07) : le live du streamer de la page ou de cette personne, jamais en vue OBS, qui n'a pas de profil.
+const twitchLiveFrameOf = (
+  { userId, twitchLive }: TwitchLiveControl,
+  session: Session | null,
+  { mode, ownerId }: Page,
+): ControlFrame | null =>
+  mode === "ui" && (userId === ownerId || userId === session?.userId)
+    ? { t: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) }
+    : null;
 
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
 const controlFrameOf = (
-  control: Exclude<LiveControl, { t: "role" | "resize" | "gaugeLimits" }>,
+  control: Exclude<LiveControl, { t: "role" | "resize" | "gaugeLimits" }> | TwitchLiveControl,
   session: Session | null,
-  role: Role,
+  page: Page,
 ): ControlFrame | null => {
   if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
   if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
-  if (control.t === "reports") return canModerate(role) ? { t: "reportCount", count: control.count } : null;
+  if (control.t === "reports")
+    return canModerate(page.role) ? { t: "reportCount", count: control.count } : null;
   if (control.t === "canvasStatus") return { t: "canvasStatus", status: control.status };
   if (control.t === "theme") return { t: "theme", theme: control.theme };
+  if (control.t === "twitchLive") return twitchLiveFrameOf(control, session, page);
   return control.userId === session?.userId ? { t: control.t } : null;
 };
 
@@ -251,7 +281,7 @@ export function createConnection(
   };
 
   // JOURNAL 2026-10-06 : un ban, un déban ou un rôle, de qui que ce soit, périme la liste de qui modère.
-  const tellStaleList = (control: LiveControl): void => {
+  const tellStaleList = (control: Exclude<ControlMessage, ScoreboardControl>): void => {
     if (state.status === "awaitingHello" || !canModerate(state.role)) return;
     if (control.t === "banned" || control.t === "unbanned") deliverControl({ t: "staleList", list: "bans" });
     if (control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
@@ -265,7 +295,7 @@ export function createConnection(
     if (control.t === "resize") return onResizeControl();
     if (control.t === "gaugeLimits") return onGaugeLimitsControl(control);
     if (state.status === "awaitingHello") return;
-    const frame = controlFrameOf(control, session, state.role);
+    const frame = controlFrameOf(control, session, state);
     if (frame) deliverControl(frame);
   };
 
@@ -361,11 +391,12 @@ export function createConnection(
 
   // S'abonner avant de lire l'état, et garder ce qui arrive pendant la lecture (§6.1). Le ban et le délai aussi.
   // Ce qui arrive pendant la lecture de l'état est gardé, puis envoyé après le snapshot.
-  const startJoining = (canvasId: string, mode: HelloFrame["mode"], role: Role): void => {
+  const startJoining = (canvasId: string, mode: HelloFrame["mode"], ownerId: string, role: Role): void => {
     state = {
       status: "joining",
       canvasId,
       mode,
+      ownerId,
       role,
       pendingFrames: [],
       pendingControls: [],
@@ -381,7 +412,7 @@ export function createConnection(
     gauge: AckFrame["gauge"] | null,
     scoreboard: ScoreboardFrame | null,
   ) => {
-    startJoining(frame.canvasId, frame.mode, role);
+    startJoining(frame.canvasId, frame.mode, meta.ownerId, role);
     // §8 : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
@@ -391,7 +422,19 @@ export function createConnection(
     await arrive(frame, meta, role, gauge, scoreboard);
   };
 
-  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente.
+  // Écart §4 (JOURNAL 2026-10-07) : le live du streamer et celui de la personne connectée, lus une fois joint : un live annoncé
+  // pendant la lecture est gardé, puis envoyé après le welcome. Aucun profil en vue OBS, aucune lecture.
+  const getTwitchLives = async (mode: HelloFrame["mode"], ownerId: string): Promise<TwitchLives> => {
+    if (mode === "obs") return { owner: null, you: null };
+    const isOwner = session?.userId === ownerId;
+    const [owner, you] = await Promise.all([
+      deps.core.getTwitchLive(ownerId),
+      session && !isOwner ? deps.core.getTwitchLive(session.userId) : null,
+    ]);
+    return { owner, you: isOwner ? owner : you };
+  };
+
+  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live.
   // Écart §15 (JOURNAL 2026-10-06) : une archive n'en a pas à dire, personne n'y pose.
   const getArrivalParts = (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
     const isArchived = meta.archivedAt !== undefined;
@@ -399,6 +442,7 @@ export function createConnection(
       getArrival(frame, meta),
       session && !isArchived ? deps.core.isBanned(frame.canvasId, session.userId) : false,
       canModerate(role) && !isArchived ? deps.core.getReportCount(frame.canvasId) : null,
+      getTwitchLives(frame.mode, meta.ownerId),
     ]);
   };
 
@@ -411,9 +455,9 @@ export function createConnection(
     scoreboard: ScoreboardFrame | null,
   ) => {
     const { canvasId } = frame;
-    const [arrival, wasBanned, reportCount] = await getArrivalParts(frame, meta, role);
+    const [arrival, wasBanned, reportCount, lives] = await getArrivalParts(frame, meta, role);
 
-    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge));
+    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge, lives));
     sendAfterArrival(reportCount, scoreboard);
 
     const held =
@@ -439,8 +483,8 @@ export function createConnection(
   // §6.1 : la taille a changé, la page reprend un snapshot sans se reconnecter.
   const rearrive = async (): Promise<void> => {
     if (state.status !== "ready") return;
-    const { canvasId, mode, role } = state;
-    startJoining(canvasId, mode, role);
+    const { canvasId, mode, ownerId, role } = state;
+    startJoining(canvasId, mode, ownerId, role);
     const meta = await deps.core.getCanvas(canvasId);
     if (!meta) return refuse("canvas_not_found");
     const gauge = await getGaugeFor(canvasId, meta);
@@ -552,8 +596,14 @@ export function createConnection(
       return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
     const isInside = x < ready.width && y < ready.height;
     const found = isInside ? await deps.core.inspect(ready.canvasId, x, y) : null;
-    const entry = found ? await entryFor(found, ready) : null;
+    const entry = found ? await entryFor(await withTwitchLive(found), ready) : null;
     socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
+  };
+
+  // Écart §4 (JOURNAL 2026-10-07) : l'auteur est-il en live ? Une lecture Redis, au débit déjà plafonné de l'inspection.
+  const withTwitchLive = async (inspected: InspectEntry): Promise<InspectEntry> => {
+    const twitchLive = inspected.userId ? await deps.core.getTwitchLive(inspected.userId) : null;
+    return twitchLive ? { ...inspected, twitchLive } : inspected;
   };
 
   const forbid = (): void => socket.sendFrame({ t: "error", code: "forbidden" });

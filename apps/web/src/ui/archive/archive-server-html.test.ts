@@ -86,6 +86,19 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
     expect(serverHtml.notFound("Kalyss")).not.toMatch(INLINE_STYLE);
   });
 
+  // Écart §4 (JOURNAL 2026-10-07) : le bandeau d'une archive dont le streamer est en live porte son bouton teinté, sur PC et
+  // sur mobile, et le HTML du serveur n'y met toujours aucun `style`
+  it("carries the live button of a streamer who is live, on desktop and on mobile, with no inline style", () => {
+    const live = { ...archive, owner: { ...archive.owner, twitchLive: { category: "Art" } } };
+
+    for (const html of [serverHtml.page(live), serverHtml.banner(false), serverHtml.banner(true)]) {
+      expect(html).not.toMatch(INLINE_STYLE);
+    }
+    expect(serverHtml.page(live)).toContain('title="Kalyss est en live sur Twitch : Art"');
+    expect(serverHtml.page(live)).toContain("lp-btn--live");
+    expect(serverHtml.page()).not.toContain("lp-btn--live");
+  });
+
   // Les pastilles de fond prennent leur couleur d'une classe : Noir et Blanc ont chacune la leur, Transparent le damier
   it("gives each background swatch its look by a class: a tone for black and white, the checker for transparent", () => {
     const swatches = [...serverHtml.window(true).matchAll(/<button[^>]*class="(lp-swatch[^"]*)"/g)].map(

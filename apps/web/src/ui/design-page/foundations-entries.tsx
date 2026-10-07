@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { ButtonIcon } from "../design/button";
 import { ColorChip } from "../design/palette";
-import { TwitchGlyph } from "../design/twitch";
+import { TwitchGlyph, TwitchLiveGlyph } from "../design/twitch";
 import { useAppearanceChoice } from "../design/use-appearance";
 import { type SpecimenKind, VariableSpecimen, VariableSwatch } from "../design/variable-specimen";
 import { Block, Entry, Lines } from "./entry-layout";
@@ -29,7 +29,7 @@ type Usages = Readonly<Record<string, string>>;
 
 const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g, "$1-$2").toLowerCase();
 
-// Les 39 couleurs de `tokens.css`, rangées par famille.
+// Les 42 couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le vide et le canvas",
@@ -107,9 +107,12 @@ const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Twitch",
     usages: {
-      twitch: "Le violet de Twitch : Se connecter, seulement.",
+      twitch: "Le violet de Twitch : Se connecter, et le logo et le rond d'un compte en live.",
       twitchHover: "Le survol de Se connecter.",
       onTwitch: "Le texte sur le violet de Twitch.",
+      twitchLiveBg: "Le fond du bouton Twitch d'un compte en live : le violet à 16 % sur la pill.",
+      twitchLiveBgHover: "Son survol : le violet à 24 %.",
+      twitchLiveInk: "Sa catégorie, plus foncée que le violet de marque en clair pour tenir le contraste AA.",
     },
   },
 ];
@@ -306,6 +309,10 @@ export const IconsEntry = () => (
       <span className="design-icon">
         <TwitchGlyph />
         <code className="lp-type-caption">twitch</code>
+      </span>
+      <span className="design-icon">
+        <TwitchLiveGlyph />
+        <code className="lp-type-caption">twitch, en live</code>
       </span>
     </div>
   </Entry>

@@ -1,5 +1,6 @@
 import type {
   TwitchCommand,
+  TwitchLiveEvent,
   TwitchSync,
   TwitchUser,
   TwitchWebhookEvent,
@@ -23,12 +24,21 @@ const setup = (event: TwitchWebhookEvent | null) => {
   const names: TwitchUser[] = [];
   const commands: TwitchCommand[] = [];
   const syncs: TwitchSync[] = [];
+  const lookedUp: string[] = []; // les propriétaires dont le canvas a été demandé à Convex
+  const applied: TwitchLiveEvent[] = [];
   const deps = {
     webhook: { read: () => event },
     now: () => now,
     durable: {
-      getActiveCanvasForOwner: async (ownerId: string) =>
-        ownerId === "1234" ? { canvasId: "canvas-1", width: 256, height: 256 } : null,
+      getActiveCanvasForOwner: async (ownerId: string) => {
+        lookedUp.push(ownerId);
+        return ownerId === "1234" ? { canvasId: "canvas-1", width: 256, height: 256 } : null;
+      },
+    },
+    tracker: {
+      apply: async (live: TwitchLiveEvent) => {
+        applied.push(live);
+      },
     },
     twitchWrites: {
       setTwitchUsers: async (_canvasId: string, users: readonly TwitchUser[]) => {
@@ -42,7 +52,7 @@ const setup = (event: TwitchWebhookEvent | null) => {
       },
     },
   };
-  return { deps, names, commands, syncs };
+  return { deps, names, commands, syncs, lookedUp, applied };
 };
 
 describe("receiveTwitchWebhook (JOURNAL 2026-09-27)", () => {
@@ -100,5 +110,40 @@ describe("receiveTwitchWebhook (JOURNAL 2026-09-27)", () => {
     expect(await receiveTwitchWebhook(unknown.deps, message)).toEqual({ status: 204 });
     expect(await receiveTwitchWebhook(ignored.deps, message)).toEqual({ status: 204 });
     expect(unknown.commands).toEqual([]);
+  });
+
+  // Confie les événements de live au suivi du live, sans toucher à Convex, à la modération ni à sa synchro
+  it("hands the live events to the live tracking, touching neither Convex, the moderation nor its sync", async () => {
+    const events: TwitchLiveEvent[] = [
+      { kind: "online", broadcasterId: "1234" },
+      { kind: "offline", broadcasterId: "1234" },
+      { kind: "category", broadcasterId: "1234", category: "Art" },
+      { kind: "liveRevoked", broadcasterId: "1234" },
+    ];
+
+    for (const event of events) {
+      const { deps, applied, lookedUp, commands, names, syncs } = setup(event);
+
+      expect(await receiveTwitchWebhook(deps, message)).toEqual({ status: 204 });
+
+      expect(applied).toEqual([event]);
+      expect(lookedUp).toEqual([]);
+      expect(commands).toEqual([]);
+      expect(names).toEqual([]);
+      expect(syncs).toEqual([]);
+    }
+  });
+
+  // Ne confie au suivi du live ni une modération, ni une révocation de la synchro
+  it("hands the live tracking neither a moderation event nor a revocation of the sync", async () => {
+    const ban = setup({ kind: "ban", broadcasterId: "1234", user: troll, isPermanent: true });
+    const revoked = setup({ kind: "revocation", broadcasterId: "1234" });
+
+    await receiveTwitchWebhook(ban.deps, message);
+    await receiveTwitchWebhook(revoked.deps, message);
+
+    expect(ban.applied).toEqual([]);
+    expect(revoked.applied).toEqual([]);
+    expect(revoked.syncs).toEqual([{ status: "revoked", syncedAt: now }]);
   });
 });

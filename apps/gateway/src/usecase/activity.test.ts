@@ -19,6 +19,7 @@ import type {
   CanvasPixelsMinute,
   ClientSocket,
   DaySignups,
+  TwitchLive,
 } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
@@ -63,6 +64,7 @@ type SetupOptions = {
   audience?: ActivityAudience; // ce que rend `getAudience`, sans la minute en cours
   canvasAudience?: CanvasAudience; // ce que rend `getCanvasAudience`, sans la minute en cours
   canvasPoints?: CanvasActivityPoint[]; // ce que rend `listCanvasHistory`
+  lives?: Record<string, TwitchLive>; // le live de chaque streamer, par `listTwitchLives` (Écart §4, JOURNAL 2026-10-07)
 };
 
 const setup = (options: SetupOptions = {}) => {
@@ -71,6 +73,7 @@ const setup = (options: SetupOptions = {}) => {
   const prunedAt: number[] = [];
   const prunedCanvasIds: string[][] = [];
   const userReads: string[] = [];
+  const liveReads: string[][] = []; // les streamers dont le live a été lu : une entrée par lecture groupée
   const signupReads: number[] = [];
   const audienceReads: ActiveIds[] = []; // les identifiants que la minute en cours a donnés à chaque lecture
   const canvasAudienceReads: { canvasId: string; playerIds: Set<string> }[] = [];
@@ -129,7 +132,18 @@ const setup = (options: SetupOptions = {}) => {
   };
   const activity = createActivity({
     store,
-    core: { getCanvas: async (canvasId) => metas.get(canvasId) ?? null },
+    core: {
+      getCanvas: async (canvasId) => metas.get(canvasId) ?? null,
+      listTwitchLives: async (userIds) => {
+        liveReads.push([...userIds]);
+        return new Map(
+          userIds.flatMap((userId) => {
+            const live = options.lives?.[userId];
+            return live ? [[userId, live] as const] : [];
+          }),
+        );
+      },
+    },
     now: () => clock.nowMs,
     isProduction: options.isProduction ?? false,
   });
@@ -176,6 +190,7 @@ const setup = (options: SetupOptions = {}) => {
     prunedAt,
     prunedCanvasIds,
     userReads,
+    liveReads,
     signupReads,
     audienceReads,
     canvasAudienceReads,
@@ -910,5 +925,58 @@ describe("the canvas of the socket in the gateway (JOURNAL 2026-10-07)", () => {
     await tickAt(nextHour + HOUR_MS + 1000);
 
     expect(prunedCanvasIds).toEqual([[], ["canvas-a"], []]);
+  });
+});
+
+describe("the Twitch live of the owners in the activity (Écart §4, JOURNAL 2026-10-07)", () => {
+  const art: TwitchLive = { category: "Art" };
+
+  // Joint à chaque canvas listé le live de son streamer, en une seule lecture pour toutes les cartes, et relit à chaque frame
+  it("joins the live of each listed owner in a single read for all the cards, read again at each frame", async () => {
+    const lives: Record<string, TwitchLive> = { "owner-a": art, "owner-b": { category: "" } };
+    const { join, watched, liveReads } = setup({ lives });
+    join("canvas-a", viewer);
+    join("canvas-b", viewer);
+    join("canvas-c", viewer);
+
+    const first = await watched();
+
+    const ownerOf = (canvasId: string) =>
+      first.canvases.find((canvas) => canvas.canvasId === canvasId)?.owner;
+    expect(ownerOf("canvas-a")).toMatchObject({ userId: "owner-a", twitchLive: art });
+    expect(ownerOf("canvas-b")).toMatchObject({ twitchLive: { category: "" } });
+    expect(ownerOf("canvas-c")).not.toHaveProperty("twitchLive");
+    expect(liveReads).toEqual([["owner-a", "owner-b", "owner-c"]]);
+
+    delete lives["owner-a"];
+    const second = await watched();
+    expect(second.canvases.find(({ canvasId }) => canvasId === "canvas-a")?.owner).not.toHaveProperty(
+      "twitchLive",
+    );
+  });
+
+  // Ne joint le live à aucun compte connecté : seul le streamer de la carte le porte
+  it("joins the live to no connected account: only the card's owner carries it", async () => {
+    const { join, watched } = setup({ lives: { "user-1": art, "owner-a": art } });
+    join("canvas-a", viewer);
+
+    const { canvases } = await watched();
+
+    expect(canvases[0]?.accounts[0]).toMatchObject({ userId: viewer.userId });
+    expect(canvases[0]?.accounts[0]).not.toHaveProperty("twitchLive");
+    expect(canvases[0]?.owner).toHaveProperty("twitchLive");
+  });
+
+  // Le canvas de la socket du développeur a aussi son streamer en live, listé ou non (un canvas où personne n'est se lit à part)
+  it("tells the live of the owner of the developer's own canvas, listed or not", async () => {
+    const { join, watched, liveReads } = setup({ lives: { "owner-a": art, "owner-b": art } });
+    join("canvas-a", viewer);
+
+    const listed = await watched("canvas-a");
+    const alone = await watched("canvas-b");
+
+    expect(listed.here?.owner).toMatchObject({ userId: "owner-a", twitchLive: art });
+    expect(alone.here?.owner).toMatchObject({ userId: "owner-b", twitchLive: art });
+    expect(liveReads).toEqual([["owner-a"], ["owner-a"], ["owner-b"]]);
   });
 });

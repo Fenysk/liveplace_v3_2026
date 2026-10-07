@@ -44,7 +44,8 @@
     { "canonical": "appearance",   "definition": "Clair, sombre ou auto : le choix d'un joueur, retenu dans son navigateur. Jamais le `theme` (JOURNAL 2026-10-07).", "banned": [] },
     { "canonical": "capacity",    "definition": "Les ressources de LivePlace face à leur plafond, et leur historique (JOURNAL 2026-10-07).", "banned": [] },
     { "canonical": "ceiling",      "definition": "Le plafond d'une ressource : la valeur où elle cesse de servir, comme `gaugeMaxCeiling` pour la jauge. Un quota Convex est un `ceiling` (JOURNAL 2026-10-07).", "banned": [] },
-    { "canonical": "saturation",   "definition": "Le plus haut des taux, et la ressource qui le porte (JOURNAL 2026-10-07).", "banned": ["pressure"] }
+    { "canonical": "saturation",   "definition": "Le plus haut des taux, et la ressource qui le porte (JOURNAL 2026-10-07).", "banned": ["pressure"] },
+    { "canonical": "twitchLive",   "definition": "Le live Twitch en cours d'un compte, avec sa catégorie ; absent hors live (JOURNAL 2026-10-07).", "banned": [] }
   ],
 
   "verbs": [

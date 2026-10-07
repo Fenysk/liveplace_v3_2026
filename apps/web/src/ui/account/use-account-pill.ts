@@ -7,10 +7,21 @@ import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import type { AccountIdentity, AccountPillProps } from "./account-pill";
 import { signInHref, signOutHref } from "./auth-links";
 
-const toIdentity = ({ role, userId, login, displayName, avatarUrl }: CanvasView): AccountIdentity => {
+// Écart §4 (JOURNAL 2026-10-07) : son profil dit aussi s'il est en live sur Twitch.
+export const toIdentity = ({
+  role,
+  userId,
+  login,
+  displayName,
+  avatarUrl,
+  twitchLive,
+}: Pick<
+  CanvasView,
+  "role" | "userId" | "login" | "displayName" | "avatarUrl" | "twitchLive"
+>): AccountIdentity => {
   if (!role) return { kind: "unknown" };
   if (!userId || !login || !displayName) return { kind: "guest" };
-  return { kind: "signedIn", user: { displayName, login, avatarUrl } };
+  return { kind: "signedIn", user: { displayName, login, avatarUrl, twitchLive } };
 };
 
 // Ce que la pill Compte montre, et ce que la fenêtre ouverte par elle en reprend.

@@ -152,9 +152,9 @@ describe("protocol frames", () => {
     });
   });
 
-  // Refuse une page du protocole 11 à 15 : elle se recharge pour reprendre le protocole du moment, 16 depuis le thème du
-  // canvas (écart §4.3, JOURNAL 2026-10-07)
-  it("refuses a page of protocol 11 to 15, which reloads to take the current protocol", () => {
+  // Refuse une page du protocole 11 à 16 : elle se recharge pour reprendre le protocole du moment, 16 depuis le thème du
+  // canvas, 17 depuis le live Twitch (écart §4.3, JOURNAL 2026-10-07)
+  it("refuses a page of protocol 11 to 16, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
 
@@ -163,6 +163,7 @@ describe("protocol frames", () => {
     expect(hello(13).ok).toBe(false);
     expect(hello(14).ok).toBe(false);
     expect(hello(15).ok).toBe(false);
+    expect(hello(16).ok).toBe(false);
     expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
@@ -306,13 +307,15 @@ describe("protocol 14: the archive", () => {
     you: { role: "guest" },
   };
 
-  // Refuse un hello resté au protocole 14, celui de l'archive (JOURNAL 2026-10-07 : la capacité passe à 15)
-  it("refuses a hello still on protocol 14", () => {
-    const hello = { t: "hello", protocolVersion: 14, canvasId: "abc123", mode: "ui" };
+  // Refuse un hello resté au protocole 15, celui de la capacité (JOURNAL 2026-10-07 : le thème passe à 16, le live Twitch à 17)
+  it("refuses a hello still on protocol 15", () => {
+    const hello = { t: "hello", protocolVersion: 15, canvasId: "abc123", mode: "ui" };
 
     expect(decodeClientFrame(hello).ok).toBe(false);
+    expect(decodeClientFrame({ ...hello, protocolVersion: 16 }).ok).toBe(false);
     expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
     expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(15);
+    expect(PROTOCOL_VERSION).toBe(17);
   });
 
   // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
@@ -691,13 +694,13 @@ describe("protocol 16: the canvas theme", () => {
   };
   const withTheme = (theme: unknown) => ({ ...welcome, params: { ...welcome.params, theme } });
 
-  // Refuse un hello resté au protocole 15, celui de la capacité : sa page se recharge
+  // Refuse un hello resté au protocole 15, celui de la capacité : sa page se recharge (le live Twitch passe ensuite à 17)
   it("refuses a hello still on protocol 15, the capacity's one", () => {
     const hello = { t: "hello", protocolVersion: 15, canvasId: "abc123", mode: "ui" };
 
     expect(decodeClientFrame(hello).ok).toBe(false);
-    expect(decodeClientFrame({ ...hello, protocolVersion: 16 }).ok).toBe(true);
-    expect(PROTOCOL_VERSION).toBe(16);
+    expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(16);
   });
 
   // Garde le thème dans les params du welcome, et accepte un welcome sans thème
@@ -855,5 +858,110 @@ describe("capacity frames", () => {
   it("lets a page from before ignore the keys it does not know", () => {
     expect(decodeServerFrame({ ...capacity, later: true }).ok).toBe(true);
     expect(decodeServerFrame({ ...history, points: [{ ...point, later: 1 }] }).ok).toBe(true);
+  });
+});
+
+// Protocole 17 (écart §4.3, JOURNAL 2026-10-07) : le live Twitch d'un compte, dans le welcome, l'inspected et une frame.
+describe("protocol 17: the Twitch live of an account", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "viewer", userId: "user-1", login: "user1", displayName: "User 1" },
+  };
+  const inspected = {
+    t: "inspected",
+    requestId: "inspect-1",
+    x: 1,
+    y: 2,
+    entry: { login: "user2", displayName: "User 2", colorIndex: 3, placedAt: 1, placementId: "puser2001" },
+  };
+
+  // Garde le live du streamer et celui de la personne connectée dans le welcome, et accepte un welcome sans eux
+  it("keeps the live of the owner and of whoever is signed in in a welcome, and accepts one without", () => {
+    const live = {
+      ...welcome,
+      canvas: { ...welcome.canvas, ownerTwitchLive: { category: "Art" } },
+      you: { ...welcome.you, twitchLive: { category: "" } },
+    };
+
+    expect(decodeServerFrame(live)).toEqual({ ok: true, value: live });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+    expect(
+      decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, ownerTwitchLive: { category: 3 } } }).ok,
+    ).toBe(false);
+  });
+
+  // Garde le live de l'auteur inspecté, et accepte un auteur hors live
+  it("keeps the live of an inspected author, and accepts an author who is not live", () => {
+    const live = { ...inspected, entry: { ...inspected.entry, twitchLive: { category: "Just Chatting" } } };
+
+    expect(decodeServerFrame(live)).toEqual({ ok: true, value: live });
+    expect(decodeServerFrame(inspected)).toEqual({ ok: true, value: inspected });
+    expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, twitchLive: {} } }).ok).toBe(false);
+  });
+
+  // Porte le live du streamer de chaque canvas de l'activité, jamais celui d'un compte connecté
+  it("carries the live of each canvas's owner in the activity, never that of a connected account", () => {
+    const day = {
+      visits: 1,
+      phoneVisits: 0,
+      visitMinutes: 2,
+      activeAccounts: 1,
+      activePlayers: 1,
+      activeStreamers: 1,
+    };
+    const user = { userId: "68710381", login: "fenysk", displayName: "Fenysk" };
+    const activity = (owner: object, account: object) => ({
+      t: "activity",
+      now: { people: 1, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+      audience: { today: day, month: day },
+      canvases: [
+        {
+          canvasId: "c1",
+          owner,
+          obsViews: 0,
+          people: 1,
+          guests: 0,
+          heat: 0,
+          signups: 0,
+          accounts: [{ ...user, role: "owner", connectedAt: 1, devices: ["desktop"], ...account }],
+        },
+      ],
+    });
+    const live = { category: "Art" };
+
+    const decoded = decodeServerFrame(activity({ ...user, twitchLive: live }, { twitchLive: live }));
+
+    expect(
+      decoded.ok && decoded.value.t === "activity" && decoded.value.canvases[0]?.owner.twitchLive,
+    ).toEqual(live);
+    expect(
+      decoded.ok && decoded.value.t === "activity" && decoded.value.canvases[0]?.accounts[0],
+    ).not.toHaveProperty("twitchLive");
+    expect(decodeServerFrame(activity(user, {})).ok).toBe(true);
+    expect(decodeServerFrame(activity({ ...user, twitchLive: { category: 4 } }, {})).ok).toBe(false);
+  });
+
+  // Annonce un live qui commence ou change de catégorie, et sa fin par l'absence de live
+  it("announces a live that starts or changes category, and its end by the absence of a live", () => {
+    const started = { t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } };
+    const ended = { t: "twitchLive", userId: "owner-1" };
+
+    expect(decodeServerFrame(started)).toEqual({ ok: true, value: started });
+    expect(decodeServerFrame(ended)).toEqual({ ok: true, value: ended });
+    expect(decodeServerFrame({ t: "twitchLive", twitchLive: { category: "Art" } }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "twitchLive", userId: "owner-1", twitchLive: { category: null } }).ok).toBe(
+      false,
+    );
   });
 });

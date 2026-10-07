@@ -8,6 +8,7 @@ import type {
   SignInWrites,
   TwitchAuth,
 } from "@liveplace/domain/ports";
+import type { TwitchLiveTracker } from "./twitch-live";
 
 export type SignInDeps = {
   twitch: TwitchAuth;
@@ -18,6 +19,7 @@ export type SignInDeps = {
   >;
   redis: SignInWrites;
   signer: SessionSigner;
+  tracker: Pick<TwitchLiveTracker, "track">; // Écart §4 et §10.1 (JOURNAL 2026-10-07) : jamais bloquant, ni en échec
   randomCanvasId: () => string;
   now: () => Timestamp;
 };
@@ -81,5 +83,7 @@ export async function signInTwitchUser(
       ...(discoveredViaCanvasId ? { discoveredViaCanvasId } : {}),
     });
   }
-  return { signedSession: await deps.signer.sign(user), login: user.login };
+  const signedSession = await deps.signer.sign(user);
+  deps.tracker.track(user.userId); // en arrière-plan : la connexion n'attend pas Twitch
+  return { signedSession, login: user.login };
 }

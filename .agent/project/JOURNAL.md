@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §4 et §10.1 : le live Twitch d'un compte, suivi par EventSub, protocole 17
+
+**Contexte.** Le logo Twitch d'un profil doit dire si la personne est en live, et dans quelle catégorie, au plus près du réel et sans charge ; le plan ne prévoit aucun statut de live.
+**Décision.** Chaque compte est abonné, avec le jeton de l'application (coût 0 pour qui a autorisé l'app), à `stream.online`, `stream.offline` et `channel.update`, à sa connexion, à la première visite de son canvas et, au démarrage du web, pour tous les comptes du miroir `user:` (un SCAN, un compte toutes les 400 ms) ; l'état de départ vient de `helix/streams`, la catégorie de `helix/channels`. Le web garde l'état dans Redis et le confie au gateway par la file `twitch:commands` ; protocole 17, après le 16 du thème : le `welcome` (le propriétaire de la page et soi), l'`inspected` (l'auteur), le streamer de chaque canvas de l'activité du développeur (une lecture groupée) et une frame de contrôle à chaque changement. Une visite de `/{login}` revérifie le propriétaire en arrière-plan si son état date de plus de 5 min : un live resté allumé s'éteint, et la bêta comme le poste, sans EventSub, suivent quand même. Le lexique gagne `twitchLive`, `tokens.css` les teintes du live.
+**Renoncement.** Sonder `helix/streams` en boucle (1 à 2 min de retard, un processus de plus) ; ComfyJS, car le chat ne dit pas si un stream tourne ; une vue OBS connectée, qui ne prouve pas un live ; un statut pour qui n'a pas de compte LivePlace (1 par abonnement, plafond de 10 000).
+
 ## 2026-10-07 — Écart §8.1 : le nom du canvas devient son thème, `canvases.theme` dans Convex, copié dans `cv:<id>:meta`
 
 **Contexte.** Le nom facultatif d'un canvas ne servait qu'au titre de ses archives ; le streamer en fait le thème du jeu, montré à tous en haut de la page (demande de l'humain). Un seul champ, un seul mot, partout.

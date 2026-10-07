@@ -215,6 +215,54 @@ describe("createBroadcast (§6.2, §6.3)", () => {
   });
 });
 
+describe("announcing a control to every page (Écart §4, JOURNAL 2026-10-07)", () => {
+  // Remet un message à chaque page de chaque canvas joint, tout de suite, sans attendre le tick, et rien après le départ
+  it("hands a message at once to every page of every joined canvas, and to nobody after they leave", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const heard: string[] = [];
+    const listenerOf = (name: string): [CellsListener, ControlListener] => [
+      () => undefined,
+      (control) => heard.push(`${name}:${control.t}`),
+    ];
+    const [firstCells, firstControl] = listenerOf("first");
+    const [secondCells, secondControl] = listenerOf("second");
+    const [thirdCells, thirdControl] = listenerOf("third");
+    await broadcast.join("canvas-1", firstCells, firstControl);
+    await broadcast.join("canvas-1", secondCells, secondControl);
+    await broadcast.join("canvas-2", thirdCells, thirdControl);
+    const message = { t: "twitchLive" as const, userId: "owner-1", twitchLive: { category: "Art" } };
+
+    broadcast.announce(message);
+    await broadcast.leave("canvas-2", thirdCells);
+    broadcast.announce({ t: "twitchLive", userId: "owner-1" });
+
+    expect(heard).toEqual([
+      "first:twitchLive",
+      "second:twitchLive",
+      "third:twitchLive",
+      "first:twitchLive",
+      "second:twitchLive",
+    ]);
+  });
+
+  // Rend le message tel quel : la page lit le compte et le live qu'il porte
+  it("hands the message as it is", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const controls: ControlMessage[] = [];
+    await broadcast.join(
+      "canvas-1",
+      () => undefined,
+      (control) => controls.push(control),
+    );
+
+    broadcast.announce({ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } });
+
+    expect(controls).toEqual([{ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } }]);
+  });
+});
+
 const entry = (login: string, pixels: number): ScoreboardEntry => ({ login, displayName: login, pixels });
 
 // Une action de modération telle que moderate.lua la publie : un événement `clear`, sans case.

@@ -28,6 +28,7 @@ import type {
   ClientSocket,
   ConnectedAccount,
   DaySignups,
+  TwitchLive,
 } from "@liveplace/domain/ports";
 import { addTo, createCanvasCounts, createRecentPixels } from "./canvas-activity";
 
@@ -39,7 +40,8 @@ const OWNER_CACHE_MS = 10 * MINUTE_MS; // le nom ou la photo d'un streamer peut 
 
 export type ActivityDeps = {
   store: ActivityStore;
-  core: Pick<CanvasCore, "getCanvas">; // le streamer d'un canvas où il ne reste que des pixels récents
+  // Le streamer d'un canvas où il ne reste que des pixels récents, et le live de chaque streamer listé (Écart §4, JOURNAL 2026-10-07)
+  core: Pick<CanvasCore, "getCanvas" | "listTwitchLives">;
   now: () => Timestamp;
   isProduction: boolean; // là seulement, les pages et les pixels du développeur ne comptent pas
 };
@@ -283,14 +285,25 @@ export function createActivity(deps: ActivityDeps): Activity {
     return user;
   };
 
+  // Écart §4 (JOURNAL 2026-10-07) : le streamer porte son live Twitch, lu à chaque frame (le miroir `user:` est gardé, pas le live).
+  const getOwnerWithLive = async (
+    ownerId: string,
+    nowMs: Timestamp,
+    lives: ReadonlyMap<string, TwitchLive>,
+  ): Promise<ActivityUser> => {
+    const twitchLive = lives.get(ownerId);
+    return { ...(await getOwner(ownerId, nowMs)), ...(twitchLive ? { twitchLive } : {}) };
+  };
+
   // Un canvas de la liste, sans ses nouveaux comptes du jour : `here` n'en a pas, son audience a les siens.
   const toCanvasNow = async (
     { canvasId, ownerId, obsViews, guests, countedUserIds, accounts }: CanvasTally,
     heat: number,
     nowMs: Timestamp,
+    lives: ReadonlyMap<string, TwitchLive>,
   ): Promise<Omit<ActivityCanvas, "signups">> => ({
     canvasId,
-    owner: await getOwner(ownerId, nowMs),
+    owner: await getOwnerWithLive(ownerId, nowMs, lives),
     obsViews,
     people: countedUserIds.size + guests,
     guests,
@@ -303,8 +316,9 @@ export function createActivity(deps: ActivityDeps): Activity {
     heat: number,
     signups: DaySignups,
     nowMs: Timestamp,
+    lives: ReadonlyMap<string, TwitchLive>,
   ): Promise<ActivityCanvas> => ({
-    ...(await toCanvasNow(canvas, heat, nowMs)),
+    ...(await toCanvasNow(canvas, heat, nowMs, lives)),
     signups: signups.byDiscoveredViaUserId.get(canvas.ownerId) ?? 0,
   });
 
@@ -324,14 +338,22 @@ export function createActivity(deps: ActivityDeps): Activity {
     canvases: Map<string, CanvasTally>,
     heat: Map<string, number>,
     nowMs: Timestamp,
+    lives: ReadonlyMap<string, TwitchLive>,
   ): Promise<ActivityHere | null> => {
     const ownerId = canvases.get(canvasId)?.ownerId ?? (await getOwnerId(canvasId));
     if (!ownerId) return null;
     // Pris avant d'attendre, comme pour tout LivePlace.
     const open = canvasCounts.getOpenMinute(canvasId, nowMs);
     const pixels = canvasCounts.getRecentPixels(canvasId, nowMs);
+    // Un canvas hors de la liste n'a pas vu son streamer lu avec les autres.
+    const ownerLives = canvases.has(canvasId) ? lives : await deps.core.listTwitchLives([ownerId]);
     const [canvas, audience] = await Promise.all([
-      toCanvasNow(canvases.get(canvasId) ?? emptyTally(canvasId, ownerId), heat.get(canvasId) ?? 0, nowMs),
+      toCanvasNow(
+        canvases.get(canvasId) ?? emptyTally(canvasId, ownerId),
+        heat.get(canvasId) ?? 0,
+        nowMs,
+        ownerLives,
+      ),
       deps.store.getCanvasAudience(canvasId, nowMs, open.playerIds),
     ]);
     return {
@@ -359,9 +381,13 @@ export function createActivity(deps: ActivityDeps): Activity {
       deps.store.getAudience(nowMs, minute),
       addHotCanvases(canvases, heat),
     ]);
+    // Le live de tous les streamers listés, en une seule lecture.
+    const lives = await deps.core.listTwitchLives([
+      ...new Set([...canvases.values()].map((canvas) => canvas.ownerId)),
+    ]);
     const shown = await Promise.all(
       [...canvases.values()].map((canvas) =>
-        toCanvas(canvas, heat.get(canvas.canvasId) ?? 0, signups, nowMs),
+        toCanvas(canvas, heat.get(canvas.canvasId) ?? 0, signups, nowMs, lives),
       ),
     );
     const frame: ActivityFrame = {
@@ -378,7 +404,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     };
     const frames = new Map<string | undefined, ActivityFrame>();
     for (const canvasId of canvasIds) {
-      const here = canvasId === undefined ? null : await buildHere(canvasId, canvases, heat, nowMs);
+      const here = canvasId === undefined ? null : await buildHere(canvasId, canvases, heat, nowMs, lives);
       frames.set(canvasId, here ? { ...frame, here } : frame);
     }
     return frames;

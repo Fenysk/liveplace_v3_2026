@@ -105,7 +105,7 @@ export const sampleAccounts = (nowMs: number): ConnectedAccount[] => [
 export const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
   {
     canvasId: "kalyss",
-    owner: { userId: "1", ...SAMPLE_OWNER },
+    owner: { userId: "1", ...SAMPLE_OWNER, twitchLive: { category: "Art" } },
     obsViews: 2,
     people: 4,
     guests: 1,

@@ -1069,3 +1069,124 @@ describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
     expect(store.getView().scoreboard).toBeUndefined();
   });
 });
+
+describe("the Twitch live in the canvas view (Écart §4, JOURNAL 2026-10-07)", () => {
+  const art = { category: "Art" };
+  const chatting = { category: "Just Chatting" };
+  const welcomeWith = (
+    ownerTwitchLive?: typeof art,
+    twitchLive?: typeof art,
+  ): Extract<ServerFrame, { t: "welcome" }> => ({
+    t: "welcome",
+    canvas: {
+      canvasId: "canvas-1",
+      width,
+      height: 4,
+      ownerId: "owner-1",
+      ...(ownerTwitchLive ? { ownerTwitchLive } : {}),
+    },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: [...PALETTE],
+    version: 7,
+    you: {
+      userId: "user-1",
+      login: "user1",
+      displayName: "User 1",
+      role: "viewer",
+      ...(twitchLive ? { twitchLive } : {}),
+    },
+    gauge,
+  });
+
+  // Prend du welcome le live du streamer et celui de la personne connectée, avec leur catégorie
+  it("takes from the welcome the live of the owner and of whoever is signed in, with their category", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+
+    receive(welcomeWith(art, chatting));
+
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(chatting);
+  });
+
+  // Sans live dans le welcome, personne n'est en live ; un nouveau welcome efface ce que l'ancien disait
+  it("has nobody live when the welcome says none, and a new welcome clears what the old one said", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith(art, chatting));
+
+    receive(welcomeWith());
+
+    expect(store.getView().ownerTwitchLive).toBeUndefined();
+    expect(store.getView().twitchLive).toBeUndefined();
+  });
+
+  // Suit le live annoncé : le streamer d'abord, la personne ensuite, par l'identifiant de la frame
+  it("follows an announced live, the owner's then the person's, by the id of the frame", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith());
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: art });
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toBeUndefined();
+
+    receive({ t: "twitchLive", userId: "user-1", twitchLive: chatting });
+    expect(store.getView().twitchLive).toEqual(chatting);
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: chatting });
+    expect(store.getView().ownerTwitchLive).toEqual(chatting);
+  });
+
+  // Efface le live sur une frame sans live, et ignore un compte qui n'est ni le streamer ni la personne
+  it("clears a live on a frame without one, and ignores an account that is neither the owner nor the person", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith(art, chatting));
+
+    receive({ t: "twitchLive", userId: "user-9", twitchLive: { category: "Music" } });
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(chatting);
+
+    receive({ t: "twitchLive", userId: "owner-1" });
+    expect(store.getView().ownerTwitchLive).toBeUndefined();
+    expect(store.getView().twitchLive).toEqual(chatting);
+  });
+
+  // Quand le streamer est la personne connectée, un seul live le dit aux deux
+  it("tells both when the owner is the person signed in", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive({
+      ...welcomeWith(),
+      you: { userId: "owner-1", login: "owner1", displayName: "Owner 1", role: "owner" },
+    });
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: art });
+
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(art);
+  });
+
+  // Garde le live de l'auteur dans l'inspection
+  it("keeps the author's live in the inspection", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+    const requestId = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+    const author = {
+      login: "user2",
+      displayName: "User 2",
+      colorIndex: 5,
+      placedAt: now,
+      placementId: "puser2001",
+      twitchLive: art,
+    };
+
+    receive({ t: "inspected", requestId, x: 1, y: 2, entry: author });
+
+    expect(store.getView().inspection).toEqual({ status: "found", x: 1, y: 2, entry: author });
+  });
+});

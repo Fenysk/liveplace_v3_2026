@@ -30,6 +30,7 @@ import type {
   ReportedPlacement,
   ScoreboardEntry,
   ScoreboardRank,
+  TwitchLive,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -163,6 +164,10 @@ const entry: InspectEntry = { userId: "user-2", ...publicEntry };
 // Laisse finir ce qu'un message de contrôle a lancé : la relecture d'un rôle est asynchrone.
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+// Une frame JSON de ce type, par opposition au snapshot binaire.
+const hasFrame = (frame: unknown, t: string): boolean =>
+  typeof frame === "object" && frame !== null && "t" in frame && frame.t === t;
+
 const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", requestId: "inspect-1", x, y });
 
 const hello = (overrides: Record<string, unknown> = {}) =>
@@ -206,6 +211,7 @@ type SetupOptions = {
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
+  twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (Écart §4, JOURNAL 2026-10-07)
 };
 
 // Ce que répond un script à qui écrit sur une archive.
@@ -224,6 +230,7 @@ const setup = (options: SetupOptions = {}) => {
   const gaugeLimits: GaugeLimits[] = [];
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
+  const twitchLiveReads: string[] = []; // les comptes dont le live a été lu
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   // `resizeCanvas` la change, comme resize.lua
@@ -278,6 +285,13 @@ const setup = (options: SetupOptions = {}) => {
     },
     async getTwitchSync() {
       return options.twitchSync ?? null;
+    },
+    async getTwitchLive(userId: string) {
+      twitchLiveReads.push(userId);
+      return options.twitchLives?.[userId] ?? null;
+    },
+    async listTwitchLives() {
+      return new Map<string, TwitchLive>();
     },
     async listEvents() {
       return options.resync ?? null;
@@ -410,6 +424,7 @@ const setup = (options: SetupOptions = {}) => {
     gaugeLimits,
     namedModerators,
     reports,
+    twitchLiveReads,
     clock,
     roles,
     open,
@@ -1808,5 +1823,192 @@ describe("the scoreboard of a canvas, for each page (JOURNAL 2026-10-06)", () =>
       top: options.scoreboard,
       you: { rank: 8, pixels: 2 },
     });
+  });
+});
+
+describe("the Twitch live in the connection (Écart §4, JOURNAL 2026-10-07)", () => {
+  const art: TwitchLive = { category: "Art" };
+  const chatting: TwitchLive = { category: "Just Chatting" };
+  const lives = { [meta.ownerId]: art, [session.userId]: chatting, "user-2": { category: "Music" } };
+  const archivedAt = now - 86_400_000;
+
+  // Dit dans le welcome si le streamer est en live et si la personne connectée l'est, avec leur catégorie
+  it("tells in the welcome whether the owner is live and whoever is signed in, with their category", async () => {
+    const { connection, sent } = setup({ twitchLives: lives });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({
+      t: "welcome",
+      canvas: { ownerTwitchLive: art },
+      you: { userId: session.userId, twitchLive: chatting },
+    });
+  });
+
+  // Ne dit rien dans le welcome quand personne n'est en live
+  it("says nothing in the welcome when nobody is live", async () => {
+    const { connection, sent } = setup();
+
+    await connection.receive(hello());
+
+    expect(sent[0]).not.toHaveProperty("canvas.ownerTwitchLive");
+    expect(sent[0]).not.toHaveProperty("you.twitchLive");
+  });
+
+  // À un invité, le welcome ne dit que le live du streamer ; le streamer sur son canvas n'en lit qu'un, le sien
+  it("tells a guest only the owner's live, and reads the owner's live once for the owner on his canvas", async () => {
+    const asGuest = setup({ session: null, twitchLives: lives });
+    const asOwner = setup({ session: owner, twitchLives: lives });
+
+    await asGuest.connection.receive(hello());
+    await asOwner.connection.receive(hello());
+
+    expect(asGuest.sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art } });
+    expect(asGuest.sent[0]).not.toHaveProperty("you.twitchLive");
+    expect(asGuest.twitchLiveReads).toEqual([meta.ownerId]);
+    expect(asOwner.sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art }, you: { twitchLive: art } });
+    expect(asOwner.twitchLiveReads).toEqual([meta.ownerId]);
+  });
+
+  // La vue OBS n'affiche aucun profil : elle ne lit aucun live et n'en reçoit aucun, même annoncé ensuite
+  it("reads no live for an OBS view, and hands it none, even announced later", async () => {
+    const { connection, sent, twitchLiveReads, broadcast } = setup({ session: null, twitchLives: lives });
+
+    await connection.receive(hello({ mode: "obs" }));
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    expect(twitchLiveReads).toEqual([]);
+    expect(sent[0]).not.toHaveProperty("canvas.ownerTwitchLive");
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Une archive porte aussi le live de son streamer : son bandeau a un profil
+  it("tells the live of the owner of an archive too, whose banner has a profile", async () => {
+    const { connection, sent } = setup({ session: null, archivedAt, twitchLives: lives });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art } });
+  });
+
+  // Joint à l'inspection le live de l'auteur du pixel, avec son identifiant ou sans, et rien quand il n'est pas en live
+  it("joins to an inspection the live of the pixel's author, with its id or without, and nothing when it is not live", async () => {
+    const byViewer = setup({ twitchLives: lives });
+    const byModerator = setup({ isModerator: true, twitchLives: lives });
+    const authorNotLive = setup({ twitchLives: { [meta.ownerId]: art } });
+    for (const { connection } of [byViewer, byModerator, authorNotLive]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
+    const music = { category: "Music" };
+    expect(byViewer.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...publicEntry, canReport: true, twitchLive: music },
+    });
+    expect(byModerator.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...entry, canReport: true, twitchLive: music },
+    });
+    expect(authorNotLive.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
+    expect(byViewer.twitchLiveReads).toContain("user-2");
+  });
+
+  // Lit le live de l'auteur seulement quand une case a un auteur, et le garde dans l'inspection d'une archive
+  it("reads an author's live only when a cell has one, and keeps it in the inspection of an archive", async () => {
+    const empty = setup({ twitchLives: lives });
+    const inArchive = setup({ archivedAt, twitchLives: lives });
+    await empty.connection.receive(hello());
+    await empty.connection.receive(inspect(0, 0));
+    await inArchive.connection.receive(hello());
+    await inArchive.connection.receive(inspect(1, 2));
+
+    expect(empty.twitchLiveReads).toEqual([meta.ownerId, session.userId]);
+    expect(inArchive.sent.at(-1)).toEqual({
+      t: "inspected",
+      requestId: "inspect-1",
+      x: 1,
+      y: 2,
+      entry: { ...publicEntry, twitchLive: { category: "Music" } },
+    });
+  });
+
+  // Passe un live annoncé aux pages du streamer et aux connexions du compte lui-même, et à personne d'autre
+  it("passes an announced live to the owner's pages and to the account's own connections, nobody else's", async () => {
+    const context = setup();
+    const otherViewer = context.open({ userId: "user-2", login: "user2", displayName: "User 2" });
+    const guest = context.open(null);
+    const obs = context.open(null);
+    await context.connection.receive(hello());
+    await otherViewer.connection.receive(hello());
+    await guest.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    const heard = (opened: { sent: unknown[] }) =>
+      opened.sent.filter((frame) => hasFrame(frame, "twitchLive"));
+
+    context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+    const ownerLive = { t: "twitchLive", userId: meta.ownerId, twitchLive: art };
+    for (const opened of [context, otherViewer, guest]) expect(heard(opened)).toEqual([ownerLive]);
+    expect(heard(obs)).toEqual([]);
+
+    context.broadcast.announce({ t: "twitchLive", userId: session.userId, twitchLive: chatting });
+    expect(heard(context).at(-1)).toEqual({ t: "twitchLive", userId: session.userId, twitchLive: chatting });
+    for (const opened of [otherViewer, guest]) expect(heard(opened)).toEqual([ownerLive]);
+
+    context.broadcast.announce({ t: "twitchLive", userId: "user-9", twitchLive: chatting });
+    expect(heard(context)).toHaveLength(2);
+    for (const opened of [otherViewer, guest]) expect(heard(opened)).toHaveLength(1);
+  });
+
+  // Annonce la fin d'un live sans live, pour que la page efface le sien
+  it("announces the end of a live without a live, so the page clears its own", async () => {
+    const { connection, sent, broadcast } = setup({ twitchLives: lives });
+    await connection.receive(hello());
+
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId });
+
+    expect(sent.at(-1)).toEqual({ t: "twitchLive", userId: meta.ownerId });
+    expect(sent.at(-1)).not.toHaveProperty("twitchLive");
+  });
+
+  // Garde un live qui tombe pendant l'arrivée, et l'envoie après le welcome
+  it("holds a live that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "twitchLive",
+    ]);
+  });
+
+  // Ne passe rien d'un live à une page qui n'a pas encore dit bonjour
+  it("passes nothing to a page that has not said hello yet", async () => {
+    const { sent, broadcast } = setup();
+
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    expect(sent).toEqual([]);
+  });
+
+  // À une nouvelle taille, le nouveau welcome reprend les lives, lus de nouveau : la page ne les perd pas
+  it("gives the lives again in the welcome of a new size, read again: the page does not lose them", async () => {
+    const context = setup({ session: owner, twitchLives: lives });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(
+      JSON.stringify({ t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 }),
+    );
+    context.control({ t: "resize" });
+    await flush();
+
+    const welcomes = context.sent.filter((frame) => hasFrame(frame, "welcome"));
+    expect(welcomes).toHaveLength(2);
+    expect(welcomes.at(-1)).toMatchObject({ canvas: { ownerTwitchLive: art }, you: { twitchLive: art } });
   });
 });

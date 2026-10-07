@@ -9,6 +9,7 @@ import type {
   TwitchCommandQueue,
 } from "@liveplace/domain/ports";
 import { describe, expect, it, vi } from "vitest";
+import type { ControlMessage } from "./broadcast";
 import { applyTwitchCommand, consumeTwitchCommands } from "./twitch-commands";
 
 const now = 1_700_000_000_000;
@@ -72,7 +73,18 @@ const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
       return undefined;
     },
   };
-  return { deps: { core, now: () => now, wait: async () => undefined }, moderations, roles };
+  const announced: ControlMessage[] = [];
+  const broadcast = {
+    announce: (control: ControlMessage) => {
+      announced.push(control);
+    },
+  };
+  return {
+    deps: { core, broadcast, now: () => now, wait: async () => undefined },
+    moderations,
+    roles,
+    announced,
+  };
 };
 
 describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
@@ -154,6 +166,54 @@ describe("a full Twitch list (JOURNAL 2026-09-27)", () => {
   });
 });
 
+describe("a Twitch live told to the pages (Écart §4, JOURNAL 2026-10-07)", () => {
+  // Annonce le live d'un compte à toutes les pages jointes, avec sa catégorie, sans toucher à aucun canvas
+  it("announces the live of an account to the joined pages, with its category, touching no canvas", async () => {
+    const { deps, announced, moderations } = setup();
+
+    const outcome = await applyTwitchCommand(deps, {
+      kind: "twitchLive",
+      userId: "owner-1",
+      twitchLive: { category: "Art" },
+    });
+
+    expect(outcome).toBe("done");
+    expect(announced).toEqual([{ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } }]);
+    expect(moderations).toEqual([]);
+  });
+
+  // La fin d'un live s'annonce sans live, sans clé vide
+  it("announces the end of a live without a live, not with an empty key", async () => {
+    const { deps, announced } = setup();
+
+    await applyTwitchCommand(deps, { kind: "twitchLive", userId: "owner-1" });
+
+    expect(announced).toEqual([{ t: "twitchLive", userId: "owner-1" }]);
+    expect(announced[0]).not.toHaveProperty("twitchLive");
+  });
+
+  // Acquitte un live comme les autres actions de la file, sans qu'un canvas prêt soit nécessaire
+  it("acknowledges a live like the other commands of the queue, with no ready canvas needed", async () => {
+    const { deps, announced } = setup();
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [{ id: "id-0", command: { kind: "twitchLive", userId: "unknown-owner" } }];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(deps, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["id-0"]);
+    expect(announced).toHaveLength(1);
+  });
+});
+
 describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
   // Applique chaque action dans l'ordre et l'acquitte, même quand elle échoue, sans arrêter la file
   it("applies each command in order and acknowledges it, even when it fails, without stopping the queue", async () => {
@@ -231,6 +291,7 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
     };
     const deps = {
       core,
+      broadcast: { announce: () => undefined },
       now: () => now,
       wait: async (ms: number) => {
         waits.push(ms);
