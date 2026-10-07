@@ -1,21 +1,21 @@
-// Le nom du canvas en cours dans la section Canvas (Écart §15, JOURNAL 2026-10-06) : lu à l'ouverture, enregistré quand le
-// champ perd le focus. Sans bouton : rien n'est appelé tant que le nom nettoyé est celui qui est déjà enregistré.
+// Le thème du canvas en cours dans la section Canvas (Écart §8.1, JOURNAL 2026-10-07) : lu à l'ouverture, enregistré quand le
+// champ perd le focus. Sans bouton : rien n'est appelé tant que le thème nettoyé est celui qui est déjà enregistré.
 
 import { useCallback, useEffect, useState } from "react";
-import { listCanvasesFn, renameCanvasFn } from "../../routes/-owner-canvases";
-import { NAME_SAVED, renameFailureLabel } from "../archive/archive-texts";
+import { listCanvasesFn, setCanvasThemeFn } from "../../routes/-owner-canvases";
+import { THEME_SAVED, themeFailureLabel } from "../archive/archive-texts";
 import { useToast } from "../design/toast";
-import { toNameToSave } from "./canvas-name";
-import type { CanvasNameField } from "./canvas-settings";
+import type { ThemeField } from "./canvas-settings";
+import { toThemeToSave } from "./canvas-theme";
 
-// `unavailable` : la liste ne se lit pas, ou il n'y a pas de canvas en cours. `ready` garde le canvas visé et son nom
-// enregistré : le champ revient à ce nom après un échec.
+// `unavailable` : la liste ne se lit pas, ou il n'y a pas de canvas en cours. `ready` garde le canvas visé et son thème
+// enregistré : le champ revient à ce thème après un échec.
 type Loaded =
   | { status: "loading" }
   | { status: "unavailable" }
   | { status: "ready"; canvasId: string; saved: string };
 
-export function useCanvasName(): CanvasNameField {
+export function useThemeField(): ThemeField {
   const toast = useToast();
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
   const [value, setValue] = useState("");
@@ -29,12 +29,12 @@ export function useCanvasName(): CanvasNameField {
           setLoaded({ status: "unavailable" });
           return;
         }
-        const saved = active.name ?? "";
+        const saved = active.theme ?? "";
         setLoaded({ status: "ready", canvasId: active.canvasId, saved });
         setValue(saved);
       },
       (error: unknown) => {
-        console.error("nom du canvas : lecture impossible", error);
+        console.error("thème du canvas : lecture impossible", error);
         setLoaded({ status: "unavailable" });
       },
     );
@@ -44,28 +44,28 @@ export function useCanvasName(): CanvasNameField {
   const commit = async () => {
     if (loaded.status !== "ready" || isSaving) return;
     const { canvasId, saved } = loaded;
-    const name = toNameToSave(value, saved);
-    if (name === null) {
+    const theme = toThemeToSave(value, saved);
+    if (theme === null) {
       setValue(saved);
       return;
     }
     setIsSaving(true);
     try {
-      const result = await renameCanvasFn({ data: { canvasId, name } });
+      const result = await setCanvasThemeFn({ data: { canvasId, theme } });
       if (result.ok) {
-        setLoaded({ status: "ready", canvasId, saved: name });
-        setValue(name);
-        toast("success", NAME_SAVED);
+        setLoaded({ status: "ready", canvasId, saved: theme });
+        setValue(theme);
+        toast("success", THEME_SAVED);
         return;
       }
       setValue(saved);
-      toast("error", renameFailureLabel(result.error));
-      // Le canvas en cours a changé depuis l'ouverture : son nom, et celui qu'on vise, sont à relire.
+      toast("error", themeFailureLabel(result.error));
+      // Le canvas en cours a changé depuis l'ouverture : son thème, et celui qu'on vise, sont à relire.
       if (result.error === "not_active") load();
     } catch (error) {
-      console.error("nom du canvas : enregistrement sans réponse", error);
+      console.error("thème du canvas : enregistrement sans réponse", error);
       setValue(saved);
-      toast("error", renameFailureLabel("network"));
+      toast("error", themeFailureLabel("network"));
     } finally {
       setIsSaving(false);
     }

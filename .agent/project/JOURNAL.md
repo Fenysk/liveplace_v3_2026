@@ -32,6 +32,25 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §8.1 : le nom du canvas devient son thème, `canvases.theme` dans Convex, copié dans `cv:<id>:meta`
+
+**Contexte.** Le nom facultatif d'un canvas ne servait qu'au titre de ses archives ; le streamer en fait le thème du jeu, montré à tous en haut de la page (demande de l'humain). Un seul champ, un seul mot, partout.
+**Décision.** `canvases.name` devient `canvases.theme` (mutations `archiveActive` et `setTheme`, port `setActiveCanvasTheme`, `THEME_MAX_LENGTH`, `toTheme`). Étendre puis contracter, pour que le code déjà déployé (bêtas, autres worktrees, la production entre `convex deploy` et le redéploiement du web) ne casse pas : le schéma garde `name` optionnel, `rename` garde sa signature d'avant (`name` facultatif) et règle le thème, `archiveActive` accepte aussi `name`, pris comme thème quand `theme` est absent, et la migration `canvases:moveNameToTheme` (idempotente, lancée après le push) recopie `name` dans `theme` quand `theme` est vide, sans retirer `name` : l'ancien code continue d'afficher ses titres. Aucun nouveau code ne lit `name`. Convex fait foi ; `cv:<id>:meta` en garde la copie du gateway (`theme`), écrite après Convex à l'enregistrement, à l'archivage (le thème du dialogue va sur l'archive, le canvas neuf n'en a pas) et à la réouverture, en best effort journalisé : si Redis échoue, le thème est enregistré mais la copie garde l'ancien jusqu'au prochain enregistrement, archivage ou réouverture. `/{login}` lit le thème dans l'appel qui rend déjà le canvas actif : la pill est rendue par le serveur, sans aller-retour de plus.
+**Renoncement.** Pas de frame client `setTheme` (le gateway n'a pas le droit d'aller dans Convex, et c'est Convex qui tranche) ; pas de renommage en un seul push (les documents d'avant ne valideraient plus) ni de migration à la lecture ; pas de thème par archive indépendant du canvas (une archive rouverte retrouve celui qu'elle avait) ; pas de retrait de `name` dans ce push.
+**Contraction.** Le retrait de `name` (schéma), de la mutation `rename` et de l'alias de `archiveActive` se fait plus tard, dans une branche `chore/` à part, une fois tout le code déployé sur le nouveau.
+
+## 2026-10-07 — Écart §4.3 : le thème du canvas part dans le `welcome` et dans la frame `theme`, protocole 16
+
+**Contexte.** Tous les viewers voient le thème, et le voient changer sans recharger, comme le délai OBS ou le fond (demande de l'humain).
+**Décision.** `welcome.params.theme` (facultatif, borné à `THEME_MAX_LENGTH`) et la frame serveur `theme` (sans `theme` : plus de thème), relayée par le gateway depuis le `ctl` `theme` du canal `live`, que le web publie à l'enregistrement. Aucune frame client. `PROTOCOL_VERSION` passe à 16, après le 15 de la capacité : les pages ouvertes se rechargent au déploiement ; dans les tests des protocoles 11 à 15, « 15 accepté » devient « 15 refusé » et « = 15 » devient « ≥ 15 ».
+**Renoncement.** Pas de frame réservée aux pages du jeu (la vue OBS reçoit le thème et ne l'affiche pas, comme le reste des réglages) ; pas de `theme` dans `canvasStatus` (un canvas qui change de statut ne change pas de thème).
+
+## 2026-10-07 — Lexique : `theme` et `appearance`
+
+**Contexte.** Le nom du canvas devient son thème, et le mot « thème » désignait déjà le choix clair, sombre ou auto du navigateur.
+**Décision.** `theme` : un texte du streamer sur un canvas, montré à tous en haut du jeu, titre de son archive ; jamais clair/sombre. `appearance` : clair, sombre ou auto, le choix d'un joueur retenu dans son navigateur (`data-appearance`) ; jamais le `theme`. Banni : `skin` pour `theme` (aucun identifiant ne le porte).
+**Renoncement.** Pas de `scheme` banni pour `appearance` (`ws-client.ts` le déclare, pour le `wss:`) ; la clé `localStorage` `liveplace:theme` garde sa valeur, la changer ferait perdre son choix à chaque joueur.
+
 ## 2026-10-07 — Écart §6 : la capacité compte le retard de diffusion, sans l'attente voulue du tick
 
 **Contexte.** Le délai de diffusion mesuré (de `occurredAt` à l'envoi de la frame) a un plancher d'environ 100 ms, l'attente du tick (D-13) : au repos, la ligne affiche déjà 49 % et passerait à l'orange sans vraie charge.

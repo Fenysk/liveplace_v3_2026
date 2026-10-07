@@ -146,6 +146,17 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
       await redis.publish(canvasKeysOf(canvasId).live, JSON.stringify(control));
     },
 
+    async setTheme(canvasId, theme) {
+      const { meta } = canvasKeysOf(canvasId);
+      if (theme === undefined) await redis.hdel(meta, "theme");
+      else await redis.hset(meta, "theme", theme);
+    },
+
+    async publishTheme(canvasId, theme) {
+      const control: LiveMessage = { ctl: { t: "theme", ...(theme === undefined ? {} : { theme }) } };
+      await redis.publish(canvasKeysOf(canvasId).live, JSON.stringify(control));
+    },
+
     async discardCanvas(canvasId) {
       await unlinkAll(redis, await scanKeys(redis, `${canvasKeysOf(canvasId).prefix}*`));
     },

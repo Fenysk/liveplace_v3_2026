@@ -47,6 +47,7 @@ const ENTRIES_BY_SLUG = {
 
   "pill-canvas": { title: "Canvas", chapterId: "game", place: "haut gauche" },
   "bandeau-d-archive": { title: "Bandeau d'archive", chapterId: "game", place: "haut gauche" },
+  "pill-theme": { title: "Thème", chapterId: "game", place: "haut centre" },
   "pill-compte": { title: "Compte", chapterId: "game", place: "haut droite" },
   "pill-classement": { title: "Classement", chapterId: "game", place: "centre gauche" },
   inspection: { title: "Inspection", chapterId: "game", place: "centre droite" },

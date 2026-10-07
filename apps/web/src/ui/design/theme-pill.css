@@ -1,0 +1,41 @@
+/* La pill Thème (Écart §8.1, JOURNAL 2026-10-07) : un petit texte discret, le thème dessous, gros, au centre. Le thème
+   se coupe par « … » plutôt que d'élargir la pill (pill.css : `.lp-pill--title`). */
+
+.lp-theme {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+}
+
+.lp-theme-narrow {
+  display: none;
+}
+
+.lp-theme-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Écran étroit ou tactile : « Thème » seul au-dessus, et le thème sur deux lignes au plus, coupé par « … » au-delà */
+@media (max-width: 640px), (pointer: coarse) {
+  .lp-theme-wide {
+    display: none;
+  }
+
+  .lp-theme-narrow {
+    display: inline;
+  }
+
+  .lp-theme-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}

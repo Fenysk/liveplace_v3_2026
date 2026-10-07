@@ -8,7 +8,7 @@ import { useState } from "react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import type { ListedArchive, ListedCanvas, ListedCanvases, Thumbnail } from "../../usecase/list-canvases";
 import { ArchiveBanner } from "../archive/archive-banner";
-import { bannerCaption, bannerTitle, type SwitchFailure, startingName } from "../archive/archive-texts";
+import { bannerCaption, bannerTitle, type SwitchFailure, startingTheme } from "../archive/archive-texts";
 import { type ArchivesList, ArchivesSection } from "../archive/canvas-cards";
 import { DownloadWindow } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
@@ -47,12 +47,12 @@ const sampleArchive = (nowMs: number, index: number, more: Partial<ListedArchive
   ...more,
 });
 
-const LONG_NAME = "Grande pixel war de la rentrée des lives";
+const LONG_THEME = "Grande pixel war de la rentrée des lives";
 
 const withArchives = (nowMs: number, count: number): ListedCanvases => ({
   active: sampleActive(nowMs, { thumbnail: HEART }),
   archives: Array.from({ length: count }, (_, index) =>
-    sampleArchive(nowMs, index + 1, index === 0 ? { name: "Soirée de lancement" } : {}),
+    sampleArchive(nowMs, index + 1, index === 0 ? { theme: "Soirée de lancement" } : {}),
   ).reverse(),
 });
 
@@ -62,7 +62,7 @@ type BannerSceneProps = { archive: ListedArchive; isDownloading?: boolean; isCom
 const BannerScene = ({ archive, isDownloading = false, isCompact = false }: BannerSceneProps) => {
   const text = {
     displayName: SAMPLE_OWNER.displayName,
-    name: archive.name,
+    theme: archive.theme,
     createdAt: archive.createdAt,
     archivedAt: archive.archivedAt,
   };
@@ -83,7 +83,7 @@ const BannerScene = ({ archive, isDownloading = false, isCompact = false }: Bann
 export const ArchiveBannerEntry = () => {
   const nowMs = useNowMs();
   const archive = sampleArchive(nowMs, 2);
-  const named = { ...archive, name: "Soirée de lancement" };
+  const themed = { ...archive, theme: "Soirée de lancement" };
   return (
     <Entry
       slug="bandeau-d-archive"
@@ -93,14 +93,14 @@ export const ArchiveBannerEntry = () => {
       where="En haut à gauche"
     >
       <Block title="États">
-        <StateRow name="Sans nom" detail="« Archive de … », la légende dit les dates.">
+        <StateRow name="Sans thème" detail="« Archive de … », la légende dit les dates.">
           <BannerScene archive={archive} />
         </StateRow>
         <StateRow
-          name="Avec un nom"
-          detail="Le nom est le titre, la légende dit à qui est l'archive, puis les dates."
+          name="Avec un thème"
+          detail="Le thème est le titre, la légende dit à qui est l'archive, puis les dates."
         >
-          <BannerScene archive={named} />
+          <BannerScene archive={themed} />
         </StateRow>
         <StateRow name="Le PNG se prépare" detail="Télécharger attend.">
           <BannerScene archive={archive} isDownloading />
@@ -112,7 +112,7 @@ export const ArchiveBannerEntry = () => {
           detail="Les actions n'ont que leur icône, la pill Compte garde sa place."
         >
           <InPhone>
-            <BannerScene archive={named} isCompact />
+            <BannerScene archive={themed} isCompact />
           </InPhone>
         </StateRow>
       </Block>
@@ -130,7 +130,7 @@ const LISTS = (nowMs: number): readonly ListScene[] => [
   },
   {
     name: "Deux archives, de la plus récente à la plus ancienne",
-    detail: "Un nom en titre, sinon les dates.",
+    detail: "Un thème en titre, sinon les dates.",
     list: { status: "ready", canvases: withArchives(nowMs, 2) },
   },
   {
@@ -139,24 +139,24 @@ const LISTS = (nowMs: number): readonly ListScene[] => [
     list: { status: "ready", canvases: withArchives(nowMs, MAX_ARCHIVES) },
   },
   {
-    name: "Le canvas en cours nommé, rouvert d'une archive",
-    detail: "Le nom en titre, « depuis le … » en légende.",
+    name: "Le canvas en cours avec un thème, rouvert d'une archive",
+    detail: "Le thème en titre, « depuis le … » en légende.",
     list: {
       status: "ready",
       canvases: {
-        active: sampleActive(nowMs, { name: "Printemps", linkCode: "kept123456", thumbnail: HEART }),
+        active: sampleActive(nowMs, { theme: "Printemps", linkCode: "kept123456", thumbnail: HEART }),
         archives: [sampleArchive(nowMs, 1)],
       },
     },
   },
   {
-    name: "Un nom de 40 caractères, le maximum",
+    name: "Un thème de 40 caractères, le maximum",
     detail: "Le titre passe à la ligne, l'icône d'ouverture le suit.",
     list: {
       status: "ready",
       canvases: {
-        active: sampleActive(nowMs, { name: LONG_NAME, thumbnail: HEART }),
-        archives: [sampleArchive(nowMs, 1, { name: LONG_NAME })],
+        active: sampleActive(nowMs, { theme: LONG_THEME, thumbnail: HEART }),
+        archives: [sampleArchive(nowMs, 1, { theme: LONG_THEME })],
       },
     },
   },
@@ -216,7 +216,7 @@ export const ArchivesEntry = () => {
                 status: "ready",
                 canvases: {
                   ...withArchives(nowMs, 2),
-                  active: sampleActive(nowMs, { name: "Printemps", thumbnail: HEART }),
+                  active: sampleActive(nowMs, { theme: "Printemps", thumbnail: HEART }),
                 },
               }}
             />
@@ -239,12 +239,12 @@ type SwitchRowProps = {
 // Une fenêtre qu'on ouvre pour de bon : le choix se fait, Archiver s'active, la confirmation verrouille la fenêtre un
 // instant, puis elle se ferme, ou garde la raison du refus.
 const SwitchRow = ({ name, detail, request, progress: initial, pendingReports, refusal }: SwitchRowProps) => {
-  const [startName, setStartName] = useState("");
+  const [startTheme, setStartTheme] = useState("");
   const [progress, setProgress] = useState<ProgressChoice | null>(initial);
   const [status, setStatus] = useState<SwitchStatus>("idle");
   const [failure, setFailure] = useState<SwitchFailure | null>(null);
   const open = () => {
-    setStartName(startingName(request));
+    setStartTheme(startingTheme(request));
     setProgress(initial);
     setStatus("idle");
     setFailure(null);
@@ -255,8 +255,8 @@ const SwitchRow = ({ name, detail, request, progress: initial, pendingReports, r
         {({ isOpen, close }) => (
           <SwitchWindow
             request={isOpen ? request : null}
-            name={startName}
-            onName={setStartName}
+            theme={startTheme}
+            onTheme={setStartTheme}
             progress={progress}
             onProgress={setProgress}
             pendingReports={pendingReports}
@@ -313,9 +313,9 @@ export const SwitchWindowEntry = () => {
           pendingReports={0}
         />
         <SwitchRow
-          name="Archiver le canvas en cours nommé"
-          detail="Le champ propose son nom."
-          request={{ kind: "archive", canvas: sampleActive(nowMs, { name: "Printemps" }) }}
+          name="Archiver le canvas en cours avec un thème"
+          detail="Le champ propose son thème."
+          request={{ kind: "archive", canvas: sampleActive(nowMs, { theme: "Printemps" }) }}
           progress={null}
           pendingReports={0}
         />

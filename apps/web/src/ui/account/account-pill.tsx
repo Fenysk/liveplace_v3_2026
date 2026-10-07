@@ -1,13 +1,13 @@
 // La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas) ou
-// Modération (qui modère sans être le streamer), le thème, puis sa photo (Mon compte) ou Se connecter.
+// Modération (qui modère sans être le streamer), l'apparence, puis sa photo (Mon compte) ou Se connecter.
 // Sur son canvas, c'est la seule pill du streamer.
 
 import { Activity, Settings, Shield } from "lucide-react";
+import type { AppearanceChoice } from "../design/appearance";
+import { AppearanceButton } from "../design/appearance-controls";
 import { Button } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
-import type { ThemeChoice } from "../design/theme";
-import { ThemeButton } from "../design/theme-controls";
 import { SignInButton } from "../design/twitch";
 import { reportCountLabel } from "../moderation/moderation-texts";
 
@@ -22,8 +22,8 @@ export type AccountIdentity =
 export type AccountPillProps = {
   identity: AccountIdentity;
   signInHref: string;
-  themeChoice: ThemeChoice;
-  onPickTheme: (choice: ThemeChoice) => void;
+  appearanceChoice: AppearanceChoice;
+  onPickAppearance: (choice: AppearanceChoice) => void;
   onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent (sauf au modérateur)
   onOpenSettings?: (() => void) | undefined; // la fenêtre, sur Canvas ; absent : pas le streamer sur son canvas
   onOpenModeration?: (() => void) | undefined; // la fenêtre, sur Modération ; absent : pas modérateur sans être le streamer
@@ -41,8 +41,8 @@ const titleWithReports = (title: string, reports: number): string =>
 export const AccountPill = ({
   identity,
   signInHref,
-  themeChoice,
-  onPickTheme,
+  appearanceChoice,
+  onPickAppearance,
   onOpenAccount,
   onOpenSettings,
   onOpenModeration,
@@ -71,7 +71,7 @@ export const AccountPill = ({
           onPress={onOpenModeration}
         />
       )}
-      <ThemeButton choice={themeChoice} onPick={onPickTheme} />
+      <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />
       {identity.kind === "guest" &&
         // Sur mobile, l'icône seule : la place manque en haut de l'écran.
         (isCompact ? (

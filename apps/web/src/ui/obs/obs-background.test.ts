@@ -6,7 +6,7 @@ import { backgroundSavedToast, obsFillStyle } from "./obs-background";
 
 const tokens = readFileSync(join(import.meta.dirname, "..", "design", "tokens.css"), "utf8");
 
-// Les jetons que la vue OBS lit : le vrai noir et le vrai blanc, les mêmes dans les deux thèmes
+// Les jetons que la vue OBS lit : le vrai noir et le vrai blanc, les mêmes dans les deux apparences
 const PROPERTIES: Record<string, string> = { "--obs-black": "#000000", "--obs-white": "#ffffff" };
 const getProperty = (property: string): string => PROPERTIES[property] ?? "";
 

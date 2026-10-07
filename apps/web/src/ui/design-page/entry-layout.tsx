@@ -107,6 +107,16 @@ export const InPhone = ({ isWindow = false, children }: { isWindow?: boolean; ch
   </div>
 );
 
+// La place entre les pills Canvas et Compte, en haut de l'écran d'un PC (la pill Thème, Écart §8.1, JOURNAL 2026-10-07).
+export const InTopRoom = ({ children }: { children: ReactNode }) => (
+  <div className="design-in-top-room">{children}</div>
+);
+
+// Le haut d'un téléphone, sous la rangée des pills : ce que la pill Thème y devient, et le toast qui se pose dessous.
+export const InPhoneTop = ({ children }: { children: ReactNode }) => (
+  <div className="design-in-phone-top">{children}</div>
+);
+
 // L'heure de la page : les exemples datent d'« il y a trois heures » par rapport à elle, et elle ne bouge pas.
 export const useNowMs = (): number => useState(() => Date.now())[0];
 

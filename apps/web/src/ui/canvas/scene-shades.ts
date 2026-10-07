@@ -1,5 +1,5 @@
 // Les teintes du canvas, lues dans les variables de tokens.css : la même source que les pills (JOURNAL 2026-09-24).
-// Relues quand `data-theme` change : le canvas suit le thème comme le reste.
+// Relues quand `data-appearance` change : le canvas suit l'apparence comme le reste.
 
 import type { SceneShades } from "./render-scene";
 

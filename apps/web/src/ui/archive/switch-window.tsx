@@ -2,7 +2,7 @@
 // Rouvrir, qui dit ce qui va se passer et pose le choix des jauges ; une petite à part pour Supprimer.
 // Rien ne se fait avant que le streamer confirme, et la fenêtre se verrouille pendant l'action.
 
-import { ARCHIVE_NAME_MAX_LENGTH } from "@liveplace/domain";
+import { THEME_MAX_LENGTH } from "@liveplace/domain";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import type { ListedArchive, ListedCanvas } from "../../usecase/list-canvases";
 import { Button } from "../design/button";
@@ -13,13 +13,14 @@ import {
   ARCHIVE_SENTENCE,
   canvasTitle,
   discardSentence,
-  NAME_PLACEHOLDER,
   PROGRESS_LABEL,
   progressOptions,
   reopenSentence,
   reportsSentence,
   type SwitchFailure,
   switchFailureLabel,
+  THEME_LABEL,
+  THEME_PLACEHOLDER,
 } from "./archive-texts";
 
 // `running` : verrouillée jusqu'à la réponse. `failed` : elle reste ouverte, et dit pourquoi.
@@ -35,8 +36,8 @@ const requestSentence = (request: SwitchRequest): string =>
 
 type SwitchWindowProps = {
   request: SwitchRequest | null; // `null` : fermée
-  name: string; // le nom facultatif, pour archiver seulement
-  onName: (name: string) => void;
+  theme: string; // le thème facultatif, pour archiver seulement
+  onTheme: (theme: string) => void;
   progress: ProgressChoice | null; // aucune n'est présélectionnée
   onProgress: (progress: ProgressChoice) => void;
   pendingReports: number;
@@ -48,8 +49,8 @@ type SwitchWindowProps = {
 
 export const SwitchWindow = ({
   request,
-  name,
-  onName,
+  theme,
+  onTheme,
   progress,
   onProgress,
   pendingReports,
@@ -84,12 +85,12 @@ export const SwitchWindow = ({
       <p className="lp-type-body lp-prompt">{requestSentence(shown)}</p>
       {isArchive && (
         <TextField
-          label="Nom de l'archive (facultatif)"
-          placeholder={NAME_PLACEHOLDER}
-          value={name}
-          maxLength={ARCHIVE_NAME_MAX_LENGTH}
+          label={THEME_LABEL}
+          placeholder={THEME_PLACEHOLDER}
+          value={theme}
+          maxLength={THEME_MAX_LENGTH}
           isDisabled={isRunning}
-          onInput={onName}
+          onInput={onTheme}
         />
       )}
       {reports && <p className="lp-type-caption lp-muted lp-prompt">{reports}</p>}

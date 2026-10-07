@@ -1,9 +1,9 @@
-// Ce que montre la pill Compte : qui est connecté, d'après la réponse du gateway au `hello`, et le thème choisi.
+// Ce que montre la pill Compte : qui est connecté, d'après la réponse du gateway au `hello`, et l'apparence choisie.
 
 import { canModerate } from "@liveplace/domain";
 import { useSyncExternalStore } from "react";
 import type { CanvasStore, CanvasView } from "../../state/canvas-store";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import type { AccountIdentity, AccountPillProps } from "./account-pill";
 import { signInHref, signOutHref } from "./auth-links";
 
@@ -29,13 +29,13 @@ export type AccountProps = Omit<
 
 export function useAccountPillProps(canvas: CanvasStore, login: string): AccountProps {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return {
     identity: toIdentity(view),
     signInHref: signInHref(login),
     signOutHref: signOutHref(login),
-    themeChoice,
-    onPickTheme: pickTheme,
+    appearanceChoice,
+    onPickAppearance: pickAppearance,
     pendingReports: view.role && canModerate(view.role) ? view.reportCount : 0,
   };
 }

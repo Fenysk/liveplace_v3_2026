@@ -15,9 +15,11 @@ import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
 import type { ProfileUser } from "../ui/design/profile";
+import { ThemePill } from "../ui/design/theme-pill";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DeveloperWindow } from "../ui/developer/developer-window";
@@ -133,8 +135,8 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
           onClose={() => setWindowState((shown) => ({ ...shown, isOpen: false }))}
           user={account.identity.user}
           signOutHref={signOutHref}
-          themeChoice={account.themeChoice}
-          onPickTheme={account.onPickTheme}
+          appearanceChoice={account.appearanceChoice}
+          onPickAppearance={account.onPickAppearance}
           moderationTab={
             moderation.controls && (
               <ModerationTab
@@ -177,8 +179,17 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   );
 };
 
+// Écart §8.1 (JOURNAL 2026-10-07) : le thème du canvas, pour tous, dès le rendu serveur ; le gateway le suit ensuite en direct.
+const CanvasThemePill = ({
+  canvas,
+  loaded,
+}: {
+  canvas: CanvasStore | undefined;
+  loaded: string | undefined;
+}) => <ThemePill theme={useCanvasTheme(canvas, loaded)} />;
+
 const GamePage = () => {
-  const { canvasId, owner, isOwnerSession = false } = Route.useLoaderData();
+  const { canvasId, owner, theme, isOwnerSession = false } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
   const [stores, setStores] = useState<Stores>();
@@ -216,6 +227,8 @@ const GamePage = () => {
           ownerName={owner.displayName}
         />
       )}
+      {/* Le store d'un canvas qu'on quitte (le streamer vient d'archiver) ne dit plus le thème de celui-ci. */}
+      <CanvasThemePill canvas={stores?.canvasId === canvasId ? stores.canvas : undefined} loaded={theme} />
       {stores ? (
         // CDC 2026, Toasts : un seul à la fois, pour toute la page.
         <ToastProvider>

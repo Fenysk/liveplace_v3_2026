@@ -4,9 +4,10 @@ import { toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
-import { NAME_PLACEHOLDER, PROGRESS_LABEL, progressOptions } from "../archive/archive-texts";
+import { PROGRESS_LABEL, progressOptions, THEME_LABEL, THEME_PLACEHOLDER } from "../archive/archive-texts";
 import { PNG_BACKGROUND_OPTIONS } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
+import { AppearanceButton, AppearancePicker } from "../design/appearance-controls";
 import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
 import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../design/canvas-activity-card";
@@ -23,10 +24,9 @@ import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import { TextField } from "../design/text-field";
-import { ThemeButton, ThemePicker } from "../design/theme-controls";
 import { TimeCharts } from "../design/time-charts";
 import { TwitchGlyph } from "../design/twitch";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import {
   AUDIENCE_COLUMNS,
   toActivityAccounts,
@@ -332,16 +332,16 @@ export const FieldsEntry = () => (
     note="Un curseur à crans fixes, une case à cocher, et une valeur à copier : tout le champ est le bouton."
   >
     <Block title="Champ de texte">
-      <StateRow name="Champ de texte" detail="Le nom facultatif d'une archive.">
+      <StateRow name="Champ de texte" detail="Le thème facultatif d'un canvas.">
         <InSmallWindow>
           <WithValue initial="">
-            {(name, setName) => (
+            {(theme, setTheme) => (
               <TextField
-                label="Nom de l'archive (facultatif)"
-                placeholder={NAME_PLACEHOLDER}
-                value={name}
+                label={THEME_LABEL}
+                placeholder={THEME_PLACEHOLDER}
+                value={theme}
                 maxLength={40}
-                onInput={setName}
+                onInput={setTheme}
               />
             )}
           </WithValue>
@@ -349,7 +349,7 @@ export const FieldsEntry = () => (
       </StateRow>
       <StateRow name="Champ de texte désactivé">
         <InSmallWindow>
-          <TextField label="Nom de l'archive (facultatif)" value="Printemps" onInput={noop} isDisabled />
+          <TextField label={THEME_LABEL} value="Printemps" onInput={noop} isDisabled />
         </InSmallWindow>
       </StateRow>
     </Block>
@@ -575,13 +575,13 @@ export const StatTilesEntry = () => {
 };
 
 export const ChoicesEntry = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="choix"
-      components={["ChoiceList", "ThemePicker", "ThemeButton", "SwatchChoice"]}
-      file="ui/design/{choice-list,theme-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton de thème fait le cycle auto, clair, sombre."
+      components={["ChoiceList", "AppearancePicker", "AppearanceButton", "SwatchChoice"]}
+      file="ui/design/{choice-list,appearance-controls,palette}.tsx"
+      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -610,12 +610,12 @@ export const ChoicesEntry = () => {
           </InSmallWindow>
         </StateRow>
       </Block>
-      <Block title="Thème">
-        <StateRow name="Thème, comme dans Mon compte">
-          <ThemePicker choice={themeChoice} onPick={pickTheme} />
+      <Block title="Apparence">
+        <StateRow name="Apparence, comme dans Mon compte">
+          <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
-        <StateRow name="Thème, comme dans la pill Compte">
-          <ThemeButton choice={themeChoice} onPick={pickTheme} />
+        <StateRow name="Apparence, comme dans la pill Compte">
+          <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
       </Block>
       <Block title="Choix de couleur">

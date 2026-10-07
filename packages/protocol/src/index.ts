@@ -10,6 +10,7 @@ import {
   OBS_BACKGROUNDS,
   ROLES,
   SCOREBOARD_SIZE,
+  THEME_MAX_LENGTH,
   type Timestamp,
 } from "@liveplace/domain";
 import { CAPACITY_LINKS, CAPACITY_RESOURCE_IDS, CAPACITY_UNITS } from "@liveplace/domain/capacity";
@@ -31,7 +32,8 @@ import { z } from "zod";
 // 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (Écart §15, JOURNAL 2026-10-06), et le fond
 // noir de la vue OBS.
 // 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
-export const PROTOCOL_VERSION = 15;
+// 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (Écart §4.3, JOURNAL 2026-10-07).
+export const PROTOCOL_VERSION = 16;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -352,6 +354,13 @@ export type ClientFrame = z.infer<typeof ClientFrameSchema>;
 // Le snapshot est hors bande : une frame binaire (width × height octets),
 // jamais un objet `t`-discriminé, donc pas de schéma Zod ici.
 
+// Écart §4.3 (JOURNAL 2026-10-07) : borné par caractères comme `toTheme` ; `.max` compterait les unités UTF-16, et un
+// thème de 40 émojis serait refusé.
+const ThemeSchema = z
+  .string()
+  .min(1)
+  .refine((theme) => Array.from(theme).length <= THEME_MAX_LENGTH, "thème trop long");
+
 const WelcomeFrameSchema = z.object({
   t: z.literal("welcome"),
   canvas: z.object({
@@ -368,6 +377,7 @@ const WelcomeFrameSchema = z.object({
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
     obsBackground: z.enum(OBS_BACKGROUNDS), // JOURNAL 2026-09-29
+    theme: ThemeSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : absent, le canvas n'a pas de thème
   }),
   palette: z.array(z.string()),
   version: VersionSchema,
@@ -538,6 +548,10 @@ const ObsBackgroundFrameSchema = z.object({
   t: z.literal("obsBackground"),
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
+
+// Le thème vient de changer : toutes les pages du canvas le prennent aussitôt ; sans `theme`, il n'y en a plus
+// (Écart §4.3, JOURNAL 2026-10-07).
+const ThemeFrameSchema = z.object({ t: z.literal("theme"), theme: ThemeSchema.optional() });
 
 // Les bornes viennent de changer : chaque page les prend, et reçoit ensuite sa jauge (JOURNAL 2026-09-30).
 const GaugeLimitsFrameSchema = z.object({
@@ -738,6 +752,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ObsBackgroundFrameSchema,
+  ThemeFrameSchema,
   GaugeLimitsFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,

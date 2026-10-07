@@ -1,18 +1,22 @@
 // Le chapitre L'écran de jeu : les pills, les vraies, avec des props d'exemple, chacune dans chacun de ses états.
 
 import { PALETTE } from "@liveplace/domain";
+import { useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { CanvasPill } from "../canvas/canvas-pill";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
+import { Button } from "../design/button";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
+import { ThemePill } from "../design/theme-pill";
+import { Toast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { noop, SAMPLE_OWNER } from "./design-fixtures";
-import { Block, Entry, InNotice, InPhone, StateRow, useNowMs } from "./entry-layout";
+import { Block, Entry, InNotice, InPhone, InPhoneTop, InTopRoom, StateRow, useNowMs } from "./entry-layout";
 
 const REFILL_MS = 10_000;
 
@@ -31,6 +35,80 @@ export const CanvasPillEntry = () => (
     <Block title="Sur mobile">
       <StateRow name="Version compacte">
         <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
+      </StateRow>
+    </Block>
+  </Entry>
+);
+
+const SHORT_THEME = "Halloween";
+const LONG_THEME = "Grande pixel war de la rentrée des lives"; // 40 caractères, le maximum
+const TWO_LINES_THEME = "Festival international des pixels fous";
+
+// Le thème qui paraît, change de largeur puis part : la pill, comme dans le jeu quand le streamer règle son thème.
+const THEME_STEPS = [undefined, SHORT_THEME, "Pixel war de la rentrée", undefined] as const;
+
+const ThemeDemo = () => {
+  const [step, setStep] = useState(0);
+  return (
+    <>
+      <InTopRoom>
+        <ThemePill theme={THEME_STEPS[step]} isDocked={false} />
+      </InTopRoom>
+      <Button label="Changer le thème" onPress={() => setStep((step + 1) % THEME_STEPS.length)} />
+    </>
+  );
+};
+
+export const ThemePillEntry = () => (
+  <Entry
+    slug="pill-theme"
+    components={["ThemePill"]}
+    file="ui/design/theme-pill.tsx"
+    note="Le thème du canvas, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
+    where="En haut au centre, entre les pills Canvas et Compte · sur mobile, sous la rangée des pills du haut"
+  >
+    <Block title="États">
+      <StateRow name="Un thème court" detail="Un petit texte discret au-dessus, le thème dessous, gros.">
+        <ThemePill theme={SHORT_THEME} isDocked={false} />
+      </StateRow>
+      <StateRow
+        name="Un thème de 40 caractères, le maximum"
+        detail="Entre les deux pills, la place manque : il se coupe par « … » plutôt que de passer dessous."
+      >
+        <InTopRoom>
+          <ThemePill theme={LONG_THEME} isDocked={false} />
+        </InTopRoom>
+      </StateRow>
+      <StateRow
+        name="Elle paraît, change de largeur et part"
+        detail="Quand le streamer règle son thème, partout en direct."
+        isDemo
+      >
+        <ThemeDemo />
+      </StateRow>
+    </Block>
+    <Block title="Sur mobile">
+      <StateRow
+        name="Un thème court"
+        detail="Sous la rangée des pills du haut, centrée : « Thème » au-dessus."
+      >
+        <InPhoneTop>
+          <ThemePill theme={SHORT_THEME} isDocked={false} />
+        </InPhoneTop>
+      </StateRow>
+      <StateRow name="Un thème sur deux lignes" detail="Deux lignes au plus.">
+        <InPhoneTop>
+          <ThemePill theme={TWO_LINES_THEME} isDocked={false} />
+        </InPhoneTop>
+      </StateRow>
+      <StateRow
+        name="Un toast sous la pill"
+        detail="Il se pose dessous et ne la recouvre jamais, quelle que soit sa hauteur."
+      >
+        <InPhoneTop>
+          <ThemePill theme={TWO_LINES_THEME} isDocked={false} />
+          <Toast message={{ id: 1, tone: "success", text: "Thème enregistré" }} isDocked={false} />
+        </InPhoneTop>
       </StateRow>
     </Block>
   </Entry>
@@ -121,7 +199,7 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
 ];
 
 export const AccountPillEntry = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="pill-compte"
@@ -147,8 +225,8 @@ export const AccountPillEntry = () => {
                 <AccountPill
                   identity={identity}
                   signInHref="#"
-                  themeChoice={themeChoice}
-                  onPickTheme={pickTheme}
+                  appearanceChoice={appearanceChoice}
+                  onPickAppearance={pickAppearance}
                   onOpenAccount={noop}
                   onOpenSettings={hasSettings ? noop : undefined}
                   onOpenModeration={hasModeration ? noop : undefined}

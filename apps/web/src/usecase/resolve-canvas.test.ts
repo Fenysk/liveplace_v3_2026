@@ -13,7 +13,7 @@ const canvas: OwnedCanvas = { canvasId: "opaque-canvas", width: 256, height: 256
 
 // Un double qui ne connaît qu'un propriétaire, avec ou sans canvas actif.
 const durableWith = (
-  activeCanvas: OwnedCanvas | null,
+  activeCanvas: (OwnedCanvas & { theme?: string }) | null,
   user: User = owner,
 ): Pick<DurableStore, "getUserByLogin" | "getActiveCanvasForOwner"> => ({
   getUserByLogin: async (login) => (login === user.login ? user : null),
@@ -36,6 +36,18 @@ describe("resolveCanvas (§9.1, D-14)", () => {
       canvasId: canvas.canvasId,
       owner: { displayName: owner.displayName, login: owner.login },
     });
+  });
+
+  // Rend le thème du canvas actif avec la page, dans le même appel que le canvas, et sans thème la clé est absente
+  // (Écart §8.1, JOURNAL 2026-10-07)
+  it("gives the theme of the active canvas with the page, and leaves the key out without one", async () => {
+    expect(await resolveCanvas(durableWith({ ...canvas, theme: "Halloween" }), "fenysk")).toEqual({
+      canvasId: canvas.canvasId,
+      owner: { displayName: owner.displayName, login: owner.login, avatarUrl: owner.avatarUrl },
+      theme: "Halloween",
+    });
+    expect(await resolveCanvas(durableWith(canvas), "fenysk")).not.toHaveProperty("theme");
+    expect(await resolveCanvas(durableWith({ ...canvas, theme: "" }), "fenysk")).not.toHaveProperty("theme");
   });
 
   // Cherche le pseudo en minuscules, comme Twitch les écrit

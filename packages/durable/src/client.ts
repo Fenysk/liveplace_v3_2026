@@ -20,7 +20,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
 
     // Écart §15 (JOURNAL 2026-10-06) : les archives. Un refus de Convex est une valeur `{ ok: false, error }`.
     listCanvasesForOwner: (ownerId) => convex.query(api.canvases.listForOwner, { serviceKey, ownerId }),
-    async archiveActiveCanvas({ incoming, name, ...archiving }) {
+    async archiveActiveCanvas({ incoming, theme, ...archiving }) {
       const result = await convex.mutation(api.canvases.archiveActive, {
         serviceKey,
         ...archiving,
@@ -28,7 +28,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
         width: incoming.width,
         height: incoming.height,
         maxArchives: MAX_ARCHIVES,
-        ...(name ? { name } : {}),
+        ...(theme ? { theme } : {}),
       });
       return result.ok ? { ok: true, value: undefined } : result;
     },
@@ -36,12 +36,12 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
       const result = await convex.mutation(api.canvases.reopen, { serviceKey, ...reopening });
       return result.ok ? { ok: true, value: undefined } : result;
     },
-    async renameActiveCanvas(ownerId, canvasId, name) {
-      const result = await convex.mutation(api.canvases.rename, {
+    async setActiveCanvasTheme(ownerId, canvasId, theme) {
+      const result = await convex.mutation(api.canvases.setTheme, {
         serviceKey,
         ownerId,
         canvasId,
-        ...(name ? { name } : {}),
+        ...(theme ? { theme } : {}),
       });
       return result.ok ? { ok: true, value: undefined } : result;
     },

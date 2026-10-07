@@ -58,51 +58,51 @@ const capitalized = (text: string): string => text.charAt(0).toUpperCase() + tex
 export const datesTitle = (createdAt: Timestamp, archivedAt?: Timestamp): string =>
   capitalized(datesLabel(createdAt, archivedAt));
 
-// Le nom d'abord ; sans nom, ce sont ses dates.
+// Le thème d'abord ; sans thème, ce sont ses dates.
 export function canvasTitle({
-  name,
+  theme,
   createdAt,
   archivedAt,
 }: {
-  name?: string;
+  theme?: string;
   createdAt: Timestamp;
   archivedAt?: Timestamp;
 }): string {
-  return name ?? datesTitle(createdAt, archivedAt);
+  return theme ?? datesTitle(createdAt, archivedAt);
 }
 
 // Le libellé du canvas en cours, et son bouton : l'icône d'archive dit le reste.
 export const CURRENT_CANVAS_LABEL = "Canvas en cours";
 export const ARCHIVE_ACTION = "Archiver";
 
-// La ligne du canvas en cours : le nom en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
+// La ligne du canvas en cours : le thème en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
 // le dit déjà.
 export const currentCanvasTitle = ({
-  name,
+  theme,
   createdAt,
 }: {
-  name?: string | undefined;
+  theme?: string | undefined;
   createdAt: Timestamp;
-}): string => name ?? datesTitle(createdAt);
+}): string => theme ?? datesTitle(createdAt);
 
 export const currentCanvasCaption = ({
-  name,
+  theme,
   createdAt,
 }: {
-  name?: string | undefined;
+  theme?: string | undefined;
   createdAt: Timestamp;
-}): string | null => (name ? datesLabel(createdAt) : null);
+}): string | null => (theme ? datesLabel(createdAt) : null);
 
 // La légende d'une archive : ses dates, sauf si elles sont déjà son titre.
 export const archiveCaption = ({
-  name,
+  theme,
   createdAt,
   archivedAt,
 }: {
-  name?: string | undefined;
+  theme?: string | undefined;
   createdAt: Timestamp;
   archivedAt: Timestamp;
-}): string | null => (name ? datesTitle(createdAt, archivedAt) : null);
+}): string | null => (theme ? datesTitle(createdAt, archivedAt) : null);
 
 // Le nom du lien d'une archive pour un lecteur d'écran : son titre, et qu'il ouvre un nouvel onglet.
 export const openArchiveLabel = (title: string): string => `Ouvrir l'archive ${title} dans un nouvel onglet`;
@@ -116,32 +116,34 @@ export const NO_CURRENT_CANVAS = "Aucun canvas en cours.";
 export const NO_ARCHIVE_SENTENCE =
   "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur un canvas vide.";
 
-type NameRequest =
-  | { kind: "archive"; canvas: { name?: string } }
-  | { kind: "reopen"; archive: { name?: string } };
+type ThemeRequest =
+  | { kind: "archive"; canvas: { theme?: string } }
+  | { kind: "reopen"; archive: { theme?: string } };
 
-// Écart §15 (JOURNAL 2026-10-06) : en archivant, le champ propose le nom du canvas actif, qu'une archive rouverte a
-// gardé ; vide, il l'effacerait. Rouvrir n'a pas de nom à donner.
-export const startingName = (request: NameRequest): string =>
-  request.kind === "archive" ? (request.canvas.name ?? "") : "";
+// Écart §8.1 (JOURNAL 2026-10-07) : en archivant, le champ propose le thème du canvas actif, qu'une archive rouverte a
+// gardé ; vide, il l'effacerait. Rouvrir n'a pas de thème à donner.
+export const startingTheme = (request: ThemeRequest): string =>
+  request.kind === "archive" ? (request.canvas.theme ?? "") : "";
 
-// Le nom du champ propose un exemple, jamais une consigne.
-export const NAME_PLACEHOLDER = "Ex. : Pixel war de la rentrée";
+// Le champ propose un exemple, jamais une consigne.
+export const THEME_PLACEHOLDER = "Ex. : Halloween";
 
-// Le champ de l'onglet Canvas : le nom du canvas en cours, enregistré quand le champ perd le focus, sans bouton.
-export const CANVAS_NAME_LABEL = "Nom du canvas";
-export const NAME_SAVED = "Nom enregistré";
+// Le champ de l'onglet Canvas et celui de la fenêtre Archiver : le thème du canvas en cours, enregistré dans l'onglet
+// quand le champ perd le focus, sans bouton.
+export const THEME_LABEL = "Thème";
+export const THEME_CAPTION = "Affiché en haut du canvas, pour tout le monde.";
+export const THEME_SAVED = "Thème enregistré";
 
-// Pourquoi le nom n'a pas été enregistré, en un toast. `network` : pas de réponse, comme `failed` pour le streamer.
-export type RenameFailure = "not_active" | "failed" | "network" | "unauthenticated";
+// Pourquoi le thème n'a pas été enregistré, en un toast. `network` : pas de réponse, comme `failed` pour le streamer.
+export type ThemeFailure = "not_active" | "failed" | "network" | "unauthenticated";
 
-export function renameFailureLabel(failure: RenameFailure): string {
+export function themeFailureLabel(failure: ThemeFailure): string {
   switch (failure) {
     case "not_active":
-      return "Le canvas en cours a changé : son nom est rechargé.";
+      return "Le canvas en cours a changé : son thème est rechargé.";
     case "failed":
     case "network":
-      return "Le nom n'a pas pu être enregistré. Réessaie dans un instant.";
+      return "Le thème n'a pas pu être enregistré. Réessaie dans un instant.";
     case "unauthenticated":
       return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
   }
@@ -170,18 +172,18 @@ export const progressOptions = (kind: "archive" | "reopen"): readonly ChoiceOpti
 
 type BannerArchive = {
   displayName: string;
-  name?: string | undefined;
+  theme?: string | undefined;
   createdAt: Timestamp;
   archivedAt: Timestamp;
 };
 
-// Le bandeau d'une archive : le nom en titre, sinon à qui elle est ; la légende dit les dates, et à qui elle est quand
-// le nom a pris le titre.
-export const bannerTitle = ({ displayName, name }: Pick<BannerArchive, "displayName" | "name">): string =>
-  name ?? `Archive de ${displayName}`;
+// Le bandeau d'une archive : le thème en titre, sinon à qui elle est ; la légende dit les dates, et à qui elle est quand
+// le thème a pris le titre.
+export const bannerTitle = ({ displayName, theme }: Pick<BannerArchive, "displayName" | "theme">): string =>
+  theme ?? `Archive de ${displayName}`;
 
-export const bannerCaption = ({ displayName, name, createdAt, archivedAt }: BannerArchive): string =>
-  name
+export const bannerCaption = ({ displayName, theme, createdAt, archivedAt }: BannerArchive): string =>
+  theme
     ? `Archive de ${displayName} · ${datesLabel(createdAt, archivedAt)}`
     : datesTitle(createdAt, archivedAt);
 

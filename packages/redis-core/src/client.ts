@@ -149,6 +149,8 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
       OBS_BACKGROUNDS.find((background) => background === fields.obsBackground) ?? OBS_BACKGROUND,
     ...(fields.archivedAt === undefined ? {} : { archivedAt: metaNumber(fields, "archivedAt") }),
     ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
+    // Écart §8.1 (JOURNAL 2026-10-07) : un champ vide vaut pas de thème.
+    ...(fields.theme ? { theme: fields.theme } : {}),
   };
 }
 

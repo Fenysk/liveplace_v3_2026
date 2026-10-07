@@ -48,13 +48,13 @@ describe("resolveArchive (Écart §10.3, JOURNAL 2026-10-06)", () => {
     expect(lookups).toEqual([{ ownerId: "1234", linkCode: "3mAqXz9RbK" }]);
   });
 
-  // Garde le nom d'une archive qui en a un, et cherche le pseudo en minuscules
-  it("keeps the name of an archive that has one, and looks the login up in lowercase", async () => {
-    const { durable } = durableWith({ status: "archived", archive: { ...archive, name: "Printemps" } });
+  // Garde le thème d'une archive qui en a un, et cherche le pseudo en minuscules
+  it("keeps the theme of an archive that has one, and looks the login up in lowercase", async () => {
+    const { durable } = durableWith({ status: "archived", archive: { ...archive, theme: "Printemps" } });
 
     expect(await resolveArchive(durable, "Fenysk", "3mAqXz9RbK")).toMatchObject({
       status: "archived",
-      archive: { name: "Printemps" },
+      archive: { theme: "Printemps" },
     });
   });
 

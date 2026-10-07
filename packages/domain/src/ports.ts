@@ -127,7 +127,8 @@ export type LiveControl =
   | ({ t: "gaugeLimits" } & GaugeLimits) // chaque page reçoit sa jauge recalculée (JOURNAL 2026-09-30)
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   | { t: "resize" } // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
-  | { t: "canvasStatus"; status: CanvasStatus }; // publié par le web : archivé, redevenu actif, supprimé (Écart §15, JOURNAL 2026-10-06)
+  | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (Écart §15, JOURNAL 2026-10-06)
+  | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (Écart §4.3, JOURNAL 2026-10-07)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
@@ -401,6 +402,10 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
   // Classés sans suite : `reported`, `reports:*` et `offstream` vidés ; `approved` reste.
   settleReports(canvasId: string): Promise<void>;
   publishStatus(canvasId: string, status: CanvasStatus): Promise<void>;
+  // Écart §8.1 (JOURNAL 2026-10-07) : la copie du thème dans `meta` (sans `theme`, plus de thème), jamais publiée ; puis
+  // le `ctl` `theme`, pour les pages d'un canvas qui reste là. Archiver ou rouvrir n'écrit que la copie : ses pages changent de canvas.
+  setTheme(canvasId: string, theme: string | undefined): Promise<void>;
+  publishTheme(canvasId: string, theme: string | undefined): Promise<void>;
   discardCanvas(canvasId: string): Promise<void>; // toutes les clés `cv:<id>:*`
   getCanvasImage(canvasId: string): Promise<CanvasImage | null>;
 }
@@ -408,15 +413,16 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
 
-// Écart §15 (JOURNAL 2026-10-06) : le canvas actif d'un propriétaire. Son nom et son code ne viennent que d'une archive rouverte.
-export type ActiveCanvas = OwnedCanvas & { createdAt: Timestamp; name?: string; linkCode?: string };
+// Écart §15 (JOURNAL 2026-10-06) : le canvas actif d'un propriétaire. Son code ne vient que d'une archive rouverte ; son
+// thème (Écart §8.1, JOURNAL 2026-10-07) est celui que le streamer lui a donné, ou qu'une archive rouverte a gardé.
+export type ActiveCanvas = OwnedCanvas & { createdAt: Timestamp; theme?: string; linkCode?: string };
 
 // Une archive : son lien est `/{login}/archives/{linkCode}`, et rien d'autre ne la désigne aux yeux d'un public.
 export type Archive = OwnedCanvas & {
   createdAt: Timestamp;
   archivedAt: Timestamp;
   linkCode: string;
-  name?: string;
+  theme?: string;
 };
 
 export type OwnerCanvases = { active: ActiveCanvas | null; archives: Archive[] }; // archives : dans un ordre quelconque
@@ -425,17 +431,18 @@ export type OwnerCanvases = { active: ActiveCanvas | null; archives: Archive[] }
 export type LinkedCanvas = { status: "active" } | { status: "archived"; archive: Archive };
 
 // Archiver : le sortant (`outgoingId`, l'actif) devient une archive, l'entrant naît actif. `archivedAt` est aussi la
-// naissance de l'entrant ; `linkCode` ne sert que si le sortant n'en a pas déjà un ; sans `name`, l'archive n'en a pas.
+// naissance de l'entrant ; `linkCode` ne sert que si le sortant n'en a pas déjà un ; l'entrant n'a pas de thème, et sans
+// `theme` l'archive n'en a pas non plus : celui du sortant, s'il en avait un, ne reste pas.
 export type ArchiveInput = {
   ownerId: string;
   outgoingId: string;
   incoming: OwnedCanvas;
   archivedAt: Timestamp;
   linkCode: string;
-  name?: string;
+  theme?: string;
 };
 
-// Rouvrir : l'actif (`outgoingId`) devient une archive, `reopenedId` redevient actif, avec son code et son nom.
+// Rouvrir : l'actif (`outgoingId`) devient une archive, `reopenedId` redevient actif, avec son code et son thème.
 export type ReopenInput = {
   ownerId: string;
   outgoingId: string;
@@ -455,7 +462,8 @@ export interface DurableStore {
   getUserByLogin(login: string): Promise<User | null>;
   // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
   ensureCanvasForOwner(ownerId: string, candidate: OwnedCanvas): Promise<string>;
-  getActiveCanvasForOwner(ownerId: string): Promise<OwnedCanvas | null>;
+  // Écart §8.1 (JOURNAL 2026-10-07) : avec son thème, que `/{login}` rend dans la page sans appel de plus.
+  getActiveCanvasForOwner(ownerId: string): Promise<(OwnedCanvas & { theme?: string }) | null>;
   // Écart §15 (JOURNAL 2026-10-06) : le canvas actif et les archives de ce propriétaire.
   listCanvasesForOwner(ownerId: string): Promise<OwnerCanvases>;
   // Une transaction. Refus : `not_active`, le sortant n'est pas l'actif de ce propriétaire ; `archives_full`, il a déjà
@@ -463,9 +471,13 @@ export interface DurableStore {
   archiveActiveCanvas(archiving: ArchiveInput): Promise<Result<void, "not_active" | "archives_full">>;
   // Une transaction. Refus : `not_active`, ou `not_archive` : ce n'est pas une archive de ce propriétaire.
   reopenArchive(reopening: ReopenInput): Promise<Result<void, "not_active" | "not_archive">>;
-  // Le nom du canvas actif seulement : `not_active` si `canvasId` n'est pas l'actif de ce propriétaire. Sans `name`, le
+  // Le thème du canvas actif seulement : `not_active` si `canvasId` n'est pas l'actif de ce propriétaire. Sans `theme`, le
   // canvas n'en a plus.
-  renameActiveCanvas(ownerId: string, canvasId: string, name?: string): Promise<Result<void, "not_active">>;
+  setActiveCanvasTheme(
+    ownerId: string,
+    canvasId: string,
+    theme?: string,
+  ): Promise<Result<void, "not_active">>;
   // Jamais le canvas actif, jamais celui d'un autre propriétaire : `not_archive`.
   discardArchive(ownerId: string, canvasId: string): Promise<Result<void, "not_archive">>;
   // `null` : aucun canvas de ce propriétaire n'a ce code. Rendu sans session : le lien suffit à voir une archive.

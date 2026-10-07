@@ -614,6 +614,40 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
     });
   });
 
+  // Prend le thème du welcome, puis celui d'une frame qui le change, puis plus aucun quand la frame n'en porte pas, sans
+  // toucher au reste des params (Écart §8.1, JOURNAL 2026-10-07)
+  it("takes the theme of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    const withoutTheme = { ...welcome, params: { ...welcome.params } };
+    if (withoutTheme.t !== "welcome") throw new Error("le welcome d'exemple n'en est pas un");
+
+    receive({ ...withoutTheme, params: { ...withoutTheme.params, theme: "Halloween" } });
+    expect(store.getView().params?.theme).toBe("Halloween");
+
+    receive({ t: "theme", theme: "Noël" });
+    expect(store.getView().params).toEqual({ ...withoutTheme.params, theme: "Noël" });
+
+    receive({ t: "theme" });
+    expect(store.getView().params).toEqual(withoutTheme.params);
+    expect(store.getView().params).not.toHaveProperty("theme");
+  });
+
+  // Une reconnexion dit le thème du moment : un welcome sans thème retire celui qu'on avait ; une frame arrivée avant le
+  // premier welcome n'a rien à changer
+  it("lets a reconnection's welcome without a theme drop the one it had, and ignores a frame before the first welcome", () => {
+    const { store, receive, close } = setup({ isWelcomed: false });
+
+    receive({ t: "theme", theme: "Trop tôt" });
+    expect(store.getView().params).toBeUndefined();
+
+    receive(welcome);
+    receive({ t: "theme", theme: "Halloween" });
+    close();
+    receive(welcome);
+
+    expect(store.getView().params).not.toHaveProperty("theme");
+  });
+
   // Prend de nouvelles bornes et la jauge qui suit, et n'envoie que les deux bornes, jamais tout `params` (JOURNAL 2026-09-30)
   it("takes new limits and the gauge that follows, and sends only the two limits, never the whole params", () => {
     const { store, sent, receive } = setup();

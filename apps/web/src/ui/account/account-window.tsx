@@ -1,13 +1,13 @@
 // La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte, ou Canvas par Réglages) : Canvas et Vue
-// OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, le thème,
+// OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, l'apparence,
 // Se déconnecter.
 
 import { Layers, LogOut, MonitorPlay, Scaling, Shield, Trophy, User } from "lucide-react";
 import type { ReactNode } from "react";
+import type { AppearanceChoice } from "../design/appearance";
+import { AppearancePicker } from "../design/appearance-controls";
 import { Button } from "../design/button";
 import { Profile, type ProfileUser } from "../design/profile";
-import type { ThemeChoice } from "../design/theme";
-import { ThemePicker } from "../design/theme-controls";
 import { Window, WindowRow } from "../design/window";
 
 export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "scoreboard" | "account";
@@ -31,8 +31,8 @@ type AccountWindowProps = {
   onClose: () => void;
   user: ProfileUser;
   signOutHref: string;
-  themeChoice: ThemeChoice;
-  onPickTheme: (choice: ThemeChoice) => void;
+  appearanceChoice: AppearanceChoice;
+  onPickAppearance: (choice: AppearanceChoice) => void;
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
   canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
@@ -47,8 +47,8 @@ export const AccountWindow = ({
   onClose,
   user,
   signOutHref,
-  themeChoice,
-  onPickTheme,
+  appearanceChoice,
+  onPickAppearance,
   moderationTab,
   obsTab,
   canvasTab,
@@ -77,8 +77,8 @@ export const AccountWindow = ({
           <WindowRow label={<Profile user={user} variant="full" />}>
             <Button label="Se déconnecter" icon={LogOut} href={signOutHref} />
           </WindowRow>
-          <WindowRow label="Thème">
-            <ThemePicker choice={themeChoice} onPick={onPickTheme} />
+          <WindowRow label="Apparence">
+            <AppearancePicker choice={appearanceChoice} onPick={onPickAppearance} />
           </WindowRow>
         </>
       )}

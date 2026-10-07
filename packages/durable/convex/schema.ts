@@ -29,9 +29,11 @@ export default defineSchema({
     createdAt: v.number(),
     purgedBeforeVersion: v.number(), // curseur de purge du worker (D-18), 0 à la création
     purgedBeforeTs: v.number(),
-    // Écart §15 (JOURNAL 2026-10-06) : ajoutés, jamais requis, pour les canvas d'avant. Le code et le nom survivent à
+    // Écart §15 (JOURNAL 2026-10-06) : ajoutés, jamais requis, pour les canvas d'avant. Le code et le thème survivent à
     // une réouverture ; la date d'archivage non.
     archivedAt: v.optional(v.number()),
+    theme: v.optional(v.string()), // Écart §8.1 (JOURNAL 2026-10-07)
+    // Ancien nom du thème, recopié dans `theme` par `canvases:moveNameToTheme`, retiré au prochain changement de schéma.
     name: v.optional(v.string()),
     linkCode: v.optional(v.string()),
   })

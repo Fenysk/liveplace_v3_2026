@@ -202,6 +202,7 @@ type SetupOptions = {
   canReport?: boolean; // ce que rend `canReport`
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
   archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
+  theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
@@ -226,8 +227,11 @@ const setup = (options: SetupOptions = {}) => {
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   // `resizeCanvas` la change, comme resize.lua
-  let currentMeta: CanvasMeta =
-    options.archivedAt === undefined ? meta : { ...meta, archivedAt: options.archivedAt };
+  let currentMeta: CanvasMeta = {
+    ...meta,
+    ...(options.archivedAt === undefined ? {} : { archivedAt: options.archivedAt }),
+    ...(options.theme === undefined ? {} : { theme: options.theme }),
+  };
   const core = {
     async getCanvas(asked: string) {
       return asked === canvasId ? currentMeta : null;
@@ -1043,6 +1047,56 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     expect(context.obsBackgrounds).toEqual(["white"]);
     for (const opened of [context, viewer])
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
+  });
+
+  // Donne le thème du canvas dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-07)
+  it("gives the canvas theme in the params of the welcome, to everyone, and none when the canvas has none", async () => {
+    const themed = setup({ session: owner, theme: "Halloween" });
+    const viewer = themed.open(session);
+    const guest = themed.open(null);
+    const obs = themed.open(null);
+    const plain = setup();
+
+    for (const opened of [themed, viewer, guest]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    await plain.connection.receive(hello());
+
+    for (const opened of [themed, viewer, guest, obs])
+      expect(opened.sent[0]).toMatchObject({ t: "welcome", params: { theme: "Halloween" } });
+    const plainWelcome = plain.sent[0];
+    expect(plainWelcome).toMatchObject({ t: "welcome" });
+    expect(plainWelcome && "params" in plainWelcome && "theme" in plainWelcome.params).toBe(false);
+  });
+
+  // Transmet un thème qui change, ou qui disparaît, à toutes les pages du canvas, tel que le web l'a publié
+  it("hands a theme that changes or goes away to every page of the canvas, as the web published it", async () => {
+    const context = setup({ session: owner, theme: "Halloween" });
+    const viewer = context.open(session);
+    const guest = context.open(null);
+    for (const opened of [context, viewer, guest]) await opened.connection.receive(hello());
+
+    context.control({ t: "theme", theme: "Noël" });
+    for (const opened of [context, viewer, guest])
+      expect(opened.sent.at(-1)).toEqual({ t: "theme", theme: "Noël" });
+
+    context.control({ t: "theme" });
+    for (const opened of [context, viewer, guest]) expect(opened.sent.at(-1)).toEqual({ t: "theme" });
+  });
+
+  // Garde un thème tombé pendant l'arrivée, et l'envoie après le welcome : il est plus récent que celui du welcome
+  it("holds a theme that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ theme: "Halloween", duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "theme", theme: "Noël" });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "theme",
+    ]);
+    expect(context.sent.at(-1)).toEqual({ t: "theme", theme: "Noël" });
   });
 
   // Le fond noir passe comme le blanc : le streamer le demande, le cœur l'écrit

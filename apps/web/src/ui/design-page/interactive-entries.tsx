@@ -6,15 +6,15 @@ import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { ownerToast } from "../archive/archive-texts";
 import { switchToast } from "../canvas/switch-toast";
+import { AppearancePicker } from "../design/appearance-controls";
 import { Button } from "../design/button";
 import { Grabber } from "../design/grabber";
 import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Profile } from "../design/profile";
-import { ThemePicker } from "../design/theme-controls";
 import { Toast, ToastProvider, useToast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { SmallWindow, Window, WindowRow } from "../design/window";
 import { noop, SAMPLE_OWNER } from "./design-fixtures";
 import { Block, DIALOG_NOTE, Entry, InPhone, OpenWindow, StateRow, WithValue } from "./entry-layout";
@@ -208,7 +208,7 @@ export const WindowEntry = () => (
 );
 
 export const AccountWindowEntry = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="mon-compte"
@@ -230,8 +230,8 @@ export const AccountWindowEntry = () => {
                 <WindowRow label={<Profile user={SAMPLE_OWNER} variant="full" />}>
                   <Button label="Se déconnecter" onPress={noop} />
                 </WindowRow>
-                <WindowRow label="Thème">
-                  <ThemePicker choice={themeChoice} onPick={pickTheme} />
+                <WindowRow label="Apparence">
+                  <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
                 </WindowRow>
               </Window>
             )}

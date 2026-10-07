@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
-  ARCHIVE_NAME_MAX_LENGTH,
   AUDIENCE_DAYS,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
@@ -38,9 +37,9 @@ import {
   roleFor,
   type Session,
   type StateOffset,
+  THEME_MAX_LENGTH,
   TRANSPARENT_COLOR_INDEX,
   toActivityPointStarts,
-  toArchiveName,
   toAudienceDays,
   toCell,
   toCellKey,
@@ -48,6 +47,7 @@ import {
   toSession,
   toSessionClaims,
   toStateOffset,
+  toTheme,
 } from "./index";
 
 describe("roleFor (§10.3)", () => {
@@ -432,20 +432,20 @@ describe("the archives (Écart §15, JOURNAL 2026-10-06)", () => {
     expect(isLinkCode("")).toBe(false);
   });
 
-  // Le nom d'une archive est nettoyé : sans espace en trop, sans caractère de contrôle, 40 caractères au plus
-  it("cleans an archive name: no extra spaces, no control characters, 40 characters at most", () => {
-    expect(toArchiveName("  Fête du 14  ")).toBe("Fête du 14");
-    expect(toArchiveName("Fête \n du\t14")).toBe("Fête du 14");
-    expect(toArchiveName("a".repeat(60))).toBe("a".repeat(ARCHIVE_NAME_MAX_LENGTH));
-    expect(toArchiveName(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
+  // Le thème d'un canvas est nettoyé : sans espace en trop, sans caractère de contrôle, 40 caractères au plus
+  it("cleans a theme: no extra spaces, no control characters, 40 characters at most", () => {
+    expect(toTheme("  Fête du 14  ")).toBe("Fête du 14");
+    expect(toTheme("Fête \n du\t14")).toBe("Fête du 14");
+    expect(toTheme("a".repeat(60))).toBe("a".repeat(THEME_MAX_LENGTH));
+    expect(toTheme(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
   });
 
-  // Un nom vide ne donne aucun nom, et un caractère hors du plan de base n'est jamais coupé en deux
-  it("gives no name for an empty one, and never cuts a character outside the basic plane in two", () => {
-    expect(toArchiveName("")).toBeUndefined();
-    expect(toArchiveName("   ")).toBeUndefined();
-    expect(toArchiveName("\u0000\u0007")).toBeUndefined();
-    expect(toArchiveName("🎨".repeat(41))).toBe("🎨".repeat(ARCHIVE_NAME_MAX_LENGTH));
+  // Un thème vide ne donne aucun thème, et un caractère hors du plan de base n'est jamais coupé en deux
+  it("gives no theme for an empty one, and never cuts a character outside the basic plane in two", () => {
+    expect(toTheme("")).toBeUndefined();
+    expect(toTheme("   ")).toBeUndefined();
+    expect(toTheme("\u0000\u0007")).toBeUndefined();
+    expect(toTheme("🎨".repeat(41))).toBe("🎨".repeat(THEME_MAX_LENGTH));
   });
 });
 

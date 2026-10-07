@@ -1,17 +1,22 @@
-// La section Canvas de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-29), pour le streamer : le nom du canvas, un format,
+// La section Canvas de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-29), pour le streamer : le thème du canvas, un format,
 // puis Petit, Moyen ou Grand, et la confirmation qui montre ce qui sort du cadre. L'affichage seul, nourri par `CanvasTab`.
 
 import {
-  ARCHIVE_NAME_MAX_LENGTH,
   CANVAS_FORMATS,
   type CanvasFormat,
   type CanvasSize,
   GAUGE_MAX_CEILING_BOUND,
   GAUGE_MAX_START_BOUNDS,
   type GaugeLimits,
+  THEME_MAX_LENGTH,
 } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
-import { CANVAS_NAME_LABEL, CANVASES_UNAVAILABLE, NAME_PLACEHOLDER } from "../archive/archive-texts";
+import {
+  CANVASES_UNAVAILABLE,
+  THEME_CAPTION,
+  THEME_LABEL,
+  THEME_PLACEHOLDER,
+} from "../archive/archive-texts";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
 import { Segmented, type SegmentedOption } from "../design/segmented";
@@ -47,9 +52,9 @@ const SIZE_OPTIONS: readonly SegmentedOption<SizeKey>[] = [
 
 const sizeLabel = ({ width, height }: CanvasSize): string => `${width} × ${height} cases`;
 
-// Le champ du nom du canvas en cours : lu à l'ouverture, enregistré quand il perd le focus (use-canvas-name.ts).
-// `unavailable` : le nom ne se lit pas, le champ reste fermé.
-export type CanvasNameField = {
+// Le champ du thème du canvas en cours : lu à l'ouverture, enregistré quand il perd le focus (use-theme-field.ts).
+// `unavailable` : le thème ne se lit pas, le champ reste fermé.
+export type ThemeField = {
   status: "loading" | "unavailable" | "ready";
   value: string;
   isSaving: boolean;
@@ -57,23 +62,24 @@ export type CanvasNameField = {
   onCommit: () => void;
 };
 
-export const CanvasNameSettings = ({ name }: { name: CanvasNameField }) => (
+export const ThemeSettings = ({ theme }: { theme: ThemeField }) => (
   <div className="lp-setting">
     <TextField
-      label={CANVAS_NAME_LABEL}
-      placeholder={NAME_PLACEHOLDER}
-      value={name.value}
-      maxLength={ARCHIVE_NAME_MAX_LENGTH}
-      isDisabled={name.status !== "ready" || name.isSaving}
-      onInput={name.onInput}
-      onCommit={name.onCommit}
+      label={THEME_LABEL}
+      placeholder={THEME_PLACEHOLDER}
+      value={theme.value}
+      maxLength={THEME_MAX_LENGTH}
+      isDisabled={theme.status !== "ready" || theme.isSaving}
+      onInput={theme.onInput}
+      onCommit={theme.onCommit}
     />
-    {name.status === "unavailable" && <p className="lp-type-caption lp-danger">{CANVASES_UNAVAILABLE}</p>}
+    <p className="lp-type-caption lp-muted">{THEME_CAPTION}</p>
+    {theme.status === "unavailable" && <p className="lp-type-caption lp-danger">{CANVASES_UNAVAILABLE}</p>}
   </div>
 );
 
 type CanvasSettingsProps = {
-  name: CanvasNameField;
+  theme: ThemeField;
   current: CanvasSize;
   choice: SizeChoice;
   chosen: CanvasSize; // la taille de `choice`
@@ -81,11 +87,18 @@ type CanvasSettingsProps = {
   onApply: () => void; // ouvre la confirmation
 };
 
-export const CanvasSettings = ({ name, current, choice, chosen, onChoose, onApply }: CanvasSettingsProps) => {
+export const CanvasSettings = ({
+  theme,
+  current,
+  choice,
+  chosen,
+  onChoose,
+  onApply,
+}: CanvasSettingsProps) => {
   const isCurrent = chosen.width === current.width && chosen.height === current.height;
   return (
     <>
-      <CanvasNameSettings name={name} />
+      <ThemeSettings theme={theme} />
       <div className="lp-setting">
         <span className="lp-type-body">Taille du canvas</span>
         <p className="lp-type-caption lp-muted">Actuellement {sizeLabel(current)}.</p>

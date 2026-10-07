@@ -7,8 +7,8 @@ import type { CanvasOpener } from "../state/canvas-store";
 import { ADSENSE_CLIENT } from "../ui/ads/adsense";
 import { BetaBadge } from "../ui/beta/beta-badge";
 import betaBadgeCss from "../ui/beta/beta-badge.css?url";
+import { APPEARANCE_SCRIPT } from "../ui/design/appearance";
 import designSystemCss from "../ui/design/design-system.css?url";
-import { THEME_SCRIPT } from "../ui/design/theme";
 import { OBS_VIEW_SCRIPT } from "../ui/obs/obs-view";
 
 export type RouterContext = { openCanvas: CanvasOpener };
@@ -19,11 +19,11 @@ const getBetaLabel = createServerFn({ method: "GET" }).handler(({ context }) => 
 const RootDocument = ({ children }: { children: ReactNode }) => {
   const betaLabel = Route.useLoaderData();
   return (
-    // `data-theme` et `data-view` sont posés par script avant que React hydrate : un écart voulu, sur `<html>` seul.
+    // `data-appearance` et `data-view` sont posés par script avant que React hydrate : un écart voulu, sur `<html>` seul.
     <html lang="fr" suppressHydrationWarning>
       <head>
-        {/* Avant tout le reste : le thème est posé avant la première peinture (JOURNAL 2026-09-24). */}
-        <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
+        {/* Avant tout le reste : l'apparence est posée avant la première peinture (JOURNAL 2026-09-24). */}
+        <ScriptOnce>{APPEARANCE_SCRIPT}</ScriptOnce>
         {/* Et la vue OBS : l'interface ne passe jamais sur le stream (JOURNAL 2026-09-25). */}
         <ScriptOnce>{OBS_VIEW_SCRIPT}</ScriptOnce>
         <HeadContent />

@@ -15,13 +15,13 @@ const active: ListedCanvas = {
   thumbnail: null,
 };
 
-const archiveOf = (index: number, name?: string): ListedArchive => ({
+const archiveOf = (index: number, theme?: string): ListedArchive => ({
   canvasId: `archive-${index}`,
   createdAt: Date.UTC(2026, 9, 12, 10),
   archivedAt: Date.UTC(2026, 9, 18, 10),
   linkCode: `code${index}xxxxxx`,
   thumbnail: null,
-  ...(name ? { name } : {}),
+  ...(theme ? { theme } : {}),
 });
 
 const sectionHtml = (current: ListedCanvas, archives: ListedArchive[]): string =>
@@ -46,7 +46,7 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
     expect(html).not.toMatch(/\sstyle=/);
   });
 
-  // Le canvas en cours : son libellé, son titre à partir de sa date sans nom, et Archiver seul, sans « repartir à zéro »
+  // Le canvas en cours : son libellé, son titre à partir de sa date sans thème, et Archiver seul, sans « repartir à zéro »
   it("labels the current canvas, titles it by its date, and offers « Archiver » alone", () => {
     const html = sectionHtml(active, []);
 
@@ -82,8 +82,8 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
     expect(html).not.toContain("Ouvrir l&#x27;archive</");
   });
 
-  // Sans nom, les dates sont le titre et rien dessous ; avec un nom, le nom est le titre et les dates la légende
-  it("titles an archive by its dates without a name, and by its name with the dates below with one", () => {
+  // Sans thème, les dates sont le titre et rien dessous ; avec un thème, le thème est le titre et les dates la légende
+  it("titles an archive by its dates without a theme, and by its theme with the dates below with one", () => {
     const unnamed = sectionHtml(active, [archiveOf(1)]);
     const named = sectionHtml(active, [archiveOf(1, "Printemps")]);
 
@@ -126,9 +126,9 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
     expect(sectionHtml(active, archives.slice(1))).not.toContain("supprime-en une avant");
   });
 
-  // Un canvas en cours nommé : le nom en titre, et « depuis le … » en légende
-  it("titles a named current canvas by its name, the caption saying since when", () => {
-    const html = sectionHtml({ ...active, name: "Printemps" }, []);
+  // Un canvas en cours avec un thème : le thème en titre, et « depuis le … » en légende
+  it("titles a current canvas with a theme by its theme, the caption saying since when", () => {
+    const html = sectionHtml({ ...active, theme: "Printemps" }, []);
 
     expect(html).toContain("Printemps");
     expect(html).toMatch(/lp-muted">depuis le 4 octobre 2026</);

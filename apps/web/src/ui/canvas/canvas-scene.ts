@@ -278,12 +278,12 @@ export function createCanvasScene(
   });
   resizeObserver.observe(surface);
 
-  // Le thème change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
-  const themeObserver = new MutationObserver(() => {
+  // L'apparence change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
+  const appearanceObserver = new MutationObserver(() => {
     shades = getSceneShades(root);
     requestRender();
   });
-  themeObserver.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  appearanceObserver.observe(root, { attributes: true, attributeFilter: ["data-appearance"] });
 
   // §5.3 : une nouvelle taille ramène la vue à l'arrivée.
   let knownSize: Size | null = null;
@@ -394,7 +394,7 @@ export function createCanvasScene(
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
       checkerDrift?.cancel();
-      themeObserver.disconnect();
+      appearanceObserver.disconnect();
       setPanning(false);
       unsubscribe();
       unsubscribeDraft();

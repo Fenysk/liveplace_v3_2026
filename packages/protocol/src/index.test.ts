@@ -152,9 +152,9 @@ describe("protocol frames", () => {
     });
   });
 
-  // Refuse une page du protocole 11, 12, 13 ou 14 : elle se recharge pour reprendre le protocole du moment, 15 depuis la
-  // capacité (écart §4.3, JOURNAL 2026-10-07)
-  it("refuses a page of protocol 11, 12, 13 or 14, which reloads to take the current protocol", () => {
+  // Refuse une page du protocole 11 à 15 : elle se recharge pour reprendre le protocole du moment, 16 depuis le thème du
+  // canvas (écart §4.3, JOURNAL 2026-10-07)
+  it("refuses a page of protocol 11 to 15, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
 
@@ -162,6 +162,7 @@ describe("protocol frames", () => {
     expect(hello(12).ok).toBe(false);
     expect(hello(13).ok).toBe(false);
     expect(hello(14).ok).toBe(false);
+    expect(hello(15).ok).toBe(false);
     expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
@@ -310,8 +311,8 @@ describe("protocol 14: the archive", () => {
     const hello = { t: "hello", protocolVersion: 14, canvasId: "abc123", mode: "ui" };
 
     expect(decodeClientFrame(hello).ok).toBe(false);
-    expect(decodeClientFrame({ ...hello, protocolVersion: 15 }).ok).toBe(true);
-    expect(PROTOCOL_VERSION).toBe(15);
+    expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(15);
   });
 
   // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
@@ -668,6 +669,68 @@ describe("the canvas of the socket in the activity frames", () => {
 
     expect(before.safeParse({ ...history, canvasPoints: [canvasPoint] }).data).toEqual(history);
     expect(beforeActivity.safeParse({ ...activity, here }).data).toEqual({ t: "activity", canvases: [] });
+  });
+});
+
+// Protocole 16 (Écart §4.3, JOURNAL 2026-10-07) : le thème du canvas, dans le welcome et dans la frame `theme`
+describe("protocol 16: the canvas theme", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  };
+  const withTheme = (theme: unknown) => ({ ...welcome, params: { ...welcome.params, theme } });
+
+  // Refuse un hello resté au protocole 15, celui de la capacité : sa page se recharge
+  it("refuses a hello still on protocol 15, the capacity's one", () => {
+    const hello = { t: "hello", protocolVersion: 15, canvasId: "abc123", mode: "ui" };
+
+    expect(decodeClientFrame(hello).ok).toBe(false);
+    expect(decodeClientFrame({ ...hello, protocolVersion: 16 }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBe(16);
+  });
+
+  // Garde le thème dans les params du welcome, et accepte un welcome sans thème
+  it("keeps the theme in the params of a welcome, and accepts a welcome without one", () => {
+    expect(decodeServerFrame(withTheme("Halloween"))).toEqual({ ok: true, value: withTheme("Halloween") });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+  });
+
+  // Refuse un thème vide ou qui n'est pas du texte, et en accepte un de 40 caractères même en émojis : le domaine les compte par caractère
+  it("refuses an empty or non-text theme, and accepts 40 characters even in emoji", () => {
+    expect(decodeServerFrame(withTheme("")).ok).toBe(false);
+    expect(decodeServerFrame(withTheme(12)).ok).toBe(false);
+    expect(decodeServerFrame(withTheme("a".repeat(41))).ok).toBe(false);
+    expect(decodeServerFrame(withTheme("a".repeat(40))).ok).toBe(true);
+    expect(decodeServerFrame(withTheme("🎨".repeat(40))).ok).toBe(true);
+    expect(decodeServerFrame(withTheme("🎨".repeat(41))).ok).toBe(false);
+  });
+
+  // Annonce un thème qui change, ou qui disparaît, et rien d'autre qu'un texte
+  it("announces a theme that changes or goes away, and nothing but text", () => {
+    expect(decodeServerFrame({ t: "theme", theme: "Halloween" })).toEqual({
+      ok: true,
+      value: { t: "theme", theme: "Halloween" },
+    });
+    expect(decodeServerFrame({ t: "theme" })).toEqual({ ok: true, value: { t: "theme" } });
+    expect(decodeServerFrame({ t: "theme", theme: "" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "theme", theme: 3 }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "theme", theme: "a".repeat(41) }).ok).toBe(false);
+  });
+
+  // Aucune frame client ne règle le thème : le streamer l'enregistre par la fonction serveur du web
+  it("has no client frame to set the theme", () => {
+    expect(decodeClientFrame({ t: "setTheme", requestId: "r", theme: "Halloween" }).ok).toBe(false);
   });
 });
 

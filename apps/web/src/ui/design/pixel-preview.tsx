@@ -55,10 +55,13 @@ export const PixelPreview = ({ width, height, palette, pixels, label }: PixelPre
     const element = surface.current;
     if (!element) return;
     paint(element, area, pixels, palette);
-    // Le thème change : la gomme suit, comme sur le canvas. Le damier et la bordure suivent seuls, en CSS.
-    const themeObserver = new MutationObserver(() => paint(element, area, pixels, palette));
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => themeObserver.disconnect();
+    // L'apparence change : la gomme suit, comme sur le canvas. Le damier et la bordure suivent seuls, en CSS.
+    const appearanceObserver = new MutationObserver(() => paint(element, area, pixels, palette));
+    appearanceObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-appearance"],
+    });
+    return () => appearanceObserver.disconnect();
   }, [area, pixels, palette]);
   return (
     <div className="lp-preview" style={{ aspectRatio: `${area.width} / ${area.height}` }}>

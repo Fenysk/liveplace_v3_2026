@@ -6,17 +6,17 @@ import {
   GAUGE_MAX_START,
   type GaugeLimits,
   type ObsBackground,
-  toArchiveName,
+  toTheme,
 } from "@liveplace/domain";
 import { useState } from "react";
 import {
-  type CanvasNameField,
-  CanvasNameSettings,
   CanvasSettings,
   CeilingWindow,
   GaugeSettings,
   type ResizeStatus,
   ResizeWindow,
+  type ThemeField,
+  ThemeSettings,
 } from "../canvas/canvas-settings";
 import { type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
@@ -26,31 +26,31 @@ import { Block, DIALOG_NOTE, Entry, InWindow, OpenWindow, StateRow } from "./ent
 
 const LOCKED_MS = 1500; // la démonstration du verrou : l'action, puis la fermeture
 
-// Le champ du nom : on écrit, et en le quittant (ou par Entrée) le nom est nettoyé, comme celui qui s'enregistre.
-const useNameField = (
+// Le champ du thème : on écrit, et en le quittant (ou par Entrée) le thème est nettoyé, comme celui qui s'enregistre.
+const useThemeField = (
   initial: string,
-  status: CanvasNameField["status"] = "ready",
+  status: ThemeField["status"] = "ready",
   isSaving = false,
-): CanvasNameField => {
+): ThemeField => {
   const [value, setValue] = useState(initial);
-  return { status, value, isSaving, onInput: setValue, onCommit: () => setValue(toArchiveName(value) ?? "") };
+  return { status, value, isSaving, onInput: setValue, onCommit: () => setValue(toTheme(value) ?? "") };
 };
 
-type NameSceneProps = { initial: string; status?: CanvasNameField["status"]; isSaving?: boolean };
+type ThemeSceneProps = { initial: string; status?: ThemeField["status"]; isSaving?: boolean };
 
-const NameScene = ({ initial, status, isSaving }: NameSceneProps) => {
-  const name = useNameField(initial, status, isSaving);
+const ThemeScene = ({ initial, status, isSaving }: ThemeSceneProps) => {
+  const theme = useThemeField(initial, status, isSaving);
   return (
     <InWindow>
-      <CanvasNameSettings name={name} />
+      <ThemeSettings theme={theme} />
     </InWindow>
   );
 };
 
-// Le nom du canvas, puis le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui sort du
+// Le thème du canvas, puis le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui sort du
 // cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256).
 const CanvasSettingsScene = () => {
-  const name = useNameField("");
+  const theme = useThemeField("");
   const [choice, setChoice] = useState<SizeChoice>({ format: "1:1", sizeIndex: 1 });
   const [isConfirming, setIsConfirming] = useState(false);
   const [status, setStatus] = useState<ResizeStatus>("idle");
@@ -61,7 +61,7 @@ const CanvasSettingsScene = () => {
     <>
       <InWindow>
         <CanvasSettings
-          name={name}
+          theme={theme}
           current={current}
           choice={choice}
           chosen={chosen}
@@ -119,25 +119,25 @@ const GaugeSettingsScene = () => {
 export const CanvasSettingsEntry = () => (
   <Entry
     slug="fenetre-canvas"
-    components={["CanvasSettings", "CanvasNameSettings", "GaugeSettings"]}
+    components={["CanvasSettings", "ThemeSettings", "GaugeSettings"]}
     file="ui/canvas/canvas-settings.tsx"
-    note="Pour le streamer : le nom du canvas, qui s'enregistre quand le champ perd le focus, la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
+    note="Pour le streamer : le thème du canvas, qui s'enregistre quand le champ perd le focus, la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
   >
     <Block title="États">
       <StateRow
-        name="Le nom du canvas, vide, puis un format, Petit, Moyen ou Grand"
+        name="Le thème du canvas, vide, puis un format, Petit, Moyen ou Grand"
         detail="La confirmation montre ce qui sort du cadre."
       >
         <CanvasSettingsScene />
       </StateRow>
-      <StateRow name="Le nom du canvas rempli" detail="Enregistré en quittant le champ, sans bouton.">
-        <NameScene initial="Pixel war de la rentrée" />
+      <StateRow name="Le thème du canvas rempli" detail="Enregistré en quittant le champ, sans bouton.">
+        <ThemeScene initial="Halloween" />
       </StateRow>
-      <StateRow name="Le nom s'enregistre" detail="Le champ attend la réponse.">
-        <NameScene initial="Pixel war de la rentrée" isSaving />
+      <StateRow name="Le thème s'enregistre" detail="Le champ attend la réponse.">
+        <ThemeScene initial="Halloween" isSaving />
       </StateRow>
-      <StateRow name="Le nom ne se lit pas" detail="Le champ reste fermé, et le dit.">
-        <NameScene initial="" status="unavailable" />
+      <StateRow name="Le thème ne se lit pas" detail="Le champ reste fermé, et le dit.">
+        <ThemeScene initial="" status="unavailable" />
       </StateRow>
       <StateRow name="La jauge de départ et la jauge maximale" detail="La baisser demande une confirmation.">
         <GaugeSettingsScene />

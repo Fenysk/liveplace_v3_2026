@@ -19,8 +19,8 @@ const renderWindow = (props: Partial<WindowProps> = {}): string =>
       onClose: doNothing,
       user: { displayName: "Kalyss", login: "kalyss" },
       signOutHref: "#",
-      themeChoice: "auto",
-      onPickTheme: doNothing,
+      appearanceChoice: "auto",
+      onPickAppearance: doNothing,
       ...props,
     }),
   );
@@ -106,11 +106,11 @@ describe("la section Mon compte (CDC 2026, Fenêtre)", () => {
     expect(markup).toContain("Se déconnecter");
   });
 
-  // Mon compte porte le choix du thème : les trois choix, celui du moment coché
-  it("holds the three theme choices, the current one checked", () => {
-    const markup = renderWindow({ themeChoice: "dark" });
+  // Mon compte porte le choix de l'apparence : les trois choix, celui du moment coché
+  it("holds the three appearance choices, the current one checked", () => {
+    const markup = renderWindow({ appearanceChoice: "dark" });
 
-    expect(markup).toMatch(/role="radiogroup" aria-label="Thème"/);
+    expect(markup).toMatch(/role="radiogroup" aria-label="Apparence"/);
     for (const label of ["Auto", "Clair", "Sombre"]) expect(markup).toContain(label);
     expect(markup).toMatch(/checked=""[^>]*value="dark"/);
     expect(markup).not.toMatch(/checked=""[^>]*value="(auto|light)"/);

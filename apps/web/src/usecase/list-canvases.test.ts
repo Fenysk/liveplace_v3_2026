@@ -3,7 +3,13 @@ import { toBase64 } from "@liveplace/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ListDeps, listCanvases, sortArchives } from "./list-canvases";
 
-const active: ActiveCanvas = { canvasId: "canvas-a", width: 4, height: 3, createdAt: 3000, name: "En cours" };
+const active: ActiveCanvas = {
+  canvasId: "canvas-a",
+  width: 4,
+  height: 3,
+  createdAt: 3000,
+  theme: "En cours",
+};
 const archiveOf = (index: number, more: Partial<Archive> = {}): Archive => ({
   canvasId: `archive-${index}`,
   width: 2,
@@ -75,7 +81,7 @@ describe("listCanvases (Écart §10.3, JOURNAL 2026-10-06)", () => {
         active: {
           canvasId: "canvas-a",
           createdAt: 3000,
-          name: "En cours",
+          theme: "En cours",
           thumbnail: { width: 4, height: 3, state: toBase64(images["canvas-a"].state) },
         },
         archives: [
@@ -119,7 +125,7 @@ describe("listCanvases (Écart §10.3, JOURNAL 2026-10-06)", () => {
         active: {
           canvasId: "canvas-a",
           createdAt: 3000,
-          name: "En cours",
+          theme: "En cours",
           thumbnail: { width: 50, height: 50, state: toBase64(image.state) },
         },
         archives: [
@@ -148,7 +154,7 @@ describe("listCanvases (Écart §10.3, JOURNAL 2026-10-06)", () => {
     expect(listed).toEqual({
       ok: true,
       value: {
-        active: { canvasId: "canvas-a", createdAt: 3000, name: "En cours", thumbnail: null },
+        active: { canvasId: "canvas-a", createdAt: 3000, theme: "En cours", thumbnail: null },
         archives: [
           {
             canvasId: "archive-1",
@@ -162,14 +168,14 @@ describe("listCanvases (Écart §10.3, JOURNAL 2026-10-06)", () => {
     });
   });
 
-  // Garde le nom d'une archive, ne montre pas de nom vide, et rend un propriétaire sans canvas actif
-  it("keeps the name of an archive, shows no empty name, and handles an owner without an active canvas", async () => {
+  // Garde le thème d'une archive, ne montre pas de thème vide, et rend un propriétaire sans canvas actif
+  it("keeps the theme of an archive, shows no empty theme, and handles an owner without an active canvas", async () => {
     const listed = await listCanvases(
-      depsWith({ active: null, archives: [archiveOf(1, { name: "Hiver" })] }),
+      depsWith({ active: null, archives: [archiveOf(1, { theme: "Hiver" })] }),
       "owner-1",
     );
 
-    expect(listed).toMatchObject({ ok: true, value: { active: null, archives: [{ name: "Hiver" }] } });
+    expect(listed).toMatchObject({ ok: true, value: { active: null, archives: [{ theme: "Hiver" }] } });
   });
 
   // Une lecture qui échoue donne `failed`, journalisée, plutôt qu'une erreur du serveur

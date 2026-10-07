@@ -1,76 +1,85 @@
 import { describe, expect, it } from "vitest";
 import {
-  nextThemeChoice,
-  resolveTheme,
-  THEME_CHOICES,
-  THEME_SCRIPT,
-  THEME_STORAGE_KEY,
-  type Theme,
-  toThemeChoice,
-} from "./theme";
+  APPEARANCE_CHOICES,
+  APPEARANCE_SCRIPT,
+  APPEARANCE_STORAGE_KEY,
+  type Appearance,
+  nextAppearanceChoice,
+  resolveAppearance,
+  toAppearanceChoice,
+} from "./appearance";
 
 // Le script d'avant la première peinture, exécuté contre un faux navigateur.
-const runThemeScript = (saved: string | null, isSystemDark: boolean, isStorageBlocked = false): string => {
-  const root: { dataset: { theme?: string } } = { dataset: {} };
+const runAppearanceScript = (
+  saved: string | null,
+  isSystemDark: boolean,
+  isStorageBlocked = false,
+): string => {
+  const root: { dataset: { appearance?: string } } = { dataset: {} };
   const storage = {
     getItem: (key: string) => {
       if (isStorageBlocked) throw new Error("stockage refusé");
-      return key === THEME_STORAGE_KEY ? saved : null;
+      return key === APPEARANCE_STORAGE_KEY ? saved : null;
     },
   };
   const systemQuery = (query: string) => ({
     matches: query === "(prefers-color-scheme: dark)" && isSystemDark,
   });
-  new Function("localStorage", "matchMedia", "document", THEME_SCRIPT)(storage, systemQuery, {
+  new Function("localStorage", "matchMedia", "document", APPEARANCE_SCRIPT)(storage, systemQuery, {
     documentElement: root,
   });
-  return root.dataset.theme ?? "";
+  return root.dataset.appearance ?? "";
 };
 
-describe("theme", () => {
-  // Quand aucun choix n'est enregistré, le thème est auto (CDC 2026 : auto au premier chargement)
+describe("appearance", () => {
+  // Quand aucun choix n'est enregistré, l'apparence est auto (CDC 2026 : auto au premier chargement)
   it("donne auto sans choix enregistré", () => {
-    expect(toThemeChoice(null)).toBe("auto");
+    expect(toAppearanceChoice(null)).toBe("auto");
   });
 
-  // Si le choix enregistré est illisible, alors le thème est auto, jamais une erreur
+  // Si le choix enregistré est illisible, alors l'apparence est auto, jamais une erreur
   it("donne auto pour un choix illisible", () => {
-    expect(toThemeChoice("violet")).toBe("auto");
-    expect(toThemeChoice("")).toBe("auto");
+    expect(toAppearanceChoice("violet")).toBe("auto");
+    expect(toAppearanceChoice("")).toBe("auto");
   });
 
   it("relit un choix enregistré", () => {
-    for (const choice of THEME_CHOICES) expect(toThemeChoice(choice)).toBe(choice);
+    for (const choice of APPEARANCE_CHOICES) expect(toAppearanceChoice(choice)).toBe(choice);
+  });
+
+  // Quand on renomme l'apparence, la clé du navigateur garde sa valeur : aucun joueur ne perd son choix
+  it("garde la clé du navigateur d'avant le renommage, pour que personne ne perde son choix", () => {
+    expect(APPEARANCE_STORAGE_KEY).toBe("liveplace:theme");
   });
 
   // Le bouton de la pill Compte passe de auto à clair, de clair à sombre, de sombre à auto
   it("fait le cycle auto, clair, sombre", () => {
-    expect(nextThemeChoice("auto")).toBe("light");
-    expect(nextThemeChoice("light")).toBe("dark");
-    expect(nextThemeChoice("dark")).toBe("auto");
+    expect(nextAppearanceChoice("auto")).toBe("light");
+    expect(nextAppearanceChoice("light")).toBe("dark");
+    expect(nextAppearanceChoice("dark")).toBe("auto");
   });
 
-  // Tant que le choix est auto, le thème suit le système ; un choix explicite l'emporte
+  // Tant que le choix est auto, l'apparence suit le système ; un choix explicite l'emporte
   it("suit le système en auto seulement", () => {
-    expect(resolveTheme("auto", true)).toBe("dark");
-    expect(resolveTheme("auto", false)).toBe("light");
-    expect(resolveTheme("light", true)).toBe("light");
-    expect(resolveTheme("dark", false)).toBe("dark");
+    expect(resolveAppearance("auto", true)).toBe("dark");
+    expect(resolveAppearance("auto", false)).toBe("light");
+    expect(resolveAppearance("light", true)).toBe("light");
+    expect(resolveAppearance("dark", false)).toBe("dark");
   });
 
-  // Le script pose le même thème que resolveTheme, pour chaque choix enregistré et chaque système
-  it("pose avant la peinture le thème que l'app posera ensuite", () => {
-    const savedValues = [null, "violet", ...THEME_CHOICES];
+  // Le script pose la même apparence que resolveAppearance, pour chaque choix enregistré et chaque système
+  it("pose avant la peinture l'apparence que l'app posera ensuite", () => {
+    const savedValues = [null, "violet", ...APPEARANCE_CHOICES];
     for (const saved of savedValues)
       for (const isSystemDark of [true, false]) {
-        const expected: Theme = resolveTheme(toThemeChoice(saved), isSystemDark);
-        expect(runThemeScript(saved, isSystemDark)).toBe(expected);
+        const expected: Appearance = resolveAppearance(toAppearanceChoice(saved), isSystemDark);
+        expect(runAppearanceScript(saved, isSystemDark)).toBe(expected);
       }
   });
 
   // Si le stockage refuse l'accès, alors le script suit le système au lieu d'échouer
   it("suit le système quand le stockage est refusé", () => {
-    expect(runThemeScript("light", true, true)).toBe("dark");
-    expect(runThemeScript("dark", false, true)).toBe("light");
+    expect(runAppearanceScript("light", true, true)).toBe("dark");
+    expect(runAppearanceScript("dark", false, true)).toBe("light");
   });
 });

@@ -414,6 +414,13 @@ export function createCanvasStore(
     if (view.params) publish({ params: { ...view.params, ...change } });
   };
 
+  // Écart §8.1 (JOURNAL 2026-10-07) : sans `theme`, le canvas n'en a plus ; le reste de `params` ne bouge pas.
+  const takeTheme = ({ theme }: Extract<ServerFrame, { t: "theme" }>): void => {
+    if (!view.params) return;
+    const { theme: previous, ...rest } = view.params;
+    publish({ params: theme === undefined ? rest : { ...rest, theme } });
+  };
+
   const onInspected = (frame: Extract<ServerFrame, { t: "inspected" }>): void => {
     if (frame.requestId !== inspectRequestId) return;
     inspectRequestId = null;
@@ -480,6 +487,9 @@ export function createCanvasStore(
       case "obsBackground":
       case "gaugeLimits":
         takeSetting(frame);
+        break;
+      case "theme":
+        takeTheme(frame);
         break;
       case "canvasStatus":
         publish(toStatusView(frame.status));

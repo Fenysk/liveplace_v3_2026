@@ -74,7 +74,8 @@ type ControlFrame = Extract<
       | "reportCount"
       | "staleList"
       | "scoreboard"
-      | "canvasStatus";
+      | "canvasStatus"
+      | "theme";
   }
 >;
 
@@ -181,6 +182,7 @@ const buildWelcome = (
     refillCharges: meta.refillCharges,
     obsDelayMs: meta.obsDelayMs,
     obsBackground: meta.obsBackground,
+    ...(meta.theme === undefined ? {} : { theme: meta.theme }), // Écart §8.1 (JOURNAL 2026-10-07)
   },
   palette: [...PALETTE],
   version,
@@ -199,6 +201,7 @@ const controlFrameOf = (
   if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
   if (control.t === "reports") return canModerate(role) ? { t: "reportCount", count: control.count } : null;
   if (control.t === "canvasStatus") return { t: "canvasStatus", status: control.status };
+  if (control.t === "theme") return { t: "theme", theme: control.theme };
   return control.userId === session?.userId ? { t: control.t } : null;
 };
 

@@ -10,6 +10,8 @@ export type StoredCanvas = {
   height: number;
   createdAt: number;
   archivedAt?: number;
+  theme?: string;
+  // Écart §8.1 (JOURNAL 2026-10-07) : l'ancien nom du thème, que seule `planNameToTheme` lit, retiré au prochain changement de schéma.
   name?: string;
   linkCode?: string;
 };
@@ -18,6 +20,7 @@ export type StoredCanvas = {
 export type CanvasFields = {
   isActive?: boolean;
   archivedAt?: number | undefined;
+  theme?: string | undefined;
   name?: string | undefined;
   linkCode?: string;
 };
@@ -48,6 +51,8 @@ export type ArchivePlanInput = {
   incoming: { canvasId: string; width: number; height: number };
   archivedAt: number;
   linkCode: string;
+  theme?: string | undefined;
+  // Ancien appel (le code d'avant envoie `name`), pris comme thème quand `theme` est absent ; retiré au prochain changement de schéma.
   name?: string | undefined;
   maxArchives: number;
 };
@@ -65,6 +70,11 @@ const getActiveCanvas = (canvases: readonly StoredCanvas[], ownerId: string, can
 
 const getArchivedCanvas = (canvases: readonly StoredCanvas[], ownerId: string, canvasId: string) =>
   canvases.find((canvas) => canvas.canvasId === canvasId && canvas.ownerId === ownerId && !canvas.isActive);
+
+// Le thème d'un canvas dans un patch : `undefined` retire le champ, et l'ancien `name` avec lui, que la migration ne
+// ressortirait donc pas.
+const themeFields = (theme: string | undefined): Pick<CanvasFields, "theme" | "name"> =>
+  theme ? { theme } : { theme: undefined, name: undefined };
 
 // Le sortant devient une archive : son code reste le sien s'il en a un, sinon c'est celui qu'on propose.
 const archiveFields = (outgoing: StoredCanvas, input: { archivedAt: number; linkCode: string }) => ({
@@ -85,11 +95,11 @@ export function planArchive(
   return {
     ok: true,
     writes: [
-      // Sans nom donné, l'archive n'en a pas : celui du sortant, s'il en avait un, ne reste pas.
+      // Sans thème donné, l'archive n'en a pas : celui du sortant, s'il en avait un, ne reste pas.
       {
         kind: "patch",
         canvasId: outgoing.canvasId,
-        fields: { ...archiveFields(outgoing, input), name: input.name },
+        fields: { ...archiveFields(outgoing, input), ...themeFields(input.theme || input.name) },
       },
       {
         kind: "insert",
@@ -108,7 +118,7 @@ export function planArchive(
   };
 }
 
-// Le nombre d'archives ne change pas : l'actif prend la place de l'archive qui revient, avec son code et son nom.
+// Le nombre d'archives ne change pas : l'actif prend la place de l'archive qui revient, avec son code et son thème.
 export function planReopen(
   canvases: readonly StoredCanvas[],
   input: ReopenPlanInput,
@@ -136,15 +146,25 @@ export function planDiscard(
   return { ok: true, writes: [{ kind: "delete", canvasId }] };
 }
 
-// Le nom du canvas actif seulement, jamais d'une archive ni d'un autre propriétaire. Sans nom, `undefined` retire le champ.
-export function planRename(
+// Le thème du canvas actif seulement, jamais d'une archive ni d'un autre propriétaire. Sans thème, `undefined` retire le champ.
+// La mutation `rename`, ancien appel (retirée au prochain changement de schéma), passe aussi par ce plan, `name` pris comme thème.
+export function planSetTheme(
   canvases: readonly StoredCanvas[],
   ownerId: string,
   canvasId: string,
-  name: string | undefined,
+  theme: string | undefined,
 ): Plan<"not_active"> {
   if (!getActiveCanvas(canvases, ownerId, canvasId)) return { ok: false, error: "not_active" };
-  return { ok: true, writes: [{ kind: "patch", canvasId, fields: { name } }] };
+  return { ok: true, writes: [{ kind: "patch", canvasId, fields: themeFields(theme) }] };
+}
+
+// Écart §8.1 (JOURNAL 2026-10-07) : la migration de `name` vers `theme`, idempotente et non destructive : `name` reste, le
+// code d'avant l'affiche encore. Elle ne copie que dans un thème vide, jamais sur un thème posé ; un nom vide ne donne
+// aucun thème. Tous les canvas, de tous les propriétaires : elle ne regarde que ce qu'elle trouve.
+export function planNameToTheme(canvases: readonly StoredCanvas[]): CanvasWrite[] {
+  return canvases.flatMap(({ canvasId, name, theme }) =>
+    name && !theme ? [{ kind: "patch" as const, canvasId, fields: { theme: name } }] : [],
+  );
 }
 
 type ListedActive = {
@@ -152,16 +172,28 @@ type ListedActive = {
   width: number;
   height: number;
   createdAt: number;
+  theme?: string;
   name?: string;
   linkCode?: string;
 };
 type ListedArchive = ListedActive & { archivedAt: number; linkCode: string };
 
+// `name` : ancien alias du thème, que le code d'avant lit pour ses titres ; retiré au prochain changement de schéma.
+const listedTheme = (theme: string | undefined) => (theme ? { theme, name: theme } : {});
+
+// Le canvas actif tel que la page de `/{login}` le lit : son thème dans le même appel, sans champ vide.
+export const toActiveCanvas = ({ canvasId, width, height, theme }: StoredCanvas) => ({
+  canvasId,
+  width,
+  height,
+  ...(theme ? { theme } : {}),
+});
+
 // Sans code ni date d'archivage, un canvas inactif ne serait pas une archive : il n'a pas de lien, on ne le liste pas.
 const toArchive = (canvas: StoredCanvas): ListedArchive | null => {
-  const { canvasId, width, height, createdAt, archivedAt, linkCode, name } = canvas;
+  const { canvasId, width, height, createdAt, archivedAt, linkCode, theme } = canvas;
   if (archivedAt === undefined || linkCode === undefined) return null;
-  return { canvasId, width, height, createdAt, archivedAt, linkCode, ...(name ? { name } : {}) };
+  return { canvasId, width, height, createdAt, archivedAt, linkCode, ...listedTheme(theme) };
 };
 
 export function toOwnerCanvases(canvases: readonly StoredCanvas[]) {
@@ -173,7 +205,7 @@ export function toOwnerCanvases(canvases: readonly StoredCanvas[]) {
           width: active.width,
           height: active.height,
           createdAt: active.createdAt,
-          ...(active.name ? { name: active.name } : {}),
+          ...listedTheme(active.theme),
           ...(active.linkCode ? { linkCode: active.linkCode } : {}),
         }
       : null,

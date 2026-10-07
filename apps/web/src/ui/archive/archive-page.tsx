@@ -58,8 +58,8 @@ const ArchiveAccount = ({
           onClose={() => setIsOpen(false)}
           user={account.identity.user}
           signOutHref={signOutHref}
-          themeChoice={account.themeChoice}
-          onPickTheme={account.onPickTheme}
+          appearanceChoice={account.appearanceChoice}
+          onPickAppearance={account.onPickAppearance}
         />
       )}
       <InspectionPill {...inspection} />
@@ -75,7 +75,7 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   const [isDownloading, setIsDownloading] = useState(false);
   const [isChoosing, setIsChoosing] = useState(false);
   const [background, setBackground] = useState<PngBackground | null>(null);
-  const { owner, createdAt, archivedAt, name } = archive;
+  const { owner, createdAt, archivedAt, theme } = archive;
 
   // Le dessin visible, case par case : le même que celui de la page, agrandi sans lissage, sur le fond choisi.
   const download = async (choice: PngBackground): Promise<void> => {
@@ -111,8 +111,8 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
     <>
       <ArchiveBanner
         owner={owner}
-        title={bannerTitle({ displayName: owner.displayName, name })}
-        caption={bannerCaption({ displayName: owner.displayName, name, createdAt, archivedAt })}
+        title={bannerTitle({ displayName: owner.displayName, theme })}
+        caption={bannerCaption({ displayName: owner.displayName, theme, createdAt, archivedAt })}
         isDownloading={isDownloading || !stores}
         onCopyLink={() => copyLink(window.location.pathname)}
         onDownload={openChoice}

@@ -103,6 +103,18 @@
   margin: 2px 4px;
 }
 
+/* Des lignes de texte (la pill Thème) : le contenu garde sa propre taille, que la pill suit et anime (use-morph.ts), mais
+   plafonnée à la place que lui laisse --lp-theme-room, une longueur absolue : en pourcentage de la pill, il dépendrait
+   de la taille qu'elle anime, et chaque image de l'animation en relancerait une. Le texte se coupe au plafond. */
+.lp-pill--title {
+  max-width: none;
+}
+
+.lp-pill--title .lp-pill-content {
+  max-width: var(--lp-theme-room, none);
+  padding-inline: var(--space-4);
+}
+
 /* Le pourcentage de zoom tient dans la largeur d'un contrôle, même à quatre chiffres */
 .lp-zoom {
   width: var(--control-size);
@@ -133,6 +145,23 @@
 .lp-floating[data-dock="tr"] {
   top: var(--space-4);
   right: var(--space-4);
+}
+
+/* Haut centre (la pill Thème, Écart §8.1, JOURNAL 2026-10-07) : sur toute la largeur, moins de chaque côté ce que prend la
+   plus large des pills Canvas et Compte (mesurées par pill.tsx ; avant cela, une largeur moyenne) et deux marges, pour
+   rester centrée. Le thème se coupe à cette place plutôt que de passer dessous. */
+.lp-floating[data-dock="tc"] {
+  --lp-theme-side: calc(2 * var(--space-4) + max(var(--lp-top-left, 260px), var(--lp-top-right, 260px)));
+  --lp-theme-room: calc(100vw - 2 * var(--lp-theme-side));
+  top: var(--space-4);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.lp-floating[data-dock="tc"] > .lp-pill {
+  animation: lp-theme-in var(--lp-dur) var(--lp-ease);
 }
 
 .lp-floating[data-dock="br"] {
@@ -192,11 +221,29 @@ html[data-panning] .lp-floating > .lp-pill,
   transform: translateY(var(--space-4));
 }
 
+/* La pill Thème paraît et part par le haut, d'où elle vient */
+.lp-floating[data-dock="tc"] > .lp-pill.is-hidden {
+  transform: translateY(calc(-1 * var(--space-2)));
+}
+
 @keyframes lp-toast-in {
   from {
     opacity: 0;
     transform: translateY(var(--space-4));
   }
+}
+
+@keyframes lp-theme-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-2)));
+  }
+}
+
+/* La hauteur de la pill Thème, mesurée (pill.tsx) tant qu'elle est là. Sans elle, moins les deux espaces (de --space-2
+   chacun) que le toast lui ajoute sur mobile : il reste alors où il était. */
+:root {
+  --lp-theme-bar: calc(-1 * var(--space-4));
 }
 
 /* Envoi en cours : le contenu grisé, non cliquable */
@@ -262,6 +309,15 @@ html[data-panning] .lp-floating > .lp-pill,
   place-items: center;
 }
 
+/* Écran étroit ou tactile : la pill Thème passe sous la rangée des pills du haut, centrée (Écart §8.1, JOURNAL
+   2026-10-07). La rangée mesure un contrôle et ses deux marges, à 44 px ici comme dans tokens.css. */
+@media (max-width: 640px), (pointer: coarse) {
+  .lp-floating[data-dock="tc"] {
+    --lp-theme-side: var(--space-4);
+    top: calc(var(--space-4) + var(--control-size) + 3 * var(--space-2));
+  }
+}
+
 /* Écran étroit : pills du haut sous l'encoche, barre du bas pleine largeur au-dessus de l'indicateur d'accueil.
    L'inspection et Recentrer se posent juste au-dessus de la barre du bas : une seule feuille à la fois. */
 @media (max-width: 640px) {
@@ -311,13 +367,36 @@ html[data-panning] .lp-floating > .lp-pill,
     right: var(--space-2);
   }
 
-  /* En haut au centre, sous les pills Canvas et Compte */
+  /* Sous la rangée des pills du haut, avec la même marge sous l'encoche qu'elles */
+  .lp-floating[data-dock="tc"] {
+    --lp-theme-side: var(--space-2);
+    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size) + 3 * var(--space-2));
+  }
+
+  /* En haut au centre, sous les pills Canvas et Compte, et sous la pill Thème quand elle est là : sa hauteur mesurée,
+     et ses deux espaces, un --space-4 en tout (--lp-theme-bar vaut son opposé sans elle) */
   .lp-floating[data-dock="toast"] {
-    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size-touch) + var(--space-4));
+    top: calc(
+      max(var(--space-2), env(safe-area-inset-top)) +
+      var(--control-size-touch) +
+      var(--space-4) +
+      var(--lp-theme-bar) +
+      var(--space-4)
+    );
     bottom: auto;
     left: 50%;
     transform: translateX(-50%);
     max-width: calc(100vw - 2 * var(--space-2));
+    /* Il glisse d'une place à l'autre quand la fenêtre se ferme sous lui */
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      top var(--lp-dur) var(--lp-ease);
+  }
+
+  /* Tant qu'une fenêtre est ouverte, la feuille couvre le dessous de la pill Thème, que le voile cache de toute façon :
+     le toast garde sa place d'avant, sous les pills Canvas et Compte, et reste entièrement visible */
+  html:has(dialog[open]) .lp-floating[data-dock="toast"] {
+    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size-touch) + var(--space-4));
   }
 
   .lp-pill.is-hidden {

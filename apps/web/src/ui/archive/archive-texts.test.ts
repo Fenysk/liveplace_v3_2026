@@ -7,7 +7,6 @@ import {
   archivesCounter,
   bannerCaption,
   bannerTitle,
-  CANVAS_NAME_LABEL,
   CURRENT_CANVAS_LABEL,
   canvasTitle,
   currentCanvasCaption,
@@ -16,8 +15,6 @@ import {
   datesTitle,
   discardSentence,
   missingDisplayName,
-  NAME_PLACEHOLDER,
-  NAME_SAVED,
   NO_ARCHIVE_SENTENCE,
   NO_CURRENT_CANVAS,
   openArchiveLabel,
@@ -25,12 +22,16 @@ import {
   ownerToast,
   PROGRESS_LABEL,
   progressOptions,
-  renameFailureLabel,
   reopenSentence,
   reportsSentence,
   shouldReloadAfter,
-  startingName,
+  startingTheme,
   switchFailureLabel,
+  THEME_CAPTION,
+  THEME_LABEL,
+  THEME_PLACEHOLDER,
+  THEME_SAVED,
+  themeFailureLabel,
 } from "./archive-texts";
 
 // Midi à Paris : loin des minuits, quel que soit l'heure d'été.
@@ -67,11 +68,11 @@ describe("datesLabel (Écart §15, JOURNAL 2026-10-06)", () => {
 });
 
 describe("canvasTitle (Écart §15, JOURNAL 2026-10-06)", () => {
-  // Le nom d'abord ; sans nom, ses dates, avec une majuscule
-  it("is the name first, and without one the dates, capitalised", () => {
+  // Le thème d'abord ; sans thème, ses dates, avec une majuscule
+  it("is the theme first, and without one the dates, capitalised", () => {
     const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
 
-    expect(canvasTitle({ ...dates, name: "Printemps" })).toBe("Printemps");
+    expect(canvasTitle({ ...dates, theme: "Printemps" })).toBe("Printemps");
     expect(canvasTitle(dates)).toBe("Du 12 au 18 octobre 2026");
     expect(canvasTitle({ createdAt: at(2026, 10, 12) })).toBe("Depuis le 12 octobre 2026");
   });
@@ -80,16 +81,16 @@ describe("canvasTitle (Écart §15, JOURNAL 2026-10-06)", () => {
 describe("currentCanvasTitle and currentCanvasCaption (Écart §15, JOURNAL 2026-10-06)", () => {
   const createdAt = at(2026, 10, 4);
 
-  // Sans nom : les dates en titre, « Depuis le … », et aucune légende
-  it("is « Depuis le … » without a name, and has no caption", () => {
+  // Sans thème : les dates en titre, « Depuis le … », et aucune légende
+  it("is « Depuis le … » without a theme, and has no caption", () => {
     expect(currentCanvasTitle({ createdAt })).toBe("Depuis le 4 octobre 2026");
     expect(currentCanvasCaption({ createdAt })).toBeNull();
   });
 
-  // Avec un nom : le nom est le titre, la légende dit depuis quand il est en cours
-  it("is the name with one, the caption saying since when", () => {
-    expect(currentCanvasTitle({ name: "Printemps", createdAt })).toBe("Printemps");
-    expect(currentCanvasCaption({ name: "Printemps", createdAt })).toBe("depuis le 4 octobre 2026");
+  // Avec un thème : le thème est le titre, la légende dit depuis quand il est en cours
+  it("is the theme with one, the caption saying since when", () => {
+    expect(currentCanvasTitle({ theme: "Printemps", createdAt })).toBe("Printemps");
+    expect(currentCanvasCaption({ theme: "Printemps", createdAt })).toBe("depuis le 4 octobre 2026");
   });
 });
 
@@ -97,9 +98,9 @@ describe("archiveCaption (Écart §15, JOURNAL 2026-10-06)", () => {
   const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
 
   // Sans nom, les dates sont déjà le titre : pas de légende ; avec un nom, la légende dit les dates
-  it("has no caption without a name, the dates being the title, and says the dates under a name", () => {
+  it("has no caption without a theme, the dates being the title, and says the dates under a theme", () => {
     expect(archiveCaption(dates)).toBeNull();
-    expect(archiveCaption({ ...dates, name: "Printemps" })).toBe("Du 12 au 18 octobre 2026");
+    expect(archiveCaption({ ...dates, theme: "Printemps" })).toBe("Du 12 au 18 octobre 2026");
   });
 });
 
@@ -116,19 +117,22 @@ describe("the labels of the Archives section (Écart §15, JOURNAL 2026-10-06)",
   });
 });
 
-describe("the name of the current canvas (Écart §15, JOURNAL 2026-10-06)", () => {
-  // Le champ de l'onglet Canvas, et ce que dit le toast quand l'enregistrement a réussi
-  it("labels the field of the Canvas section, and confirms the saving", () => {
-    expect(CANVAS_NAME_LABEL).toBe("Nom du canvas");
-    expect(NAME_SAVED).toBe("Nom enregistré");
+describe("the theme of the current canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  // Le champ de l'onglet Canvas, sa légende, et ce que dit le toast quand l'enregistrement a réussi
+  it("labels the field of the Canvas section, captions it, and confirms the saving", () => {
+    expect(THEME_LABEL).toBe("Thème");
+    expect(THEME_CAPTION).toBe("Affiché en haut du canvas, pour tout le monde.");
+    expect(THEME_SAVED).toBe("Thème enregistré");
   });
 
   // Chaque échec de l'enregistrement a sa phrase, courte ; la session expirée le dit, les autres invitent à réessayer
   it("gives each failure of the saving its short sentence, asking to try again unless the session expired", () => {
-    expect(renameFailureLabel("not_active")).toBe("Le canvas en cours a changé : son nom est rechargé.");
-    expect(renameFailureLabel("failed")).toBe("Le nom n'a pas pu être enregistré. Réessaie dans un instant.");
-    expect(renameFailureLabel("network")).toBe(renameFailureLabel("failed"));
-    expect(renameFailureLabel("unauthenticated")).toBe("Ta session a expiré. Reconnecte-toi, puis réessaie.");
+    expect(themeFailureLabel("not_active")).toBe("Le canvas en cours a changé : son thème est rechargé.");
+    expect(themeFailureLabel("failed")).toBe(
+      "Le thème n'a pas pu être enregistré. Réessaie dans un instant.",
+    );
+    expect(themeFailureLabel("network")).toBe(themeFailureLabel("failed"));
+    expect(themeFailureLabel("unauthenticated")).toBe("Ta session a expiré. Reconnecte-toi, puis réessaie.");
   });
 });
 
@@ -150,16 +154,16 @@ describe("archivesCounter and the empty list (Écart §15, JOURNAL 2026-10-06)",
   });
 });
 
-describe("startingName (Écart §15, JOURNAL 2026-10-06)", () => {
-  // Archiver propose le nom du canvas actif, que rouvrir une archive lui a laissé : valider tel quel le garde
-  it("offers the name of the active canvas when archiving, so confirming as it is keeps the name", () => {
-    expect(startingName({ kind: "archive", canvas: { name: "Printemps" } })).toBe("Printemps");
+describe("startingTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  // Archiver propose le thème du canvas actif, que rouvrir une archive lui a laissé : valider tel quel le garde
+  it("offers the theme of the active canvas when archiving, so confirming as it is keeps the theme", () => {
+    expect(startingTheme({ kind: "archive", canvas: { theme: "Printemps" } })).toBe("Printemps");
   });
 
-  // Sans nom, le champ est vide ; et rouvrir n'a pas de nom à donner, même si l'archive en a un
-  it("is empty for an unnamed canvas, and for reopening even when the archive has a name", () => {
-    expect(startingName({ kind: "archive", canvas: {} })).toBe("");
-    expect(startingName({ kind: "reopen", archive: { name: "Printemps" } })).toBe("");
+  // Sans thème, le champ est vide ; et rouvrir n'a pas de thème à donner, même si l'archive en a un
+  it("is empty for a canvas without a theme, and for reopening even when the archive has a theme", () => {
+    expect(startingTheme({ kind: "archive", canvas: {} })).toBe("");
+    expect(startingTheme({ kind: "reopen", archive: { theme: "Printemps" } })).toBe("");
   });
 });
 
@@ -185,9 +189,9 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
     expect(discardSentence("Printemps")).not.toContain("lien");
   });
 
-  // Le champ du nom montre un exemple
-  it("gives the name field an example as its placeholder", () => {
-    expect(NAME_PLACEHOLDER).toBe("Ex. : Pixel war de la rentrée");
+  // Le champ du thème montre un exemple
+  it("gives the theme field an example as its placeholder", () => {
+    expect(THEME_PLACEHOLDER).toBe("Ex. : Halloween");
   });
 });
 
@@ -287,8 +291,8 @@ describe("shouldReloadAfter (Écart §15, JOURNAL 2026-10-06)", () => {
 describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () => {
   const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
 
-  // Sans nom : « Archive de {nom affiché} », et la légende, ce sont ses dates
-  it("is « Archive de {display name} » without a name, the caption being its dates", () => {
+  // Sans thème : « Archive de {nom affiché} », et la légende, ce sont ses dates
+  it("is « Archive de {display name} » without a theme, the caption being its dates", () => {
     expect(bannerTitle({ displayName: "Kalyss" })).toBe("Archive de Kalyss");
     expect(bannerCaption({ displayName: "Kalyss", ...dates })).toBe("Du 12 au 18 octobre 2026");
     expect(
@@ -296,10 +300,10 @@ describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () =
     ).toBe("Le 12 octobre 2026");
   });
 
-  // Avec un nom : le nom est le titre, et la légende dit de qui est l'archive, puis ses dates
-  it("is the name with one, the caption saying whose archive it is, then its dates", () => {
-    expect(bannerTitle({ displayName: "Kalyss", name: "Printemps" })).toBe("Printemps");
-    expect(bannerCaption({ displayName: "Kalyss", name: "Printemps", ...dates })).toBe(
+  // Avec un thème : le thème est le titre, et la légende dit de qui est l'archive, puis ses dates
+  it("is the theme with one, the caption saying whose archive it is, then its dates", () => {
+    expect(bannerTitle({ displayName: "Kalyss", theme: "Printemps" })).toBe("Printemps");
+    expect(bannerCaption({ displayName: "Kalyss", theme: "Printemps", ...dates })).toBe(
       "Archive de Kalyss · du 12 au 18 octobre 2026",
     );
   });
@@ -309,7 +313,7 @@ describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () =
     const texts = [
       bannerTitle({ displayName: "Kalyss" }),
       bannerCaption({ displayName: "Kalyss", ...dates }),
-      bannerCaption({ displayName: "Kalyss", name: "Printemps", ...dates }),
+      bannerCaption({ displayName: "Kalyss", theme: "Printemps", ...dates }),
     ];
 
     for (const text of texts) expect(text.toLowerCase()).not.toContain("lecture seule");

@@ -267,6 +267,72 @@ describe("publishing the status (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
+describe("the theme of a canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  const listen = async (canvasId: string) => {
+    const subscriber = redis.duplicate();
+    const received: string[] = [];
+    subscriber.on("message", (_channel: string, raw: string) => received.push(raw));
+    await subscriber.subscribe(buildCanvasKeys(canvasId).live);
+    return { received, stop: () => subscriber.quit() };
+  };
+
+  // Écrit le thème dans meta, que getCanvas relit, sans rien publier ; sans thème, le champ part
+  it("writes the theme into meta, which getCanvas reads back, publishing nothing; without a theme the field goes", async () => {
+    const canvasId = uniqueCanvasId();
+    await signIn.createCanvas(canvasId, meta);
+    const { received, stop } = await listen(canvasId);
+    try {
+      await writes.setTheme(canvasId, "Halloween");
+      expect(await writes.getCanvas(canvasId)).toEqual({ ...meta, theme: "Halloween" });
+
+      await writes.setTheme(canvasId, undefined);
+      expect(await writes.getCanvas(canvasId)).toEqual(meta);
+      expect(await redis.hexists(buildCanvasKeys(canvasId).meta, "theme")).toBe(0);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      await stop();
+    }
+
+    expect(received).toEqual([]);
+  });
+
+  // Publie le thème sur le canal live, tel que le gateway le relit, et rien dans meta ; sans thème, une frame sans texte
+  it("publishes the theme on the live channel as the gateway reads it, and nothing in meta; without one, a message without text", async () => {
+    const canvasId = uniqueCanvasId();
+    await signIn.createCanvas(canvasId, meta);
+    const { received, stop } = await listen(canvasId);
+    try {
+      await writes.publishTheme(canvasId, "Halloween");
+      await writes.publishTheme(canvasId, undefined);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      await stop();
+    }
+
+    expect(received.map((raw) => JSON.parse(raw))).toEqual([
+      { ctl: { t: "theme", theme: "Halloween" } },
+      { ctl: { t: "theme" } },
+    ]);
+    expect((await writes.getCanvas(canvasId))?.theme).toBeUndefined();
+  });
+
+  // Copier ce qui est commun ne touche pas au thème : chaque canvas garde le sien, le neuf n'a pas celui du sortant
+  it("leaves the theme alone when copying what is shared: each canvas keeps its own, the new one gets none", async () => {
+    const [outgoing, incoming] = [uniqueCanvasId(), uniqueCanvasId()];
+    await signIn.createCanvas(outgoing, meta);
+    await signIn.createCanvas(incoming, meta);
+    await writes.setTheme(outgoing, "Halloween");
+
+    await writes.copyShared(outgoing, incoming);
+
+    expect((await writes.getCanvas(outgoing))?.theme).toBe("Halloween");
+    expect((await writes.getCanvas(incoming))?.theme).toBeUndefined();
+    await writes.setTheme(incoming, "Noël");
+    await writes.copyShared(outgoing, incoming);
+    expect((await writes.getCanvas(incoming))?.theme).toBe("Noël");
+  });
+});
+
 describe("discarding a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   // Efface toutes les clés du canvas, le classement et ses scores à l'écart compris, et pas celles d'un canvas dont
   // l'identifiant commence pareil

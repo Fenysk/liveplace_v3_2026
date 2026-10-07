@@ -50,11 +50,11 @@ const serverHtml = {
         onClose: doNothing,
       }),
     ),
-  banner: (isCompact: boolean, name?: string) =>
+  banner: (isCompact: boolean, theme?: string) =>
     renderToString(
       createElement(ArchiveBanner, {
         owner: archive.owner,
-        title: name ?? "Archive de Kalyss",
+        title: theme ?? "Archive de Kalyss",
         caption: "Du 12 au 18 octobre 2026",
         isDownloading: false,
         onCopyLink: doNothing,
@@ -67,13 +67,13 @@ const serverHtml = {
 };
 
 describe("the HTML the server writes for the archive page (CSP of production)", () => {
-  // Aucun attribut `style` dans la page entière, fenêtre du PNG comprise, avec ou sans nom
+  // Aucun attribut `style` dans la page entière, fenêtre du PNG comprise, avec ou sans thème
   it("carries no inline style in the whole page, the PNG window included", () => {
     const html = serverHtml.page();
 
     expect(html).toContain("lp-swatch"); // la fenêtre du fond y est bien rendue : le garde-fou ne regarde pas dans le vide
     expect(html).not.toMatch(INLINE_STYLE);
-    expect(serverHtml.page({ ...archive, name: "Soirée de lancement" })).not.toMatch(INLINE_STYLE);
+    expect(serverHtml.page({ ...archive, theme: "Soirée de lancement" })).not.toMatch(INLINE_STYLE);
   });
 
   // Ni la fenêtre du fond, ouverte ou fermée, ni le bandeau sur PC et sur mobile, ni l'archive introuvable
