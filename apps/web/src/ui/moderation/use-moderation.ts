@@ -1,13 +1,15 @@
 // Retirer ou bannir depuis la pill Inspection (CDC 2026, JOURNAL 2026-09-25), ou depuis un signalement (JOURNAL
 // 2026-09-28) : la demande, l'aperçu de ses pixels, puis l'action. Bannir enchaîne `ban` puis `clearUser`, jamais
-// l'inverse (§5.4). Un retrait fait, la fenêtre propose de bannir l'auteur (JOURNAL 2026-09-29).
+// l'inverse (§5.4). Une ligne de signalements retire ses poses l'une après l'autre (JOURNAL 2026-10-07). Un retrait
+// fait, la fenêtre propose de bannir l'auteur (JOURNAL 2026-09-29).
 
 import { canModerate } from "@liveplace/domain";
 import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
-import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toClearAction } from "./cleared-pixels";
+import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toClearActions } from "./cleared-pixels";
+import { moderateInOrder } from "./moderate-in-order";
 import type {
   ModeratedAuthor,
   ModerationStatus,
@@ -65,23 +67,20 @@ export function useModeration(canvas: CanvasStore): {
     canvas.closeInspection();
   };
 
-  // Bannir retire tous ses pixels ; Retirer ses pixels suit la case et le curseur.
-  const clearActionOf = ({ kind, author }: ModeratorRequest): ModerationAction =>
+  // Retirer ses pixels suit la case et le curseur ; bannir enchaîne `ban`, puis retire tous ses pixels.
+  const actionsOf = ({ kind, author }: ModeratorRequest): ModerationAction[] =>
     kind === "clear"
-      ? toClearAction(author, pixels ?? [], scope)
-      : { action: "clearUser", target: author.userId };
-
-  const run = async (active: ModeratorRequest) => {
-    const banned =
-      active.kind === "clear" ? null : await canvas.moderate({ action: "ban", target: active.author.userId });
-    return banned?.ok === false ? banned : canvas.moderate(clearActionOf(active));
-  };
+      ? toClearActions(author, pixels ?? [], scope)
+      : [
+          { action: "ban", target: author.userId },
+          { action: "clearUser", target: author.userId },
+        ];
 
   const confirm = async (): Promise<void> => {
     const active = current.current;
     if (!active || status === "running") return;
     setStatus("running");
-    const done = await run(active);
+    const done = await moderateInOrder(canvas, actionsOf(active));
     if (current.current !== active) return;
     if (!done.ok) return setStatus("failed");
     // La preuve du ban qui suivrait : tous ses pixels d'avant le retrait, que le serveur garde une heure.

@@ -1,18 +1,21 @@
 // L'onglet Modération, branché sur le store (JOURNAL 2026-09-25) : monté à l'ouverture de l'onglet, il relit alors
 // la liste des modérateurs avec l'état de la synchro Twitch (JOURNAL 2026-09-27). Les signalements et les bannis se
 // relisent aussi à chaque changement du nombre de signalements : bannir depuis un signalement les change tous deux
-// (JOURNAL 2026-09-28). Les bannis et les modérateurs se relisent enfin quand le gateway dit leur liste périmée, un ban
-// ou un rôle venu de Twitch ou d'un autre modérateur (JOURNAL 2026-10-06).
+// (JOURNAL 2026-09-28). Un signalement de plage n'a qu'une ligne, ses poses réunies ici (JOURNAL 2026-10-07). Les
+// bannis et les modérateurs se relisent enfin quand le gateway dit leur liste périmée, un ban ou un rôle venu de
+// Twitch ou d'un autre modérateur (JOURNAL 2026-10-06).
 // L'affichage est dans `reported-placements.tsx`, `banned-users.tsx`, `moderator-users.tsx` et `twitch-sync.tsx`.
 
-import type { ReportedPlacement } from "@liveplace/domain/ports";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { CanvasStore, StaleList } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
 import { useToast } from "../design/toast";
 import { type BannedList, BannedUsers, type BanPreview } from "./banned-users";
+import { moderateInOrder } from "./moderate-in-order";
+import { approvedToast } from "./moderation-texts";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
 import { oneAtATime } from "./one-at-a-time";
+import { type PendingReport, pendingReportKey, toPendingReports } from "./pending-reports";
 import { ReportedPlacements, type ReportList } from "./reported-placements";
 import { TwitchSyncBlock, type TwitchSyncView } from "./twitch-sync";
 import type { ModerationControls } from "./use-moderation";
@@ -94,33 +97,42 @@ const useRelistOnReports = (canvas: CanvasStore, relist: () => void) => {
 const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["onModerate"]) => {
   const { width, height, palette } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const [list, setList] = useState<ReportList>({ status: "loading" });
-  const [approvingPlacementId, setApprovingPlacementId] = useState<string | null>(null);
+  const [approvingReportKey, setApprovingReportKey] = useState<string | null>(null);
   const toast = useToast();
 
   const relist = useCallback(() => {
     void canvas.listReports().then((result) => {
-      setList(result.ok ? { status: "ready", reports: result.value } : { status: "failed" });
+      setList(
+        result.ok ? { status: "ready", reports: toPendingReports(result.value) } : { status: "failed" },
+      );
     });
   }, [canvas]);
   useRelistOnReports(canvas, relist);
 
-  const onApprove = ({ userId, placementId }: ReportedPlacement) => {
-    setApprovingPlacementId(placementId);
-    void canvas.moderate({ action: "approvePlacement", target: userId, placementId }).then((result) => {
-      setApprovingPlacementId(null);
-      if (!result.ok) return setList({ status: "failed" });
-      toast("success", "Pose rétablie : elle revient sur le stream");
-    });
+  // Une pose après l'autre, un seul toast à la fin (JOURNAL 2026-10-07).
+  const approve = async (report: PendingReport): Promise<void> => {
+    setApprovingReportKey(pendingReportKey(report));
+    const result = await moderateInOrder(
+      canvas,
+      report.placementIds.map((placementId) => ({
+        action: "approvePlacement",
+        target: report.userId,
+        placementId,
+      })),
+    );
+    setApprovingReportKey(null);
+    if (!result.ok) return setList({ status: "failed" });
+    toast("success", approvedToast(report.placementIds.length));
   };
 
   return {
     list,
-    approvingPlacementId,
+    approvingReportKey,
     canvas: { width, height, palette },
     nowMs: Date.now(),
-    onClear: (report: ReportedPlacement) => onModerate("clear", report),
-    onBan: (report: ReportedPlacement) => onModerate("ban", report),
-    onApprove,
+    onClear: (report: PendingReport) => onModerate("clear", report),
+    onBan: (report: PendingReport) => onModerate("ban", report),
+    onApprove: (report: PendingReport) => void approve(report),
   };
 };
 

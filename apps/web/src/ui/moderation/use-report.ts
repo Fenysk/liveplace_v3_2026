@@ -54,7 +54,7 @@ export function useReport(canvas: CanvasStore): {
 
   // Cette pose seule, ou ses voisines : la plage de l'aperçu, calculée sur les mêmes pixels.
   const rangeOf = ({ placementId }: ReportTarget) =>
-    scope.spanMs > 0 ? (toPlacementRange(pixels ?? [], placementId, scope.spanMs) ?? undefined) : undefined;
+    scope.spanMs > 0 ? (toPlacementRange(pixels ?? [], [placementId], scope.spanMs) ?? undefined) : undefined;
 
   // Refusé (la case a changé, ou la pose ne se signale plus) : la fenêtre le dit, le bouton de la pill revient.
   const confirm = async (): Promise<void> => {

@@ -9,6 +9,13 @@ export function reportCountLabel(count: number): string {
   return count === 1 ? "1 signalement" : `${count.toLocaleString("fr-FR")} signalements`;
 }
 
+// Le toast de Rétablir : une pose, ou toutes celles d'une ligne de signalements (JOURNAL 2026-10-07).
+export function approvedToast(placementCount: number): string {
+  return placementCount > 1
+    ? "Poses rétablies : elles reviennent sur le stream"
+    : "Pose rétablie : elle revient sur le stream";
+}
+
 // D'où vient le rôle d'un modérateur, sous son nom dans l'onglet Modération.
 export function moderatorMention({
   isFromTwitch,

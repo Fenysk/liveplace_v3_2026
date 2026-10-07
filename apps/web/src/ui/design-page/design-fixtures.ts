@@ -1,15 +1,9 @@
 // Les exemples de /design : des utilisateurs de démonstration, et rien d'autre. Aucune connexion, aucun store.
 
 import { PALETTE } from "@liveplace/domain";
-import type {
-  AuthoredPixel,
-  BannedUser,
-  Moderator,
-  Pixel,
-  ReportedPlacement,
-  ScoreboardEntry,
-} from "@liveplace/domain/ports";
+import type { AuthoredPixel, BannedUser, Moderator, Pixel, ScoreboardEntry } from "@liveplace/domain/ports";
 import type { ProfileUser } from "../design/profile";
+import type { PendingReport } from "../moderation/pending-reports";
 import sampleAvatarUrl from "./sample-avatar.svg?url";
 
 export const SAMPLE_OWNER: ProfileUser = {
@@ -73,14 +67,16 @@ export const samplePlacements = (nowMs: number): readonly AuthoredPixel[] => [
   })),
 ];
 
-// Deux poses signalées : l'une cachée du stream (le seuil est atteint), l'autre en attente.
-export const sampleReports = (nowMs: number): readonly ReportedPlacement[] => [
+// Trois signalements : une pose cachée du stream (le seuil est atteint), une pose en attente, et un dessin de
+// plusieurs poses signalées d'un coup (JOURNAL 2026-10-07).
+export const sampleReports = (nowMs: number): readonly PendingReport[] => [
   {
     userId: "3",
     login: "troll42",
     displayName: "Troll42",
     hasAccount: true,
     placementId: SAMPLE_PLACEMENT_ID,
+    placementIds: [SAMPLE_PLACEMENT_ID],
     reportCount: 3,
     reportedAt: nowMs - 2 * 60_000,
     isOffStream: true,
@@ -92,10 +88,23 @@ export const sampleReports = (nowMs: number): readonly ReportedPlacement[] => [
     displayName: "pixelmoth",
     hasAccount: true,
     placementId: "pline0001",
+    placementIds: ["pline0001"],
     reportCount: 1,
     reportedAt: nowMs - 30_000,
     isOffStream: false,
     pixels: SAMPLE_DRAWING.slice(0, 14).map((pixel) => ({ ...pixel, colorIndex: 28 })),
+  },
+  {
+    userId: "5",
+    login: "glitchfox",
+    displayName: "GlitchFox",
+    hasAccount: true,
+    placementId: "pwhole0001",
+    placementIds: ["pwhole0001", "pwhole0002", "pwhole0003"],
+    reportCount: 2,
+    reportedAt: nowMs - 10_000,
+    isOffStream: false,
+    pixels: SAMPLE_DRAWING.slice(0, -1).map((pixel) => ({ ...pixel, colorIndex: 9 })),
   },
 ];
 

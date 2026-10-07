@@ -94,6 +94,61 @@ describe("clearPlacement (JOURNAL 2026-09-28)", () => {
     expect(await colorAt(canvasId, 2, 0)).toBe(TRANSPARENT_COLOR_INDEX);
   });
 
+  // Une ligne de signalements se retire pose par pose, sans plage : chacune entre dans `cleared:placements`, et la pose rétablie entre les deux reste (JOURNAL 2026-10-07)
+  it("clears a report row placement by placement without a range, keeping an approved placement between them", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, "author-a", "pbelow001", [{ x: 3, y: 3, colorIndex: 2 }]);
+    await placeAs(canvasId, "troll", "pone00001", [{ x: 0, y: 0, colorIndex: 4 }]);
+    await placeAs(canvasId, "troll", "pbetween1", [{ x: 2, y: 0, colorIndex: 4 }], now + 60_000);
+    await placeAs(canvasId, "troll", "ptwo00001", [{ x: 3, y: 3, colorIndex: 4 }], now + 2 * 60_000);
+    await placeAs(canvasId, "author-c", "pcover001", [{ x: 3, y: 3, colorIndex: 6 }], now + 3 * 60_000);
+    await moderateAll(canvasId, { action: "approvePlacement", target: "troll", placementId: "pbetween1" });
+
+    for (const placementId of ["pone00001", "ptwo00001"])
+      await moderateAll(canvasId, { action: "clearPlacement", target: "troll", placementId });
+    await moderateAll(canvasId, { action: "clearUser", target: "author-c" });
+
+    expect((await redis.smembers(keys.clearedPlacements)).sort()).toEqual([
+      "troll:pone00001",
+      "troll:ptwo00001",
+    ]);
+    expect(await redis.exists(keys.clearedRanges)).toBe(0);
+    expect(await colorAt(canvasId, 0, 0)).toBe(TRANSPARENT_COLOR_INDEX);
+    expect(await colorAt(canvasId, 2, 0)).toBe(4);
+    expect(await colorAt(canvasId, 3, 3)).toBe(2);
+  });
+
+  // Une plage sur la première pose d'une ligne, puis une action par pose : chacune entre dans `cleared:placements`, même son pixel enterré hors de la plage (JOURNAL 2026-10-07)
+  it("clears a report row with one range on its first placement, then one action per placement, burying nothing back", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, "author-a", "pbelow001", [{ x: 3, y: 3, colorIndex: 2 }]);
+    await placeAs(canvasId, "troll", "pone00001", [{ x: 0, y: 0, colorIndex: 4 }]);
+    await placeAs(canvasId, "troll", "pbetween1", [{ x: 2, y: 0, colorIndex: 4 }], now + 60_000);
+    await placeAs(canvasId, "troll", "ptwo00001", [{ x: 1, y: 0, colorIndex: 4 }], now + 2 * 60_000);
+    await placeAs(canvasId, "troll", "pafter001", [{ x: 4, y: 0, colorIndex: 4 }], now + 20 * 60_000);
+    await placeAs(canvasId, "troll", "ptwo00001", [{ x: 3, y: 3, colorIndex: 4 }], now + 30 * 60_000);
+    await placeAs(canvasId, "author-c", "pcover001", [{ x: 3, y: 3, colorIndex: 6 }], now + 31 * 60_000);
+
+    await moderateAll(canvasId, {
+      action: "clearPlacement",
+      target: "troll",
+      placementId: "pone00001",
+      range: { from: now - 60_000, to: now + 3 * 60_000 },
+    });
+    await moderateAll(canvasId, { action: "clearPlacement", target: "troll", placementId: "ptwo00001" });
+    await moderateAll(canvasId, { action: "clearUser", target: "author-c" });
+
+    expect((await redis.smembers(keys.clearedPlacements)).sort()).toEqual([
+      "troll:pone00001",
+      "troll:ptwo00001",
+    ]);
+    expect(await colorAt(canvasId, 0, 0)).toBe(TRANSPARENT_COLOR_INDEX);
+    expect(await colorAt(canvasId, 1, 0)).toBe(TRANSPARENT_COLOR_INDEX);
+    expect(await colorAt(canvasId, 2, 0)).toBe(TRANSPARENT_COLOR_INDEX);
+    expect(await colorAt(canvasId, 4, 0)).toBe(4);
+    expect(await colorAt(canvasId, 3, 3)).toBe(2);
+  });
+
   // Un pixel de la pose, enterré sous un autre, ne revient jamais, même quand on retire ce qui le couvrait
   it("never brings back a buried pixel of the placement, even once its cover is cleared", async () => {
     const { canvasId } = await readyCanvas();
@@ -359,6 +414,40 @@ describe("reporting a time range, and the proof of a ban after a clear (JOURNAL 
     );
   });
 
+  // Les poses d'un signalement de plage ont le même `reportedAt`, qu'un signalement plus tardif ne change pas : le web
+  // en fait une ligne (JOURNAL 2026-10-07). Une pose signalée seule avant la plage garde le sien
+  it("a range report gives all its placements the same reportedAt, which a later report keeps; a placement reported alone earlier keeps its own", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pbefore01", [{ x: 1, y: 0, colorIndex: 4 }], now - 60_000);
+    await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 4 }]);
+    await placeAs(canvasId, "troll", "pnear00001", [{ x: 2, y: 0, colorIndex: 4 }], now + 60_000);
+    const range = { from: now - 5 * 60_000, to: now + 5 * 60_000 };
+
+    // `pbefore01` tombe dans la plage, mais un autre compte l'a signalée seule avant
+    await report(canvasId, {
+      reporterId: "viewer-1",
+      x: 1,
+      placementId: "pbefore01",
+      threshold: 5,
+      nowMs: now - 5_000,
+    });
+    await report(canvasId, { reporterId: "viewer-2", range, threshold: 5, nowMs: now + 1_000 });
+    await report(canvasId, { reporterId: "viewer-3", range, threshold: 5, nowMs: now + 10 * 60_000 });
+
+    const reports = await core.listReports(canvasId);
+    const reportedAt = Object.fromEntries(reports.map((entry) => [entry.placementId, entry.reportedAt]));
+    expect(reportedAt).toEqual({
+      pbefore01: now - 5_000,
+      ptroll001: now + 1_000,
+      pnear00001: now + 1_000,
+    });
+    expect(reports.map(({ placementId, reportCount }) => [placementId, reportCount]).sort()).toEqual([
+      ["pbefore01", 3],
+      ["pnear00001", 2],
+      ["ptroll001", 2],
+    ]);
+  });
+
   // Une pose rétablie reste hors de la plage signalée
   it("an approved placement stays out of a reported range", async () => {
     const { canvasId } = await readyCanvas();
@@ -408,5 +497,23 @@ describe("reporting a time range, and the proof of a ban after a clear (JOURNAL 
       ]),
     );
     expect(await redis.exists(keys.recentlyCleared("troll"))).toBe(0);
+  });
+
+  // Une ligne retirée de la plus ancienne pose à la plus récente : la preuve garde la couleur que le stream montrait sur une case que deux poses de la ligne se partagent (JOURNAL 2026-10-07)
+  it("a ban after a report row cleared oldest first keeps the colour the stream showed on a cell two of its placements share", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "troll", "pdraw0001", [
+      { x: 0, y: 0, colorIndex: 4 },
+      { x: 3, y: 3, colorIndex: 4 },
+    ]);
+    await placeAs(canvasId, "troll", "pcover001", [{ x: 3, y: 3, colorIndex: 7 }], now + 60_000);
+
+    for (const placementId of ["pdraw0001", "pcover001"])
+      await moderateAll(canvasId, { action: "clearPlacement", target: "troll", placementId });
+    await moderateAll(canvasId, { action: "ban", target: "troll" });
+
+    const proof = await core.listPixels(canvasId, "troll");
+    expect(proof.filter(({ x, y }) => x === 3 && y === 3)).toEqual([{ x: 3, y: 3, colorIndex: 7 }]);
+    expect(proof).toContainEqual({ x: 0, y: 0, colorIndex: 4 });
   });
 });

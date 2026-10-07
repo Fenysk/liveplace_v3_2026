@@ -9,7 +9,7 @@ import type { SliderStep } from "../design/slider";
 const MINUTE = 60_000;
 
 // A2 : un curseur à crans, qui étend la plage avant et après à la fois.
-export const CLEAR_SPAN_STEPS: readonly SliderStep[] = [
+const CLEAR_SPAN_STEPS: readonly SliderStep[] = [
   { value: 0, label: "Cette pose seule" },
   { value: MINUTE, label: "± 1 min" },
   { value: 5 * MINUTE, label: "± 5 min" },
@@ -17,25 +17,38 @@ export const CLEAR_SPAN_STEPS: readonly SliderStep[] = [
   { value: 60 * MINUTE, label: "± 1 h" },
 ];
 
+// Une ligne de plusieurs poses n'a pas de « pose seule » : son cran 0 les retire toutes (JOURNAL 2026-10-07).
+export const clearSpanSteps = (placementCount: number): readonly SliderStep[] =>
+  placementCount > 1
+    ? CLEAR_SPAN_STEPS.map((step) => (step.value === 0 ? { ...step, label: "Les poses signalées" } : step))
+    : CLEAR_SPAN_STEPS;
+
 // La case « Retirer tous ses pixels », décochée par défaut, et le cran du curseur.
 export type ClearScope = { isAll: boolean; spanMs: number };
 export const PLACEMENT_ONLY: ClearScope = { isAll: false, spanMs: 0 };
 
-// La pose visée, figée au clic : quelqu'un peut poser sur la case pendant qu'on hésite.
-export type ClearTarget = { userId: string; placementId: string };
+// La pose visée, figée au clic : quelqu'un peut poser sur la case pendant qu'on hésite. `placementIds` : une ligne de
+// signalements, toutes ses poses (JOURNAL 2026-10-07) ; absent, `placementId` seule.
+export type ClearTarget = { userId: string; placementId: string; placementIds?: readonly string[] };
 
 type Range = { from: number; to: number };
 
-// De la première à la dernière heure visible de la pose, élargie du cran. Sans pixel visible de la pose : aucune.
+const placementIdsOf = ({ placementId, placementIds }: Omit<ClearTarget, "userId">): readonly string[] =>
+  placementIds ?? [placementId];
+
+const isOfPlacements = ({ placementId }: AuthoredPixel, placementIds: readonly string[]): boolean =>
+  placementId !== undefined && placementIds.includes(placementId);
+
+// De la première à la dernière heure visible de ces poses, élargie du cran. Sans pixel visible d'elles : aucune.
 export function toPlacementRange(
   pixels: readonly AuthoredPixel[],
-  placementId: string,
+  placementIds: readonly string[],
   spanMs: number,
 ): Range | null {
   let from = Number.POSITIVE_INFINITY;
   let to = Number.NEGATIVE_INFINITY;
   for (const pixel of pixels) {
-    if (pixel.placementId !== placementId || pixel.placedAt === undefined) continue;
+    if (!isOfPlacements(pixel, placementIds) || pixel.placedAt === undefined) continue;
     from = Math.min(from, pixel.placedAt);
     to = Math.max(to, pixel.placedAt);
   }
@@ -47,20 +60,40 @@ const isInRange = ({ placedAt }: AuthoredPixel, range: Range | null): boolean =>
 
 export function listClearedPixels(
   pixels: readonly AuthoredPixel[],
-  { placementId }: Pick<ClearTarget, "placementId">,
+  target: Omit<ClearTarget, "userId">,
   { isAll, spanMs }: ClearScope,
 ): readonly AuthoredPixel[] {
   if (isAll) return pixels;
-  const range = spanMs > 0 ? toPlacementRange(pixels, placementId, spanMs) : null;
-  return pixels.filter((pixel) => pixel.placementId === placementId || isInRange(pixel, range));
+  const placementIds = placementIdsOf(target);
+  const range = spanMs > 0 ? toPlacementRange(pixels, placementIds, spanMs) : null;
+  return pixels.filter((pixel) => isOfPlacements(pixel, placementIds) || isInRange(pixel, range));
 }
 
-export function toClearAction(
-  { userId, placementId }: ClearTarget,
+// De la plus ancienne à la plus récente, d'après ses pixels visibles ; sans pixel visible, d'abord. Une pose enterrée
+// part avant celle qui la recouvre : la preuve d'un ban garde ce que le stream montrait (JOURNAL 2026-10-07).
+const oldestFirst = (placementIds: readonly string[], pixels: readonly AuthoredPixel[]): string[] => {
+  const placedAtOf = new Map<string, number>();
+  for (const { placementId, placedAt } of pixels) {
+    if (placementId === undefined || placedAt === undefined) continue;
+    placedAtOf.set(placementId, Math.min(placedAtOf.get(placementId) ?? placedAt, placedAt));
+  }
+  return [...placementIds].sort((a, b) => (placedAtOf.get(a) ?? 0) - (placedAtOf.get(b) ?? 0));
+};
+
+// Une action par pose, pour que chacune entre dans `cleared:placements`, même recouverte. La plage, une fois, sur la
+// première : elle couvre toute la ligne, les suivantes ne font que poser la pierre de leur pose (JOURNAL 2026-10-07).
+export function toClearActions(
+  target: ClearTarget,
   pixels: readonly AuthoredPixel[],
   { isAll, spanMs }: ClearScope,
-): ModerationAction {
-  if (isAll) return { action: "clearUser", target: userId };
-  const range = spanMs > 0 ? toPlacementRange(pixels, placementId, spanMs) : null;
-  return { action: "clearPlacement", target: userId, placementId, ...(range ? { range } : {}) };
+): ModerationAction[] {
+  if (isAll) return [{ action: "clearUser", target: target.userId }];
+  const placementIds = placementIdsOf(target);
+  const range = spanMs > 0 ? toPlacementRange(pixels, placementIds, spanMs) : null;
+  return oldestFirst(placementIds, pixels).map((placementId, index) => ({
+    action: "clearPlacement",
+    target: target.userId,
+    placementId,
+    ...(range && index === 0 ? { range } : {}),
+  }));
 }

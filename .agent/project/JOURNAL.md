@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Un signalement de plage arrive en une seule ligne chez les modérateurs, réuni dans le web
+
+**Contexte.** Signaler une plage d'heures signale chaque pose de l'auteur qu'elle touche, et la section Modération affichait une ligne par pose : un dessin arrivait en dizaines de lignes (demande de l'humain).
+**Décision.** Le web réunit les poses en une ligne par (auteur, `reportedAt`) : `report.lua` fait `ZADD NX` avec un seul `nowMs` par appel, donc toutes les poses d'un signalement de plage ont la même heure, qu'un signalement suivant ne change pas. Rétablir envoie un `approvePlacement` par pose ; Retirer, un `clearPlacement` par pose, de la plus ancienne à la plus récente (la plage une seule fois, sur la première), pour que chacune entre dans `cleared:placements` et que la preuve d'un ban garde la couleur que le stream montrait. `PROTOCOL_VERSION` ne change pas. Lève le renoncement du 2026-09-29 (« Pas de signalement groupé », `archives/JOURNAL--bloc-1.md`).
+**Renoncement.** Pas de protocole 15 ni de regroupement dans Redis (le web a déjà l'information) ; `reportCount` compte toujours les poses, il déclenche la relecture de la liste ; une pose signalée seule avant la plage garde sa propre ligne, le dessin peut arriver en deux lignes.
+
 ## 2026-10-07 — Écart §5.1 : le web compte le nouveau compte dans les points du canvas actif du streamer d'origine
 
 **Contexte.** La courbe des nouveaux comptes venus de la page d'un canvas (cahier des charges du suivi d'activité, §3) a un point par minute, heure et jour ; la clé du jour de Paris par provenance ne donne qu'un nombre par jour, et par `ownerId` : une archive y lirait les comptes de son successeur.

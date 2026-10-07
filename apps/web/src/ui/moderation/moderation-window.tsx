@@ -1,8 +1,8 @@
 // La confirmation d'une modération (CDC 2026, JOURNAL 2026-09-25) : une petite fenêtre, l'aperçu des pixels qui
-// partent, leur nombre, puis Annuler ou l'action. Retirer ses pixels vise d'abord la pose inspectée, et s'étend par
-// une plage d'heures ou à tous ses pixels (JOURNAL 2026-09-28), puis propose de bannir l'auteur. Signaler une pose
-// passe par la même fenêtre, avec la même plage (JOURNAL 2026-09-29). L'affichage seul, nourri par `useModeration`
-// et `useReport`.
+// partent, leur nombre, puis Annuler ou l'action. Retirer ses pixels vise d'abord la pose inspectée, ou toutes celles
+// d'une ligne de signalements (JOURNAL 2026-10-07), et s'étend par une plage d'heures ou à tous ses pixels (JOURNAL
+// 2026-09-28), puis propose de bannir l'auteur. Signaler une pose passe par la même fenêtre, avec la même plage
+// (JOURNAL 2026-09-29). L'affichage seul, nourri par `useModeration` et `useReport`.
 
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
@@ -10,7 +10,7 @@ import { Checkbox } from "../design/checkbox";
 import { PixelPreview } from "../design/pixel-preview";
 import { Slider } from "../design/slider";
 import { SmallWindow, useShownWhileClosing } from "../design/window";
-import { CLEAR_SPAN_STEPS, type ClearScope } from "./cleared-pixels";
+import { type ClearScope, type ClearTarget, clearSpanSteps } from "./cleared-pixels";
 import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
 
 // Retirer ses pixels, bannir (qui les retire aussi), bannir juste après un retrait, ou signaler.
@@ -20,8 +20,10 @@ export type ModerationKind = "clear" | "ban" | "banAfterClear" | "report";
 export type ModeratedAuthor = InspectEntry & { userId: string };
 
 // La cible est l'auteur et la pose affichés au moment du clic, jamais la case relue : elle peut changer pendant
-// qu'on hésite. Une pose signalée la donne aussi (JOURNAL 2026-09-28).
-export type ModerationTarget = Pick<ModeratedAuthor, "userId" | "displayName" | "placementId">;
+// qu'on hésite. Une ligne de signalements la donne aussi (JOURNAL 2026-09-28), avec toutes ses poses si elle en a
+// plusieurs (JOURNAL 2026-10-07).
+export type ModerationTarget = Pick<ModeratedAuthor, "userId" | "displayName" | "placementId"> &
+  Pick<ClearTarget, "placementIds">;
 
 // Qui signale n'a pas l'identifiant de l'auteur : la case inspectée et sa pose le désignent (JOURNAL 2026-09-29).
 export type ReportTarget = Pick<InspectEntry, "displayName" | "placementId"> & { x: number; y: number };
@@ -46,14 +48,21 @@ export type ModerationWindowProps = {
   onClose: () => void;
 };
 
-const titleOf = ({ kind, author }: ModerationRequest, { isAll, spanMs }: ClearScope): string => {
+// Les poses que Retirer vise : toutes celles d'une ligne de signalements, sinon une.
+const placementCountOf = (request: ModerationRequest): number =>
+  request.kind === "clear" ? (request.author.placementIds?.length ?? 1) : 1;
+
+const titleOf = (request: ModerationRequest, { isAll, spanMs }: ClearScope): string => {
+  const { kind, author } = request;
   const name = author.displayName;
   if (kind === "ban") return `Bannir ${name} ?`;
   if (kind === "banAfterClear") return `C'est retiré. Bannir aussi ${name} ?`;
   if (kind === "report")
     return spanMs === 0 ? `Signaler cette pose de ${name} ?` : `Signaler ces poses de ${name} ?`;
   if (isAll) return `Retirer tous les pixels de ${name} ?`;
-  return spanMs === 0 ? `Retirer cette pose de ${name} ?` : `Retirer ces poses de ${name} ?`;
+  return spanMs === 0 && placementCountOf(request) <= 1
+    ? `Retirer cette pose de ${name} ?`
+    : `Retirer ces poses de ${name} ?`;
 };
 
 const BAN_CONSEQUENCE = "Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.";
@@ -89,10 +98,11 @@ const Preview = ({ pixels, canvas, name }: PreviewProps) => {
 type ScopeControlsProps = Pick<ModerationWindowProps, "scope" | "onScope"> & {
   isDisabled: boolean;
   hasAll: boolean; // la case « Retirer tous ses pixels » : pour qui modère seulement
+  placementCount: number;
 };
 
 // Cochée, la plage disparaît et tous ses pixels partent (CDC 2026, Inspection).
-const ScopeControls = ({ scope, onScope, isDisabled, hasAll }: ScopeControlsProps) => {
+const ScopeControls = ({ scope, onScope, isDisabled, hasAll, placementCount }: ScopeControlsProps) => {
   const pickSpan = (spanMs: number) => onScope({ ...scope, spanMs });
   return (
     <>
@@ -107,7 +117,7 @@ const ScopeControls = ({ scope, onScope, isDisabled, hasAll }: ScopeControlsProp
       {!scope.isAll && (
         <Slider
           label="Plage de temps"
-          steps={CLEAR_SPAN_STEPS}
+          steps={clearSpanSteps(placementCount)}
           value={scope.spanMs}
           isDisabled={isDisabled}
           onPick={pickSpan}
@@ -151,6 +161,7 @@ export const ModerationWindow = ({
           onScope={onScope}
           isDisabled={status === "running"}
           hasAll={shown.kind === "clear"}
+          placementCount={placementCountOf(shown)}
         />
       )}
       <Preview pixels={pixels} canvas={canvas} name={shown.author.displayName} />

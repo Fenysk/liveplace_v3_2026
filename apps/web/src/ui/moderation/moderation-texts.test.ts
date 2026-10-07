@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { pixelCountLabel, reportCountLabel } from "./moderation-texts";
+import { approvedToast, pixelCountLabel, reportCountLabel } from "./moderation-texts";
+
+describe("approvedToast (JOURNAL 2026-10-07)", () => {
+  // Une pose au singulier, plusieurs poses au pluriel
+  it("says one placement in the singular, several in the plural", () => {
+    expect(approvedToast(1)).toBe("Pose rétablie : elle revient sur le stream");
+    expect(approvedToast(3)).toBe("Poses rétablies : elles reviennent sur le stream");
+  });
+});
 
 describe("reportCountLabel (JOURNAL 2026-09-28)", () => {
   // Accorde le nombre de signalements

@@ -17,6 +17,7 @@ import {
   ModerationWindow,
 } from "../moderation/moderation-window";
 import { ModeratorUsers } from "../moderation/moderator-users";
+import { pendingReportKey } from "../moderation/pending-reports";
 import { ReportedPlacements, type ReportedPlacementsProps } from "../moderation/reported-placements";
 import { TwitchSyncBlock, type TwitchSyncView } from "../moderation/twitch-sync";
 import type { ModerationControls } from "../moderation/use-moderation";
@@ -189,7 +190,7 @@ const TAB_STATES: readonly { caption: string; props: BannedUsersProps }[] = [
 ];
 
 const REPORTS_BASE = (nowMs: number): Omit<ReportedPlacementsProps, "list"> => ({
-  approvingPlacementId: null,
+  approvingReportKey: null,
   canvas: SAMPLE_CANVAS,
   nowMs,
   onClear: noop,
@@ -197,21 +198,29 @@ const REPORTS_BASE = (nowMs: number): Omit<ReportedPlacementsProps, "list"> => (
   onApprove: noop,
 });
 
-const REPORT_STATES = (nowMs: number): readonly { caption: string; props: ReportedPlacementsProps }[] => [
-  {
-    caption: "Deux poses signalées : l'une cachée du stream, l'autre en attente du seuil",
-    props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: sampleReports(nowMs) } },
-  },
-  {
-    caption: "Rétablir attend sa réponse",
-    props: {
-      ...REPORTS_BASE(nowMs),
-      list: { status: "ready", reports: sampleReports(nowMs).slice(0, 1) },
-      approvingPlacementId: SAMPLE_PLACEMENT_ID,
+const REPORT_STATES = (nowMs: number): readonly { caption: string; props: ReportedPlacementsProps }[] => {
+  const reports = sampleReports(nowMs);
+  const [approving] = reports;
+  return [
+    {
+      caption:
+        "Trois signalements : une pose cachée du stream, une pose en attente du seuil, un dessin de plusieurs poses",
+      props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports } },
     },
-  },
-  { caption: "Aucun signalement", props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: [] } } },
-];
+    {
+      caption: "Rétablir attend sa réponse",
+      props: {
+        ...REPORTS_BASE(nowMs),
+        list: { status: "ready", reports: reports.slice(0, 1) },
+        approvingReportKey: approving ? pendingReportKey(approving) : null,
+      },
+    },
+    {
+      caption: "Aucun signalement",
+      props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: [] } },
+    },
+  ];
+};
 
 const SYNC_STATES = (nowMs: number): readonly { caption: string; sync: TwitchSyncView }[] => [
   { caption: "Pour le streamer, jamais synchronisé", sync: { status: "never" } },
