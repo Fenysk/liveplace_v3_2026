@@ -95,7 +95,7 @@ describe("the value of a resource, in its unit (JOURNAL 2026-10-07)", () => {
   it("says each value against its ceiling, in the unit of the resource", () => {
     const texts = [
       measured("redisMemory", "bytes", 333_447_168, 536_870_912, 62.1),
-      measured("gatewayDelay", "milliseconds", 140, 250, 56),
+      measured("gatewayDelay", "milliseconds", 40, 100, 40),
       measured("gatewayConnections", "connections", 410, 1750, 23.4),
       measured("gatewayOutbound", "bitsPerSecond", 9_000_000, 200_000_000, 4.5),
       measured("gatewayUtilization", "percent", 40, 100, 40),
@@ -108,7 +108,7 @@ describe("the value of a resource, in its unit (JOURNAL 2026-10-07)", () => {
 
     expect(texts).toEqual([
       "318\u00a0Mo sur 512\u00a0Mo",
-      "140\u00a0ms sur 250\u00a0ms",
+      "40\u00a0ms sur 100\u00a0ms",
       "410 sur 1\u202f750",
       "9\u00a0Mbit/s sur 200\u00a0Mbit/s",
       "40\u00a0%",
@@ -219,7 +219,7 @@ describe("the saturation at the head of the section (JOURNAL 2026-10-07)", () =>
 describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
   const resources: Resource[] = [
     measured("redisMemory", "bytes", 333_447_168, 536_870_912, 62.1),
-    measured("gatewayDelay", "milliseconds", 140, 250, 56),
+    measured("gatewayDelay", "milliseconds", 40, 100, 40),
     without("webUtilization", "withoutNews", "web"),
     measured("machineDisk", "bytes", 1_743_074_131_968, 1_999_540_056_064, 87.2),
     measured("convexCalls", "calls", 930_000, 1_000_000, 93, {
@@ -238,7 +238,7 @@ describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
     expect(groups.map(({ title }) => title)).toEqual(["Redis", "Gateway", "Web", "VPS", "Convex"]);
     expect(groups.map(({ rows }) => rows.map(({ name }) => name))).toEqual([
       ["Mémoire"],
-      ["Délai de diffusion"],
+      ["Retard de diffusion"],
       ["Occupation"],
       ["Disque"],
       ["Appels de fonctions", "Données sortantes"],
@@ -267,11 +267,11 @@ describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
     expect(egress?.note).toBe("projection fin octobre");
   });
 
-  // Le délai de diffusion dit pour combien de poses il compte
-  it("tells the broadcast delay for how many poses it counts", () => {
+  // Le retard de diffusion dit au-delà de quoi il compte, et pour combien de poses
+  it("tells the broadcast lateness beyond what it counts, and for how many poses", () => {
     const [delay] = toCapacityLinks(resources, nowMs)[1]?.rows ?? [];
 
-    expect(delay?.note).toBe("pour 99 % des poses");
+    expect(delay?.note).toBe("au-delà du tick, pour 99 % des poses");
   });
 
   // Laisse sans légende une ressource sans nouvelles, et ne montre aucun groupe sans ressource

@@ -2,7 +2,7 @@ import { INSTANT_WINDOW_MS } from "@liveplace/domain/capacity";
 import { describe, expect, it } from "vitest";
 import { createDelayTally, MAX_DELAY_MS } from "./delay-tally";
 
-// Écart §5.1 (JOURNAL 2026-10-07) : le délai de diffusion, d'une pose reçue à l'envoi de sa frame, p99 sur 5 minutes.
+// Écart §5.1 et §6 (JOURNAL 2026-10-07) : le retard de diffusion, d'une pose reçue à l'envoi de sa frame, p99 sur 5 minutes.
 describe("the broadcast delay tally (JOURNAL 2026-10-07)", () => {
   const record = (tally: ReturnType<typeof createDelayTally>, delayMs: number, count: number) => {
     for (let index = 0; index < count; index++) tally.record(delayMs);

@@ -29,11 +29,12 @@ const redis = new Redis(config.redisUrl);
 // En mode abonné, Redis n'accepte plus les autres commandes : il faut sa propre connexion (§6.3).
 const liveSubscriber = new Redis(config.redisUrl);
 const core = createCanvasCore(redis, liveSubscriber);
-// Écart §5.1 (JOURNAL 2026-10-07) : le délai de diffusion, d'une pose reçue à l'envoi de sa frame.
+// Écart §5.1 et §6 (JOURNAL 2026-10-07) : le retard de diffusion, d'une pose reçue à l'envoi de sa frame, sans l'attente du tick.
+const tickMs = Math.round(1000 / config.broadcastHz);
 const delays = createDelayTally();
-const broadcast = createBroadcast(core, { now: Date.now, record: delays.record });
+const broadcast = createBroadcast(core, { now: Date.now, record: delays.record, tickMs });
 
-setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
+setInterval(broadcast.tick, tickMs);
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
 setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
 

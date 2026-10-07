@@ -1,4 +1,4 @@
-// Le délai de diffusion (écart §5.1, JOURNAL 2026-10-07) : d'une pose reçue à l'envoi de sa frame, en p99 sur 5 minutes. Un
+// Le retard de diffusion (écart §5.1 et §6, JOURNAL 2026-10-07) : d'une pose reçue à l'envoi de sa frame, sans l'attente du tick, en p99 sur 5 minutes. Un
 // compteur par milliseconde, ouvert le temps d'une tranche : la mémoire ne dépend pas du nombre de poses, seulement des délais vus.
 
 import type { Timestamp } from "@liveplace/domain";

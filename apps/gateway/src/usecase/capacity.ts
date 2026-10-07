@@ -180,7 +180,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
   };
 
   // L'occupation et le débit sur le temps écoulé depuis le dernier échantillon, jamais sur moins d'une seconde : le premier
-  // échantillon, pris au démarrage, ne mesurerait que le démarrage. Le délai de diffusion et les connexions, tels qu'ils sont.
+  // échantillon, pris au démarrage, ne mesurerait que le démarrage. Le retard de diffusion et les connexions, tels qu'ils sont.
   const sampleGateway = (at: Timestamp): void => {
     const utilization = deps.host.getUtilizationPercent(); // lu même écarté : le temps suivant repart d'ici
     const elapsedSeconds = (at - lastSampledAt) / 1000;

@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §6 : la capacité compte le retard de diffusion, sans l'attente voulue du tick
+
+**Contexte.** Le délai de diffusion mesuré (de `occurredAt` à l'envoi de la frame) a un plancher d'environ 100 ms, l'attente du tick (D-13) : au repos, la ligne affiche déjà 49 % et passerait à l'orange sans vraie charge.
+**Décision.** Le retard d'une pose = l'envoi de sa frame − `occurredAt` − l'attente voulue : de son arrivée dans le tampon du canvas jusqu'à l'heure prévue du tick qui l'envoie (le tick précédent + l'intervalle), tick sauté par la diffusion adaptative compris. Restent comptés l'aller-retour Redis et le pub/sub, le retard du tick sur son heure, et la construction de la frame. Plafond : 100 ms (la cible de 250 ms du §12.3, moins le tick et le réseau). L'identifiant `gatewayDelay` ne change pas : pas de protocole.
+**Renoncement.** Retrancher l'intervalle entier du tick (une pose arrivée juste avant lui serait comptée à zéro, un vrai retard masqué).
+
 ## 2026-10-07 — Écart §11.3 : Redis a 2 Go en production, réglés par `REDIS_MAXMEMORY`
 
 **Contexte.** L'analyse de scalabilité du 07/10 montre que la mémoire de Redis est le premier plafond : un canvas très joué pèse des dizaines de Mo, et un streamer garde jusqu'à cinq archives. Le §11.3 fixe 512 Mo, « à réajuster selon la RAM du VPS, en gardant Redis sous la moitié du total ».

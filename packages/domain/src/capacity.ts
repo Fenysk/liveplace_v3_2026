@@ -53,7 +53,7 @@ export const INSTANT_WINDOW_MS = 5 * MINUTE_MS; // la valeur d'une ressource ins
 
 // Les plafonds fixés par l'infrastructure ou mesurés par le test de charge du 26/09 (§3).
 export const GATEWAY_OUTBOUND_CEILING_BPS = 200_000_000; // le port du VPS, 200 Mbit/s
-export const BROADCAST_DELAY_CEILING_MS = 250; // la cible du plan d'architecture, §12.3
+export const BROADCAST_DELAY_CEILING_MS = 100; // la cible de 250 ms du plan d'architecture, §12.3, moins le tick et le réseau (Écart §6, JOURNAL 2026-10-07)
 export const CANVAS_CONNECTIONS_CEILING = 1000;
 export const TOTAL_CONNECTIONS_CEILING = 1750;
 export const SNAPSHOT_AGE_CEILING_MS = 15 * MINUTE_MS; // à venir, avec la sauvegarde : pas encore de ressource
@@ -88,7 +88,7 @@ export const CONVEX_CEILINGS: Record<ConvexPlan, ConvexCeilings> = {
 const convexCeilings = CONVEX_CEILINGS[CONVEX_PLAN];
 
 // `ceiling` nul : lu avec la mesure (`maxmemory` de Redis, mémoire et disque de la machine). `windowMs` : sur quelle durée
-// la valeur prend le pic ; le délai de diffusion est déjà un p99 sur 5 minutes, il ne garde que le dernier échantillon.
+// la valeur prend le pic ; le retard de diffusion est déjà un p99 sur 5 minutes, il ne garde que le dernier échantillon.
 export type CapacitySpec = {
   id: CapacityResourceId;
   link: CapacityLink;

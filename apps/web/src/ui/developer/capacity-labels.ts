@@ -33,7 +33,7 @@ const RESOURCE_NAMES: Record<CapacityResourceId, { name: string; inline: string 
   redisMemory: { name: "Mémoire", inline: "mémoire" },
   redisCpu: { name: "Processeur", inline: "processeur" },
   gatewayUtilization: { name: "Occupation", inline: "occupation" },
-  gatewayDelay: { name: "Délai de diffusion", inline: "délai de diffusion" },
+  gatewayDelay: { name: "Retard de diffusion", inline: "retard de diffusion" },
   gatewayOutbound: { name: "Débit sortant", inline: "débit sortant" },
   gatewayCanvasConnections: {
     name: "Connexions au plus gros canvas",
@@ -141,9 +141,9 @@ const toMonthName = (nowMs: number): string =>
 const toDayOfMonth = (at: number): string =>
   new Date(at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", timeZone: "Europe/Paris" });
 
-// Une légende discrète sous le nom : un quota mensuel dit sa projection, et son jour plein ; le délai, ses poses.
+// Une légende discrète sous le nom : un quota mensuel dit sa projection, et son jour plein ; le retard, au-delà du tick et pour combien de poses.
 export function toRowNote(resource: FrameResource, nowMs: number): string | undefined {
-  if (resource.id === "gatewayDelay") return "pour 99 % des poses";
+  if (resource.id === "gatewayDelay") return "au-delà du tick, pour 99 % des poses";
   if (resource.link !== "convex" || resource.state !== "measured") return undefined;
   const projection = `projection fin ${toMonthName(nowMs)}`;
   return resource.fullAt === undefined

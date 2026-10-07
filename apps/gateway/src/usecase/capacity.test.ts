@@ -267,7 +267,7 @@ describe("what the capacity measures (JOURNAL 2026-10-07)", () => {
       redisMemory: { value: 318_000_000, ceiling: 512_000_000, ratio: 62.1, unit: "bytes" },
       redisCpu: { value: 0.2, ceiling: 1, ratio: 20, unit: "cores" }, // 2 s de processeur en 10 s : 20 % d'un cœur
       gatewayUtilization: { value: 40, ceiling: 100, ratio: 40, unit: "percent" },
-      gatewayDelay: { value: 0, ceiling: 250, ratio: 0, unit: "milliseconds" },
+      gatewayDelay: { value: 0, ceiling: 100, ratio: 0, unit: "milliseconds" },
       gatewayOutbound: { value: 1_000_000, ceiling: 200_000_000, ratio: 0.5, unit: "bitsPerSecond" },
       gatewayCanvasConnections: { value: 500, ceiling: 1000, ratio: 50, unit: "connections" },
       gatewayConnections: { value: 875, ceiling: 1750, ratio: 50, unit: "connections" },
@@ -323,15 +323,15 @@ describe("what the capacity measures (JOURNAL 2026-10-07)", () => {
     expect(resourceOf("redisCpu")).toMatchObject({ value: 0.25 }); // aucun échantillon négatif : le pic reste celui d'avant
   });
 
-  // Dit le délai de diffusion au p99 des poses envoyées depuis les 5 dernières minutes
-  it("tells the broadcast delay at the p99 of the poses sent in the last 5 minutes", async () => {
+  // Dit le retard de diffusion au p99 des poses envoyées depuis les 5 dernières minutes
+  it("tells the broadcast lateness at the p99 of the poses sent in the last 5 minutes", async () => {
     const { delays, sampleAfter, resourceOf } = setup();
     for (let pose = 0; pose < 98; pose++) delays.record(40);
     for (let pose = 0; pose < 2; pose++) delays.record(310);
 
     await sampleAfter(0);
 
-    expect(resourceOf("gatewayDelay")).toMatchObject({ state: "measured", value: 310, ratio: 124 });
+    expect(resourceOf("gatewayDelay")).toMatchObject({ state: "measured", value: 310, ratio: 310 });
   });
 
   // Ne compte que les octets envoyés depuis le dernier échantillon, et rien au premier : il n'y a pas de durée

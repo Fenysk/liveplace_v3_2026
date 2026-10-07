@@ -40,10 +40,10 @@ const withoutNews = (id: CapacityResourceId): CapacityResource => {
 
 // Écart §5.1 et §6 (JOURNAL 2026-10-07) : les plafonds fixes de la capacité, dans domain.
 describe("the fixed ceilings (JOURNAL 2026-10-07)", () => {
-  // Fixe le débit sortant à 200 Mbit/s, le délai de diffusion à 250 ms, et les connexions à 1 000 et 1 750
-  it("fixes the outbound rate at 200 Mbit/s, the broadcast delay at 250 ms, and the connections at 1,000 and 1,750", () => {
+  // Fixe le débit sortant à 200 Mbit/s, le retard de diffusion à 100 ms, et les connexions à 1 000 et 1 750
+  it("fixes the outbound rate at 200 Mbit/s, the broadcast lateness at 100 ms, and the connections at 1,000 and 1,750", () => {
     expect(GATEWAY_OUTBOUND_CEILING_BPS).toBe(200_000_000);
-    expect(BROADCAST_DELAY_CEILING_MS).toBe(250);
+    expect(BROADCAST_DELAY_CEILING_MS).toBe(100);
     expect(CANVAS_CONNECTIONS_CEILING).toBe(1000);
     expect(TOTAL_CONNECTIONS_CEILING).toBe(1750);
   });
@@ -154,8 +154,8 @@ describe("the value of an instant resource: the peak of the last 5 minutes (JOUR
       unit: "milliseconds",
       state: "measured",
       value: 120, // un p99 sur 5 minutes déjà : la fenêtre ne garde que le dernier échantillon
-      ceiling: 250,
-      ratio: 48,
+      ceiling: 100,
+      ratio: 120,
     });
     expect(toInstantResource(getCapacitySpec("redisMemory"), samples, 512, now)).toMatchObject({
       state: "measured",

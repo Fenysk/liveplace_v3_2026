@@ -44,7 +44,7 @@ const base = (): Resource[] => [
   measured("redisMemory", 318 * MIB, 512 * MIB),
   measured("redisCpu", 0.09, 1),
   measured("gatewayUtilization", 8, 100),
-  measured("gatewayDelay", 140, 250),
+  measured("gatewayDelay", 40, 100),
   measured("gatewayOutbound", 9_000_000, 200_000_000),
   measured("gatewayCanvasConnections", 120, 1000),
   measured("gatewayConnections", 410, 1750),
@@ -75,7 +75,7 @@ const toFrame = (resources: Resource[], nowMs: number): CapacityFrame => {
 const CALM = replaced(
   base(),
   measured("redisMemory", 96 * MIB, 512 * MIB),
-  measured("gatewayDelay", 40, 250),
+  measured("gatewayDelay", 12, 100),
   measured("machineDisk", 12 * GIB, 80 * GIB),
 );
 
