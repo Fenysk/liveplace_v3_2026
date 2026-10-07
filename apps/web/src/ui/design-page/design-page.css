@@ -2,13 +2,12 @@
 
 @import "../design/variable-specimen.css";
 
+/* Le texte sur le fond des pills : le vide n'apparaît que dans les scènes. Le `body` reste sur --void, la page le couvre. */
 .design-page {
   box-sizing: border-box;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-4) 96px;
-  display: grid;
-  gap: 48px;
+  min-height: 100dvh;
+  background: var(--pill-surface);
+  color: var(--ink);
 }
 
 /* Le pointeur « Doigt » : les contrôles à la taille tactile, comme sur un téléphone */
@@ -16,38 +15,45 @@
   --control-size: var(--control-size-touch);
 }
 
-.design-head {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.design-head h1,
-.design-head p,
-.design-section h2,
-.design-group h3,
-.design-group p {
-  margin: 0;
-}
-
-/* Barre latérale + contenu, comme la fenêtre du jeu (design/window.css) : une section à la fois, jamais un long scroll */
 .design-shell {
+  box-sizing: border-box;
+  max-width: 1332px;
+  margin: 0 auto;
+  padding: 24px 32px 96px 24px;
   display: flex;
   align-items: flex-start;
-  gap: var(--space-4);
+  gap: 32px;
 }
 
+/* Le sommaire : collé en haut, comme la barre latérale de la fenêtre du jeu (design/window.css) */
 .design-nav {
   flex: none;
-  width: 288px;
+  width: 264px;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--chip);
   position: sticky;
-  top: var(--space-4);
+  top: 24px;
+  max-height: calc(100dvh - 48px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.design-nav-bar {
+  display: none;
+}
+
+.design-nav-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.design-nav-title {
+  margin: 0;
+  padding: var(--space-2) 10px var(--space-3);
 }
 
 .design-nav ul {
@@ -71,76 +77,276 @@
   }
 }
 
+.design-chapter {
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.design-chapter-chevron {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.design-nav-entry {
+  height: calc(var(--control-size) - 4px);
+  padding: 0 10px 0 38px;
+}
+
+.design-nav-place {
+  margin-left: auto;
+}
+
 .design-nav .lp-btn[aria-current="page"] {
   background: var(--pill-surface);
   box-shadow: var(--pill-shadow);
 }
 
-/* Thème et Pointeur, sous la liste des sections : séparés par un filet, comme dans la fenêtre du jeu */
+/* Thème et Pointeur, sous le sommaire : séparés par un filet, comme dans la fenêtre du jeu */
 .design-nav-controls {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-top: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) 2px 4px;
   border-top: 1px solid var(--chip-hover);
 }
 
 .design-main {
   flex: 1;
   min-width: 0;
+  max-width: 980px;
 }
 
-.design-section {
+.design-entry {
   display: grid;
-  gap: 32px;
+  gap: 36px;
 }
 
-.design-group {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.design-specimens {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-4) 32px;
-  margin-top: var(--space-2);
-}
-
-.design-specimen {
-  margin: 0;
+.design-entry-head {
   display: grid;
   justify-items: start;
+  gap: var(--space-1);
+}
+
+.design-entry-head p,
+.design-entry-head h1 {
+  margin: 0;
+}
+
+.design-entry .design-entry-title {
+  font-size: 30px;
+  line-height: 36px;
+}
+
+.design-code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.design-note {
+  max-width: 680px;
+  margin-top: 6px;
+}
+
+/* Où la pill vit dans le jeu : une puce, comme un badge, mais qui peut passer à la ligne */
+.design-where {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+}
+
+.design-where svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.design-block {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.design-block .design-block-title {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.design-block-note {
+  margin: 0;
+  max-width: 680px;
+}
+
+.design-states {
+  display: grid;
   gap: var(--space-2);
 }
 
-/* Les couleurs, un thème par colonne : chaque colonne porte son propre `data-theme` */
-.design-theme-column {
-  flex: 1 1 320px;
+/* Une ligne par état : son nom et son détail à gauche, l'exemple à droite */
+.design-state {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--void);
-  color: var(--ink);
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
 
-.design-theme-column p {
+.design-state-label {
+  padding-top: 14px;
+}
+
+.design-state-label p {
   margin: 0;
+}
+
+.design-state-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* La scène : le vide du jeu et ses points, l'exemple à gauche et centré en hauteur */
+.design-stage {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 76px;
+  padding: 18px 22px;
+  overflow-x: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(circle, var(--void-dot) 0 1px, transparent 1.5px) 50% 50% / 24px 24px,
+    var(--void);
+}
+
+/* Là où le composant vit : le contenu d'une fenêtre (520 px), d'une petite fenêtre (400 px), d'une grande (900 px) ou
+   d'une fenêtre sur téléphone, sur la surface d'une pill ; ou la largeur d'un téléphone, moins ses marges */
+.design-in-window.lp-pill,
+.design-in-small-window.lp-pill,
+.design-in-large-window.lp-pill,
+.design-in-phone--window.lp-pill {
+  max-width: 100%;
+  padding: var(--space-4);
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+.design-in-window.lp-pill {
+  width: 552px;
+}
+
+.design-in-small-window.lp-pill {
+  width: 400px;
+}
+
+/* Elle garde sa largeur : sous 900 px, la scène défile plutôt que de la ramener à une seule colonne */
+.design-in-large-window.lp-pill {
+  width: 900px;
+  max-width: none;
+  flex: none;
+}
+
+/* La barre du bas y prend toute la place, comme dans le jeu */
+.design-in-phone {
+  width: 359px;
+  max-width: 100%;
+}
+
+.design-in-phone .lp-pill,
+.design-in-phone .lp-pill-content {
+  width: 100%;
+}
+
+/* Ce que `@media (max-width: 640px)` fait au vrai écran (tokens.css, window.css) */
+.design-in-phone--window.lp-pill {
+  --control-size: var(--control-size-touch);
+  width: 375px;
+}
+
+.design-in-phone--window .lp-window-row--profile {
+  flex-wrap: wrap;
+}
+
+.design-in-phone--window .lp-window-row--profile > :first-child {
+  flex-basis: 100%;
+}
+
+.design-in-phone--window .lp-window-row--profile > :not(:first-child) {
+  margin-left: auto;
+}
+
+/* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */
+.design-in-notice .lp-notice {
+  min-height: 0;
+  padding: 0;
+}
+
+/* Les fondations : des lignes sous filet sur le fond de la page */
+.design-lines {
+  display: grid;
+}
+
+.design-colors-legend {
+  display: grid;
+  grid-template-columns: 36px 36px;
+  gap: 0 10px;
+  margin: 0 0 var(--space-3);
+  white-space: nowrap;
+}
+
+.design-colors {
+  columns: 2;
+  column-gap: 40px;
+}
+
+.design-family {
+  break-inside: avoid;
+  margin-bottom: 22px;
+}
+
+.design-family h2 {
+  margin: 0 0 var(--space-2);
+}
+
+.design-color-row {
+  display: grid;
+  grid-template-columns: 36px 36px minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid var(--chip-hover);
+}
+
+.design-color-row .lp-specimen-sample {
+  width: 36px;
+  height: 36px;
+}
+
+.design-color-row .lp-specimen-text {
+  display: grid;
+}
+
+.design-color-row code,
+.design-icon code {
+  font-family: ui-monospace, monospace;
 }
 
 .design-palette-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: var(--space-2) var(--space-4);
-  width: 100%;
-}
-
-.design-list {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .design-type-row {
@@ -148,118 +354,122 @@
   grid-template-columns: 160px 140px 1fr;
   align-items: baseline;
   gap: var(--space-3);
+  padding: 10px 0;
+  border-top: 1px solid var(--chip-hover);
 }
 
-.design-type-row code,
-.design-icon code {
+.design-type-row code {
   font-family: ui-monospace, monospace;
+}
+
+.design-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 112px);
+  gap: var(--space-4);
 }
 
 .design-icon {
   display: grid;
   justify-items: center;
   gap: var(--space-1);
-  width: 88px;
+  text-align: center;
 }
 
-.design-fill-box {
-  display: flex;
-  width: 280px;
+.design-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
-/* La largeur d'un téléphone, moins ses marges : la barre du bas y prend toute la place, comme dans le jeu */
-.design-phone-box {
-  width: 359px;
-  max-width: 100%;
+/* Les choix de thème et de pointeur, un peu plus serrés : les trois options tiennent dans les 264 px du sommaire */
+.design-nav .lp-segmented-option {
+  gap: var(--space-1);
+  padding: 0 10px;
 }
 
-.design-phone-box .lp-pill,
-.design-phone-box .lp-pill-content {
-  width: 100%;
+.design-nav .lp-segmented-option svg {
+  width: 16px;
+  height: 16px;
 }
 
-/* Le contenu d'une fenêtre sur mobile : ce que `@media (max-width: 640px)` fait au vrai écran (tokens.css, window.css) */
-.design-phone-box--window {
-  --control-size: var(--control-size-touch);
-}
-
-.design-phone-box--window .lp-window-row--profile {
-  flex-wrap: wrap;
-}
-
-.design-phone-box--window .lp-window-row--profile > :first-child {
-  flex-basis: 100%;
-}
-
-.design-phone-box--window .lp-window-row--profile > :not(:first-child) {
-  margin-left: auto;
-}
-
-/* Un aperçu de pixels à la largeur d'une petite fenêtre */
-.design-preview-box {
-  width: 320px;
-  max-width: 100%;
-}
-
-/* Le contenu d'un onglet de la fenêtre, hors de la fenêtre */
-.design-window-box {
-  display: grid;
-  gap: var(--space-4);
-  width: min(520px, 100%);
-}
-
-/* La largeur d'une grande fenêtre : de quoi mettre deux colonnes côte à côte */
-.design-window-box--wide {
-  width: min(900px, 100%);
-}
-
-/* La largeur de la fenêtre même quand l'exemple est court : un champ y prend toute la place */
-.design-window-box--full {
-  width: 520px;
-  max-width: 100%;
-}
-
-/* Des boutons de démonstration : ils passent à la ligne sur un téléphone */
-.design-demo-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-/* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */
-.design-notice-box .lp-notice {
-  min-height: 0;
-  padding: 0;
-}
-
+/* Écran étroit : le sommaire se replie dans une barre, chaque ligne met son exemple sous son nom */
 @media (max-width: 640px) {
-  .design-type-row {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  /* La barre latérale devient une rangée d'onglets, comme la fenêtre du jeu sous 640 px */
   .design-shell {
+    padding: 0 0 48px;
     flex-direction: column;
+    align-items: stretch;
+    gap: 0;
   }
 
   .design-nav {
     width: 100%;
-    position: static;
+    max-height: 100dvh;
+    padding: 0;
+    border-radius: 0;
+    top: 0;
+    z-index: 2;
   }
 
-  .design-nav ul {
-    flex-direction: row;
-    overflow-x: auto;
-    scrollbar-width: none;
+  .design-nav-bar {
+    display: flex;
+    width: 100%;
+    height: 52px;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+    border-radius: 0;
   }
 
-  .design-nav .lp-btn {
-    width: auto;
+  .design-nav-tree {
+    display: none;
+    padding: var(--space-2);
   }
 
-  .design-nav-controls {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .design-nav.is-open .design-nav-tree {
+    display: flex;
   }
+
+  .design-main {
+    padding: var(--space-4) var(--space-4) 0;
+  }
+
+  /* La barre du sommaire dit déjà le chapitre */
+  .design-crumb {
+    display: none;
+  }
+
+  .design-entry .design-entry-title {
+    font-size: 26px;
+    line-height: 32px;
+  }
+
+  .design-state {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .design-state-label {
+    padding-top: 0;
+  }
+
+  .design-stage {
+    padding: 14px;
+  }
+
+  .design-colors {
+    columns: 1;
+  }
+
+  .design-type-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+/* Un exemple de la largeur d'une grande fenêtre : le nom passe au-dessus, la scène prend toute la largeur */
+.design-state:has(.design-in-large-window) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.design-state:has(.design-in-large-window) .design-state-label {
+  padding-top: 0;
 }
