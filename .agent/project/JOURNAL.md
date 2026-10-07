@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §11.3 : Redis a 2 Go en production, réglés par `REDIS_MAXMEMORY`
+
+**Contexte.** L'analyse de scalabilité du 07/10 montre que la mémoire de Redis est le premier plafond : un canvas très joué pèse des dizaines de Mo, et un streamer garde jusqu'à cinq archives. Le §11.3 fixe 512 Mo, « à réajuster selon la RAM du VPS, en gardant Redis sous la moitié du total ».
+**Décision.** `--maxmemory ${REDIS_MAXMEMORY:-512mb}` dans le compose ; la Compose de production porte `REDIS_MAXMEMORY=2gb` (8 Go sur le VPS, de la marge pour la copie de l'AOF et les quatre Redis des bêtas, qui gardent 512 Mo). La section Capacité lit le plafond sur Redis : il suit seul.
+**Renoncement.** 4 Go, la moitié du VPS : les bêtas et le fork de réécriture de l'AOF partagent la même machine. Un `CONFIG SET` à chaud : le compose reprendrait 512 Mo au déploiement suivant.
+
 ## 2026-10-07 — Écart §4.3 : la section Capacité de la fenêtre Développeur, ses teintes en tokens, ses processeurs en cœurs
 
 **Contexte.** La maquette validée veut un grand pourcentage vert, orange ou rouge, des barres de taux, et un processeur dit « 9 % de 4 cœurs » ; `tokens.css` n'a ni vert ni orange d'état, ni grande taille de texte, et la frame ne dit pas les cœurs.
