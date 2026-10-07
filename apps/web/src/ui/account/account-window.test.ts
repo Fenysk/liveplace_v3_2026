@@ -115,6 +115,17 @@ describe("la section Mon compte (CDC 2026, Fenêtre)", () => {
     expect(markup).toMatch(/checked=""[^>]*value="dark"/);
     expect(markup).not.toMatch(/checked=""[^>]*value="(auto|light)"/);
   });
+
+  // Mon compte porte aussi le choix de la langue, sous le thème, chaque langue écrite dans sa propre langue
+  it("holds the language choice below the theme, each language in its own language", () => {
+    const markup = renderWindow();
+
+    expect(markup).toMatch(/role="radiogroup" aria-label="Langue"/);
+    expect(markup).toContain("Français");
+    expect(markup).toContain("English");
+    expect(markup.indexOf('aria-label="Langue"')).toBeGreaterThan(markup.indexOf('aria-label="Thème"'));
+    expect(markup).toMatch(/checked=""[^>]*value="fr"/);
+  });
 });
 
 describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)", () => {

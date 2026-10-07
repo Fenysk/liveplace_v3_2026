@@ -1,14 +1,17 @@
 // La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte, ou Canvas par Réglages) : Canvas et Vue
 // OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, le thème,
-// Se déconnecter.
+// la langue, Se déconnecter.
 
 import { Layers, LogOut, MonitorPlay, Scaling, Shield, Trophy, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
+import { LocalePicker } from "../design/locale-controls";
 import { Profile, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
 import { ThemePicker } from "../design/theme-controls";
 import { Window, WindowRow } from "../design/window";
+import { useTexts } from "../locale/use-locale";
 
 export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "scoreboard" | "account";
 
@@ -55,6 +58,7 @@ export const AccountWindow = ({
   canvasesTab,
   scoreboardTab,
 }: AccountWindowProps) => {
+  const design = useTexts(DESIGN_TEXTS);
   const sections = [
     ...(canvasTab ? [CANVAS_SECTION] : []),
     ...(canvasesTab ? [CANVASES_SECTION] : []),
@@ -79,6 +83,9 @@ export const AccountWindow = ({
           </WindowRow>
           <WindowRow label="Thème">
             <ThemePicker choice={themeChoice} onPick={onPickTheme} />
+          </WindowRow>
+          <WindowRow label={design.language}>
+            <LocalePicker />
           </WindowRow>
         </>
       )}

@@ -8,6 +8,7 @@ import { ownerToast } from "../archive/archive-texts";
 import { switchToast } from "../canvas/switch-toast";
 import { Button } from "../design/button";
 import { Grabber } from "../design/grabber";
+import { LocalePicker } from "../design/locale-controls";
 import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Profile } from "../design/profile";
@@ -232,6 +233,9 @@ export const AccountWindowEntry = () => {
                 </WindowRow>
                 <WindowRow label="Thème">
                   <ThemePicker choice={themeChoice} onPick={pickTheme} />
+                </WindowRow>
+                <WindowRow label="Langue">
+                  <LocalePicker />
                 </WindowRow>
               </Window>
             )}

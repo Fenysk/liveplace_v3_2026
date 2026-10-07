@@ -12,6 +12,7 @@ import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../d
 import { Checkbox } from "../design/checkbox";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
+import { LocaleButton, LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
@@ -442,9 +443,16 @@ export const ChoicesEntry = () => {
   return (
     <Entry
       slug="choix"
-      components={["ChoiceList", "ThemePicker", "ThemeButton", "SwatchChoice"]}
-      file="ui/design/{choice-list,theme-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton de thème fait le cycle auto, clair, sombre."
+      components={[
+        "ChoiceList",
+        "ThemePicker",
+        "ThemeButton",
+        "LocalePicker",
+        "LocaleButton",
+        "SwatchChoice",
+      ]}
+      file="ui/design/{choice-list,theme-controls,locale-controls,palette}.tsx"
+      note="Un choix exclusif. Le bouton de thème fait le cycle auto, clair, sombre ; celui de langue bascule entre le français et l'anglais."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -479,6 +487,14 @@ export const ChoicesEntry = () => {
         </StateRow>
         <StateRow name="Thème, comme dans la pill Compte">
           <ThemeButton choice={themeChoice} onPick={pickTheme} />
+        </StateRow>
+      </Block>
+      <Block title="Langue">
+        <StateRow name="Langue, comme dans Mon compte">
+          <LocalePicker />
+        </StateRow>
+        <StateRow name="Langue, comme dans la pill Compte">
+          <LocaleButton />
         </StateRow>
       </Block>
       <Block title="Choix de couleur">
