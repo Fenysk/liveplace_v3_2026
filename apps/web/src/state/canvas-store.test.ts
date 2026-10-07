@@ -900,8 +900,29 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
     close();
 
     expect(asked.period).toBe("month");
-    expect(await listed).toEqual({ ok: true, value: [point] });
+    expect(await listed).toEqual({ ok: true, value: { points: [point] } });
     expect(await dropped).toEqual({ ok: false, error: "closed" });
+  });
+
+  // Rend avec l'historique les points du canvas de la socket quand le gateway les envoie (JOURNAL 2026-10-07)
+  it("gives with the history the points of the socket's canvas when the gateway sends them", async () => {
+    const { store, sent, receive } = setup();
+    const canvasPoint = {
+      at: 60_000,
+      people: 1,
+      obsViews: 0,
+      pixels: 4,
+      visits: 1,
+      visitMinutes: 2,
+      signups: 0,
+    };
+
+    const listed = store.listActivityHistory("day");
+    const asked = sent.at(-1);
+    if (asked?.t !== "listActivityHistory") throw new Error("aucune frame listActivityHistory");
+    receive({ t: "activityHistory", requestId: asked.requestId, points: [], canvasPoints: [canvasPoint] });
+
+    expect(await listed).toEqual({ ok: true, value: { points: [], canvasPoints: [canvasPoint] } });
   });
 
   // Donne chaque frame activity à qui écoute, jusqu'à ce qu'il se retire

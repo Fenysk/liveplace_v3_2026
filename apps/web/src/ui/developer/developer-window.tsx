@@ -1,24 +1,37 @@
-// La fenêtre Développeur (écart §10.3, JOURNAL 2026-10-06) : ouverte par le bouton de la pill Compte, pour le seul
-// développeur. Ses sections à lui, Activité pour l'instant ; celles des réglages n'y sont pas. Sur mobile, une feuille.
+// La fenêtre Développeur (écart §10.3, JOURNAL 2026-10-06 et 2026-10-07) : ouverte par le bouton de la pill Compte, pour le
+// seul développeur. Ses deux sections à lui, Ce canvas et Tout LivePlace ; celles des réglages n'y sont pas. Plus grande
+// que celle des réglages sur PC, une feuille sur mobile.
 
-import { Activity } from "lucide-react";
+import { Frame, Globe } from "lucide-react";
 import type { ReactNode } from "react";
-import { Window } from "../design/window";
+import { Window, type WindowSection } from "../design/window";
 
-const ACTIVITY_SECTION = { id: "activity", label: "Activité", icon: Activity } as const;
-const DEVELOPER_SECTIONS = [ACTIVITY_SECTION];
+export type DeveloperSectionId = "here" | "all";
 
-const doNothing = (): void => undefined;
+// Dans l'ordre du cahier des charges ; elle s'ouvre sur la première.
+export const DEVELOPER_SECTIONS = [
+  { id: "here", label: "Ce canvas", icon: Frame },
+  { id: "all", label: "Tout LivePlace", icon: Globe },
+] as const satisfies readonly WindowSection<DeveloperSectionId>[];
 
-type DeveloperWindowProps = { isOpen: boolean; onClose: () => void; children: ReactNode };
+export const FIRST_DEVELOPER_SECTION: DeveloperSectionId = "here";
 
-export const DeveloperWindow = ({ isOpen, onClose, children }: DeveloperWindowProps) => (
+type DeveloperWindowProps = {
+  isOpen: boolean;
+  sectionId: DeveloperSectionId;
+  onSelect: (sectionId: DeveloperSectionId) => void;
+  onClose: () => void;
+  children: ReactNode; // le contenu de la section choisie
+};
+
+export const DeveloperWindow = ({ isOpen, sectionId, onSelect, onClose, children }: DeveloperWindowProps) => (
   <Window
     isOpen={isOpen}
     sections={DEVELOPER_SECTIONS}
-    sectionId={ACTIVITY_SECTION.id}
-    onSelect={doNothing}
+    sectionId={sectionId}
+    onSelect={onSelect}
     onClose={onClose}
+    isLarge
   >
     {children}
   </Window>

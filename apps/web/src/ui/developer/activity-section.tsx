@@ -1,42 +1,27 @@
-// La section Activité de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : les
-// chiffres de l'instant, l'audience, les canvas, puis l'historique. L'affichage seul : `LiveActivitySection` la branche
-// sur le store.
+// La section Tout LivePlace de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : les
+// chiffres de l'instant, l'audience, les canvas, puis l'historique. L'audience et les canvas se mettent côte à côte quand
+// la place le permet. L'affichage seul : `LiveActivitySection` la branche sur le store.
 
 import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
-import type { ActivityPoint } from "@liveplace/domain/ports";
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import { CanvasActivityCard } from "../design/canvas-activity-card";
-import { Segmented } from "../design/segmented";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
-import { TimeCharts } from "../design/time-charts";
 import {
   AUDIENCE_COLUMNS,
   formatCount,
   guestsNote,
-  PERIOD_OPTIONS,
   toAudienceRows,
   toCanvasActivityCard,
 } from "./activity-labels";
 import { chartLinesFor, toActivitySlots } from "./activity-slots";
+import { HistoryBlock, LOADING, type ShownChart, type ShownHistory } from "./history-block";
 
 export type ActivitySectionProps = {
   view: ActivityWatchView;
   nowMs: Timestamp; // « depuis 12 min »
   onSelectPeriod: (period: ActivityPeriod) => void;
-};
-
-const LOADING = <span className="lp-type-caption lp-muted">Chargement…</span>;
-
-type ShownHistory = { points: readonly ActivityPoint[]; period: ActivityPeriod };
-
-// Pendant le chargement d'une autre période, les courbes d'avant restent, grisées : rien ne saute (dataviz).
-const useShownHistory = (view: ActivityWatchView): ShownHistory | null => {
-  const shown = useRef<ShownHistory | null>(null);
-  if (view.history.status === "ready" && shown.current?.points !== view.history.points)
-    shown.current = { points: view.history.points, period: view.period };
-  return shown.current;
 };
 
 const NowBlock = ({ view }: { view: ActivityWatchView }) => {
@@ -88,58 +73,37 @@ const CanvasesBlock = ({ view, nowMs }: Pick<ActivitySectionProps, "view" | "now
   );
 };
 
-const HistoryBlock = ({ view, onSelectPeriod }: Pick<ActivitySectionProps, "view" | "onSelectPeriod">) => {
-  const shown = useShownHistory(view);
-  // L'axe se recalcule à chaque relecture, chaque minute : pas à chaque frame de l'instant. Les courbes sont celles de
-  // la période des points montrés, pas de celle qu'on vient de choisir.
-  const chart = useMemo(
-    () =>
-      shown
-        ? {
-            lines: chartLinesFor(shown.period),
-            slots: toActivitySlots(shown.points, shown.period, Date.now()),
-          }
-        : null,
-    [shown],
-  );
-  return (
-    <>
-      <Segmented label="Période" options={PERIOD_OPTIONS} value={view.period} onSelect={onSelectPeriod} />
-      {view.history.status === "failed" && (
-        <span className="lp-type-caption lp-danger">
-          L'historique n'a pas pu se charger. Il se relit dans une minute.
-        </span>
-      )}
-      {chart && (
-        <TimeCharts
-          lines={chart.lines}
-          slots={chart.slots}
-          emptyText="Aucun point sur cette période."
-          isLoading={view.history.status !== "ready"}
-        />
-      )}
-      {!chart && view.history.status === "loading" && LOADING}
-    </>
-  );
-};
+// Stable d'un rendu à l'autre : les courbes ne se recalculent qu'avec l'historique.
+const toChart = ({ points, period }: ShownHistory): ShownChart => ({
+  lines: chartLinesFor(period),
+  slots: toActivitySlots(points, period, Date.now()),
+});
 
 export const ActivitySection = ({ view, nowMs, onSelectPeriod }: ActivitySectionProps) => (
-  <>
+  <div className="lp-window-layout">
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Maintenant</h3>
       <NowBlock view={view} />
     </section>
-    <section className="lp-setting">
-      <h3 className="lp-type-title lp-window-subhead">L'audience</h3>
-      <AudienceBlock view={view} />
-    </section>
-    <section className="lp-setting">
-      <h3 className="lp-type-title lp-window-subhead">Les canvas</h3>
-      <CanvasesBlock view={view} nowMs={nowMs} />
-    </section>
+    <div className="lp-window-split">
+      <section className="lp-setting">
+        <h3 className="lp-type-title lp-window-subhead">L'audience</h3>
+        <AudienceBlock view={view} />
+      </section>
+      <section className="lp-setting">
+        <h3 className="lp-type-title lp-window-subhead">Les canvas</h3>
+        <CanvasesBlock view={view} nowMs={nowMs} />
+      </section>
+    </div>
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">L'historique</h3>
-      <HistoryBlock view={view} onSelectPeriod={onSelectPeriod} />
+      <HistoryBlock
+        view={view}
+        onSelectPeriod={onSelectPeriod}
+        toChart={toChart}
+        emptyText="Aucun point sur cette période."
+        unavailableText="L'historique n'est pas disponible."
+      />
     </section>
-  </>
+  </div>
 );

@@ -674,10 +674,14 @@ export function createConnection(
     await deps.core.setGaugeLimits(ready.canvasId, { gaugeMaxStart, gaugeMaxCeiling });
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; pour les autres, rien, pas même un refus.
-  const listActivityHistory = async ({ requestId, period }: ListActivityHistoryFrame): Promise<void> => {
-    const points = await deps.activity.listHistory(session, period);
-    if (points) socket.sendFrame({ t: "activityHistory", requestId, points });
+  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; pour les autres, rien, pas même un refus. L'historique du canvas
+  // est celui de cette socket (JOURNAL 2026-10-07).
+  const listActivityHistory = async (
+    { requestId, period }: ListActivityHistoryFrame,
+    ready: ReadyState,
+  ): Promise<void> => {
+    const history = await deps.activity.listHistory(session, period, ready.canvasId);
+    if (history) socket.sendFrame({ t: "activityHistory", requestId, ...history });
   };
 
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
@@ -724,9 +728,9 @@ export function createConnection(
       case "listReports":
         return listReports(frame.requestId, ready);
       case "watchActivity":
-        return deps.activity.watch(socket, session, frame.isWatching);
+        return deps.activity.watch(socket, session, frame.isWatching, ready.canvasId);
       case "listActivityHistory":
-        return listActivityHistory(frame);
+        return listActivityHistory(frame, ready);
       case "ping":
         return socket.sendFrame({ t: "pong" });
     }

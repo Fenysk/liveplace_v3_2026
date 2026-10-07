@@ -13,7 +13,8 @@ const owner: User = {
 };
 
 // Des doubles qui notent ce qu'on leur demande d'écrire. Convex connaît le compte et le streamer de `/benitoad`.
-const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
+const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, ownerCanvasId?: string) => {
+  const activeCanvasReads: string[] = [];
   const createdCanvases: string[] = [];
   const mirroredUsers: string[] = [];
   const signedUsers: string[] = [];
@@ -34,7 +35,10 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
       },
       getUserByLogin: async (login) => known.find((candidate) => candidate.login === login) ?? null,
       ensureCanvasForOwner: async () => ensuredCanvasId,
-      getActiveCanvasForOwner: async () => null,
+      getActiveCanvasForOwner: async (ownerId) => {
+        activeCanvasReads.push(ownerId);
+        return ownerCanvasId ? { canvasId: ownerCanvasId, width: 100, height: 100 } : null;
+      },
     },
     redis: {
       createCanvas: async (canvasId) => {
@@ -58,7 +62,17 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user) => {
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };
-  return { deps, createdCanvases, mirroredUsers, signedUsers, upserts, mirrored, signed, signups };
+  return {
+    deps,
+    activeCanvasReads,
+    createdCanvases,
+    mirroredUsers,
+    signedUsers,
+    upserts,
+    mirrored,
+    signed,
+    signups,
+  };
 };
 
 describe("completeSignIn (§10.1)", () => {
@@ -141,5 +155,33 @@ describe("completeSignIn (§10.1)", () => {
 
     expect(signups).toEqual([{ nowMs: now }]);
     expect(signups[0]).not.toHaveProperty("discoveredViaUserId");
+  });
+
+  // Compte le nouveau compte dans le canvas actif du streamer dont la page a lancé la connexion (JOURNAL 2026-10-07)
+  it("counts a signup in the active canvas of the streamer whose page started the sign-in", async () => {
+    const { deps, signups, activeCanvasReads } = doubles("random-candidate", user, "owner-canvas");
+
+    await completeSignIn(deps, "code", "/benitoad");
+
+    expect(activeCanvasReads).toEqual([owner.userId]);
+    expect(signups).toEqual([
+      { nowMs: now, discoveredViaUserId: owner.userId, discoveredViaCanvasId: "owner-canvas" },
+    ]);
+  });
+
+  // Ne cherche aucun canvas pour un compte déjà connu, venu de l'accueil, ou d'un streamer sans canvas actif
+  it("looks for no canvas for a known account, one from home, or a streamer without an active canvas", async () => {
+    const known = doubles("existing-canvas", user, "owner-canvas");
+    const fromHome = doubles("random-candidate", user, "owner-canvas");
+    const withoutCanvas = doubles("random-candidate");
+
+    await completeSignIn(known.deps, "code", "/benitoad");
+    await completeSignIn(fromHome.deps, "code", null);
+    await completeSignIn(withoutCanvas.deps, "code", "/benitoad");
+
+    expect(known.activeCanvasReads).toEqual([]);
+    expect(fromHome.activeCanvasReads).toEqual([]);
+    expect(withoutCanvas.signups).toEqual([{ nowMs: now, discoveredViaUserId: owner.userId }]);
+    expect(withoutCanvas.signups[0]).not.toHaveProperty("discoveredViaCanvasId");
   });
 });

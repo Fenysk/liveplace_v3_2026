@@ -105,8 +105,10 @@ export function ownerLockKey(ownerId: string): string {
 // Écart §5.1 (JOURNAL 2026-10-06) : l'activité, des nombres seulement. Un autre préfixe isole les clés d'un test.
 export const ACTIVITY_MINUTES_RETENTION_MS = 7 * 24 * 3600 * 1000;
 export const ACTIVITY_HOURS_RETENTION_MS = 366 * 24 * 3600 * 1000;
+// Écart §5.1 (JOURNAL 2026-10-07) : les minutes d'un canvas ne servent qu'aux 24 h ; ses heures vivent comme celles du global.
+export const ACTIVITY_CANVAS_MINUTES_RETENTION_MS = 2 * 24 * 3600 * 1000;
 export const CANVAS_PIXELS_TTL_SECONDS = 61 * 60; // la température relit les 59 minutes d'avant la minute en cours
-export const SIGNUPS_TTL_SECONDS = 48 * 3600;
+export const SIGNUPS_TTL_SECONDS = 31 * 24 * 3600; // les 30 jours des nouveaux comptes venus de la page d'un streamer
 export const WITHOUT_DISCOVERED_VIA = "none"; // un nouveau compte venu de l'accueil (§8.1)
 // Écart §5.1 (JOURNAL 2026-10-07) : un jour de plus que les 30 de l'audience, pour que le jour qui sort s'y compte encore.
 export const ACTIVE_TTL_SECONDS = 31 * 24 * 3600;
@@ -135,5 +137,16 @@ export function buildActivityKeys(prefix = "activity:") {
     activeAccounts: (parisDay: string) => `${prefix}accounts:${parisDay}`, // les comptes qui ont ouvert le jeu
     activePlayers: (parisDay: string) => `${prefix}players:${parisDay}`, // les comptes dont une pose a été acceptée
     activeStreamers: (parisDay: string) => `${prefix}streamers:${parisDay}`, // les canvas avec une vue OBS ouverte
+    // Écart §5.1 (JOURNAL 2026-10-07) : l'historique d'un canvas, hors de `cv:<canvasId>:` (des nombres d'observation, que le
+    // worker ne sauvegarde pas). Les mêmes trois niveaux, écrits seulement pour une minute où il s'y passe quelque chose.
+    canvas: (canvasId: string) => ({
+      // `HASH` comme ceux du global, `people,obsViews,pixels,visits,phoneVisits,visitMinutes` (activity.lua), `toSignupsField`
+      // → nouveaux comptes venus de sa page, et pour les jours `toActiveField` → joueurs actifs.
+      minutes: `${prefix}cv:${canvasId}:minute`, // élagué au-delà de 2 jours
+      hours: `${prefix}cv:${canvasId}:hour`, // élagué au-delà de 366 jours
+      days: `${prefix}cv:${canvasId}:day`, // le début du jour de Paris, sans limite
+      // Un HyperLogLog par jour de Paris, EXPIRE 31 jours : les comptes qui y ont posé un pixel.
+      activePlayers: (parisDay: string) => `${prefix}cv:${canvasId}:players:${parisDay}`,
+    }),
   };
 }

@@ -226,6 +226,26 @@ const WindowSpecimen = () => {
   );
 };
 
+// La même fenêtre en grand : celle du développeur (JOURNAL 2026-10-07). Sur mobile, la feuille ne change pas.
+const LargeWindowSpecimen = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Specimen caption="Grande fenêtre : sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran ; sur mobile, la même feuille">
+      <Button label="Ouvrir la grande fenêtre" onPress={() => setIsOpen(true)} />
+      <Window
+        isOpen={isOpen}
+        sections={DEMO_SECTIONS}
+        sectionId="account"
+        onSelect={noop}
+        onClose={() => setIsOpen(false)}
+        isLarge
+      >
+        <p className="lp-type-body lp-muted">Une section qui profite de la largeur.</p>
+      </Window>
+    </Specimen>
+  );
+};
+
 const SmallWindowSpecimen = () => {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -448,6 +468,7 @@ export const ComponentsSection = () => {
         note="Les sections dépendent du rôle ; seules celles qui servent aujourd'hui existent."
       >
         <WindowSpecimen />
+        <LargeWindowSpecimen />
         <SmallWindowSpecimen />
         <Specimen caption="Fermer">
           <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={noop} />

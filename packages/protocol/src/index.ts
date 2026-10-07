@@ -586,13 +586,31 @@ const AudienceCountsSchema = z.object({
   activeStreamers: CountSchema,
 });
 
+// L'audience d'un canvas (JOURNAL 2026-10-07) : celle de tout LivePlace sans les comptes ni les streamers actifs, avec
+// ses joueurs actifs et les nouveaux comptes venus de sa page.
+const CanvasAudienceCountsSchema = z.object({
+  visits: CountSchema,
+  phoneVisits: CountSchema,
+  visitMinutes: CountSchema,
+  activePlayers: CountSchema,
+  signups: CountSchema,
+});
+
+// Le canvas de la socket du développeur (JOURNAL 2026-10-07) : un canvas de la liste, sans les nouveaux comptes du jour
+// (l'audience a les siens), avec ses pixels de la dernière minute, glissante, et son audience.
+const ActivityHereSchema = ActivityCanvasSchema.omit({ signups: true }).extend({
+  pixels: CountSchema,
+  audience: z.object({ today: CanvasAudienceCountsSchema, month: CanvasAudienceCountsSchema }),
+});
+
 // `pixels` : la dernière minute, glissante ; `signups` : le jour de Paris. L'audience : le jour de Paris et les 30 jours.
-// Les canvas, du plus chaud au plus froid.
+// Les canvas, du plus chaud au plus froid. `here` : absent quand la socket n'a pas de canvas prêt, ou pour un gateway d'avant.
 const ActivityFrameSchema = z.object({
   t: z.literal("activity"),
   now: ActivityCountsSchema.extend({ guests: CountSchema }),
   audience: z.object({ today: AudienceCountsSchema, month: AudienceCountsSchema }),
   canvases: z.array(ActivityCanvasSchema),
+  here: ActivityHereSchema.optional(),
 });
 
 // Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels, des comptes, des visites
@@ -607,10 +625,25 @@ const ActivityPointSchema = ActivityCountsSchema.extend({
   activeStreamers: CountSchema.optional(),
 });
 
+// Un point d'un canvas (JOURNAL 2026-10-07), à `at` son début : le pic des personnes et des vues OBS, la somme des pixels,
+// des visites, du temps passé et des nouveaux comptes venus de sa page. Les joueurs actifs ne se gardent que par jour.
+const CanvasPointSchema = z.object({
+  at: TimestampSchema,
+  people: CountSchema,
+  obsViews: CountSchema,
+  pixels: CountSchema,
+  visits: CountSchema,
+  visitMinutes: CountSchema,
+  signups: CountSchema,
+  activePlayers: CountSchema.optional(),
+});
+
+// `canvasPoints` : ceux du canvas de la socket, sur la même période ; un point absent vaut zéro. Absent : un gateway d'avant.
 const ActivityHistoryFrameSchema = z.object({
   t: z.literal("activityHistory"),
   requestId: RequestIdSchema,
   points: z.array(ActivityPointSchema),
+  canvasPoints: z.array(CanvasPointSchema).optional(),
 });
 
 const ErrorFrameSchema = z.object({

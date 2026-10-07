@@ -36,6 +36,13 @@ const getDiscoveredViaUserId = async (
   return owner && owner.userId !== user.userId ? owner.userId : undefined;
 };
 
+// Le canvas actif de ce streamer : c'est dans ses points d'historique que le nouveau compte se compte (JOURNAL 2026-10-07).
+const getDiscoveredViaCanvasId = async (
+  durable: Pick<DurableStore, "getActiveCanvasForOwner">,
+  discoveredViaUserId: string | undefined,
+): Promise<string | undefined> =>
+  discoveredViaUserId ? (await durable.getActiveCanvasForOwner(discoveredViaUserId))?.canvasId : undefined;
+
 // `returnPath` : le canvas d'où l'on s'est connecté, déjà validé (`toReturnPath`), ou `null`.
 export async function completeSignIn(
   deps: SignInDeps,
@@ -66,10 +73,13 @@ export async function signInTwitchUser(
   await deps.redis.setUser(user);
   await deps.redis.createCanvas(canvasId, meta);
   // Écart §5.1 (JOURNAL 2026-10-06) : le candidat retenu, c'est un nouveau compte.
-  if (canvasId === candidateCanvasId)
+  if (canvasId === candidateCanvasId) {
+    const discoveredViaCanvasId = await getDiscoveredViaCanvasId(deps.durable, discoveredViaUserId);
     await deps.redis.storeSignup({
       nowMs: deps.now(),
       ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
+      ...(discoveredViaCanvasId ? { discoveredViaCanvasId } : {}),
     });
+  }
   return { signedSession: await deps.signer.sign(user), login: user.login };
 }

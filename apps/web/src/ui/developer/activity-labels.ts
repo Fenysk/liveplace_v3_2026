@@ -1,8 +1,14 @@
-// Les mots de la section Activité (écart §4.3, JOURNAL 2026-10-06) : des nombres au format français, des textes courts.
+// Les mots de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07) : des nombres au format français,
+// des textes courts.
 
 import { type ActivityPeriod, MINUTE_MS, type Role, type Timestamp } from "@liveplace/domain";
-import type { ActivityAudience, ActivityCanvas } from "@liveplace/domain/ports";
-import type { CanvasActivityCardProps } from "../design/canvas-activity-card";
+import type {
+  ActivityAudience,
+  ActivityCanvas,
+  CanvasAudience,
+  ConnectedAccount,
+} from "@liveplace/domain/ports";
+import type { CanvasActivityAccount, CanvasActivityCardProps } from "../design/canvas-activity-card";
 import type { SegmentedOption } from "../design/segmented";
 import type { StatTableCell, StatTableRow } from "../design/stat-table";
 
@@ -33,6 +39,13 @@ export const streamedCanvasesLabel = (streamed: number): string =>
   counted(streamed, "canvas streamé", "canvas streamés");
 
 export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pixel posé", "pixels posés");
+
+export const obsViewsLabel = (obsViews: number): string =>
+  counted(obsViews, "vue OBS ouverte", "vues OBS ouvertes");
+
+// La pastille OBS d'un canvas n'existe que s'il est streamé ; ses vues OBS se lisent en infobulle.
+export const toObsTitle = (obsViews: number): string | null =>
+  obsViews === 0 ? null : obsViewsLabel(obsViews);
 
 // L'audience (JOURNAL 2026-10-07) : les mêmes accords, pour l'infobulle des courbes.
 export const visitsLabel = (visits: number): string => counted(visits, "visite", "visites");
@@ -69,32 +82,62 @@ export const phoneShareNote = (phoneVisits: number, visits: number): string | un
 export const AUDIENCE_COLUMNS = ["Aujourd'hui", "30 jours"] as const;
 
 // Une ligne par chiffre, ses deux cellules dans l'ordre de `AUDIENCE_COLUMNS`.
-export function toAudienceRows({ today, month }: ActivityAudience): StatTableRow[] {
-  const cells = (toCell: (counts: ActivityAudience["today"]) => StatTableCell): StatTableCell[] => [
-    toCell(today),
-    toCell(month),
-  ];
+type AudienceDays<Counts> = { today: Counts; month: Counts };
+type VisitCounts = Pick<ActivityAudience["today"], "visits" | "phoneVisits" | "visitMinutes">;
+
+const toCells = <Counts>(
+  { today, month }: AudienceDays<Counts>,
+  toCell: (counts: Counts) => StatTableCell,
+): StatTableCell[] => [toCell(today), toCell(month)];
+
+// Les trois lignes que l'audience de tout LivePlace et celle d'un canvas ont en commun.
+const toVisitRows = <Counts extends VisitCounts>(audience: AudienceDays<Counts>): StatTableRow[] => [
+  {
+    label: "Visites",
+    cells: toCells(audience, ({ visits, phoneVisits }) => ({
+      value: formatCount(visits),
+      note: phoneShareNote(phoneVisits, visits),
+    })),
+  },
+  {
+    label: "Temps passé",
+    cells: toCells(audience, ({ visitMinutes }) => ({ value: formatDuration(visitMinutes) })),
+  },
+  {
+    label: "Durée moyenne d'une visite",
+    cells: toCells(audience, ({ visits, visitMinutes }) => ({ value: averageVisit(visitMinutes, visits) })),
+  },
+];
+
+export function toAudienceRows(audience: ActivityAudience): StatTableRow[] {
   return [
-    {
-      label: "Visites",
-      cells: cells(({ visits, phoneVisits }) => ({
-        value: formatCount(visits),
-        note: phoneShareNote(phoneVisits, visits),
-      })),
-    },
-    { label: "Temps passé", cells: cells(({ visitMinutes }) => ({ value: formatDuration(visitMinutes) })) },
-    {
-      label: "Durée moyenne d'une visite",
-      cells: cells(({ visits, visitMinutes }) => ({ value: averageVisit(visitMinutes, visits) })),
-    },
+    ...toVisitRows(audience),
     {
       label: "Comptes actifs",
-      cells: cells(({ activeAccounts }) => ({ value: formatCount(activeAccounts) })),
+      cells: toCells(audience, ({ activeAccounts }) => ({ value: formatCount(activeAccounts) })),
     },
-    { label: "Joueurs actifs", cells: cells(({ activePlayers }) => ({ value: formatCount(activePlayers) })) },
+    {
+      label: "Joueurs actifs",
+      cells: toCells(audience, ({ activePlayers }) => ({ value: formatCount(activePlayers) })),
+    },
     {
       label: "Streamers actifs",
-      cells: cells(({ activeStreamers }) => ({ value: formatCount(activeStreamers) })),
+      cells: toCells(audience, ({ activeStreamers }) => ({ value: formatCount(activeStreamers) })),
+    },
+  ];
+}
+
+// Celle d'un canvas : ses joueurs actifs, et les nouveaux comptes venus de sa page, à la place des comptes et des streamers.
+export function toCanvasAudienceRows(audience: CanvasAudience): StatTableRow[] {
+  return [
+    ...toVisitRows(audience),
+    {
+      label: "Joueurs actifs",
+      cells: toCells(audience, ({ activePlayers }) => ({ value: formatCount(activePlayers) })),
+    },
+    {
+      label: "Nouveaux comptes venus de sa page",
+      cells: toCells(audience, ({ signups }) => ({ value: formatCount(signups) })),
     },
   ];
 }
@@ -144,6 +187,20 @@ const DAY_TITLE = new Intl.DateTimeFormat("fr-FR", {
 export const slotTitle = (at: Timestamp, period: ActivityPeriod): string =>
   (period === "all" ? DAY_TITLE : MOMENT_TITLE).format(at);
 
+// Chaque compte connecté, avec son rôle et depuis quand.
+export const toActivityAccounts = (
+  accounts: readonly ConnectedAccount[],
+  nowMs: Timestamp,
+): CanvasActivityAccount[] =>
+  accounts.map((account) => ({
+    user: account,
+    mention: `${roleLabel(account.role)} · ${connectedSince(account.connectedAt, nowMs)}`,
+    devices: account.devices,
+  }));
+
+export const toGuestsLine = (guests: number): string | null =>
+  guests === 0 ? null : `+ ${counted(guests, "invité", "invités")}`;
+
 export function toCanvasActivityCard(
   canvas: ActivityCanvas,
   nowMs: Timestamp,
@@ -151,13 +208,9 @@ export function toCanvasActivityCard(
   const { owner, obsViews, people, guests, heat, signups, accounts } = canvas;
   return {
     owner,
-    obsTitle: obsViews === 0 ? null : counted(obsViews, "vue OBS ouverte", "vues OBS ouvertes"),
+    obsTitle: toObsTitle(obsViews),
     facts: [peopleLabel(people, guests), heatLabel(heat), signupsLabel(signups)],
-    accounts: accounts.map((account) => ({
-      user: account,
-      mention: `${roleLabel(account.role)} · ${connectedSince(account.connectedAt, nowMs)}`,
-      devices: account.devices,
-    })),
-    guestsLine: guests === 0 ? null : `+ ${counted(guests, "invité", "invités")}`,
+    accounts: toActivityAccounts(accounts, nowMs),
+    guestsLine: toGuestsLine(guests),
   };
 }

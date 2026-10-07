@@ -190,6 +190,36 @@
   height: fit-content;
 }
 
+/* La grande fenêtre (JOURNAL 2026-10-07), sur PC seulement : jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran,
+   avec la même marge au bord. Sur mobile, la feuille ci-dessous reste la même. */
+@media (min-width: 641px) {
+  .lp-window--large {
+    width: min(1100px, calc(100% - 2 * var(--space-4)));
+    height: min(90%, calc(100% - 2 * var(--space-4)));
+  }
+}
+
+/* Le contenu d'une section qui profite de la largeur (la fenêtre Développeur) : une colonne, deux dès que la place le
+   permet. C'est son propre conteneur, pas celui de la fenêtre : les autres sections n'ont rien à y gagner. */
+.lp-window-layout {
+  container-type: inline-size;
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+.lp-window-split {
+  display: grid;
+  align-items: start;
+  gap: var(--space-4);
+}
+
+@container (min-width: 720px) {
+  .lp-window-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .lp-window-actions {
   display: flex;
   flex-wrap: wrap;

@@ -32,6 +32,24 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §5.1 : le web compte le nouveau compte dans les points du canvas actif du streamer d'origine
+
+**Contexte.** La courbe des nouveaux comptes venus de la page d'un canvas (cahier des charges du suivi d'activité, §3) a un point par minute, heure et jour ; la clé du jour de Paris par provenance ne donne qu'un nombre par jour, et par `ownerId` : une archive y lirait les comptes de son successeur.
+**Décision.** `storeSignup` reçoit aussi `discoveredViaCanvasId` : à la première connexion, le callback lit `getActiveCanvasForOwner` du streamer d'origine (une lecture de plus, pour les seuls nouveaux comptes venus d'une page) et le web ajoute le compte aux trois points du canvas, comme au global. Le gateway ne lit donc jamais la clé du jour pour un canvas ; elle passe tout de même à 31 jours, comme le cahier des charges.
+**Renoncement.** Pas de lecture de la clé du jour par le gateway (ni courbe ni audience par canvas exactes) ; un compte venu d'une page d'archive n'a pas de provenance, comme aujourd'hui (`/{login}` seul la porte).
+
+## 2026-10-07 — Écart §5.1 : l'historique d'un canvas vit sous `activity:cv:<canvasId>:`, hors des clés du canvas
+
+**Contexte.** La section Ce canvas (cahier des charges du suivi d'activité, §3) veut l'historique, les joueurs actifs et l'audience d'un seul canvas.
+**Décision.** Par canvas, la même pyramide que l'historique global (minute 2 jours, heure 366 jours, jour sans limite), écrite seulement pour une minute où il s'y passe quelque chose ; un HyperLogLog des joueurs actifs par jour de Paris, 31 jours ; les nouveaux comptes par provenance passent de 48 h à 31 jours. Préfixe `activity:cv:<canvasId>:` et non `cv:<canvasId>:` : ce sont des nombres d'observation, que le worker ne sauvegarde pas et qu'une restauration n'attend pas. Le gateway verse à la minute, jamais à chaque pose.
+**Renoncement.** Supprimer une archive ne supprime pas son historique (des nombres, quelques Ko) ; pas de comptes actifs ni de streamers actifs par canvas (le pic des personnes et les vues OBS les approchent).
+
+## 2026-10-07 — Écart §4.3 : les frames `activity` et `activityHistory` disent aussi le canvas de la socket
+
+**Contexte.** La section Ce canvas montre le canvas de la page ; le gateway sait déjà sur quel canvas est chaque socket.
+**Décision.** `activity` gagne `here` (le canvas de la socket : chiffres de l'instant, audience, comptes connectés) et `activityHistory` gagne `canvasPoints` (les points de ce canvas, même période). Aucune frame client ne change, `PROTOCOL_VERSION` non plus : les pages d'avant ignorent les champs en plus (`z.object`).
+**Renoncement.** Pas de `canvasId` demandé par le client : le développeur ne regarde que le canvas où il est, et une frame client stricte en plus aurait demandé une version.
+
 ## 2026-10-07 — Écart §5.1 : l'audience compte les comptes, joueurs et streamers distincts par HyperLogLog, sans garder qui
 
 **Contexte.** L'audience du suivi d'activité (cahier des charges dédié, §3) veut des comptes, joueurs et streamers distincts sur le jour et sur 30 jours, alors que l'historique ne garde aucun identifiant (§4 du même document).

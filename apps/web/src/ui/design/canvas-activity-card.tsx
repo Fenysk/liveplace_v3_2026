@@ -1,6 +1,7 @@
 // Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, la pastille OBS s'il est streamé,
 // ses chiffres, et, déplié, ses comptes connectés puis ses invités. Une ligne sur grand écran, une carte sur mobile.
 // Avatars et noms suivent la règle des profils (profile.tsx) : ils mènent au canvas de la personne.
+// Le streamer et la liste des comptes servent aussi seuls, dans la section Ce canvas (JOURNAL 2026-10-07).
 
 import type { Device } from "@liveplace/domain";
 import { ChevronDown, Monitor, MonitorPlay, Smartphone } from "lucide-react";
@@ -41,6 +42,41 @@ const DeviceIcon = ({ device }: { device: Device }) => {
   );
 };
 
+type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner" | "obsTitle">;
+
+// Le streamer d'un canvas, et sa pastille OBS s'il est streamé.
+export const CanvasActivityOwner = ({ owner, obsTitle }: CanvasActivityOwnerProps) => (
+  <span className="lp-canvas-activity-owner">
+    <Profile user={owner} />
+    {obsTitle && <Badge label="OBS" icon={MonitorPlay} title={obsTitle} />}
+  </span>
+);
+
+type ConnectedAccountsProps = Pick<CanvasActivityCardProps, "accounts" | "guestsLine"> & {
+  emptyText: string; // ni compte ni invité
+};
+
+// Les comptes connectés d'un canvas, avec leur rôle, depuis quand et leurs appareils, puis ses invités.
+export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: ConnectedAccountsProps) => (
+  <ul className="lp-connected-accounts">
+    {accounts.map(({ user, mention, devices }) => (
+      <li key={user.userId} className="lp-canvas-activity-account">
+        <span className="lp-marked">
+          <Profile user={user} />
+          <span className="lp-marked-mention lp-type-caption lp-muted">{mention}</span>
+        </span>
+        <span className="lp-canvas-activity-devices">
+          {devices.map((device) => (
+            <DeviceIcon key={device} device={device} />
+          ))}
+        </span>
+      </li>
+    ))}
+    {guestsLine && <li className="lp-type-caption lp-muted">{guestsLine}</li>}
+    {accounts.length === 0 && !guestsLine && <li className="lp-type-caption lp-muted">{emptyText}</li>}
+  </ul>
+);
+
 export const CanvasActivityCard = ({
   owner,
   obsTitle,
@@ -53,10 +89,7 @@ export const CanvasActivityCard = ({
   <article className={classNames("lp-canvas-activity", isOpen && "is-open")}>
     <div className="lp-canvas-activity-head">
       <span className="lp-canvas-activity-summary">
-        <span className="lp-canvas-activity-owner">
-          <Profile user={owner} />
-          {obsTitle && <Badge label="OBS" icon={MonitorPlay} title={obsTitle} />}
-        </span>
+        <CanvasActivityOwner owner={owner} obsTitle={obsTitle} />
         <span className="lp-canvas-activity-facts lp-type-caption lp-muted">
           {facts.map((fact) => (
             <span key={fact}>{fact}</span>
@@ -74,25 +107,13 @@ export const CanvasActivityCard = ({
       </span>
     </div>
     {isOpen && (
-      <ul className="lp-canvas-activity-accounts">
-        {accounts.map(({ user, mention, devices }) => (
-          <li key={user.userId} className="lp-canvas-activity-account">
-            <span className="lp-marked">
-              <Profile user={user} />
-              <span className="lp-marked-mention lp-type-caption lp-muted">{mention}</span>
-            </span>
-            <span className="lp-canvas-activity-devices">
-              {devices.map((device) => (
-                <DeviceIcon key={device} device={device} />
-              ))}
-            </span>
-          </li>
-        ))}
-        {guestsLine && <li className="lp-type-caption lp-muted">{guestsLine}</li>}
-        {accounts.length === 0 && !guestsLine && (
-          <li className="lp-type-caption lp-muted">Aucune page ouverte sur ce canvas.</li>
-        )}
-      </ul>
+      <div className="lp-canvas-activity-accounts">
+        <ConnectedAccounts
+          accounts={accounts}
+          guestsLine={guestsLine}
+          emptyText="Aucune page ouverte sur ce canvas."
+        />
+      </div>
     )}
   </article>
 );

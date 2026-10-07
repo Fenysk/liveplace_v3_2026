@@ -568,3 +568,105 @@ describe("activity frames", () => {
     expect(decodeServerFrame({ ...history, points: [{ ...point, later: true }] }).ok).toBe(true);
   });
 });
+
+// JOURNAL 2026-10-07 : les frames disent aussi le canvas de la socket, sans changer de version.
+describe("the canvas of the socket in the activity frames", () => {
+  const audience = { visits: 12, phoneVisits: 5, visitMinutes: 80, activePlayers: 2, signups: 1 };
+  const here = {
+    canvasId: "c1",
+    owner: { userId: "68710381", login: "fenysk", displayName: "Fenysk", avatarUrl: "https://avatar" },
+    obsViews: 1,
+    people: 3,
+    guests: 1,
+    heat: 120,
+    pixels: 40,
+    accounts: [
+      {
+        userId: "68710381",
+        login: "fenysk",
+        displayName: "Fenysk",
+        role: "owner",
+        connectedAt: 1,
+        devices: ["desktop"],
+      },
+    ],
+    audience: { today: audience, month: { ...audience, visits: 300 } },
+  };
+  const day = { visits: 0, phoneVisits: 0, visitMinutes: 0, activeAccounts: 0, activePlayers: 0 };
+  const activity = {
+    t: "activity",
+    now: { people: 3, guests: 1, streamed: 1, pixels: 40, signups: 2 },
+    audience: { today: { ...day, activeStreamers: 0 }, month: { ...day, activeStreamers: 0 } },
+    canvases: [],
+  };
+  const canvasPoint = {
+    at: 60_000,
+    people: 3,
+    obsViews: 1,
+    pixels: 40,
+    visits: 2,
+    visitMinutes: 7,
+    signups: 1,
+  };
+  const history = { t: "activityHistory", requestId: "r", points: [] };
+
+  // Ne change aucune frame client : le canvas n'est pas demandé, c'est celui de la socket
+  it("changes no client frame: the canvas is not asked for, it is the socket's", () => {
+    const list = { t: "listActivityHistory", requestId: "r", period: "day" };
+
+    expect(decodeClientFrame(list).ok).toBe(true);
+    expect(decodeClientFrame({ ...list, canvasId: "c1" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "watchActivity", isWatching: true, canvasId: "c1" }).ok).toBe(false);
+  });
+
+  // Rend le canvas de la socket : son streamer, les chiffres de l'instant, l'audience et les comptes connectés
+  it("carries the canvas of the socket: its owner, the numbers of the moment, the audience and the accounts", () => {
+    const frame = { ...activity, here };
+
+    expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeServerFrame({ ...frame, here: { ...here, pixels: -1 } }).ok).toBe(false);
+    expect(decodeServerFrame({ ...frame, here: { ...here, audience: { today: audience } } }).ok).toBe(false);
+    const { signups, ...withoutSignups } = audience;
+    expect(
+      decodeServerFrame({ ...frame, here: { ...here, audience: { today: withoutSignups, month: audience } } })
+        .ok,
+    ).toBe(false);
+    const { accounts, ...withoutAccounts } = here;
+    expect(decodeServerFrame({ ...frame, here: withoutAccounts }).ok).toBe(false);
+  });
+
+  // Rend les points du canvas avec les joueurs actifs de Tout en plus, des nombres entiers seulement
+  it("carries the points of the canvas, with the active players of All on top, whole numbers only", () => {
+    const frame = { ...history, canvasPoints: [canvasPoint, { ...canvasPoint, activePlayers: 4 }] };
+
+    expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, obsViews: 1.5 }] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, signups: -1 }] }).ok).toBe(false);
+    const { visits, ...withoutVisits } = canvasPoint;
+    expect(decodeServerFrame({ ...frame, canvasPoints: [withoutVisits] }).ok).toBe(false);
+  });
+
+  // Lit une frame sans ces champs, d'un gateway d'avant : pas de canvas, pas de points
+  it("reads a frame without these fields, from a gateway from before: no canvas, no points", () => {
+    const decodedActivity = decodeServerFrame(activity);
+    const decodedHistory = decodeServerFrame(history);
+
+    expect(decodedActivity).toEqual({ ok: true, value: activity });
+    expect(decodedHistory).toEqual({ ok: true, value: history });
+    expect(decodedActivity.ok && "here" in decodedActivity.value).toBe(false);
+    expect(decodedHistory.ok && "canvasPoints" in decodedHistory.value).toBe(false);
+  });
+
+  // Une page d'avant ignore le canvas et ses points : ses schémas ne sont pas stricts
+  it("lets a page from before ignore the canvas and its points", () => {
+    const before = z.object({
+      t: z.literal("activityHistory"),
+      requestId: z.string(),
+      points: z.array(z.object({ at: z.number() })),
+    });
+    const beforeActivity = z.object({ t: z.literal("activity"), canvases: z.array(z.object({})) });
+
+    expect(before.safeParse({ ...history, canvasPoints: [canvasPoint] }).data).toEqual(history);
+    expect(beforeActivity.safeParse({ ...activity, here }).data).toEqual({ t: "activity", canvases: [] });
+  });
+});

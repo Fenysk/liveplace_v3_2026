@@ -1,5 +1,10 @@
 import type { ActivityPeriod } from "@liveplace/domain";
-import type { ActivityFrame, ActivityPoint } from "@liveplace/domain/ports";
+import type {
+  ActivityFrame,
+  ActivityHistory,
+  ActivityPoint,
+  CanvasActivityPoint,
+} from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { type ActivityClock, type ActivityWatchCanvas, createActivityWatch } from "./activity-watch";
 import type { RequestResult } from "./canvas-store";
@@ -13,6 +18,16 @@ const point = (at: number): ActivityPoint => ({
   visits: 0,
   phoneVisits: 0,
   visitMinutes: 0,
+});
+
+const canvasPoint = (at: number): CanvasActivityPoint => ({
+  at,
+  people: 1,
+  obsViews: 0,
+  pixels: 2,
+  visits: 0,
+  visitMinutes: 0,
+  signups: 0,
 });
 
 const noAudience = {
@@ -31,7 +46,7 @@ const frame: ActivityFrame = {
   canvases: [],
 };
 
-type Asked = { period: ActivityPeriod; answer: (result: RequestResult<ActivityPoint[]>) => void };
+type Asked = { period: ActivityPeriod; answer: (result: RequestResult<ActivityHistory>) => void };
 
 const setup = () => {
   const isWatchingSent: boolean[] = [];
@@ -61,7 +76,7 @@ const setup = () => {
   };
   const watch = createActivityWatch(canvas, clock);
   // Laisse la réponse d'une requête arriver jusqu'au store.
-  const answered = async (index: number, result: RequestResult<ActivityPoint[]>) => {
+  const answered = async (index: number, result: RequestResult<ActivityHistory>) => {
     asked[index]?.answer(result);
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
@@ -88,7 +103,7 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
   it("shows the asked history, loads again at another period, and ignores an outdated answer", async () => {
     const { watch, asked, answered } = setup();
     watch.open();
-    await answered(0, { ok: true, value: [point(1)] });
+    await answered(0, { ok: true, value: { points: [point(1)] } });
     expect(watch.getView()).toMatchObject({
       period: "day",
       history: { status: "ready", points: [point(1)] },
@@ -97,15 +112,33 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
     watch.selectPeriod("month");
     expect(watch.getView()).toMatchObject({ period: "month", history: { status: "loading" } });
     watch.selectPeriod("all");
-    await answered(1, { ok: true, value: [point(2)] });
+    await answered(1, { ok: true, value: { points: [point(2)] } });
     expect(watch.getView().history).toEqual({ status: "loading" });
-    await answered(2, { ok: true, value: [point(3)] });
+    await answered(2, { ok: true, value: { points: [point(3)] } });
 
     expect(asked.map(({ period }) => period)).toEqual(["day", "month", "all"]);
     expect(watch.getView()).toMatchObject({
       period: "all",
       history: { status: "ready", points: [point(3)] },
     });
+  });
+
+  // Garde avec l'historique les points du canvas de la socket, et aucun quand le gateway est d'avant (JOURNAL 2026-10-07)
+  it("keeps with the history the points of the socket's canvas, and none when the gateway is from before", async () => {
+    const { watch, answered } = setup();
+    watch.open();
+
+    await answered(0, { ok: true, value: { points: [point(1)], canvasPoints: [canvasPoint(1)] } });
+    expect(watch.getView().history).toEqual({
+      status: "ready",
+      points: [point(1)],
+      canvasPoints: [canvasPoint(1)],
+    });
+
+    watch.selectPeriod("month");
+    await answered(1, { ok: true, value: { points: [point(2)] } });
+    expect(watch.getView().history).toEqual({ status: "ready", points: [point(2)] });
+    expect(watch.getView().history).not.toHaveProperty("canvasPoints");
   });
 
   // Garde les courbes montrées quand une relecture échoue, et dit l'échec quand rien n'est montré
@@ -116,7 +149,7 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
     expect(watch.getView().history).toEqual({ status: "failed" });
 
     timers[0]?.run();
-    await answered(1, { ok: true, value: [point(1)] });
+    await answered(1, { ok: true, value: { points: [point(1)] } });
     timers[0]?.run();
     await answered(2, { ok: false, error: "closed" });
 

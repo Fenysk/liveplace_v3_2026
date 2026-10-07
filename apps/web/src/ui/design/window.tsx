@@ -27,6 +27,7 @@ type WindowProps<Id extends string> = {
   sectionId: Id;
   onSelect: (id: Id) => void;
   onClose: () => void;
+  isLarge?: boolean; // sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur (JOURNAL 2026-10-07) ; mobile : la feuille
   children: ReactNode; // le contenu de la section ouverte
 };
 
@@ -63,6 +64,7 @@ type WindowShellProps = {
   onClose: () => void;
   titleId: string;
   isSmall?: boolean;
+  isLarge?: boolean;
   isLocked?: boolean;
   children: ReactNode;
 };
@@ -73,6 +75,7 @@ const WindowShell = ({
   onClose,
   titleId,
   isSmall = false,
+  isLarge = false,
   isLocked = false,
   children,
 }: WindowShellProps) => {
@@ -83,6 +86,7 @@ const WindowShell = ({
       className={classNames(
         "lp-pill lp-window",
         isSmall && "lp-window--small",
+        isLarge && "lp-window--large",
         isLocked && "is-locked",
         isShown && "is-open",
       )}
@@ -125,13 +129,14 @@ export const Window = <Id extends string>({
   sectionId,
   onSelect,
   onClose,
+  isLarge = false,
   children,
 }: WindowProps<Id>) => {
   // Un identifiant par fenêtre : une petite fenêtre peut exister à côté (JOURNAL 2026-09-25).
   const titleId = useId();
   const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
   return (
-    <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId}>
+    <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId} isLarge={isLarge}>
       <nav className="lp-window-nav" aria-label="Sections">
         <ul>
           {sections.map(({ id, label, icon: Icon }) => (

@@ -60,6 +60,8 @@ const noAudience = {
   activeStreamers: 0,
 };
 
+const noCanvasAudience = { visits: 0, phoneVisits: 0, visitMinutes: 0, activePlayers: 0, signups: 0 };
+
 // Le suivi d'activité garde ses nombres ailleurs : ici, il n'y a rien à relire (écart §5.1, JOURNAL 2026-10-06).
 const activityStore: ActivityStore = {
   storeActivityMinute: async () => undefined,
@@ -68,6 +70,8 @@ const activityStore: ActivityStore = {
   listCanvasPixels: async () => [],
   getDaySignups: async () => ({ total: 0, byDiscoveredViaUserId: new Map() }),
   getAudience: async () => ({ today: noAudience, month: noAudience }),
+  listCanvasHistory: async () => [],
+  getCanvasAudience: async () => ({ today: noCanvasAudience, month: noCanvasAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
 };
 const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
@@ -1378,8 +1382,13 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
     await activity.tick();
 
     expect(sent.some((frame) => "t" in frame && frame.t === "error")).toBe(false);
-    expect(sent.at(-2)).toEqual({ t: "activityHistory", requestId: "history-1", points: [] });
-    expect(sent.at(-1)).toMatchObject({ t: "activity", canvases: [{ canvasId }] });
+    expect(sent.at(-2)).toEqual({
+      t: "activityHistory",
+      requestId: "history-1",
+      points: [],
+      canvasPoints: [],
+    });
+    expect(sent.at(-1)).toMatchObject({ t: "activity", canvases: [{ canvasId }], here: { canvasId } });
   });
 
   // Une inspection d'archive ne donne ni l'identifiant de l'auteur, ni le droit de signaler, ni l'origine du modérateur
@@ -1499,7 +1508,26 @@ describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", ()
 
     await connection.receive(listHistory);
 
-    expect(sent.at(-1)).toEqual({ t: "activityHistory", requestId: "history-1", points: [] });
+    expect(sent.at(-1)).toEqual({
+      t: "activityHistory",
+      requestId: "history-1",
+      points: [],
+      canvasPoints: [],
+    });
+  });
+
+  // Dit au développeur le canvas de sa socket, celui de son hello : l'activité le met dans `here`
+  it("tells the developer the canvas of his socket, the one of his hello: the activity puts it in `here`", async () => {
+    const { activity, connection, sent } = setup({ session: developer });
+    await connection.receive(hello());
+    await connection.receive(watch);
+
+    await activity.tick();
+
+    expect(sent.at(-1)).toMatchObject({
+      t: "activity",
+      here: { canvasId, people: 1, owner: { userId: meta.ownerId } },
+    });
   });
 
   // Met la page dans l'activité au hello, avec son appareil et ses pixels acceptés, et l'en retire à sa fermeture

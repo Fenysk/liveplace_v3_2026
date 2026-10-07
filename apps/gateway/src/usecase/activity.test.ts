@@ -1,7 +1,9 @@
 import {
+  type ActivityPeriod,
   type CanvasMeta,
   DEVELOPER_USER_ID,
   defaultCanvasMeta,
+  HOUR_MS,
   MINUTE_MS,
   type Session,
   toActivityPointStarts,
@@ -12,6 +14,8 @@ import type {
   ActivityFrame,
   ActivityMinute,
   ActivityStore,
+  CanvasActivityPoint,
+  CanvasAudience,
   CanvasPixelsMinute,
   ClientSocket,
   DaySignups,
@@ -31,6 +35,8 @@ const noAudience = {
   activePlayers: 0,
   activeStreamers: 0,
 };
+
+const noCanvasAudience = { visits: 0, phoneVisits: 0, visitMinutes: 0, activePlayers: 0, signups: 0 };
 
 const onceVisited = { ...noAudience, visits: 1 };
 
@@ -55,21 +61,27 @@ type SetupOptions = {
   pastMinutes?: CanvasPixelsMinute[]; // ce que rend `listCanvasPixels` au démarrage
   signups?: DaySignups;
   audience?: ActivityAudience; // ce que rend `getAudience`, sans la minute en cours
+  canvasAudience?: CanvasAudience; // ce que rend `getCanvasAudience`, sans la minute en cours
+  canvasPoints?: CanvasActivityPoint[]; // ce que rend `listCanvasHistory`
 };
 
 const setup = (options: SetupOptions = {}) => {
   const clock = { nowMs: now };
   const stored: ActivityMinute[] = [];
   const prunedAt: number[] = [];
+  const prunedCanvasIds: string[][] = [];
   const userReads: string[] = [];
   const signupReads: number[] = [];
   const audienceReads: ActiveIds[] = []; // les identifiants que la minute en cours a donnés à chaque lecture
+  const canvasAudienceReads: { canvasId: string; playerIds: Set<string> }[] = [];
+  const canvasHistoryReads: { canvasId: string; period: ActivityPeriod }[] = [];
   const store: ActivityStore = {
     async storeActivityMinute(minute) {
       stored.push(minute);
     },
-    async pruneActivity(nowMs) {
+    async pruneActivity(nowMs, canvasIds = []) {
       prunedAt.push(nowMs);
+      prunedCanvasIds.push([...canvasIds]);
     },
     async listActivityHistory(period) {
       return period === "day"
@@ -101,6 +113,14 @@ const setup = (options: SetupOptions = {}) => {
         streamedCanvasIds: new Set(opened.streamedCanvasIds),
       });
       return options.audience ?? { today: noAudience, month: noAudience };
+    },
+    async listCanvasHistory(canvasId, period) {
+      canvasHistoryReads.push({ canvasId, period });
+      return options.canvasPoints ?? [];
+    },
+    async getCanvasAudience(canvasId, _nowMs, openedPlayerIds) {
+      canvasAudienceReads.push({ canvasId, playerIds: new Set(openedPlayerIds) });
+      return options.canvasAudience ?? { today: noCanvasAudience, month: noCanvasAudience };
     },
     async getUser(userId) {
       userReads.push(userId);
@@ -138,10 +158,10 @@ const setup = (options: SetupOptions = {}) => {
     return { socket, sent };
   };
 
-  // Ce que reçoit le développeur au prochain tic : il regarde depuis une socket à lui.
-  const watched = async (): Promise<ActivityFrame> => {
+  // Ce que reçoit le développeur au prochain tic : il regarde depuis une socket à lui, sur `canvasId` s'il en a un.
+  const watched = async (canvasId?: string): Promise<ActivityFrame> => {
     const { socket, sent } = openSocket();
-    activity.watch(socket, developer, true);
+    activity.watch(socket, developer, true, canvasId);
     await activity.tick();
     activity.watch(socket, developer, false);
     const frame = sent.at(-1);
@@ -154,9 +174,12 @@ const setup = (options: SetupOptions = {}) => {
     clock,
     stored,
     prunedAt,
+    prunedCanvasIds,
     userReads,
     signupReads,
     audienceReads,
+    canvasAudienceReads,
+    canvasHistoryReads,
     join,
     openSocket,
     watched,
@@ -330,7 +353,9 @@ describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () =>
 
     const unvisited = { visits: 0, phoneVisits: 0, visitMinutes: 0 };
     expect(
-      stored.map(({ pixelsByCanvas, accountIds, playerIds, streamedCanvasIds, ...counts }) => counts),
+      stored.map(
+        ({ pixelsByCanvas, canvases, accountIds, playerIds, streamedCanvasIds, ...counts }) => counts,
+      ),
     ).toEqual([
       { at: minuteAt, people: 2, streamed: 1, pixels: 7, ...unvisited, visits: 2 },
       { at: minuteAt + MINUTE_MS, people: 1, streamed: 0, pixels: 0, ...unvisited },
@@ -379,9 +404,9 @@ describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () =>
   it("gives the history to the developer only", async () => {
     const { activity } = setup();
 
-    expect(await activity.listHistory(developer, "day")).toHaveLength(1);
-    expect(await activity.listHistory(viewer, "day")).toBeNull();
-    expect(await activity.listHistory(null, "day")).toBeNull();
+    expect((await activity.listHistory(developer, "day", "canvas-a"))?.points).toHaveLength(1);
+    expect(await activity.listHistory(viewer, "day", "canvas-a")).toBeNull();
+    expect(await activity.listHistory(null, "day", "canvas-a")).toBeNull();
   });
 });
 
@@ -615,5 +640,275 @@ describe("the audience in the gateway (JOURNAL 2026-10-07)", () => {
     expect((await watched()).audience.today).toMatchObject({ visits: 1 });
     expect(audienceReads.at(-1)?.accountIds).toEqual(new Set([DEVELOPER_USER_ID]));
     expect(audienceReads.at(-1)?.playerIds).toEqual(new Set([DEVELOPER_USER_ID]));
+  });
+});
+
+describe("the canvas of the socket in the gateway (JOURNAL 2026-10-07)", () => {
+  const savedCanvas = {
+    today: { visits: 10, phoneVisits: 4, visitMinutes: 50, activePlayers: 3, signups: 2 },
+    month: { visits: 100, phoneVisits: 40, visitMinutes: 500, activePlayers: 20, signups: 9 },
+  };
+  const nothing = { people: 0, obsViews: 0, pixels: 0, visits: 0, phoneVisits: 0, visitMinutes: 0 };
+  const nobody = new Set<string>();
+
+  // Dit du canvas de la socket son streamer, ses vues OBS, ses personnes dont les invités, sa température et ses comptes connectés
+  it("tells the canvas of the socket: its owner, OBS views, people with the guests, heat and connected accounts", async () => {
+    const { activity, join, watched } = setup();
+    join("canvas-a", viewer);
+    join("canvas-a", null);
+    join("canvas-a", null, { mode: "obs" });
+    join("canvas-b", other);
+    activity.countPixels("canvas-a", viewer.userId, 4);
+
+    const { here, canvases } = await watched("canvas-a");
+
+    expect(here).toMatchObject({
+      canvasId: "canvas-a",
+      owner: { userId: "owner-a", login: "login-owner-a", displayName: "Name owner-a" },
+      obsViews: 1,
+      people: 2,
+      guests: 1,
+      heat: 4,
+      pixels: 4,
+    });
+    expect(here?.accounts.map(({ userId, role }) => [userId, role])).toEqual([[viewer.userId, "viewer"]]);
+    expect(here).not.toHaveProperty("signups");
+    expect(canvases).toHaveLength(2);
+  });
+
+  // Envoie la même frame aux sockets d'un même canvas, une autre à celles d'un autre, et la frame d'avant à une socket sans canvas
+  it("sends the same frame to the sockets of one canvas, another to another's, and the plain one to a socket without canvas", async () => {
+    const { activity, join, openSocket } = setup();
+    join("canvas-a", viewer);
+    const [first, second, elsewhere, without] = [openSocket(), openSocket(), openSocket(), openSocket()];
+    activity.watch(first.socket, developer, true, "canvas-a");
+    activity.watch(second.socket, developer, true, "canvas-a");
+    activity.watch(elsewhere.socket, developer, true, "canvas-b");
+    activity.watch(without.socket, developer, true);
+
+    await activity.tick();
+
+    expect(first.sent[0]).toBe(second.sent[0]);
+    expect(elsewhere.sent[0]).not.toBe(first.sent[0]);
+    expect(first.sent[0]).toMatchObject({ here: { canvasId: "canvas-a" } });
+    expect(elsewhere.sent[0]).toMatchObject({ here: { canvasId: "canvas-b" } });
+    expect(without.sent[0]).toMatchObject({ t: "activity" });
+    expect(without.sent[0]).not.toHaveProperty("here");
+  });
+
+  // Laisse `here` absent d'un canvas que le noyau ne connaît pas
+  it("leaves `here` out for a canvas the core does not know", async () => {
+    const { join, watched, canvasAudienceReads } = setup();
+    join("canvas-a", viewer);
+
+    const frame = await watched("canvas-unknown");
+
+    expect(frame).not.toHaveProperty("here");
+    expect(frame.canvases).toHaveLength(1);
+    expect(canvasAudienceReads).toEqual([]);
+  });
+
+  // Compte les pixels de la dernière minute canvas par canvas, glissants, et les oublie une minute après
+  it("counts the pixels of the last minute canvas by canvas, sliding, and forgets them a minute later", async () => {
+    const { activity, clock, watched } = setup();
+    activity.countPixels("canvas-a", viewer.userId, 4);
+    clock.nowMs += 30_000;
+    activity.countPixels("canvas-a", viewer.userId, 6);
+    activity.countPixels("canvas-b", other.userId, 1);
+
+    expect((await watched("canvas-a")).here?.pixels).toBe(10);
+    expect((await watched("canvas-b")).here?.pixels).toBe(1);
+    clock.nowMs += 31_000;
+    expect((await watched("canvas-a")).here?.pixels).toBe(6);
+    clock.nowMs += 2 * MINUTE_MS;
+    expect((await watched("canvas-a")).here?.pixels).toBe(0);
+  });
+
+  // Ajoute à l'audience gardée du canvas ce que sa minute en cours a vu, sans les visites d'un autre canvas, et passe ses joueurs au noyau
+  it("adds what the minute in progress has seen to the saved audience of the canvas, without another canvas's visits, and gives the store its players", async () => {
+    const { activity, join, watched, canvasAudienceReads } = setup({ canvasAudience: savedCanvas });
+    join("canvas-a", viewer, { device: "phone" });
+    join("canvas-b", other);
+    join("canvas-a", null, { mode: "obs" });
+    join("canvas-a", other, { isResumed: true });
+    activity.countPixels("canvas-a", viewer.userId, 3);
+    activity.countPixels("canvas-b", other.userId, 1);
+
+    const { here } = await watched("canvas-a");
+
+    expect(here?.audience.today).toEqual({ ...savedCanvas.today, visits: 11, phoneVisits: 5 });
+    expect(here?.audience.month).toEqual({ ...savedCanvas.month, visits: 101, phoneVisits: 41 });
+    expect(canvasAudienceReads).toEqual([{ canvasId: "canvas-a", playerIds: new Set([viewer.userId]) }]);
+  });
+
+  // N'écrit à la minute que les canvas où elle a eu quelque chose : des personnes, une vue OBS, un pixel ou une visite
+  it("writes at the minute only the canvases it had something for: people, an OBS view, a pixel or a visit", async () => {
+    const { activity, clock, join, stored } = setup();
+    join("canvas-a", viewer, { device: "phone" });
+    join("canvas-b", null, { mode: "obs" });
+    activity.countPixels("canvas-c", "user-3", 5);
+
+    clock.nowMs = minuteAt + MINUTE_MS + 1000;
+    await activity.tick();
+
+    const [first] = stored;
+    expect([...(first?.canvases.keys() ?? [])].sort()).toEqual(["canvas-a", "canvas-b", "canvas-c"]);
+    expect(first?.canvases.get("canvas-a")).toEqual({
+      ...nothing,
+      people: 1,
+      visits: 1,
+      phoneVisits: 1,
+      playerIds: nobody,
+    });
+    expect(first?.canvases.get("canvas-b")).toEqual({ ...nothing, obsViews: 1, playerIds: nobody });
+    expect(first?.canvases.get("canvas-c")).toEqual({
+      ...nothing,
+      pixels: 5,
+      playerIds: new Set(["user-3"]),
+    });
+  });
+
+  // Reporte les personnes d'un canvas d'une minute à l'autre, et cesse de l'écrire une fois sa dernière page fermée
+  it("carries the people of a canvas from one minute to the next, and stops writing it once its last page is closed", async () => {
+    const { activity, clock, join, stored } = setup();
+    const page = join("canvas-a", viewer);
+    const tickAt = async (nowMs: number) => {
+      clock.nowMs = nowMs;
+      await activity.tick();
+    };
+
+    await tickAt(minuteAt + MINUTE_MS + 1000);
+    await tickAt(minuteAt + 2 * MINUTE_MS + 1000);
+    page.leave();
+    await tickAt(minuteAt + 3 * MINUTE_MS + 1000);
+    await tickAt(minuteAt + 4 * MINUTE_MS + 1000);
+
+    const written = stored.map(({ canvases }) => canvases.get("canvas-a"));
+    expect(written.map((canvas) => canvas?.people)).toEqual([1, 1, 1, undefined]);
+    expect(written.map((canvas) => canvas?.visits)).toEqual([1, 0, 0, undefined]);
+  });
+
+  // Garde le pic des personnes d'un canvas, un compte une fois quels que soient ses onglets, et somme ses visites
+  it("keeps the peak of the people of a canvas, an account once whatever its tabs, and sums its visits", async () => {
+    const { clock, join, stored, activity } = setup();
+    join("canvas-a", viewer);
+    join("canvas-a", viewer, { device: "phone" });
+    const guest = join("canvas-a", null);
+    join("canvas-a", other);
+    guest.leave();
+    join("canvas-b", other);
+
+    clock.nowMs = minuteAt + MINUTE_MS + 1000;
+    await activity.tick();
+
+    expect(stored[0]?.canvases.get("canvas-a")).toEqual({
+      ...nothing,
+      people: 3,
+      visits: 4,
+      phoneVisits: 1,
+      visitMinutes: 2,
+      playerIds: nobody,
+    });
+    expect(stored[0]?.canvases.get("canvas-b")).toMatchObject({ people: 1, visits: 1 });
+  });
+
+  // Compte le temps passé d'un canvas en pages ouvertes fois la durée écoulée, sans perdre une seconde d'une minute à l'autre
+  it("counts the time spent on a canvas as its open pages times the time gone by, losing no second from one minute to the next", async () => {
+    const { activity, clock, join, stored, watched } = setup();
+    join("canvas-a", viewer);
+    join("canvas-a", null);
+    join("canvas-b", other);
+
+    for (let minutes = 0; minutes < 5; minutes += 1) {
+      clock.nowMs += MINUTE_MS;
+      await activity.tick();
+    }
+
+    const spent = (canvasId: string) =>
+      stored.reduce((sum, { canvases }) => sum + (canvases.get(canvasId)?.visitMinutes ?? 0), 0);
+    const opened = async (canvasId: string) =>
+      (await watched(canvasId)).here?.audience.today.visitMinutes ?? 0;
+    expect(spent("canvas-a") + (await opened("canvas-a"))).toBe(10);
+    expect(spent("canvas-b") + (await opened("canvas-b"))).toBe(5);
+  });
+
+  // Garde les secondes d'un canvas dont les pages partent avant la minute : trois pages de 20 secondes font une minute
+  it("keeps the seconds of a canvas whose pages leave before the minute: three pages of 20 seconds make one", async () => {
+    const { clock, join, watched } = setup();
+    for (const session of [viewer, null, other]) {
+      const page = join("canvas-a", session);
+      clock.nowMs += 20_000;
+      page.leave();
+    }
+
+    expect((await watched("canvas-a")).here?.audience.today.visitMinutes).toBe(1);
+  });
+
+  // Ne compte pas, en production, les pages ni les pixels du développeur dans les chiffres du canvas, et le garde dans ses comptes
+  it("in production, leaves the developer's pages and pixels out of the numbers of the canvas, and keeps him in its accounts", async () => {
+    const { activity, clock, join, stored, watched, canvasAudienceReads } = setup({ isProduction: true });
+    join("canvas-a", developer, { role: "owner", device: "phone" });
+    join("canvas-a", developer, { role: "owner", mode: "obs" });
+    activity.countPixels("canvas-a", DEVELOPER_USER_ID, 9);
+
+    const { here } = await watched("canvas-a");
+    clock.nowMs = minuteAt + MINUTE_MS + 1000;
+    await activity.tick();
+
+    expect(here).toMatchObject({
+      obsViews: 0,
+      people: 0,
+      heat: 0,
+      pixels: 0,
+      accounts: [{ userId: DEVELOPER_USER_ID }],
+      audience: { today: noCanvasAudience, month: noCanvasAudience },
+    });
+    expect(canvasAudienceReads.at(-1)?.playerIds).toEqual(nobody);
+    expect(stored[0]?.canvases.size).toBe(0);
+  });
+
+  // Ailleurs, sur le poste et les bêtas, il compte comme tout le monde dans les chiffres du canvas
+  it("elsewhere, counts the developer like anyone in the numbers of the canvas", async () => {
+    const { activity, join, watched, canvasAudienceReads } = setup();
+    join("canvas-a", developer, { role: "owner" });
+    activity.countPixels("canvas-a", DEVELOPER_USER_ID, 2);
+
+    const { here } = await watched("canvas-a");
+
+    expect(here).toMatchObject({ people: 1, pixels: 2, audience: { today: { visits: 1 } } });
+    expect(canvasAudienceReads.at(-1)?.playerIds).toEqual(new Set([DEVELOPER_USER_ID]));
+  });
+
+  // Rend au développeur seul l'historique du canvas de sa socket, avec celui de tout LivePlace
+  it("gives the history of the socket's canvas, with the whole one, to the developer only", async () => {
+    const canvasPoints = [
+      { at: minuteAt, people: 1, obsViews: 0, pixels: 2, visits: 1, visitMinutes: 3, signups: 0 },
+    ];
+    const { activity, canvasHistoryReads } = setup({ canvasPoints });
+
+    expect(await activity.listHistory(developer, "month", "canvas-a")).toEqual({ points: [], canvasPoints });
+    expect(await activity.listHistory(viewer, "day", "canvas-a")).toBeNull();
+    expect(await activity.listHistory(null, "day", "canvas-a")).toBeNull();
+    expect(canvasHistoryReads).toEqual([{ canvasId: "canvas-a", period: "month" }]);
+  });
+
+  // Élague aussi les canvas écrits depuis le dernier élagage, à chaque heure, puis les oublie
+  it("also prunes the canvases written since the last pruning, every hour, then forgets them", async () => {
+    const { activity, clock, join, prunedCanvasIds } = setup();
+    const page = join("canvas-a", viewer);
+    const nextHour = toActivityPointStarts(now).hour + HOUR_MS;
+    const tickAt = async (nowMs: number) => {
+      clock.nowMs = nowMs;
+      await activity.tick();
+    };
+
+    await activity.start();
+    await tickAt(minuteAt + MINUTE_MS + 1000);
+    page.leave();
+    await tickAt(nextHour + 1000);
+    await tickAt(nextHour + MINUTE_MS + 1000);
+    await tickAt(nextHour + HOUR_MS + 1000);
+
+    expect(prunedCanvasIds).toEqual([[], ["canvas-a"], []]);
   });
 });

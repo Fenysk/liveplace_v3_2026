@@ -108,8 +108,17 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
         onSignIn={signingIn.onSignIn}
       />
       {developer.onOpen && (
-        <DeveloperWindow isOpen={developer.isOpen} onClose={developer.onClose}>
-          <LiveActivitySection canvas={stores.canvas} isOpen={developer.isOpen} />
+        <DeveloperWindow
+          isOpen={developer.isOpen}
+          sectionId={developer.sectionId}
+          onSelect={developer.onSelect}
+          onClose={developer.onClose}
+        >
+          <LiveActivitySection
+            canvas={stores.canvas}
+            isOpen={developer.isOpen}
+            sectionId={developer.sectionId}
+          />
         </DeveloperWindow>
       )}
       {account.identity.kind === "signedIn" && (

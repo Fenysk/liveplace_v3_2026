@@ -1,6 +1,6 @@
 // Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06 et 2026-10-07) : qui est connecté, où, depuis
 // quand, les pixels acceptés, et l'audience : visites, temps passé, comptes, joueurs et streamers. La liste des connexions
-// reste en mémoire ; Redis ne garde que des nombres.
+// reste en mémoire ; Redis ne garde que des nombres. Chaque canvas a aussi ses nombres (`canvas-activity.ts`), pour `here`.
 
 import {
   type ActivityPeriod,
@@ -18,21 +18,23 @@ import type {
   ActivityAudience,
   ActivityCanvas,
   ActivityFrame,
-  ActivityPoint,
+  ActivityHere,
+  ActivityHistory,
   ActivityStore,
   ActivityUser,
   CanvasCore,
+  CanvasMinute,
   CanvasPixelsMinute,
   ClientSocket,
   ConnectedAccount,
   DaySignups,
 } from "@liveplace/domain/ports";
+import { addTo, createCanvasCounts, createRecentPixels } from "./canvas-activity";
 
 // §3 du cahier des charges : la frame part toutes les 2 s, tant que le développeur regarde.
 export const ACTIVITY_TICK_MS = 2000;
 // La température : la minute en cours et les 59 d'avant.
 const HEAT_PAST_MINUTES = 59;
-const RECENT_SECONDS = 60;
 const OWNER_CACHE_MS = 10 * MINUTE_MS; // le nom ou la photo d'un streamer peut changer à sa prochaine connexion
 
 export type ActivityDeps = {
@@ -59,8 +61,13 @@ export type ActivityMember = { setRole(role: Role): void; leave(): void };
 export interface Activity {
   join(page: ActivityPage): ActivityMember;
   countPixels(canvasId: string, userId: string, pixels: number): void; // à chaque pose acceptée : rien de lourd
-  watch(socket: ClientSocket, session: Session | null, isWatching: boolean): void; // ignoré hors du développeur
-  listHistory(session: Session | null, period: ActivityPeriod): Promise<ActivityPoint[] | null>; // `null` : refusé
+  // Ignoré hors du développeur. `canvasId` : le canvas de la socket, que `here` décrit ; sans lui, la frame n'a pas de `here`.
+  watch(socket: ClientSocket, session: Session | null, isWatching: boolean, canvasId?: string): void;
+  listHistory(
+    session: Session | null,
+    period: ActivityPeriod,
+    canvasId: string,
+  ): Promise<ActivityHistory | null>; // `null` : refusé
   tick(): Promise<void>; // toutes les 2 s : la minute écoulée part dans Redis, la frame aux sockets qui regardent
   start(): Promise<void>; // au démarrage : la température d'avant, et l'élagage
 }
@@ -78,6 +85,7 @@ type OpenMinute = {
   phoneVisits: number;
   visitMinutes: number;
   pixelsByCanvas: Map<string, number>;
+  canvases: ReadonlyMap<string, CanvasMinute>; // posé à la fermeture, pour les seuls canvas où il s'est passé quelque chose
   accountIds: Set<string>;
   playerIds: Set<string>;
   streamedCanvasIds: Set<string>;
@@ -91,12 +99,6 @@ type CanvasTally = {
   guests: number;
   countedUserIds: Set<string>;
   accounts: Map<string, ConnectedAccount>;
-};
-
-const addTo = (counts: Map<string, number>, key: string, delta: number): void => {
-  const count = (counts.get(key) ?? 0) + delta;
-  if (count > 0) counts.set(key, count);
-  else counts.delete(key);
 };
 
 const byHeatThenPeople = (left: ActivityCanvas, right: ActivityCanvas): number =>
@@ -140,30 +142,24 @@ const addPage = (canvas: CanvasTally, page: OpenPage): void => {
   }
 };
 
-// Les pixels acceptés seconde par seconde : « la dernière minute » glisse avec l'horloge.
-const createRecentPixels = () => {
-  const seconds = Array.from({ length: RECENT_SECONDS }, () => ({ second: -1, pixels: 0 }));
-  return {
-    add(nowMs: Timestamp, pixels: number): void {
-      const second = Math.floor(nowMs / 1000);
-      const slot = seconds[second % RECENT_SECONDS];
-      if (!slot) return;
-      if (slot.second !== second) Object.assign(slot, { second, pixels: 0 });
-      slot.pixels += pixels;
-    },
-    sum(nowMs: Timestamp): number {
-      const second = Math.floor(nowMs / 1000);
-      return seconds.reduce(
-        (sum, slot) => (slot.second > second - RECENT_SECONDS ? sum + slot.pixels : sum),
-        0,
-      );
-    },
-  };
-};
+// Les sommes de la minute en cours s'ajoutent à l'audience gardée ; ses identifiants sont déjà dans la lecture.
+const addOpenMinute = <
+  Counts extends Pick<ActivityAudience["today"], "visits" | "phoneVisits" | "visitMinutes">,
+>(
+  counts: Counts,
+  open: Pick<ActivityAudience["today"], "visits" | "phoneVisits" | "visitMinutes">,
+): Counts => ({
+  ...counts,
+  visits: counts.visits + open.visits,
+  phoneVisits: counts.phoneVisits + open.phoneVisits,
+  visitMinutes: counts.visitMinutes + open.visitMinutes,
+});
 
 export function createActivity(deps: ActivityDeps): Activity {
   const pages = new Set<OpenPage>();
-  const watchers = new Set<ClientSocket>();
+  const watchers = new Map<ClientSocket, string | undefined>(); // la socket, et le canvas qu'elle décrit s'il y en a un
+  const canvasCounts = createCanvasCounts();
+  const writtenCanvasIds = new Set<string>(); // les canvas écrits depuis le dernier élagage
   // Tenus à chaque arrivée et départ : le pic d'une minute ne coûte rien.
   const accountPages = new Map<string, number>(); // `userId` → ses pages en jeu
   const obsPages = new Map<string, number>(); // `canvasId` → ses vues OBS
@@ -183,6 +179,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     phoneVisits: 0,
     visitMinutes: 0,
     pixelsByCanvas: new Map(),
+    canvases: new Map(),
     accountIds: new Set(),
     playerIds: new Set(),
     streamedCanvasIds: new Set(obsPages.keys()),
@@ -209,6 +206,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     accrueVisitTime(minute.at + MINUTE_MS);
     minute.visitMinutes = Math.floor(pendingVisitMs / MINUTE_MS);
     pendingVisitMs -= minute.visitMinutes * MINUTE_MS;
+    minute.canvases = canvasCounts.roll(minute.at + MINUTE_MS, at, minute.pixelsByCanvas);
     closedMinutes.push(minute);
     pastMinutes = [...pastMinutes, { at: minute.at, pixelsByCanvas: minute.pixelsByCanvas }].filter(
       (past) => past.at >= at - HEAT_PAST_MINUTES * MINUTE_MS,
@@ -217,8 +215,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     accruedAt = at;
   };
 
-  const tally = (page: OpenPage, delta: number): void => {
-    if (!page.isCounted) return;
+  const tallyEverywhere = (page: OpenPage, delta: number): void => {
     if (page.mode === "obs") {
       addTo(obsPages, page.canvasId, delta);
       if (delta > 0) minute.streamedCanvasIds.add(page.canvasId);
@@ -231,24 +228,22 @@ export function createActivity(deps: ActivityDeps): Activity {
     minute.streamed = Math.max(minute.streamed, obsPages.size);
   };
 
+  // Une page comptée, dans les chiffres de tout LivePlace comme dans ceux de son canvas.
+  const tally = (page: OpenPage, delta: number, nowMs: Timestamp): void => {
+    if (!page.isCounted) return;
+    tallyEverywhere(page, delta);
+    if (delta > 0) canvasCounts.join(page, nowMs);
+    else canvasCounts.leave(page, nowMs);
+  };
+
   // Une visite : la page du jeu qui s'ouvre, jamais celle qui reprend ni la vue OBS ; le compte compte pour la minute.
   const countVisit = (page: OpenPage): void => {
     if (!page.isCounted || page.mode !== "ui" || page.isResumed) return;
     minute.visits += 1;
     if (page.device === "phone") minute.phoneVisits += 1;
     if (page.session) minute.accountIds.add(page.session.userId);
+    canvasCounts.countVisit(page.canvasId, page.device);
   };
-
-  // Les sommes de la minute en cours s'ajoutent à l'audience gardée ; ses identifiants sont déjà dans la lecture.
-  const addOpenMinute = (
-    { visits, phoneVisits, visitMinutes, ...distinct }: ActivityAudience["today"],
-    open: Pick<OpenMinute, "visits" | "phoneVisits" | "visitMinutes">,
-  ): ActivityAudience["today"] => ({
-    ...distinct,
-    visits: visits + open.visits,
-    phoneVisits: phoneVisits + open.phoneVisits,
-    visitMinutes: visitMinutes + open.visitMinutes,
-  });
 
   const heatByCanvas = (): Map<string, number> => {
     const heat = new Map<string, number>();
@@ -288,20 +283,29 @@ export function createActivity(deps: ActivityDeps): Activity {
     return user;
   };
 
-  const toCanvas = async (
+  // Un canvas de la liste, sans ses nouveaux comptes du jour : `here` n'en a pas, son audience a les siens.
+  const toCanvasNow = async (
     { canvasId, ownerId, obsViews, guests, countedUserIds, accounts }: CanvasTally,
     heat: number,
-    signups: DaySignups,
     nowMs: Timestamp,
-  ): Promise<ActivityCanvas> => ({
+  ): Promise<Omit<ActivityCanvas, "signups">> => ({
     canvasId,
     owner: await getOwner(ownerId, nowMs),
     obsViews,
     people: countedUserIds.size + guests,
     guests,
     heat,
-    signups: signups.byDiscoveredViaUserId.get(ownerId) ?? 0,
     accounts: [...accounts.values()].sort((left, right) => left.connectedAt - right.connectedAt),
+  });
+
+  const toCanvas = async (
+    canvas: CanvasTally,
+    heat: number,
+    signups: DaySignups,
+    nowMs: Timestamp,
+  ): Promise<ActivityCanvas> => ({
+    ...(await toCanvasNow(canvas, heat, nowMs)),
+    signups: signups.byDiscoveredViaUserId.get(canvas.ownerId) ?? 0,
   });
 
   // Les canvas chauds sans personne dessus : leur streamer se lit dans `meta`, une fois.
@@ -313,8 +317,35 @@ export function createActivity(deps: ActivityDeps): Activity {
     }
   };
 
-  // Construite une fois par envoi, le même objet pour chaque socket qui regarde.
-  const buildFrame = async (nowMs: Timestamp): Promise<ActivityFrame> => {
+  // Le canvas d'une socket, décrit comme dans la liste des canvas, avec ses pixels de la dernière minute et son audience :
+  // absent si le noyau ne le connaît pas.
+  const buildHere = async (
+    canvasId: string,
+    canvases: Map<string, CanvasTally>,
+    heat: Map<string, number>,
+    nowMs: Timestamp,
+  ): Promise<ActivityHere | null> => {
+    const ownerId = canvases.get(canvasId)?.ownerId ?? (await getOwnerId(canvasId));
+    if (!ownerId) return null;
+    // Pris avant d'attendre, comme pour tout LivePlace.
+    const open = canvasCounts.getOpenMinute(canvasId, nowMs);
+    const pixels = canvasCounts.getRecentPixels(canvasId, nowMs);
+    const [canvas, audience] = await Promise.all([
+      toCanvasNow(canvases.get(canvasId) ?? emptyTally(canvasId, ownerId), heat.get(canvasId) ?? 0, nowMs),
+      deps.store.getCanvasAudience(canvasId, nowMs, open.playerIds),
+    ]);
+    return {
+      ...canvas,
+      pixels,
+      audience: { today: addOpenMinute(audience.today, open), month: addOpenMinute(audience.month, open) },
+    };
+  };
+
+  // Construites une fois par envoi, le même objet pour chaque socket qui regarde le même canvas, ou aucun.
+  const buildFrames = async (
+    nowMs: Timestamp,
+    canvasIds: ReadonlySet<string | undefined>,
+  ): Promise<Map<string | undefined, ActivityFrame>> => {
     const heat = heatByCanvas();
     const canvases = tallyCanvases();
     // Pris avant d'attendre : une page qui s'ouvre pendant la lecture change de minute, pas ce que la lecture a compté.
@@ -333,7 +364,7 @@ export function createActivity(deps: ActivityDeps): Activity {
         toCanvas(canvas, heat.get(canvas.canvasId) ?? 0, signups, nowMs),
       ),
     );
-    return {
+    const frame: ActivityFrame = {
       t: "activity",
       now: {
         people: accountPages.size + guestPages,
@@ -345,17 +376,26 @@ export function createActivity(deps: ActivityDeps): Activity {
       audience: { today: addOpenMinute(audience.today, open), month: addOpenMinute(audience.month, open) },
       canvases: shown.sort(byHeatThenPeople),
     };
+    const frames = new Map<string | undefined, ActivityFrame>();
+    for (const canvasId of canvasIds) {
+      const here = canvasId === undefined ? null : await buildHere(canvasId, canvases, heat, nowMs);
+      frames.set(canvasId, here ? { ...frame, here } : frame);
+    }
+    return frames;
   };
 
-  // Une minute n'est retirée de la file qu'une fois écrite : Redis coupé, elle attend le tic suivant.
+  // Une minute n'est retirée de la file qu'une fois écrite : Redis coupé, elle attend le tic suivant. À chaque heure,
+  // l'élagage passe aussi par les canvas écrits depuis le dernier : un canvas muet n'a rien à élaguer.
   const storeClosedMinutes = async (nowMs: Timestamp): Promise<void> => {
     for (let closed = closedMinutes[0]; closed; closed = closedMinutes[0]) {
       await deps.store.storeActivityMinute(closed);
+      for (const canvasId of closed.canvases.keys()) writtenCanvasIds.add(canvasId);
       closedMinutes.shift();
     }
     const hourAt = toHourStart(nowMs);
     if (hourAt === prunedHourAt) return;
-    await deps.store.pruneActivity(nowMs);
+    await deps.store.pruneActivity(nowMs, writtenCanvasIds);
+    writtenCanvasIds.clear();
     prunedHourAt = hourAt;
   };
 
@@ -365,8 +405,11 @@ export function createActivity(deps: ActivityDeps): Activity {
     accrueVisitTime(nowMs);
     await storeClosedMinutes(nowMs);
     if (watchers.size === 0) return;
-    const frame = await buildFrame(nowMs);
-    for (const socket of watchers) socket.sendFrame(frame);
+    const frames = await buildFrames(nowMs, new Set(watchers.values()));
+    for (const [socket, canvasId] of watchers) {
+      const frame = frames.get(canvasId);
+      if (frame) socket.sendFrame(frame);
+    }
   };
 
   return {
@@ -376,7 +419,7 @@ export function createActivity(deps: ActivityDeps): Activity {
       accrueVisitTime(nowMs);
       const opened: OpenPage = { ...page, connectedAt: nowMs, isCounted: isCounted(page.session?.userId) };
       pages.add(opened);
-      tally(opened, 1);
+      tally(opened, 1, nowMs);
       countVisit(opened);
       return {
         setRole(role) {
@@ -387,7 +430,7 @@ export function createActivity(deps: ActivityDeps): Activity {
           const leftAt = deps.now();
           rollMinute(leftAt);
           accrueVisitTime(leftAt);
-          tally(opened, -1);
+          tally(opened, -1, leftAt);
         },
       };
     },
@@ -400,17 +443,23 @@ export function createActivity(deps: ActivityDeps): Activity {
       minute.pixels += pixels;
       addTo(minute.pixelsByCanvas, canvasId, pixels);
       recentPixels.add(nowMs, pixels);
+      canvasCounts.countPixels(canvasId, userId, pixels, nowMs);
     },
 
-    watch(socket, session, isWatching) {
+    watch(socket, session, isWatching, canvasId) {
       if (!isDeveloper(session?.userId)) return;
-      if (isWatching) watchers.add(socket);
+      if (isWatching) watchers.set(socket, canvasId);
       else watchers.delete(socket);
     },
 
-    async listHistory(session, period) {
+    async listHistory(session, period, canvasId) {
       if (!isDeveloper(session?.userId)) return null;
-      return deps.store.listActivityHistory(period, deps.now());
+      const nowMs = deps.now();
+      const [points, canvasPoints] = await Promise.all([
+        deps.store.listActivityHistory(period, nowMs),
+        deps.store.listCanvasHistory(canvasId, period, nowMs),
+      ]);
+      return { points, canvasPoints };
     },
 
     // Un tic à la fois : deux écritures d'une même minute en doubleraient les pixels.

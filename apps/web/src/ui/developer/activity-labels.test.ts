@@ -13,6 +13,7 @@ import {
   formatDuration,
   guestsNote,
   heatLabel,
+  obsViewsLabel,
   PERIOD_OPTIONS,
   peopleLabel,
   phoneShareNote,
@@ -23,6 +24,7 @@ import {
   streamedCanvasesLabel,
   toAudienceRows,
   toCanvasActivityCard,
+  toCanvasAudienceRows,
   visitMinutesLabel,
   visitsLabel,
 } from "./activity-labels";
@@ -221,6 +223,47 @@ describe("the words of the audience (JOURNAL 2026-10-07)", () => {
     };
 
     const [visits, , average] = toAudienceRows({ today: none, month: none });
+
+    expect(visits?.cells).toEqual([{ value: "0" }, { value: "0" }]);
+    expect(average?.cells).toEqual([{ value: "—" }, { value: "—" }]);
+  });
+});
+
+describe("the words of the canvas section (JOURNAL 2026-10-07)", () => {
+  const today = { visits: 38, phoneVisits: 19, visitMinutes: 200, activePlayers: 9, signups: 2 };
+  const month = { visits: 1214, phoneVisits: 497, visitMinutes: 5461, activePlayers: 131, signups: 40 };
+
+  // Accorde les vues OBS ouvertes, au singulier jusqu'à 1
+  it("agrees the open OBS views, in the singular up to 1", () => {
+    expect([obsViewsLabel(0), obsViewsLabel(1), obsViewsLabel(2)]).toEqual([
+      "0 vue OBS ouverte",
+      "1 vue OBS ouverte",
+      "2 vues OBS ouvertes",
+    ]);
+  });
+
+  // Met l'audience d'un canvas dans les mêmes lignes que celle de tout LivePlace, avec ses joueurs actifs et les nouveaux comptes venus de sa page à la fin
+  it("lays the audience of a canvas out in the same rows as the whole one, its active players and the signups from its page at the end", () => {
+    expect(toCanvasAudienceRows({ today, month })).toEqual([
+      {
+        label: "Visites",
+        cells: [
+          { value: "38", note: "dont 50 % au téléphone" },
+          { value: formatCount(1214), note: "dont 41 % au téléphone" },
+        ],
+      },
+      { label: "Temps passé", cells: [{ value: "3 h 20 min" }, { value: "91 h 01 min" }] },
+      { label: "Durée moyenne d'une visite", cells: [{ value: "5 min 16 s" }, { value: "4 min 30 s" }] },
+      { label: "Joueurs actifs", cells: [{ value: "9" }, { value: "131" }] },
+      { label: "Nouveaux comptes venus de sa page", cells: [{ value: "2" }, { value: "40" }] },
+    ]);
+  });
+
+  // Sans visite sur ce canvas, ne dit ni part au téléphone ni durée moyenne : un tiret
+  it("with no visit on the canvas, says no phone share and no average: a dash", () => {
+    const none = { visits: 0, phoneVisits: 0, visitMinutes: 0, activePlayers: 0, signups: 0 };
+
+    const [visits, , average] = toCanvasAudienceRows({ today: none, month: none });
 
     expect(visits?.cells).toEqual([{ value: "0" }, { value: "0" }]);
     expect(average?.cells).toEqual([{ value: "—" }, { value: "—" }]);

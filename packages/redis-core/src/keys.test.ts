@@ -2,10 +2,13 @@ import { type CellKey, toCellKey } from "@liveplace/domain";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVE_TTL_SECONDS,
+  ACTIVITY_CANVAS_MINUTES_RETENTION_MS,
+  ACTIVITY_HOURS_RETENTION_MS,
   buildActivityKeys,
   buildCanvasKeys,
   SCORE_MAX_PIXELS,
   SCORE_TIE_SPAN,
+  SIGNUPS_TTL_SECONDS,
   toActiveField,
   toScorePixels,
   toSignupsField,
@@ -90,6 +93,38 @@ describe("buildActivityKeys", () => {
   // Isole les clés d'un test sous son propre préfixe
   it("isolates a test's keys under its own prefix", () => {
     expect(buildActivityKeys("activity:run-1-").minutes).toBe("activity:run-1-minute");
+  });
+
+  // JOURNAL 2026-10-07 : l'historique d'un canvas vit sous `activity:cv:<canvasId>:`, jamais sous les clés du canvas
+  it("keeps a canvas's history under activity:cv:<canvasId>:, never under the canvas's own keys", () => {
+    const canvas = keys.canvas("canvas-1");
+    const names = [canvas.minutes, canvas.hours, canvas.days, canvas.activePlayers("2026-10-06")];
+
+    for (const name of names) {
+      expect(name.startsWith("activity:cv:canvas-1:")).toBe(true);
+      expect(name.startsWith(buildCanvasKeys("canvas-1").prefix)).toBe(false);
+    }
+    expect(new Set([...names, keys.minutes, keys.hours, keys.days]).size).toBe(names.length + 3);
+    expect(keys.canvas("canvas-2").minutes).not.toBe(canvas.minutes);
+    expect(buildActivityKeys("activity:run-1-").canvas("canvas-1").days).toBe(
+      "activity:run-1-cv:canvas-1:day",
+    );
+  });
+
+  // Nomme les joueurs actifs d'un canvas par le jour de Paris, un jour une clé
+  it("names a canvas's active players by the Paris day, one key per day", () => {
+    const { activePlayers } = keys.canvas("canvas-1");
+
+    expect(activePlayers("2026-10-06")).toContain("2026-10-06");
+    expect(activePlayers("2026-10-06")).not.toBe(activePlayers("2026-10-07"));
+    expect(activePlayers("2026-10-06")).not.toBe(keys.canvas("canvas-2").activePlayers("2026-10-06"));
+  });
+
+  // Garde les points d'un canvas : 2 jours pour les minutes, comme l'historique pour les heures, et les nouveaux comptes du jour 31 jours
+  it("keeps a canvas's points: 2 days of minutes, the hours as long as the history, the day's signups 31 days", () => {
+    expect(ACTIVITY_CANVAS_MINUTES_RETENTION_MS).toBe(2 * 24 * 3600 * 1000);
+    expect(ACTIVITY_HOURS_RETENTION_MS).toBe(366 * 24 * 3600 * 1000);
+    expect(SIGNUPS_TTL_SECONDS).toBe(31 * 24 * 3600);
   });
 });
 

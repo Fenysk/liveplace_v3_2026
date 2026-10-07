@@ -209,9 +209,16 @@ export type ActivityFrame = Extract<ServerFrame, { t: "activity" }>;
 export type ActivityCanvas = ActivityFrame["canvases"][number];
 export type ActivityUser = ActivityCanvas["owner"];
 export type ConnectedAccount = ActivityCanvas["accounts"][number];
-export type ActivityPoint = Extract<ServerFrame, { t: "activityHistory" }>["points"][number];
+export type ActivityHistoryFrame = Extract<ServerFrame, { t: "activityHistory" }>;
+export type ActivityPoint = ActivityHistoryFrame["points"][number];
 // JOURNAL 2026-10-07 : l'audience d'aujourd'hui et des 30 jours, chacune avec ses six nombres.
 export type ActivityAudience = ActivityFrame["audience"];
+// JOURNAL 2026-10-07 : le canvas de la socket du développeur, son audience (cinq nombres) et ses points.
+export type ActivityHere = NonNullable<ActivityFrame["here"]>;
+export type CanvasAudience = ActivityHere["audience"];
+export type CanvasActivityPoint = NonNullable<ActivityHistoryFrame["canvasPoints"]>[number];
+// L'historique d'une période : tout LivePlace, et le canvas de la socket (absent d'un gateway d'avant).
+export type ActivityHistory = Pick<ActivityHistoryFrame, "points" | "canvasPoints">;
 
 // Les identifiants que la minute a vus : de quoi compter les distincts d'un jour, jamais gardés tels quels.
 export type ActiveIds = {
@@ -220,19 +227,39 @@ export type ActiveIds = {
   streamedCanvasIds: ReadonlySet<string>; // les canvas où une vue OBS était ouverte
 };
 
+// Ce qu'un canvas a vécu dans une minute (JOURNAL 2026-10-07) : le pic de ses personnes et de ses vues OBS, ses pixels, ses
+// visites dont celles au téléphone, son temps passé, et les comptes qui y ont posé un pixel. Les nouveaux comptes viennent
+// du web, pas du gateway.
+export type CanvasMinute = Pick<
+  CanvasActivityPoint,
+  "people" | "obsViews" | "pixels" | "visits" | "visitMinutes"
+> & {
+  phoneVisits: number;
+  playerIds: ReadonlySet<string>;
+};
+
 // La minute écoulée, vue du gateway : le pic des personnes et des canvas streamés, ses pixels, ses visites et son temps passé,
-// et les pixels de chaque canvas. Les distincts ne se gardent que par jour : la minute n'apporte que ses identifiants.
+// les pixels de chaque canvas, et la minute de chacun de ceux où il s'est passé quelque chose. Les distincts ne se gardent
+// que par jour : la minute n'apporte que ses identifiants.
 export type ActivityMinute = Omit<
   ActivityPoint,
   "signups" | "activeAccounts" | "activePlayers" | "activeStreamers"
 > &
-  ActiveIds & { pixelsByCanvas: ReadonlyMap<string, number> };
+  ActiveIds & {
+    pixelsByCanvas: ReadonlyMap<string, number>;
+    canvases: ReadonlyMap<string, CanvasMinute>;
+  };
 
 // Les pixels d'une minute passée, canvas par canvas : la température survit à un redémarrage.
 export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
 
-// Un nouveau compte, à sa première connexion, et le streamer depuis la page duquel il s'est connecté (§8.1).
-export type Signup = { nowMs: Timestamp; discoveredViaUserId?: string | undefined };
+// Un nouveau compte, à sa première connexion, le streamer depuis la page duquel il s'est connecté (§8.1), et le canvas actif
+// de ce streamer à cet instant : c'est dans ses points que le compte se compte (JOURNAL 2026-10-07).
+export type Signup = {
+  nowMs: Timestamp;
+  discoveredViaUserId?: string | undefined;
+  discoveredViaCanvasId?: string | undefined;
+};
 
 // Les nouveaux comptes d'un jour de Paris : tous, et ceux venus de la page de chaque streamer.
 export type DaySignups = { total: number; byDiscoveredViaUserId: ReadonlyMap<string, number> };
@@ -241,13 +268,27 @@ export type DaySignups = { total: number; byDiscoveredViaUserId: ReadonlyMap<str
 // et lit ce que le développeur regarde.
 export interface ActivityStore {
   storeActivityMinute(minute: ActivityMinute): Promise<void>;
-  pruneActivity(nowMs: Timestamp): Promise<void>; // les minutes de plus de 7 jours, les heures de plus de 366
+  // Les minutes de plus de 7 jours, les heures de plus de 366 ; pour chaque canvas de `canvasIds`, ses minutes de plus de
+  // 2 jours et ses heures de plus de 366.
+  pruneActivity(nowMs: Timestamp, canvasIds?: Iterable<string>): Promise<void>;
   listActivityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<ActivityPoint[]>; // un point absent le reste
   listCanvasPixels(fromMs: Timestamp, toMs: Timestamp): Promise<CanvasPixelsMinute[]>; // les minutes de [from, to), alignés
   getDaySignups(nowMs: Timestamp): Promise<DaySignups>;
   // L'audience du jour et des 30 jours : les sommes des minutes écrites, les distincts avec `opened`, ce que la minute en
   // cours a déjà vu, versé à ce moment (sans effet pour qui est déjà compté).
   getAudience(nowMs: Timestamp, opened: ActiveIds): Promise<ActivityAudience>;
+  // JOURNAL 2026-10-07 : les points d'un canvas, seulement ceux qui existent ; un point absent vaut zéro pour qui les lit.
+  listCanvasHistory(
+    canvasId: string,
+    period: ActivityPeriod,
+    nowMs: Timestamp,
+  ): Promise<CanvasActivityPoint[]>;
+  // L'audience d'un canvas, du jour et des 30 jours, comme `getAudience` : `openedPlayerIds`, les joueurs de la minute en cours.
+  getCanvasAudience(
+    canvasId: string,
+    nowMs: Timestamp,
+    openedPlayerIds: ReadonlySet<string>,
+  ): Promise<CanvasAudience>;
   getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
 }
 

@@ -12,7 +12,7 @@ import {
 import type {
   AckFrame,
   ActivityFrame,
-  ActivityPoint,
+  ActivityHistory,
   AuthoredPixel,
   BannedUser,
   InspectEntry,
@@ -131,7 +131,7 @@ export type CanvasStore = {
   listenStaleLists(listener: (list: StaleList) => void): () => void;
   // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul, le gateway décide. Redit à chaque reprise de la socket.
   watchActivity(isWatching: boolean): void;
-  listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityPoint[]>>;
+  listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityHistory>>;
   listenActivity(listener: (frame: ActivityFrame) => void): () => void;
   close(): void;
 };
@@ -593,7 +593,9 @@ export function createCanvasStore(
     },
     listActivityHistory: (period) =>
       request({ t: "listActivityHistory", requestId: crypto.randomUUID(), period }, (reply) =>
-        reply.t === "activityHistory" ? reply.points : undefined,
+        reply.t === "activityHistory"
+          ? { points: reply.points, canvasPoints: reply.canvasPoints }
+          : undefined,
       ),
     listenActivity(listener) {
       activityListeners.add(listener);

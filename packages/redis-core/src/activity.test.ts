@@ -1,9 +1,10 @@
 import { AUDIENCE_DAYS, HOUR_MS, MINUTE_MS, toActivityPointStarts, toParisDay } from "@liveplace/domain";
-import type { ActiveIds, ActivityMinute } from "@liveplace/domain/ports";
+import type { ActiveIds, ActivityMinute, CanvasMinute } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { createActivityStore, createSignupWrites } from "./activity";
 import {
   ACTIVE_TTL_SECONDS,
+  ACTIVITY_CANVAS_MINUTES_RETENTION_MS,
   ACTIVITY_HOURS_RETENTION_MS,
   ACTIVITY_MINUTES_RETENTION_MS,
   CANVAS_PIXELS_TTL_SECONDS,
@@ -44,6 +45,7 @@ const minute = (at: number, counts: Partial<ActivityMinute> = {}): ActivityMinut
   ...noVisits,
   ...ids(),
   pixelsByCanvas: new Map(),
+  canvases: new Map(),
   ...counts,
 });
 
@@ -168,8 +170,8 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
     expect(ttl).toBeLessThanOrEqual(CANVAS_PIXELS_TTL_SECONDS);
   });
 
-  // Garde les nouveaux comptes d'un jour de Paris 48 heures, et rien d'autre qu'un nombre par provenance
-  it("keeps the signups of a Paris day 48 hours, and nothing but a number per provenance", async () => {
+  // Garde les nouveaux comptes d'un jour de Paris 31 jours, et rien d'autre qu'un nombre par provenance
+  it("keeps the signups of a Paris day 31 days, and nothing but a number per provenance", async () => {
     const { keys, signups } = stores();
 
     await signups.storeSignup({ nowMs: now, discoveredViaUserId: "owner-1" });
@@ -448,6 +450,247 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
       }
 
     expect(dumped).toContain("accounts:");
+    expect(dumped).not.toContain("4242");
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-07) : l'historique d'un canvas, ses trois niveaux, ses joueurs actifs et son audience.
+describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
+  const canvasMinute = (counts: Partial<CanvasMinute> = {}): CanvasMinute => ({
+    people: 0,
+    obsViews: 0,
+    pixels: 0,
+    visits: 0,
+    phoneVisits: 0,
+    visitMinutes: 0,
+    playerIds: new Set(),
+    ...counts,
+  });
+  const inMinute = (at: number, canvases: Record<string, CanvasMinute>) =>
+    minute(at, { canvases: new Map(Object.entries(canvases)) });
+  const players = (...playerIds: string[]) => ({ playerIds: new Set(playerIds) });
+  const quiet = { visits: 0, visitMinutes: 0, signups: 0 };
+
+  // Garde le pic des personnes et des vues OBS d'un canvas, et les sommes du reste, sur la minute, l'heure et le jour
+  it("keeps the peak of people and OBS views of a canvas, and the sums of the rest, on the minute, hour and day", async () => {
+    const { store } = stores();
+    const at = minuteAt - MINUTE_MS;
+
+    await store.storeActivityMinute(
+      inMinute(at, {
+        c1: canvasMinute({ people: 5, obsViews: 2, pixels: 30, visits: 3, phoneVisits: 1, visitMinutes: 12 }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(at, {
+        c1: canvasMinute({ people: 3, obsViews: 1, pixels: 4, visits: 2, phoneVisits: 2, visitMinutes: 5 }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(minuteAt - 2 * MINUTE_MS, { c1: canvasMinute({ people: 8, pixels: 10 }) }),
+    );
+
+    const summed = { obsViews: 2, visits: 5, visitMinutes: 17, signups: 0 };
+    expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
+      { at: minuteAt - 2 * MINUTE_MS, people: 8, obsViews: 0, pixels: 10, ...quiet },
+      { at, people: 5, pixels: 34, ...summed },
+    ]);
+    expect(await store.listCanvasHistory("c1", "month", now)).toEqual([
+      { at: hourAt, people: 8, pixels: 44, ...summed },
+    ]);
+    expect(await store.listCanvasHistory("c1", "all", now)).toEqual([
+      { at: dayAt, people: 8, pixels: 44, activePlayers: 0, ...summed },
+    ]);
+  });
+
+  // N'écrit rien pour un canvas où la minute n'a rien eu, et laisse chaque canvas à ses points
+  it("writes nothing for a canvas the minute had nothing for, and keeps each canvas to its own points", async () => {
+    const { keys, store } = stores();
+
+    await store.storeActivityMinute(minute(minuteAt - 3 * MINUTE_MS, { people: 4 }));
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 2 }), c2: canvasMinute({ pixels: 9 }) }),
+    );
+
+    expect(await store.listCanvasHistory("c3", "day", now)).toEqual([]);
+    expect(await redis.exists(keys.canvas("c3").minutes, keys.canvas("c3").days)).toBe(0);
+    expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
+      { at: minuteAt - MINUTE_MS, people: 2, obsViews: 0, pixels: 0, ...quiet },
+    ]);
+    expect(await store.listCanvasHistory("c2", "day", now)).toEqual([
+      { at: minuteAt - MINUTE_MS, people: 0, obsViews: 0, pixels: 9, ...quiet },
+    ]);
+    expect((await store.listActivityHistory("day", now)).map(({ people }) => people)).toEqual([4, 0]);
+  });
+
+  // Compte un nouveau compte dans les points du canvas d'où il vient, seul : zéro pour le reste, et aucun point d'un autre canvas
+  it("counts a signup in the points of the canvas it came from, alone: zero for the rest, and none for another", async () => {
+    const { keys, store, signups } = stores();
+    const nowMs = now - 2 * MINUTE_MS;
+
+    await signups.storeSignup({ nowMs, discoveredViaUserId: "owner-1", discoveredViaCanvasId: "c1" });
+    await signups.storeSignup({ nowMs, discoveredViaUserId: "owner-2" });
+    await signups.storeSignup({ nowMs });
+
+    const point = { people: 0, obsViews: 0, pixels: 0, visits: 0, visitMinutes: 0, signups: 1 };
+    expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
+      { at: toActivityPointStarts(nowMs).minute, ...point },
+    ]);
+    expect(await store.listCanvasHistory("c1", "month", now)).toEqual([{ at: hourAt, ...point }]);
+    expect(await store.listCanvasHistory("c1", "all", now)).toEqual([
+      { at: dayAt, activePlayers: 0, ...point },
+    ]);
+    expect(await store.listCanvasHistory("c2", "all", now)).toEqual([]);
+    expect(await redis.exists(keys.canvas("owner-1").days, keys.canvas("owner-2").days)).toBe(0);
+    expect((await store.getDaySignups(nowMs)).total).toBe(3);
+  });
+
+  // Compte une fois un joueur que plusieurs minutes d'un jour revoient, et garde le nombre du jour dans son point, pour Tout seul
+  it("counts once a player that several minutes of a day see again, and keeps the day's count in its point, for All alone", async () => {
+    const { store } = stores();
+
+    await store.storeActivityMinute(
+      inMinute(minuteAt - 2 * MINUTE_MS, { c1: canvasMinute({ people: 1, ...players("p1", "p2") }) }),
+    );
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 1, ...players("p2", "p3") }) }),
+    );
+
+    const [day] = await store.listCanvasHistory("c1", "all", now);
+    expect(day).toMatchObject({ at: dayAt, activePlayers: 3 });
+    for (const period of ["day", "month"] as const) {
+      const [point] = await store.listCanvasHistory("c1", period, now);
+      expect(point).not.toHaveProperty("activePlayers");
+    }
+  });
+
+  // Garde l'HyperLogLog des joueurs d'un jour de ce canvas 31 jours, sous le sien : un autre canvas ne s'y mêle pas
+  it("keeps the HyperLogLog of a canvas's players for a day 31 days, under its own key: another canvas does not mix in", async () => {
+    const { keys, store } = stores();
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, {
+        c1: canvasMinute({ people: 1, ...players("p1") }),
+        c2: canvasMinute({ people: 1, ...players("p1", "p2", "p3") }),
+      }),
+    );
+
+    const key = keys.canvas("c1").activePlayers(toParisDay(now));
+    expect(await redis.type(key)).toBe("string");
+    expect(await redis.pfcount(key)).toBe(1);
+    expect(await redis.pfcount(keys.canvas("c2").activePlayers(toParisDay(now)))).toBe(3);
+    const ttl = await redis.ttl(key);
+    expect(ttl).toBeGreaterThan(ACTIVE_TTL_SECONDS - 5);
+    expect(ttl).toBeLessThanOrEqual(ACTIVE_TTL_SECONDS);
+  });
+
+  // Compte l'audience d'un canvas aujourd'hui et sur les 30 derniers jours de Paris, ses joueurs en union et ses nouveaux comptes en somme
+  it("counts the audience of a canvas today and over the last 30 Paris days, its players as a union, its signups as a sum", async () => {
+    const { store, signups } = stores();
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, {
+        c1: canvasMinute({ visits: 3, phoneVisits: 1, visitMinutes: 10, ...players("a1", "a2") }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(toActivityPointStarts(now - DAY_MS).minute, {
+        c1: canvasMinute({ visits: 4, phoneVisits: 2, visitMinutes: 20, ...players("a2", "a3") }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(toActivityPointStarts(now - (AUDIENCE_DAYS - 1) * DAY_MS).minute, {
+        c1: canvasMinute({ visits: 1, visitMinutes: 5, ...players("a4") }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(toActivityPointStarts(now - AUDIENCE_DAYS * DAY_MS).minute, {
+        c1: canvasMinute({ visits: 100, phoneVisits: 50, visitMinutes: 900, ...players("a5") }),
+      }),
+    );
+    for (const [nowMs, count] of [
+      [now, 2],
+      [now - DAY_MS, 1],
+      [now - AUDIENCE_DAYS * DAY_MS, 7],
+    ] as const)
+      for (let signup = 0; signup < count; signup += 1)
+        await signups.storeSignup({ nowMs, discoveredViaCanvasId: "c1" });
+
+    expect(await store.getCanvasAudience("c1", now, new Set())).toEqual({
+      today: { visits: 3, phoneVisits: 1, visitMinutes: 10, activePlayers: 2, signups: 2 },
+      month: { visits: 8, phoneVisits: 3, visitMinutes: 35, activePlayers: 4, signups: 3 },
+    });
+  });
+
+  // Rend une audience à zéro à un canvas dont rien n'a été écrit, et ne compte pas les visites d'un autre
+  it("gives a zero audience to a canvas nothing was written for, and counts no visit of another", async () => {
+    const { store } = stores();
+    const zero = { visits: 0, phoneVisits: 0, visitMinutes: 0, activePlayers: 0, signups: 0 };
+    await store.storeActivityMinute(inMinute(minuteAt - MINUTE_MS, { c2: canvasMinute({ visits: 6 }) }));
+
+    expect(await store.getCanvasAudience("c1", now, new Set())).toEqual({ today: zero, month: zero });
+  });
+
+  // Compte les joueurs de la minute en cours sans l'attendre, et une seule fois quand elle s'écrit
+  it("counts the players of the minute in progress without waiting for it, and once when it is written", async () => {
+    const { store } = stores();
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 1, ...players("p1") }) }),
+    );
+    const open = new Set(["p1", "p2"]);
+
+    const first = await store.getCanvasAudience("c1", now, open);
+    expect(await store.getCanvasAudience("c1", now, open)).toEqual(first);
+    expect(first.today.activePlayers).toBe(2);
+    expect(first.month.activePlayers).toBe(2);
+
+    await store.storeActivityMinute(inMinute(minuteAt, { c1: canvasMinute({ people: 1, playerIds: open }) }));
+    expect((await store.getCanvasAudience("c1", now, new Set())).today.activePlayers).toBe(2);
+    const [day] = await store.listCanvasHistory("c1", "all", now);
+    expect(day).toMatchObject({ activePlayers: 2 });
+  });
+
+  // Élague les minutes d'un canvas de plus de 2 jours et ses heures de plus de 366 jours, jamais un jour, et seulement les canvas demandés
+  it("prunes a canvas's minutes older than 2 days and hours older than 366 days, never a day, and only the canvases asked", async () => {
+    const { keys, store, signups } = stores();
+    const expiredMinute = toActivityPointStarts(now - ACTIVITY_CANVAS_MINUTES_RETENTION_MS - MINUTE_MS);
+    const expiredHour = toActivityPointStarts(now - ACTIVITY_HOURS_RETENTION_MS - HOUR_MS);
+    for (const canvasId of ["c1", "c2"])
+      for (const at of [expiredMinute.minute, expiredHour.minute, minuteAt])
+        await store.storeActivityMinute(inMinute(at, { [canvasId]: canvasMinute({ people: 1 }) }));
+    await signups.storeSignup({ nowMs: expiredMinute.minute, discoveredViaCanvasId: "c1" });
+
+    await store.pruneActivity(now, ["c1"]);
+
+    const [c1, c2] = [keys.canvas("c1"), keys.canvas("c2")];
+    expect(await redis.hkeys(c1.minutes)).toEqual([String(minuteAt)]);
+    expect((await redis.hkeys(c1.hours)).sort()).toEqual(
+      [`${expiredMinute.hour}`, `${expiredMinute.hour}:signups`, `${hourAt}`].sort(),
+    );
+    expect(await redis.hlen(c1.days)).toBe(4);
+    expect(await redis.hlen(c2.minutes)).toBe(3);
+    expect(await redis.hlen(c2.hours)).toBe(3);
+    expect((await redis.hkeys(keys.minutes)).sort()).toEqual(
+      [`${expiredMinute.minute}`, `${expiredMinute.minute}:signups`, `${minuteAt}`].sort(),
+    );
+  });
+
+  // Ne garde aucun identifiant de joueur : des compteurs et des HyperLogLog seulement
+  it("keeps no player identifier: counters and HyperLogLogs only", async () => {
+    const { keys, store } = stores();
+    const prefix = keys.minutes.slice(0, -"minute".length);
+    await store.storeActivityMinute(
+      inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 1, ...players("player-4242") }) }),
+    );
+
+    let dumped = "";
+    for await (const names of redis.scanStream({ match: `${prefix}cv:*`, count: 1000 }))
+      for (const name of names as string[]) {
+        const type = await redis.type(name);
+        const content =
+          type === "hash" ? JSON.stringify(await redis.hgetall(name)) : await redis.getBuffer(name);
+        dumped += `${name}=${content}\n`;
+      }
+
+    expect(dumped).toContain("players:");
     expect(dumped).not.toContain("4242");
   });
 });

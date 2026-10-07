@@ -46,13 +46,19 @@
   flex: none;
 }
 
+/* Les comptes d'un canvas déplié, en retrait sous son streamer */
 .lp-canvas-activity-accounts {
-  margin: 0;
   padding: 0 0 var(--space-1) var(--space-4);
+  animation: lp-canvas-activity-in var(--lp-dur-fade) ease;
+}
+
+/* La liste des comptes, seule (la section Ce canvas) ou dans une carte */
+.lp-connected-accounts {
+  margin: 0;
+  padding: 0;
   list-style: none;
   display: grid;
   gap: var(--space-2);
-  animation: lp-canvas-activity-in var(--lp-dur-fade) ease;
 }
 
 .lp-canvas-activity-account {

@@ -208,6 +208,11 @@
   width: min(520px, 100%);
 }
 
+/* La largeur d'une grande fenêtre : de quoi mettre deux colonnes côte à côte */
+.design-window-box--wide {
+  width: min(900px, 100%);
+}
+
 /* La largeur de la fenêtre même quand l'exemple est court : un champ y prend toute la place */
 .design-window-box--full {
   width: 520px;

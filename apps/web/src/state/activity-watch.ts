@@ -1,9 +1,10 @@
-// La section Activité du développeur (écart §4.2, JOURNAL 2026-10-06) : les chiffres de l'instant, que le gateway
-// pousse toutes les 2 s tant qu'elle est ouverte, et l'historique d'une période, redemandé chaque minute.
+// La fenêtre Développeur (écart §4.2, JOURNAL 2026-10-06 et 2026-10-07) : les chiffres de l'instant, que le gateway
+// pousse toutes les 2 s tant qu'elle est ouverte, et l'historique d'une période, redemandé chaque minute. Une seule
+// écoute pour ses deux sections : Ce canvas et Tout LivePlace lisent la même vue.
 // Le web affiche, le gateway décide : pour tout autre compte, rien ne revient.
 
 import type { ActivityPeriod } from "@liveplace/domain";
-import type { ActivityFrame, ActivityPoint } from "@liveplace/domain/ports";
+import type { ActivityFrame, ActivityHistory } from "@liveplace/domain/ports";
 import type { CanvasStore } from "./canvas-store";
 
 const HISTORY_REFRESH_MS = 60_000;
@@ -17,9 +18,10 @@ export type ActivityWatchCanvas = Pick<
 // Injectée pour les tests : un minuteur qu'on peut arrêter.
 export type ActivityClock = { repeat(ms: number, run: () => void): () => void };
 
+// `canvasPoints` : ceux du canvas de la socket ; absents, le gateway est d'avant.
 export type ActivityHistoryView =
   | { status: "loading" }
-  | { status: "ready"; points: readonly ActivityPoint[] }
+  | ({ status: "ready" } & Readonly<ActivityHistory>)
   | { status: "failed" };
 
 export type ActivityWatchView = {
@@ -54,7 +56,7 @@ export function createActivityWatch(canvas: ActivityWatchCanvas, clock: Activity
     const request = ++lastRequest;
     void canvas.listActivityHistory(view.period).then((result) => {
       if (request !== lastRequest) return;
-      if (result.ok) publish({ history: { status: "ready", points: result.value } });
+      if (result.ok) publish({ history: { status: "ready", ...result.value } });
       else if (view.history.status !== "ready") publish({ history: { status: "failed" } });
     });
   };

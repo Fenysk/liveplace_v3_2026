@@ -1,6 +1,7 @@
 -- Une minute de l'activité, reportée d'un coup sur ses trois niveaux (écart §5.1, JOURNAL 2026-10-06 et 2026-10-07) : le pic
 -- des personnes et des canvas streamés, la somme des pixels, des visites, des visites au téléphone et du temps passé. Les
--- nouveaux comptes et les distincts ont leur propre champ, écrit par le web et par le gateway.
+-- nouveaux comptes et les distincts ont leur propre champ, écrit par le web et par le gateway. Le même script écrit les
+-- points d'un canvas (JOURNAL 2026-10-07) : le deuxième pic y est celui de ses vues OBS.
 -- KEYS : les HASH des minutes, des heures, des jours. ARGV : le début du point de chacun, puis people, streamed, pixels,
 -- visits, phoneVisits, visitMinutes. Un point d'avant l'audience n'a que les trois premiers champs : les autres valent 0.
 
