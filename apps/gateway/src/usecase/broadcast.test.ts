@@ -435,3 +435,78 @@ describe("the scoreboard window of a canvas (JOURNAL 2026-10-06)", () => {
     expect(scoreboard.topReads).toBe(2);
   });
 });
+
+// Écart §5.1 (JOURNAL 2026-10-07) : la capacité lit le délai de diffusion et les connexions, sans rien coûter par pose.
+describe("what the broadcast tells the capacity (JOURNAL 2026-10-07)", () => {
+  // Compte, à l'envoi de la frame, le délai de chaque pose : de son `occurredAt` à l'instant du tick
+  it("counts, when the frame is sent, the delay of each pose: from its `occurredAt` to the instant of the tick", async () => {
+    const { core, publish } = fakeCore();
+    const delays: number[] = [];
+    const broadcast = createBroadcast(core, {
+      now: () => occurredAt + 180,
+      record: (delay) => delays.push(delay),
+    });
+    await broadcast.join("canvas-1", () => undefined, ignoreControl);
+
+    publish("canvas-1", event(1, 3, 5));
+    publish("canvas-1", { ...event(2, 4, 5), occurredAt: occurredAt + 100 });
+    broadcast.tick();
+
+    expect(delays).toEqual([180, 80]); // les deux poses, même conflatées dans une seule frame
+  });
+
+  // Ne compte que les poses : un retrait ou une modération n'est pas une pose reçue
+  it("counts only poses: a clear or a hide is not a pose received", async () => {
+    const { core, publish } = fakeCore();
+    const delays: number[] = [];
+    const broadcast = createBroadcast(core, {
+      now: () => occurredAt + 50,
+      record: (delay) => delays.push(delay),
+    });
+    await broadcast.join("canvas-1", () => undefined, ignoreControl);
+
+    publish("canvas-1", { ...event(1, 3, 5), kind: "clear" });
+    publish("canvas-1", { ...event(2, 4, 5), kind: "hide" });
+    broadcast.tick();
+
+    expect(delays).toEqual([]);
+  });
+
+  // Ne compte rien tant que la frame n'est pas partie : le canvas attend son tour (plus de 500 clients)
+  it("counts nothing until the frame has gone: the canvas waits for its turn", async () => {
+    const { core, publish } = fakeCore();
+    const delays: number[] = [];
+    const broadcast = createBroadcast(core, {
+      now: () => occurredAt + 200,
+      record: (delay) => delays.push(delay),
+    });
+    for (let index = 0; index < 501; index++)
+      await broadcast.join("canvas-1", () => undefined, ignoreControl);
+    publish("canvas-1", event(1, 3, 5));
+
+    broadcast.tick();
+    expect(delays).toEqual([]);
+
+    broadcast.tick();
+    expect(delays).toEqual([200]);
+  });
+
+  // Dit les connexions en tout et celles du plus gros canvas
+  it("tells the connections in all and those of the largest canvas", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    expect(broadcast.countConnections()).toEqual({ total: 0, largestCanvas: 0 });
+
+    await broadcast.join("canvas-1", () => undefined, ignoreControl);
+    await broadcast.join("canvas-2", () => undefined, ignoreControl);
+    const third: CellsListener = () => undefined;
+    await broadcast.join("canvas-2", third, ignoreControl);
+    await broadcast.join("canvas-2", () => undefined, ignoreControl);
+
+    expect(broadcast.countConnections()).toEqual({ total: 4, largestCanvas: 3 });
+
+    await broadcast.leave("canvas-2", third);
+
+    expect(broadcast.countConnections()).toEqual({ total: 3, largestCanvas: 2 });
+  });
+});

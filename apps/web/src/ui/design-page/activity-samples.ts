@@ -21,14 +21,14 @@ import { SAMPLE_BROKEN_PHOTO, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtu
 const DAY_MS = 24 * HOUR_MS;
 
 // Des courbes qui ondulent, et un trou : le serveur arrêté une quarantaine de minutes, ou quelques heures.
-const PERIOD_SHAPES = {
+export const PERIOD_SHAPES = {
   day: { count: 1440, stepMs: MINUTE_MS, gap: [600, 640] },
   month: { count: 720, stepMs: HOUR_MS, gap: [200, 206] },
   all: { count: 120, stepMs: DAY_MS, gap: [40, 42] },
 } as const;
 
 // Le début du dernier point d'une période : la dernière minute écoulée, l'heure ou le jour en cours.
-const lastPointAt = (period: ActivityPeriod, nowMs: number): number => {
+export const lastPointAt = (period: ActivityPeriod, nowMs: number): number => {
   const starts = toActivityPointStarts(nowMs);
   return period === "day" ? starts.minute - MINUTE_MS : period === "month" ? starts.hour : starts.day;
 };

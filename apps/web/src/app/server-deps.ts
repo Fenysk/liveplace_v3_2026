@@ -3,7 +3,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { generateLinkCode } from "@liveplace/domain";
 import { createDurableStore } from "@liveplace/durable";
-import { createArchiveWrites, createSignInWrites, createTwitchWrites } from "@liveplace/redis-core";
+import {
+  createArchiveWrites,
+  createCapacityWrites,
+  createSignInWrites,
+  createTwitchWrites,
+} from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createSessionSigner, createSessionVerifier } from "../infra/session";
 import { createTwitchAuth, createTwitchEventSub, createTwitchWebhook } from "../infra/twitch";
@@ -23,6 +28,7 @@ const buildServerDeps = () => {
     redis: createSignInWrites(redis),
     twitchWrites: createTwitchWrites(redis), // JOURNAL 2026-09-27
     archiveWrites: createArchiveWrites(redis), // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
+    capacityWrites: createCapacityWrites(redis), // Écart §2 et §9 (JOURNAL 2026-10-07) : l'occupation du web, l'usage de Convex
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub: createTwitchEventSub({
       clientId: config.twitchClientId,

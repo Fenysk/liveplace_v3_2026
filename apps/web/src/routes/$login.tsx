@@ -21,6 +21,7 @@ import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DeveloperWindow } from "../ui/developer/developer-window";
 import { LiveActivitySection } from "../ui/developer/live-activity-section";
+import { LiveCapacitySection } from "../ui/developer/live-capacity-section";
 import { useDeveloperWindow } from "../ui/developer/use-developer-window";
 import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
@@ -114,11 +115,15 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
           onSelect={developer.onSelect}
           onClose={developer.onClose}
         >
-          <LiveActivitySection
-            canvas={stores.canvas}
-            isOpen={developer.isOpen}
-            sectionId={developer.sectionId}
-          />
+          {developer.sectionId === "capacity" ? (
+            <LiveCapacitySection canvas={stores.canvas} isOpen={developer.isOpen} />
+          ) : (
+            <LiveActivitySection
+              canvas={stores.canvas}
+              isOpen={developer.isOpen}
+              sectionId={developer.sectionId}
+            />
+          )}
         </DeveloperWindow>
       )}
       {account.identity.kind === "signedIn" && (

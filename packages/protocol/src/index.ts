@@ -12,6 +12,7 @@ import {
   SCOREBOARD_SIZE,
   type Timestamp,
 } from "@liveplace/domain";
+import { CAPACITY_LINKS, CAPACITY_RESOURCE_IDS, CAPACITY_UNITS } from "@liveplace/domain/capacity";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
@@ -29,7 +30,8 @@ import { z } from "zod";
 // 13 : le développeur suit l'activité, `watchActivity`, `listActivityHistory`, `activity`, `activityHistory` (JOURNAL 2026-10-06).
 // 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (Écart §15, JOURNAL 2026-10-06), et le fond
 // noir de la vue OBS.
-export const PROTOCOL_VERSION = 14;
+// 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
+export const PROTOCOL_VERSION = 15;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -309,6 +311,15 @@ const ListActivityHistoryFrameSchema = z.strictObject({
   period: z.enum(ACTIVITY_PERIODS),
 });
 
+// Écart §4.2 (JOURNAL 2026-10-07) : la capacité, comme l'activité, pour le développeur seul.
+const WatchCapacityFrameSchema = z.strictObject({ t: z.literal("watchCapacity"), isWatching: z.boolean() });
+
+const ListCapacityHistoryFrameSchema = z.strictObject({
+  t: z.literal("listCapacityHistory"),
+  requestId: RequestIdSchema,
+  period: z.enum(ACTIVITY_PERIODS),
+});
+
 const PingFrameSchema = z.strictObject({ t: z.literal("ping") });
 
 const ClientFrameSchema = z.discriminatedUnion("t", [
@@ -330,6 +341,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetGaugeLimitsFrameSchema,
   WatchActivityFrameSchema,
   ListActivityHistoryFrameSchema,
+  WatchCapacityFrameSchema,
+  ListCapacityHistoryFrameSchema,
   PingFrameSchema,
 ]);
 
@@ -646,6 +659,61 @@ const ActivityHistoryFrameSchema = z.object({
   canvasPoints: z.array(CanvasPointSchema).optional(),
 });
 
+// Écart §4.3 (JOURNAL 2026-10-07) : la capacité, pour le développeur seul. Un taux est un pourcentage de son plafond.
+const RatioSchema = z.number().nonnegative();
+const CapacityResourceIdSchema = z.enum(CAPACITY_RESOURCE_IDS);
+
+// Une ressource : mesurée, elle dit sa valeur, son plafond et son taux (et le jour où un quota mensuel serait plein) ;
+// sans nouvelles ou non mesurée, rien de tout cela. Convex dit les déploiements qu'il compte, par leur nom.
+const CapacityResourceBaseSchema = z.object({
+  link: z.enum(CAPACITY_LINKS),
+  id: CapacityResourceIdSchema,
+  unit: z.enum(CAPACITY_UNITS),
+  deployments: z.array(z.string()).optional(),
+});
+
+const CapacityResourceSchema = z.discriminatedUnion("state", [
+  CapacityResourceBaseSchema.extend({
+    state: z.literal("measured"),
+    value: z.number().nonnegative(),
+    ceiling: z.number().positive(),
+    ratio: RatioSchema,
+    fullAt: TimestampSchema.optional(),
+  }),
+  CapacityResourceBaseSchema.extend({ state: z.literal("withoutNews") }),
+  CapacityResourceBaseSchema.extend({ state: z.literal("unmeasured") }),
+]);
+
+// `resource` : celle qui porte la saturation, absente quand rien n'est mesuré. `isIncomplete` : une ressource est sans nouvelles.
+const CapacityFrameSchema = z.object({
+  t: z.literal("capacity"),
+  saturation: z.object({
+    percent: RatioSchema,
+    resource: CapacityResourceIdSchema.optional(),
+    isIncomplete: z.boolean(),
+  }),
+  resources: z.array(CapacityResourceSchema),
+});
+
+// Un point, à `at` son début : le pic de la saturation et de la ressource qui la portait, et le plus haut taux de chaque
+// maillon. Un maillon sans mesure à ce moment-là n'a pas de taux : la courbe laisse un trou.
+const CapacityPointSchema = z.object({
+  at: TimestampSchema,
+  saturation: RatioSchema,
+  resource: CapacityResourceIdSchema.optional(),
+  redis: RatioSchema.optional(),
+  gateway: RatioSchema.optional(),
+  web: RatioSchema.optional(),
+  machine: RatioSchema.optional(),
+  convex: RatioSchema.optional(),
+});
+
+const CapacityHistoryFrameSchema = z.object({
+  t: z.literal("capacityHistory"),
+  requestId: RequestIdSchema,
+  points: z.array(CapacityPointSchema),
+});
+
 const ErrorFrameSchema = z.object({
   t: z.literal("error"),
   code: ErrorCodeSchema,
@@ -681,6 +749,8 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   CanvasStatusFrameSchema,
   ActivityFrameSchema,
   ActivityHistoryFrameSchema,
+  CapacityFrameSchema,
+  CapacityHistoryFrameSchema,
   ErrorFrameSchema,
   PongFrameSchema,
 ]);

@@ -32,6 +32,7 @@ import {
 } from "@liveplace/protocol";
 import type { Activity, ActivityMember } from "./activity";
 import type { Broadcast, CellsListener, ControlListener, ScoreboardControl } from "./broadcast";
+import type { Capacity } from "./capacity";
 import { toCellsFrame } from "./cells-frame";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 
@@ -56,6 +57,7 @@ type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" }>;
+type ListCapacityHistoryFrame = Extract<ClientFrame, { t: "listCapacityHistory" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
 // attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), ou le statut du
@@ -118,6 +120,7 @@ export type ConnectionDeps = {
   core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe" | "copyTwitchUsers">;
   broadcast: Broadcast;
   activity: Omit<Activity, "tick" | "start">; // écart §4.3 (JOURNAL 2026-10-06) : le gateway décide, et ne dit rien aux autres
+  capacity: Pick<Capacity, "watch" | "listHistory">; // écart §4.3 (JOURNAL 2026-10-07) : de même
   now: () => Timestamp;
 };
 
@@ -684,16 +687,24 @@ export function createConnection(
     if (history) socket.sendFrame({ t: "activityHistory", requestId, ...history });
   };
 
+  // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, qui n'a rien de propre au canvas de la socket.
+  const listCapacityHistory = async ({ requestId, period }: ListCapacityHistoryFrame): Promise<void> => {
+    const history = await deps.capacity.listHistory(session, period);
+    if (history) socket.sendFrame({ t: "capacityHistory", requestId, ...history });
+  };
+
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
     // Écart §15 (JOURNAL 2026-10-06) : une archive se regarde (`inspect`) et se tient en vie (`ping`) ; le reste est refusé,
-    // sauf le suivi d'activité (écart §4.2), qui ne touche pas au canvas.
+    // sauf le suivi d'activité et de capacité (écart §4.2), qui ne touchent pas au canvas.
     if (
       ready.isArchived &&
       frame.t !== "inspect" &&
       frame.t !== "ping" &&
       frame.t !== "watchActivity" &&
-      frame.t !== "listActivityHistory"
+      frame.t !== "listActivityHistory" &&
+      frame.t !== "watchCapacity" &&
+      frame.t !== "listCapacityHistory"
     )
       return refuseArchived(frame.requestId);
     switch (frame.t) {
@@ -731,6 +742,10 @@ export function createConnection(
         return deps.activity.watch(socket, session, frame.isWatching, ready.canvasId);
       case "listActivityHistory":
         return listActivityHistory(frame, ready);
+      case "watchCapacity":
+        return deps.capacity.watch(socket, session, frame.isWatching);
+      case "listCapacityHistory":
+        return listCapacityHistory(frame);
       case "ping":
         return socket.sendFrame({ t: "pong" });
     }
@@ -757,6 +772,7 @@ export function createConnection(
     async close() {
       member?.leave();
       deps.activity.watch(socket, session, false);
+      deps.capacity.watch(socket, session, false);
       if (state.status !== "awaitingHello") await deps.broadcast.leave(state.canvasId, listener);
     },
   };

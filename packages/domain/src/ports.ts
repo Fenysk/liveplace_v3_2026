@@ -2,6 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
+import type { CapacityResourceId, Saturation } from "./capacity";
 import type {
   ActivityPeriod,
   CanvasMeta,
@@ -295,6 +296,81 @@ export interface ActivityStore {
 // Le web compte un nouveau compte au callback OAuth : des compteurs seulement, jamais un script (§2).
 export interface SignupWrites {
   storeSignup(signup: Signup): Promise<void>;
+}
+
+// Écart §4.3 (JOURNAL 2026-10-07) : la capacité, telle que le gateway l'envoie au développeur.
+export type CapacityFrame = Extract<ServerFrame, { t: "capacity" }>;
+export type CapacityHistoryFrame = Extract<ServerFrame, { t: "capacityHistory" }>;
+export type CapacityPoint = CapacityHistoryFrame["points"][number];
+export type CapacityHistory = Pick<CapacityHistoryFrame, "points">;
+
+// Ce que Redis dit de lui-même (`INFO`) : sa mémoire face à `maxmemory` (0 : sans limite), le temps de processeur de son fil
+// principal en secondes depuis son démarrage, et le nombre d'écritures refusées faute de mémoire (`errorstat_OOM`).
+export type RedisUsage = {
+  usedMemoryBytes: number;
+  maxMemoryBytes: number;
+  cpuSeconds: number;
+  outOfMemoryRefusals: number;
+};
+
+// Ce que le web dépose pour le gateway (Écart §2 et §9, JOURNAL 2026-10-07) : son occupation, en pourcentage, à l'instant
+// de sa mesure ; et l'usage du mois d'un déploiement Convex, à l'instant de sa lecture (appels, Go, Go-heures).
+export type WebMeasure = { at: Timestamp; utilization: number };
+export type ConvexUsage = {
+  at: Timestamp;
+  calls: number;
+  databaseIoGb: number;
+  egressGb: number;
+  computeGbHours: number;
+};
+
+// Un déploiement dont le web lit l'usage (Écart §2 et §9, JOURNAL 2026-10-07) : son nom, l'URL de son API et la clé de
+// déploiement qui l'ouvre. La clé ne sort jamais de l'adaptateur : ni dans un journal, ni dans Redis, ni dans une frame.
+export type ConvexDeployment = { name: string; url: string; key: string };
+
+// L'usage du mois d'un déploiement, par l'API de déploiement de Convex (en bêta). Une forme inconnue ou un refus ne plante rien :
+// le résultat dit en quelques mots pourquoi, sans jamais nommer la clé.
+export interface ConvexUsageSource {
+  name: string;
+  getUsage(): Promise<Result<Omit<ConvexUsage, "at">>>;
+}
+
+// Ce que le web a déposé pour Convex : rien (`null`), qu'aucun déploiement n'est configuré, ou l'usage de chacun par son nom.
+export type ConvexDeposit =
+  | { status: "unconfigured" }
+  | { status: "configured"; deployments: ReadonlyMap<string, ConvexUsage> };
+
+// Les pics d'une minute : la saturation, la ressource qui la portait, et le plus haut taux de chaque maillon mesuré.
+export type CapacityMinute = { at: Timestamp } & Pick<Saturation, "percent" | "resource" | "linkRatios">;
+
+// Écart §5.1 (JOURNAL 2026-10-07) : des nombres sous `capacity:`. Le gateway lit ce que le web dépose, écrit chaque minute et élague.
+export interface CapacityStore {
+  getRedisUsage(): Promise<RedisUsage>;
+  getWebMeasure(): Promise<WebMeasure | null>; // `null` : le web n'a rien déposé
+  getConvexDeposit(): Promise<ConvexDeposit | null>;
+  // Le plafond atteint le plus récemment, par ressource : il survit à un redémarrage du gateway.
+  listCeilingsReached(): Promise<Map<CapacityResourceId, Timestamp>>;
+  storeCeilingReached(id: CapacityResourceId, at: Timestamp): Promise<void>;
+  storeCapacityMinute(minute: CapacityMinute): Promise<void>;
+  pruneCapacity(nowMs: Timestamp): Promise<void>; // les minutes de plus de 7 jours, les heures de plus de 366
+  listCapacityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<CapacityPoint[]>; // un point absent le reste
+}
+
+// Ce que le web écrit pour la capacité : des nombres seulement, jamais un script (§2).
+export interface CapacityWrites {
+  storeWebUtilization(measure: WebMeasure): Promise<void>;
+  storeConvexUsage(deployment: string, usage: ConvexUsage): Promise<void>; // `deployment` : son nom, jamais une clé
+  storeConvexUnconfigured(): Promise<void>;
+}
+
+// Ce que le process mesure de sa machine et de lui-même, par `node:os` et `node:fs` : les chiffres de l'hôte, même
+// depuis un conteneur. Un pourcentage se compte depuis le dernier appel : le premier n'en a pas (`null`).
+export interface HostProbe {
+  getMemory(): { usedBytes: number; totalBytes: number };
+  getCpuPercent(): number | null; // tous les cœurs de la machine
+  getCoreCount(): number; // ses cœurs : le plafond du processeur
+  getDisk(): Promise<{ usedBytes: number; totalBytes: number }>; // le disque du process
+  getUtilizationPercent(): number; // la part du temps où la boucle d'événements du process travaille
 }
 
 // Le verrou d'un propriétaire, pris pour la durée d'un changement de canvas actif : `holderId` ne se rend qu'à qui l'a pris.

@@ -124,6 +124,26 @@ export function toActiveField(dayAt: number): string {
   return `${dayAt}:active`;
 }
 
+// Écart §5.1 (JOURNAL 2026-10-07) : la capacité, des nombres seulement, sous `capacity:`, avec la pyramide de l'activité.
+export const CAPACITY_MINUTES_RETENTION_MS = ACTIVITY_MINUTES_RETENTION_MS;
+export const CAPACITY_HOURS_RETENTION_MS = ACTIVITY_HOURS_RETENTION_MS;
+
+export function buildCapacityKeys(prefix = "capacity:") {
+  return {
+    // `HASH` début du point → `saturation,resource,redis,gateway,web,machine,convex` (capacity.lua) : la saturation, la
+    // position de la ressource qui la portait dans `CAPACITY_RESOURCE_IDS` (-1 : aucune), et le taux de chaque maillon (-1 : sans mesure).
+    minutes: `${prefix}minute`, // élagué au-delà de 7 jours
+    hours: `${prefix}hour`, // élagué au-delà de 366 jours
+    days: `${prefix}day`, // le début du jour de Paris, sans limite
+    // Déposé par le web : `STRING` `at,utilization`, son occupation à l'instant de sa mesure.
+    web: `${prefix}web`,
+    // Déposé par le web : `HASH` nom du déploiement → `at,calls,databaseIoGb,egressGb,computeGbHours`, l'usage du mois.
+    convex: `${prefix}convex`,
+    convexUnconfigured: `${prefix}convex:unconfigured`, // posé quand aucun déploiement n'est configuré
+    reached: `${prefix}reached`, // `HASH` ressource → instant du dernier plafond atteint, sans EXPIRE : il survit au redémarrage
+  };
+}
+
 export function buildActivityKeys(prefix = "activity:") {
   return {
     // `HASH` début du point → `people,streamed,pixels,visits,phoneVisits,visitMinutes` (activity.lua ; un point d'avant

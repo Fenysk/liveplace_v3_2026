@@ -1,12 +1,21 @@
 // Le câblage du gateway : config, Redis, usecases, serveur (§3.3).
 
-import { createActivityStore, createCanvasCore, createTwitchCommandQueue } from "@liveplace/redis-core";
+import { CAPACITY_SAMPLE_MS } from "@liveplace/domain/capacity";
+import {
+  createActivityStore,
+  createCanvasCore,
+  createCapacityStore,
+  createTwitchCommandQueue,
+} from "@liveplace/redis-core";
 import { Redis } from "ioredis";
+import { createHostProbe } from "../infra/host";
 import { createSessionVerifier } from "../infra/session";
 import { startGatewayServer } from "../infra/ws-server";
 import { ACTIVITY_TICK_MS, createActivity } from "../usecase/activity";
 import { createBroadcast, SCOREBOARD_WINDOW_MS } from "../usecase/broadcast";
+import { CAPACITY_TICK_MS, createCapacity } from "../usecase/capacity";
 import { createConnection } from "../usecase/connection";
+import { createDelayTally } from "../usecase/delay-tally";
 import { consumeTwitchCommands } from "../usecase/twitch-commands";
 import { parseGatewayConfig } from "./config";
 
@@ -20,7 +29,9 @@ const redis = new Redis(config.redisUrl);
 // En mode abonné, Redis n'accepte plus les autres commandes : il faut sa propre connexion (§6.3).
 const liveSubscriber = new Redis(config.redisUrl);
 const core = createCanvasCore(redis, liveSubscriber);
-const broadcast = createBroadcast(core);
+// Écart §5.1 (JOURNAL 2026-10-07) : le délai de diffusion, d'une pose reçue à l'envoi de sa frame.
+const delays = createDelayTally();
+const broadcast = createBroadcast(core, { now: Date.now, record: delays.record });
 
 setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
@@ -40,6 +51,21 @@ setInterval(() => {
     .catch((error: unknown) => console.error("gateway: activité non écrite ou non envoyée", error));
 }, ACTIVITY_TICK_MS);
 
+// Écart §4.3 et §5.1 (JOURNAL 2026-10-07) : la capacité se mesure toutes les 10 s, et part toutes les 2 s à qui la regarde.
+const capacity = createCapacity({
+  store: createCapacityStore(redis),
+  host: createHostProbe(),
+  broadcast,
+  delays,
+  now: Date.now,
+  isProduction: config.isProduction,
+});
+await capacity.start();
+setInterval(() => {
+  capacity.sample().catch((error: unknown) => console.error("gateway: capacité non mesurée", error));
+}, CAPACITY_SAMPLE_MS);
+setInterval(capacity.tick, CAPACITY_TICK_MS);
+
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
@@ -57,7 +83,8 @@ const server = startGatewayServer({
   publicOrigin: config.publicOrigin,
   verifier: createSessionVerifier(config.sessionSecret),
   openConnection: (socket, session, device) =>
-    createConnection({ core, broadcast, activity, now: Date.now }, socket, session, device),
+    createConnection({ core, broadcast, activity, capacity, now: Date.now }, socket, session, device),
+  onBytesSent: capacity.countBytes,
 });
 
 const shutDown = (): void => {

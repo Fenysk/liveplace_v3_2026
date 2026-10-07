@@ -1,5 +1,6 @@
 // Le chapitre Composants (1/2) : ce qui se montre sans état de jeu autour. Chacun dans chacun de ses états.
 
+import { toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
@@ -9,6 +10,7 @@ import type { PngBackground } from "../archive/png-export";
 import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
 import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../design/canvas-activity-card";
+import { CapacityLinkRows, CapacityRow } from "../design/capacity-row";
 import { Checkbox } from "../design/checkbox";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
@@ -16,6 +18,7 @@ import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
+import { SaturationFigure } from "../design/saturation-figure";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
@@ -39,6 +42,8 @@ import {
   toActivitySlots,
   toCanvasSlots,
 } from "../developer/activity-slots";
+import { formatRate, toRowState } from "../developer/capacity-labels";
+import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
 import {
   NO_AUDIENCE,
   sampleCanvases,
@@ -47,6 +52,7 @@ import {
   sampleHere,
   samplePoints,
 } from "./activity-samples";
+import { sampleCapacityPoints } from "./capacity-samples";
 import {
   noop,
   SAMPLE_BROKEN_PHOTO,
@@ -56,7 +62,16 @@ import {
   SAMPLE_SPREAD,
   SAMPLE_VIEWER,
 } from "./design-fixtures";
-import { Block, Entry, InSmallWindow, InWindow, StateRow, useNowMs, WithValue } from "./entry-layout";
+import {
+  Block,
+  Entry,
+  InPhone,
+  InSmallWindow,
+  InWindow,
+  StateRow,
+  useNowMs,
+  WithValue,
+} from "./entry-layout";
 
 const PREVIEWS = [
   { name: "Un petit dessin", detail: "Cadré de près, la gomme en croix.", pixels: SAMPLE_DRAWING },
@@ -376,15 +391,39 @@ export const FieldsEntry = () => (
   </Entry>
 );
 
+// Une ligne de capacité sur un nombre de connexions : les mêmes mots et les mêmes teintes que le jeu, qui les tire de `domain`.
+const ratioRow = (name: string, value: number, ceiling: number, note?: string) => (
+  <CapacityRow
+    name={name}
+    note={note}
+    state={toRowState({
+      link: "gateway",
+      id: "gatewayConnections",
+      unit: "connections",
+      state: "measured",
+      value,
+      ceiling,
+      ratio: toRatio(value, ceiling),
+    })}
+  />
+);
+
 export const StatTilesEntry = () => {
   const nowMs = useNowMs();
   const { audience } = sampleFrame(nowMs);
   return (
     <Entry
       slug="chiffres"
-      components={["StatTiles", "StatTile", "StatTable"]}
-      file="ui/design/{stat-tile,stat-table}.tsx"
-      note="Un chiffre de l'instant. Quatre sur une ligne, deux sur mobile."
+      components={[
+        "StatTiles",
+        "StatTile",
+        "StatTable",
+        "SaturationFigure",
+        "CapacityLinkRows",
+        "CapacityRow",
+      ]}
+      file="ui/design/{stat-tile,stat-table,saturation-figure,capacity-row}.tsx"
+      note="Un chiffre de l'instant. Quatre sur une ligne, deux sur mobile. La capacité a les siens : la saturation en grand, et les ressources en lignes."
     >
       <Block title="Tuiles">
         <StateRow name="Les quatre chiffres de Maintenant">
@@ -431,6 +470,100 @@ export const StatTilesEntry = () => {
               rows={toCanvasAudienceRows(sampleHere(nowMs).audience)}
             />
           </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="La saturation"
+        note="Le plus haut des taux, en grand, et la ressource qui le porte. Vert sous 50 %, orange de 50 à 80 %, rouge à partir de 80 %."
+      >
+        <StateRow name="Large" detail="Sous 50 %.">
+          <InWindow>
+            <SaturationFigure percent={formatRate(31)} tone="ok" caption="VPS, disque · large" />
+          </InWindow>
+        </StateRow>
+        <StateRow name="À surveiller" detail="De 50 à 80 %.">
+          <InWindow>
+            <SaturationFigure
+              percent={formatRate(62)}
+              tone="warning"
+              caption="Redis, mémoire · à surveiller"
+            />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Proche" detail="À partir de 80 %.">
+          <InWindow>
+            <SaturationFigure percent={formatRate(87)} tone="danger" caption="Redis, mémoire · proche" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Incomplète"
+          detail="Une ressource est sans nouvelles : jamais verte, neutre, et elle le dit."
+        >
+          <InWindow>
+            <SaturationFigure
+              percent={formatRate(31)}
+              tone="neutral"
+              caption="VPS, disque"
+              note="Incomplète : Web, occupation sans nouvelles"
+            />
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Les ressources"
+        note="Des lignes simples sous un intitulé de maillon : le nom, la valeur sur son plafond, une fine barre, le taux. Sur mobile, le taux passe sous le nom."
+      >
+        <StateRow name="Les trois teintes" detail="Un taux sous 50 %, de 50 à 80 %, à partir de 80 %.">
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {ratioRow("Connexions en tout", 410, 1750)}
+                {ratioRow("Connexions au plus gros canvas", 640, 1000)}
+                {ratioRow("Connexions de la vue OBS", 910, 1000)}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Sans nouvelles, non mesurée"
+          detail="Le texte tient la place de la valeur, de la barre et du taux."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Convex" detail="plan Free">
+                <CapacityRow name="Appels de fonctions" state={{ kind: "withoutNews" }} />
+                <CapacityRow name="Calcul des actions" state={{ kind: "unmeasured" }} />
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Avec une légende, au-delà du plafond"
+          detail="Une projection de 155 % : la barre est pleine, le taux le dit."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Convex" detail="valiant-panther-436, watchful-spider-409 · plan Free">
+                {ratioRow(
+                  "Appels de fonctions",
+                  1_550_000,
+                  1_000_000,
+                  "projection fin octobre · plein le 15/10",
+                )}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
+        <StateRow name="Sur mobile" detail="Le nom et la valeur en haut ; dessous, le taux et la barre.">
+          <InPhone isWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {ratioRow("Connexions en tout", 410, 1750)}
+                {ratioRow("Connexions au plus gros canvas", 910, 1000)}
+                <CapacityRow name="Occupation" state={{ kind: "withoutNews" }} />
+              </CapacityLinkRows>
+            </div>
+          </InPhone>
         </StateRow>
       </Block>
     </Entry>
@@ -562,6 +695,27 @@ export const TimeChartsEntry = () => {
               lines={canvasChartLinesFor("all")}
               slots={toCanvasSlots(sampleCanvasPoints("all", nowMs), "all", nowMs)}
               emptyText={NO_CANVAS_POINT}
+            />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Un taux, 24 h"
+          detail="La saturation et un maillon par courbe, chacune de 0 à 100 % ; Convex ne mesure qu'à partir d'un moment, un trou avant."
+        >
+          <InWindow>
+            <TimeCharts
+              lines={CAPACITY_LINES}
+              slots={toCapacitySlots(sampleCapacityPoints("day", nowMs), "day", nowMs)}
+              emptyText={NO_POINT}
+            />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Un taux, Tout" detail="Un point par jour.">
+          <InWindow>
+            <TimeCharts
+              lines={CAPACITY_LINES}
+              slots={toCapacitySlots(sampleCapacityPoints("all", nowMs), "all", nowMs)}
+              emptyText={NO_POINT}
             />
           </InWindow>
         </StateRow>

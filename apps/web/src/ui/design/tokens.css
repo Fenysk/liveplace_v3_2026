@@ -20,6 +20,8 @@
   --on-accent: #ffffff;
   --danger: #ac2847;
   --on-danger: #ffffff;
+  --success: var(--gauge-charge); /* le vert de la jauge : un état sain */
+  --warning: #b45f06;
   --gauge-charge: #26854c;
   --gauge-draft: #f3a833;
   --claim: #f3a833;
@@ -59,6 +61,8 @@
   --on-accent: #10121c;
   --danger: #fa6e79;
   --on-danger: #10121c;
+  --success: var(--gauge-charge);
+  --warning: #f3a833;
   --gauge-charge: #5ab552;
   --gauge-draft: #f7f3b7;
   --claim: #f3a833;
@@ -139,6 +143,14 @@
   font-weight: 900;
 }
 
+.lp-type-display {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 .lp-type-title {
   font-family: var(--font-sans);
   font-size: 16px;
@@ -181,6 +193,14 @@
 
 .lp-danger {
   color: var(--danger);
+}
+
+.lp-success {
+  color: var(--success);
+}
+
+.lp-warning {
+  color: var(--warning);
 }
 
 /* Présent pour les lecteurs d'écran, invisible à l'écran */

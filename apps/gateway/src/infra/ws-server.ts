@@ -20,6 +20,7 @@ export type GatewayServerDeps = {
   publicOrigin: string;
   verifier: SessionVerifier;
   openConnection: (socket: ClientSocket, session: Session | null, device: Device) => ClientConnection;
+  onBytesSent: (bytes: number) => void; // Écart §5.1 (JOURNAL 2026-10-07) : le débit sortant, compté à chaque envoi
 };
 
 // Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
@@ -33,9 +34,21 @@ const encode = (frame: ServerFrame): Buffer => {
   return encoded;
 };
 
-const toClientSocket = (socket: WebSocket): ClientSocket => ({
-  sendFrame: (frame) => socket.send(encode(frame), { binary: false }),
-  sendSnapshot: (state) => socket.send(state, { binary: true }),
+// Les octets comptés sont ceux des frames et des snapshots, sans l'en-tête WebSocket ni TLS : pour chaque socket, même quand
+// la frame est partagée.
+export const toClientSocket = (
+  socket: Pick<WebSocket, "send" | "close">,
+  onBytesSent: (bytes: number) => void,
+): ClientSocket => ({
+  sendFrame: (frame) => {
+    const encoded = encode(frame);
+    onBytesSent(encoded.length);
+    socket.send(encoded, { binary: false });
+  },
+  sendSnapshot: (state) => {
+    onBytesSent(state.length);
+    socket.send(state, { binary: true });
+  },
   close: (code) => socket.close(code),
 });
 
@@ -56,7 +69,7 @@ export function startGatewayServer(deps: GatewayServerDeps) {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
   const serve = (socket: WebSocket, session: Session | null, device: Device): void => {
-    const connection = deps.openConnection(toClientSocket(socket), session, device);
+    const connection = deps.openConnection(toClientSocket(socket, deps.onBytesSent), session, device);
     // `hello` attendu dans les 5 s (§6.3) : le compte à rebours s'arrête à la première frame.
     const greeting = setTimeout(() => socket.close(CLOSE_POLICY), HELLO_TIMEOUT_MS);
 

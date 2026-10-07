@@ -10,6 +10,12 @@ export function chartMax(values: readonly (number | null)[]): number {
   return values.reduce<number>((max, value) => Math.max(max, value ?? 0), 1);
 }
 
+// Une courbe d'un taux a une échelle fixe (`floor`, 100 %) qu'un taux plus haut dépasse : son pic ne se confond pas avec le
+// plafond de la ressource (Écart §4.3, JOURNAL 2026-10-07).
+export function chartScale(values: readonly (number | null)[], floor: number): number {
+  return Math.max(floor, chartMax(values));
+}
+
 // Les suites de créneaux qui ont un point, chacune un morceau de courbe.
 const toRuns = (values: readonly (number | null)[], max: number): Point[][] => {
   const runs: Point[][] = [];

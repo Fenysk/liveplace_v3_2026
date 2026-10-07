@@ -1,0 +1,19 @@
+/* La saturation : un grand pourcentage coloré, son libellé et la ressource qui la porte à côté. */
+
+.lp-saturation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Le pourcentage change de teinte en passant un seuil : un fondu, comme les survols */
+.lp-saturation-value {
+  flex: none;
+  transition: color var(--lp-dur-fast) ease;
+}
+
+.lp-saturation-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}

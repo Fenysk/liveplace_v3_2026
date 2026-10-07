@@ -32,6 +32,36 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-07 — Écart §4.3 : la section Capacité de la fenêtre Développeur, ses teintes en tokens, ses processeurs en cœurs
+
+**Contexte.** La maquette validée veut un grand pourcentage vert, orange ou rouge, des barres de taux, et un processeur dit « 9 % de 4 cœurs » ; `tokens.css` n'a ni vert ni orange d'état, ni grande taille de texte, et la frame ne dit pas les cœurs.
+**Décision.** `tokens.css` gagne `--success` (le vert de la jauge), `--warning`, `.lp-type-display`, `.lp-success` et `.lp-warning`. La barre d'une ressource est un `<meter>` natif, jamais un `style` que la CSP de production bloque dans le HTML du serveur. Les processeurs de Redis (un cœur) et de la machine (ses cœurs, lus avec la mesure) se disent en cœurs, `unit: "cores"`. `TimeCharts` accepte une échelle fixe de 0 à 100 % et un trou par courbe, `HistoryBlock` sert l'activité et la capacité.
+**Renoncement.** Une largeur de barre posée par `style` ; le processeur en pourcentage de 100 %, qui ne dirait pas les cœurs ; un second bloc d'historique recopié pour la capacité.
+
+## 2026-10-07 — Écart §4.2 et §4.3 : le développeur suit la capacité par le WebSocket, protocole 15
+
+**Contexte.** Comme l'activité, la capacité (cahier des charges dédié, 07/10) vit en direct, et seul le gateway la rassemble.
+**Décision.** Deux frames client, `watchCapacity` (`isWatching`) et `listCapacityHistory` (`period`, `requestId`) ; deux frames serveur, `capacity` (toutes les 2 s tant que le développeur regarde) et `capacityHistory`. Ignorées hors de `DEVELOPER_USER_ID`. `PROTOCOL_VERSION` passe à 15.
+**Renoncement.** La capacité dans la frame `activity` : deux sections, et chacune ne part que si on la regarde.
+
+## 2026-10-07 — Écart §5.1 et §6 : le gateway mesure la capacité toutes les 10 s et en garde les pics sous `capacity:`
+
+**Contexte.** La section Capacité veut chaque ressource au plus près des vraies données : Redis, le gateway, la machine, et ce que le web dépose.
+**Décision.** Toutes les 10 s, le gateway lit `INFO` de Redis (mémoire et `maxmemory`, processeur, refus `OOM`), la machine par le module `os` de Node (celle de l'hôte, même depuis un conteneur), son occupation (ELU), les octets de ses sockets, le délai de diffusion (de `occurredAt` à l'envoi de la frame) et les mesures du web dans Redis. Chaque minute, il garde les pics sous `capacity:` (minute 7 jours, heure 366 jours, jour sans limite). Les plafonds fixes vivent dans `domain`, le plan Convex compris.
+**Renoncement.** Prometheus, Grafana et un exporteur : trois conteneurs et une interface de plus, pour un seul lecteur. `MEMORY USAGE` par clé : il faudrait un `SCAN`.
+
+## 2026-10-07 — Écart §2 et §9 : le web lit l'usage de Convex et mesure sa propre occupation, par une tâche de fond
+
+**Contexte.** Les quotas Convex se comptent pour l'équipe, et seule l'API de déploiement les donne (`GET /api/v1/get_current_usage`, en bêta, `Authorization: Convex <clé de déploiement>`). Le gateway ne parle jamais à Convex (§2), et le worker n'est pas en production.
+**Décision.** Le plugin de démarrage du web lance deux minuteries : toutes les 15 min, l'usage de chaque déploiement de `CONVEX_USAGE_DEPLOYMENTS` (facultative, des paires « URL clé ») ; toutes les 10 s, son occupation (ELU). Il les écrit dans Redis sous `capacity:`. Sans la variable, Convex est « non mesuré » ; en production, « sans nouvelles ».
+**Renoncement.** Le worker (pas en production) ; le gateway vers Convex (§2). Une clé de déploiement peut aussi déployer : celle de la production ne va qu'au web de la production.
+
+## 2026-10-07 — Lexique : `capacity`, `ceiling` et `saturation`
+
+**Contexte.** La section Capacité apporte trois concepts sans mot ; `quota` est déjà banni (synonyme de `gauge`), comme `metrics` et `telemetry`.
+**Décision.** `capacity` : les ressources de LivePlace face à leur plafond, et leur historique. `ceiling` : le plafond d'une ressource, comme celui de la jauge (`gaugeMaxCeiling`) ; un quota Convex est un `ceiling`. `saturation` : le plus haut taux, et la ressource qui le porte (banni : `pressure`).
+**Renoncement.** Pas de mot pour le taux (`ratio`, un nombre) ni pour la ressource (un champ de `capacity`).
+
 ## 2026-10-07 — Un signalement de plage arrive en une seule ligne chez les modérateurs, réuni dans le web
 
 **Contexte.** Signaler une plage d'heures signale chaque pose de l'auteur qu'elle touche, et la section Modération affichait une ligne par pose : un dessin arrivait en dizaines de lignes (demande de l'humain).

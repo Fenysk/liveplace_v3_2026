@@ -70,6 +70,8 @@ services:
       TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:?TWITCH_EVENTSUB_SECRET manquante}
       # Vide en production : ni bandeau, ni `noindex`.
       BETA_LABEL: ${BETA_LABEL:-}
+      # Écart §2 et §9 (JOURNAL 2026-10-07) : facultative, des paires « URL clé » ; sans elle, Convex n'est pas mesuré.
+      CONVEX_USAGE_DEPLOYMENTS: ${CONVEX_USAGE_DEPLOYMENTS:-}
     # Le callback OAuth crée le canvas dans Redis (§10.1).
     depends_on:
       redis:

@@ -8,14 +8,16 @@ import { ActivitySection } from "./activity-section";
 import { CanvasSection } from "./canvas-section";
 import type { DeveloperSectionId } from "./developer-window";
 
-const browserClock: ActivityClock = {
+export const browserClock: ActivityClock = {
   repeat: (ms, run) => {
     const timer = setInterval(run, ms);
     return () => clearInterval(timer);
   },
 };
 
-type WatchedSectionProps = { watch: ActivityWatch; sectionId: DeveloperSectionId };
+type ActivitySectionId = Exclude<DeveloperSectionId, "capacity">; // la capacité a sa propre écoute
+
+type WatchedSectionProps = { watch: ActivityWatch; sectionId: ActivitySectionId };
 
 const WatchedSection = ({ watch, sectionId }: WatchedSectionProps) => {
   const view = useSyncExternalStore(watch.subscribe, watch.getView, watch.getView);
@@ -23,7 +25,7 @@ const WatchedSection = ({ watch, sectionId }: WatchedSectionProps) => {
   return <Section view={view} nowMs={Date.now()} onSelectPeriod={watch.selectPeriod} />;
 };
 
-type LiveActivitySectionProps = { canvas: CanvasStore; isOpen: boolean; sectionId: DeveloperSectionId };
+type LiveActivitySectionProps = { canvas: CanvasStore; isOpen: boolean; sectionId: ActivitySectionId };
 
 export const LiveActivitySection = ({ canvas, isOpen, sectionId }: LiveActivitySectionProps) => {
   const [watch, setWatch] = useState<ActivityWatch | null>(null);

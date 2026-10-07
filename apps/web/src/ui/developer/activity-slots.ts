@@ -80,10 +80,14 @@ export const canvasChartLinesFor = (period: ActivityPeriod): readonly TimeChartL
 type TimeAxis = { firstAt: Timestamp; stepMs: number; count: number };
 
 // Tout : du premier jour au dernier, ceux de ces débuts de jour de Paris.
-type DayRange = { firstAt: Timestamp; lastAt: Timestamp };
+export type DayRange = { firstAt: Timestamp; lastAt: Timestamp };
 
 // 24 h : jusqu'à la dernière minute écoulée. 30 jours : jusqu'à l'heure en cours. Tout : du premier jour au dernier.
-const toTimeAxis = (days: DayRange | null, period: ActivityPeriod, nowMs: Timestamp): TimeAxis | null => {
+export const toTimeAxis = (
+  days: DayRange | null,
+  period: ActivityPeriod,
+  nowMs: Timestamp,
+): TimeAxis | null => {
   if (period === "day")
     return { firstAt: toMinuteStart(nowMs) - 1440 * MINUTE_MS, stepMs: MINUTE_MS, count: 1440 };
   if (period === "month") return { firstAt: toHourStart(nowMs) - 719 * HOUR_MS, stepMs: HOUR_MS, count: 720 };
