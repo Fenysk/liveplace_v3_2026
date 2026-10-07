@@ -47,6 +47,22 @@ export const resolveLocale = ({ cookieHeader, preferenceHeader }: LocaleHeaders)
   fromPreferenceHeader(preferenceHeader) ??
   DEFAULT_LOCALE;
 
+// Pour une route serveur qui répond en texte brut, sans passer par la page.
+export const resolveRequestLocale = ({ headers }: Pick<Request, "headers">): Locale =>
+  resolveLocale({
+    cookieHeader: headers.get("cookie") ?? undefined,
+    preferenceHeader: headers.get("accept-language") ?? undefined,
+  });
+
+const fromRootLoader = (data: unknown): Locale | undefined =>
+  typeof data === "object" && data !== null && "locale" in data && typeof data.locale === "string"
+    ? toLocale(data.locale)
+    : undefined;
+
+// La langue que la racine a rendue, lue par une route dans ses `matches` : son `<title>` est écrit par le serveur.
+export const localeOfMatches = (matches: readonly { loaderData?: unknown }[]): Locale =>
+  matches.map(({ loaderData }) => fromRootLoader(loaderData)).find((locale) => locale) ?? DEFAULT_LOCALE;
+
 export const nextLocale = (locale: Locale): Locale =>
   LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length] ?? DEFAULT_LOCALE;
 
@@ -62,6 +78,10 @@ export const localeCookie = (locale: Locale, isSecure: boolean): string =>
 
 export const formatNumber = (value: number, locale: Locale): string =>
   value.toLocaleString(INTL_TAGS[locale]);
+
+// Une date et son heure, en toutes lettres, au fuseau du navigateur : la pose d'un pixel, la dernière synchro Twitch.
+export const formatDateTime = (timestamp: number, locale: Locale): string =>
+  new Intl.DateTimeFormat(INTL_TAGS[locale], { dateStyle: "long", timeStyle: "short" }).format(timestamp);
 
 // Le pluriel suit la règle de la langue : en français 0 et 1 sont au singulier, en anglais 1 seul.
 export const isSingular = (count: number, locale: Locale): boolean =>

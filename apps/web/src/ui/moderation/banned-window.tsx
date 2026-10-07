@@ -5,7 +5,8 @@ import type { Pixel } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
 import { SmallWindow } from "../design/window";
-import { pixelCountLabel } from "./moderation-texts";
+import { useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 
 export type BannedWindowProps = {
@@ -15,20 +16,23 @@ export type BannedWindowProps = {
   onClose: () => void; // Je comprends, Échap ou Fermer
 };
 
-export const BannedWindow = ({ isOpen, pixels, canvas, onClose }: BannedWindowProps) => (
-  <SmallWindow
-    isOpen={isOpen}
-    title="Tu es banni·e de ce canvas"
-    onClose={onClose}
-    actions={<Button label="Je comprends" variant="primary" onPress={onClose} />}
-  >
-    {pixels && pixels.length > 0 && (
-      <>
-        <p className="lp-type-body lp-prompt">Les pixels qui t'ont valu ce bannissement ont été retirés :</p>
-        <PixelPreview {...canvas} pixels={pixels} label="Tes pixels retirés" />
-        <span className="lp-type-caption lp-muted lp-prompt">{pixelCountLabel(pixels.length)}</span>
-      </>
-    )}
-    <p className="lp-type-body lp-prompt">Tu peux seulement regarder le canvas.</p>
-  </SmallWindow>
-);
+export const BannedWindow = ({ isOpen, pixels, canvas, onClose }: BannedWindowProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  return (
+    <SmallWindow
+      isOpen={isOpen}
+      title={t.bannedTitle}
+      onClose={onClose}
+      actions={<Button label={t.understood} variant="primary" onPress={onClose} />}
+    >
+      {pixels && pixels.length > 0 && (
+        <>
+          <p className="lp-type-body lp-prompt">{t.bannedProof}</p>
+          <PixelPreview {...canvas} pixels={pixels} label={t.yourClearedPixels} />
+          <span className="lp-type-caption lp-muted lp-prompt">{t.pixelCount(pixels.length)}</span>
+        </>
+      )}
+      <p className="lp-type-body lp-prompt">{t.watchOnly}</p>
+    </SmallWindow>
+  );
+};

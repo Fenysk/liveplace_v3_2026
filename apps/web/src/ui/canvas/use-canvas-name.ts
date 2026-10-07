@@ -3,8 +3,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCanvasesFn, renameCanvasFn } from "../../routes/-owner-canvases";
-import { NAME_SAVED, renameFailureLabel } from "../archive/archive-texts";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import { toNameToSave } from "./canvas-name";
 import type { CanvasNameField } from "./canvas-settings";
 
@@ -17,6 +18,7 @@ type Loaded =
 
 export function useCanvasName(): CanvasNameField {
   const toast = useToast();
+  const t = useTexts(ARCHIVE_TEXTS);
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
   const [value, setValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -55,17 +57,17 @@ export function useCanvasName(): CanvasNameField {
       if (result.ok) {
         setLoaded({ status: "ready", canvasId, saved: name });
         setValue(name);
-        toast("success", NAME_SAVED);
+        toast("success", t.nameSaved);
         return;
       }
       setValue(saved);
-      toast("error", renameFailureLabel(result.error));
+      toast("error", t.renameFailure(result.error));
       // Le canvas en cours a changé depuis l'ouverture : son nom, et celui qu'on vise, sont à relire.
       if (result.error === "not_active") load();
     } catch (error) {
       console.error("nom du canvas : enregistrement sans réponse", error);
       setValue(saved);
-      toast("error", renameFailureLabel("network"));
+      toast("error", t.renameFailure("network"));
     } finally {
       setIsSaving(false);
     }

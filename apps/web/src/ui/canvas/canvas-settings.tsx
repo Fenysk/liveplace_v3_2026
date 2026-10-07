@@ -11,24 +11,19 @@ import {
   type GaugeLimits,
 } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
-import { CANVAS_NAME_LABEL, CANVASES_UNAVAILABLE, NAME_PLACEHOLDER } from "../archive/archive-texts";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { Segmented, type SegmentedOption } from "../design/segmented";
 import { Slider, type SliderStep } from "../design/slider";
 import { TextField } from "../design/text-field";
 import { SmallWindow, useShownWhileClosing } from "../design/window";
-import { CONNECTION_LOST, pixelCountLabel } from "../moderation/moderation-texts";
+import { useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import type { CanvasPreviewProps } from "../moderation/moderation-window";
 import type { SizeChoice } from "./canvas-size";
-
-const FORMAT_NAMES: Record<CanvasFormat, string> = {
-  "1:1": "Carré",
-  "16:9": "Paysage 16:9",
-  "9:16": "Portrait 9:16",
-  "4:3": "Paysage 4:3",
-  "3:4": "Portrait 3:4",
-};
+import { CANVAS_TEXTS } from "./canvas-texts";
 
 const FORMAT_OPTIONS: readonly SegmentedOption<CanvasFormat>[] = CANVAS_FORMATS.map(({ format }) => ({
   value: format,
@@ -38,14 +33,6 @@ const FORMAT_OPTIONS: readonly SegmentedOption<CanvasFormat>[] = CANVAS_FORMATS.
 // La place de la taille dans son format, en texte : ce que les boutons radio savent porter.
 const SIZE_KEYS = ["0", "1", "2"] as const;
 type SizeKey = (typeof SIZE_KEYS)[number];
-
-const SIZE_OPTIONS: readonly SegmentedOption<SizeKey>[] = [
-  { value: "0", label: "Petit" },
-  { value: "1", label: "Moyen" },
-  { value: "2", label: "Grand" },
-];
-
-const sizeLabel = ({ width, height }: CanvasSize): string => `${width} × ${height} cases`;
 
 // Le champ du nom du canvas en cours : lu à l'ouverture, enregistré quand il perd le focus (use-canvas-name.ts).
 // `unavailable` : le nom ne se lit pas, le champ reste fermé.
@@ -57,20 +44,23 @@ export type CanvasNameField = {
   onCommit: () => void;
 };
 
-export const CanvasNameSettings = ({ name }: { name: CanvasNameField }) => (
-  <div className="lp-setting">
-    <TextField
-      label={CANVAS_NAME_LABEL}
-      placeholder={NAME_PLACEHOLDER}
-      value={name.value}
-      maxLength={ARCHIVE_NAME_MAX_LENGTH}
-      isDisabled={name.status !== "ready" || name.isSaving}
-      onInput={name.onInput}
-      onCommit={name.onCommit}
-    />
-    {name.status === "unavailable" && <p className="lp-type-caption lp-danger">{CANVASES_UNAVAILABLE}</p>}
-  </div>
-);
+export const CanvasNameSettings = ({ name }: { name: CanvasNameField }) => {
+  const t = useTexts(ARCHIVE_TEXTS);
+  return (
+    <div className="lp-setting">
+      <TextField
+        label={t.canvasNameLabel}
+        placeholder={t.namePlaceholder}
+        value={name.value}
+        maxLength={ARCHIVE_NAME_MAX_LENGTH}
+        isDisabled={name.status !== "ready" || name.isSaving}
+        onInput={name.onInput}
+        onCommit={name.onCommit}
+      />
+      {name.status === "unavailable" && <p className="lp-type-caption lp-danger">{t.canvasesUnavailable}</p>}
+    </div>
+  );
+};
 
 type CanvasSettingsProps = {
   name: CanvasNameField;
@@ -82,33 +72,37 @@ type CanvasSettingsProps = {
 };
 
 export const CanvasSettings = ({ name, current, choice, chosen, onChoose, onApply }: CanvasSettingsProps) => {
+  const t = useTexts(CANVAS_TEXTS);
   const isCurrent = chosen.width === current.width && chosen.height === current.height;
+  const sizeOptions: readonly SegmentedOption<SizeKey>[] = SIZE_KEYS.map((value) => ({
+    value,
+    label: t.sizeNames[value],
+  }));
   return (
     <>
       <CanvasNameSettings name={name} />
       <div className="lp-setting">
-        <span className="lp-type-body">Taille du canvas</span>
-        <p className="lp-type-caption lp-muted">Actuellement {sizeLabel(current)}.</p>
+        <span className="lp-type-body">{t.canvasSize}</span>
+        <p className="lp-type-caption lp-muted">{t.currentSize(t.cellsLabel(current))}</p>
       </div>
       <div className="lp-setting">
         <Segmented
-          label="Format"
+          label={t.format}
           options={FORMAT_OPTIONS}
           value={choice.format}
           onSelect={(format) => onChoose({ ...choice, format })}
         />
         <Segmented
-          label="Taille"
-          options={SIZE_OPTIONS}
+          label={t.size}
+          options={sizeOptions}
           value={SIZE_KEYS[choice.sizeIndex] ?? "0"}
           onSelect={(sizeIndex) => onChoose({ ...choice, sizeIndex: Number(sizeIndex) })}
         />
         <p className="lp-type-caption lp-muted">
-          {FORMAT_NAMES[choice.format]}, {sizeLabel(chosen)}. Rien ne se perd : ce qui sort du cadre revient
-          quand le canvas s'agrandit.
+          {t.chosenSize({ format: t.formatNames[choice.format], size: t.cellsLabel(chosen) })}
         </p>
         <div className="lp-row">
-          <Button label="Changer la taille" variant="primary" isDisabled={isCurrent} onPress={onApply} />
+          <Button label={t.changeSize} variant="primary" isDisabled={isCurrent} onPress={onApply} />
         </div>
       </div>
     </>
@@ -128,30 +122,31 @@ type ResizeWindowProps = {
 };
 
 export const ResizeWindow = ({ next, outside, status, canvas, onConfirm, onClose }: ResizeWindowProps) => {
+  const t = useTexts(CANVAS_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  const moderation = useTexts(MODERATION_TEXTS);
   const shown = useShownWhileClosing(next);
   if (!shown) return null;
   return (
     <SmallWindow
       isOpen={next !== null}
-      title={`Passer à ${sizeLabel(shown)} ?`}
+      title={t.resizeTitle(t.cellsLabel(shown))}
       onClose={onClose}
       isLocked={status === "running"}
       actions={
         <>
-          <Button label="Annuler" kbd="Échap" onPress={onClose} />
-          <Button label="Changer la taille" variant="primary" onPress={onConfirm} />
+          <Button label={design.cancel} kbd={design.escapeKey} onPress={onClose} />
+          <Button label={t.changeSize} variant="primary" onPress={onConfirm} />
         </>
       }
     >
-      {outside.length > 0 && (
-        <PixelPreview {...canvas} pixels={outside} label="Les pixels qui sortent du cadre" />
-      )}
+      {outside.length > 0 && <PixelPreview {...canvas} pixels={outside} label={t.outsideLabel} />}
       <p className="lp-type-body lp-prompt">
-        {outside.length > 0
-          ? `${pixelCountLabel(outside.length)} sortent du cadre : gardés, invisibles, ils reviennent quand le canvas s'agrandit.`
-          : "Aucun pixel posé ne sort du cadre."}
+        {outside.length > 0 ? t.outsideSentence(outside.length) : t.nothingOutside}
       </p>
-      {status === "failed" && <p className="lp-type-caption lp-danger lp-prompt">{CONNECTION_LOST}</p>}
+      {status === "failed" && (
+        <p className="lp-type-caption lp-danger lp-prompt">{moderation.connectionLost}</p>
+      )}
     </SmallWindow>
   );
 };
@@ -182,33 +177,33 @@ type GaugeSettingsProps = {
   onPick: (limits: GaugeLimits) => void; // un plafond plus bas passe d'abord par la confirmation
 };
 
-export const GaugeSettings = ({ limits, onPick }: GaugeSettingsProps) => (
-  <>
-    <div className="lp-setting">
-      <span className="lp-type-body">Jauge des joueurs</span>
-      <p className="lp-type-caption lp-muted">
-        Chaque joueur part de la jauge de départ et la fait grandir en posant sur ton canvas : un premier +1 à
-        réclamer au 12e pixel, puis de plus en plus espacés, jusqu'à la jauge maximale.
-      </p>
-    </div>
-    <div className="lp-setting">
-      <Slider
-        label="Jauge de départ"
-        steps={START_STEPS}
-        value={limits.gaugeMaxStart}
-        onPick={(gaugeMaxStart) =>
-          onPick({ gaugeMaxStart, gaugeMaxCeiling: Math.max(gaugeMaxStart, limits.gaugeMaxCeiling) })
-        }
-      />
-      <Slider
-        label="Jauge maximale"
-        steps={ceilingSteps(limits)}
-        value={limits.gaugeMaxCeiling}
-        onPick={(gaugeMaxCeiling) => onPick({ ...limits, gaugeMaxCeiling })}
-      />
-    </div>
-  </>
-);
+export const GaugeSettings = ({ limits, onPick }: GaugeSettingsProps) => {
+  const t = useTexts(CANVAS_TEXTS);
+  return (
+    <>
+      <div className="lp-setting">
+        <span className="lp-type-body">{t.playerGauge}</span>
+        <p className="lp-type-caption lp-muted">{t.playerGaugeNote}</p>
+      </div>
+      <div className="lp-setting">
+        <Slider
+          label={t.startingGauge}
+          steps={START_STEPS}
+          value={limits.gaugeMaxStart}
+          onPick={(gaugeMaxStart) =>
+            onPick({ gaugeMaxStart, gaugeMaxCeiling: Math.max(gaugeMaxStart, limits.gaugeMaxCeiling) })
+          }
+        />
+        <Slider
+          label={t.maximumGauge}
+          steps={ceilingSteps(limits)}
+          value={limits.gaugeMaxCeiling}
+          onPick={(gaugeMaxCeiling) => onPick({ ...limits, gaugeMaxCeiling })}
+        />
+      </div>
+    </>
+  );
+};
 
 type CeilingWindowProps = {
   next: GaugeLimits | null; // `null` : fermée
@@ -218,24 +213,23 @@ type CeilingWindowProps = {
 
 // Baisser le plafond fait redescendre des joueurs : ce qu'ils ont réclamé reste acquis, et revient s'il remonte.
 export const CeilingWindow = ({ next, onConfirm, onClose }: CeilingWindowProps) => {
+  const t = useTexts(CANVAS_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   const shown = useShownWhileClosing(next);
   if (!shown) return null;
   return (
     <SmallWindow
       isOpen={next !== null}
-      title={`Baisser la jauge maximale à ${shown.gaugeMaxCeiling} ?`}
+      title={t.lowerTitle(shown.gaugeMaxCeiling)}
       onClose={onClose}
       actions={
         <>
-          <Button label="Annuler" kbd="Échap" onPress={onClose} />
-          <Button label="Baisser" variant="primary" onPress={onConfirm} />
+          <Button label={design.cancel} kbd={design.escapeKey} onPress={onClose} />
+          <Button label={t.lower} variant="primary" onPress={onConfirm} />
         </>
       }
     >
-      <p className="lp-type-body lp-prompt">
-        Les joueurs au-dessus de {shown.gaugeMaxCeiling} charges vont redescendre. Ce qu'ils ont réclamé reste
-        acquis : ils le retrouvent si la jauge maximale remonte.
-      </p>
+      <p className="lp-type-body lp-prompt">{t.lowerSentence(shown.gaugeMaxCeiling)}</p>
     </SmallWindow>
   );
 };

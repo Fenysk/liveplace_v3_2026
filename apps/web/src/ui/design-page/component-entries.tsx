@@ -3,8 +3,8 @@
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
-import { NAME_PLACEHOLDER, PROGRESS_LABEL, progressOptions } from "../archive/archive-texts";
-import { PNG_BACKGROUND_OPTIONS } from "../archive/download-window";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
+import { pngBackgroundOptions } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
 import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
@@ -12,6 +12,7 @@ import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../d
 import { Checkbox } from "../design/checkbox";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { LocaleButton, LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
@@ -221,6 +222,10 @@ const ActivityCardScene = ({
 );
 
 const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
+
+// Écart §14 (JOURNAL 2026-10-07) : les exemples de /design gardent le français de la page.
+const { namePlaceholder: NAME_PLACEHOLDER, progressLabel: PROGRESS_LABEL } = ARCHIVE_TEXTS.fr;
+const PNG_BACKGROUND_OPTIONS = pngBackgroundOptions(DESIGN_TEXTS.fr.backgroundNames);
 
 export const ActivityCardEntry = () => {
   const nowMs = useNowMs();
@@ -461,7 +466,7 @@ export const ChoicesEntry = () => {
               {(progress, setProgress) => (
                 <ChoiceList
                   label={PROGRESS_LABEL}
-                  options={progressOptions("archive")}
+                  options={ARCHIVE_TEXTS.fr.progressOptions.archive}
                   value={progress}
                   onSelect={setProgress}
                 />
@@ -473,7 +478,7 @@ export const ChoicesEntry = () => {
           <InSmallWindow>
             <ChoiceList
               label={PROGRESS_LABEL}
-              options={progressOptions("archive")}
+              options={ARCHIVE_TEXTS.fr.progressOptions.archive}
               value="keep"
               onSelect={noop}
               isDisabled

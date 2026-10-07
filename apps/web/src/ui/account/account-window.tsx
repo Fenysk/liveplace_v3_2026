@@ -2,7 +2,7 @@
 // OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, le thème,
 // la langue, Se déconnecter.
 
-import { Layers, LogOut, MonitorPlay, Scaling, Shield, Trophy, User } from "lucide-react";
+import { Layers, LogOut, type LucideIcon, MonitorPlay, Scaling, Shield, Trophy, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
@@ -12,6 +12,7 @@ import type { ThemeChoice } from "../design/theme";
 import { ThemePicker } from "../design/theme-controls";
 import { Window, WindowRow } from "../design/window";
 import { useTexts } from "../locale/use-locale";
+import { ACCOUNT_TEXTS } from "./account-texts";
 
 export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "scoreboard" | "account";
 
@@ -20,12 +21,14 @@ export const SETTINGS_SECTION = "canvas" as const satisfies AccountSection;
 
 // Dans l'ordre du CDC 2026 : Canvas, Vue OBS, Modération, Mon compte ; Archives à côté de Canvas (Écart §15,
 // JOURNAL 2026-10-06). Le Classement du mobile se met avant Mon compte.
-const CANVAS_SECTION = { id: "canvas", label: "Canvas", icon: Scaling } as const;
-const CANVASES_SECTION = { id: "canvases", label: "Archives", icon: Layers } as const;
-const OBS_SECTION = { id: "obs", label: "Vue OBS", icon: MonitorPlay } as const;
-const MODERATION_SECTION = { id: "moderation", label: "Modération", icon: Shield } as const;
-const SCOREBOARD_SECTION = { id: "scoreboard", label: "Classement", icon: Trophy } as const;
-const ACCOUNT_SECTION = { id: "account", label: "Mon compte", icon: User } as const;
+const SECTION_ICONS = {
+  canvas: Scaling,
+  canvases: Layers,
+  obs: MonitorPlay,
+  moderation: Shield,
+  scoreboard: Trophy,
+  account: User,
+} as const satisfies Record<AccountSection, LucideIcon>;
 
 type AccountWindowProps = {
   isOpen: boolean;
@@ -58,14 +61,16 @@ export const AccountWindow = ({
   canvasesTab,
   scoreboardTab,
 }: AccountWindowProps) => {
+  const t = useTexts(ACCOUNT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
+  const section = (id: AccountSection, label: string) => ({ id, label, icon: SECTION_ICONS[id] });
   const sections = [
-    ...(canvasTab ? [CANVAS_SECTION] : []),
-    ...(canvasesTab ? [CANVASES_SECTION] : []),
-    ...(obsTab ? [OBS_SECTION] : []),
-    ...(moderationTab ? [MODERATION_SECTION] : []),
-    ...(scoreboardTab ? [SCOREBOARD_SECTION] : []),
-    ACCOUNT_SECTION,
+    ...(canvasTab ? [section("canvas", t.canvas)] : []),
+    ...(canvasesTab ? [section("canvases", t.archives)] : []),
+    ...(obsTab ? [section("obs", t.obsView)] : []),
+    ...(moderationTab ? [section("moderation", t.moderation)] : []),
+    ...(scoreboardTab ? [section("scoreboard", t.scoreboard)] : []),
+    section("account", t.myAccount),
   ];
   // Une section qui n'existe plus (le classement, en passant du mobile au PC) : la fenêtre montre la première.
   const shownId = sections.find(({ id }) => id === sectionId)?.id ?? sections[0]?.id;
@@ -79,9 +84,9 @@ export const AccountWindow = ({
       {shownId === "account" && (
         <>
           <WindowRow label={<Profile user={user} variant="full" />}>
-            <Button label="Se déconnecter" icon={LogOut} href={signOutHref} />
+            <Button label={t.signOut} icon={LogOut} href={signOutHref} />
           </WindowRow>
-          <WindowRow label="Thème">
+          <WindowRow label={design.theme}>
             <ThemePicker choice={themeChoice} onPick={onPickTheme} />
           </WindowRow>
           <WindowRow label={design.language}>

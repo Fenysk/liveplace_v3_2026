@@ -5,12 +5,14 @@
 import type { AuthoredPixel } from "@liveplace/domain/ports";
 import type { ModerationAction } from "../../state/canvas-store";
 import type { SliderStep } from "../design/slider";
+import type { Locale } from "../locale/locale";
+import { MODERATION_TEXTS } from "./moderation-texts";
 
 const MINUTE = 60_000;
 
-// A2 : un curseur à crans, qui étend la plage avant et après à la fois.
-const CLEAR_SPAN_STEPS: readonly SliderStep[] = [
-  { value: 0, label: "Cette pose seule" },
+// A2 : un curseur à crans, qui étend la plage avant et après à la fois. Le cran 0 porte le libellé de ce qu'il vise.
+const clearSpanStepsOf = (zeroLabel: string): readonly SliderStep[] => [
+  { value: 0, label: zeroLabel },
   { value: MINUTE, label: "± 1 min" },
   { value: 5 * MINUTE, label: "± 5 min" },
   { value: 15 * MINUTE, label: "± 15 min" },
@@ -18,10 +20,12 @@ const CLEAR_SPAN_STEPS: readonly SliderStep[] = [
 ];
 
 // Une ligne de plusieurs poses n'a pas de « pose seule » : son cran 0 les retire toutes (JOURNAL 2026-10-07).
-export const clearSpanSteps = (placementCount: number): readonly SliderStep[] =>
-  placementCount > 1
-    ? CLEAR_SPAN_STEPS.map((step) => (step.value === 0 ? { ...step, label: "Les poses signalées" } : step))
-    : CLEAR_SPAN_STEPS;
+export const clearSpanSteps = (placementCount: number, locale: Locale): readonly SliderStep[] =>
+  clearSpanStepsOf(
+    placementCount > 1
+      ? MODERATION_TEXTS[locale].spanReportedPlacements
+      : MODERATION_TEXTS[locale].spanPlacementOnly,
+  );
 
 // La case « Retirer tous ses pixels », décochée par défaut, et le cran du curseur.
 export type ClearScope = { isAll: boolean; spanMs: number };

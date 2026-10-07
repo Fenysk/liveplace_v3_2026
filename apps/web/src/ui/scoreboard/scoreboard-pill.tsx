@@ -11,17 +11,11 @@ import { Button } from "../design/button";
 import { classNames } from "../design/class-names";
 import { Pill, type PillDock } from "../design/pill";
 import { useShownWhileClosing } from "../design/window";
-import { pixelCountLabel } from "../moderation/moderation-texts";
+import { useLocale, useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import { RankAvatar } from "./rank-avatar";
 import { nextFocusIndex } from "./scoreboard-keys";
-import {
-  badgeRank,
-  ordinalSuffix,
-  pixelsNumber,
-  rowLabel,
-  TOGGLE_COLLAPSE,
-  TOGGLE_EXPAND,
-} from "./scoreboard-texts";
+import { badgeRank, ordinalSuffix, pixelsNumber, rowLabel, SCOREBOARD_TEXTS } from "./scoreboard-texts";
 import { slideKeyProps, useSlideOnReorder } from "./slide-on-reorder";
 
 const DOCK: PillDock = "cl";
@@ -45,31 +39,39 @@ const moveFocus = (event: KeyboardEvent<HTMLButtonElement>): void => {
 
 type RankItemProps = { row: ScoreboardRow; isCollapsed: boolean; isFirst: boolean; isOutside: boolean };
 
-const Ordinal = ({ rank }: { rank: number }) => (
-  <>
-    {rank}
-    <sup className="lp-rank-sup">{ordinalSuffix(rank)}</sup>
-  </>
-);
+const Ordinal = ({ rank }: { rank: number }) => {
+  const locale = useLocale();
+  return (
+    <>
+      {rank}
+      <sup className="lp-rank-sup">{ordinalSuffix(rank, locale)}</sup>
+    </>
+  );
+};
 
 // Déplié : le pseudo, le nombre de pixels, et le rang sous le pseudo pour sa place à part, où la position ne le dit plus.
-const ExpandedRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean }) => (
-  <>
-    <span className="lp-rank-text" aria-hidden="true">
-      <span className="lp-rank-name lp-type-body">{row.player.displayName}</span>
-      {isOutside && (
-        <span className="lp-type-numeric lp-muted">
-          <Ordinal rank={row.rank} />
-        </span>
-      )}
-    </span>
-    <span className="lp-rank-pixels lp-type-numeric lp-muted" aria-hidden="true">
-      {pixelsNumber(row.pixels)}
-    </span>
-  </>
-);
+const ExpandedRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean }) => {
+  const locale = useLocale();
+  return (
+    <>
+      <span className="lp-rank-text" aria-hidden="true">
+        <span className="lp-rank-name lp-type-body">{row.player.displayName}</span>
+        {isOutside && (
+          <span className="lp-type-numeric lp-muted">
+            <Ordinal rank={row.rank} />
+          </span>
+        )}
+      </span>
+      <span className="lp-rank-pixels lp-type-numeric lp-muted" aria-hidden="true">
+        {pixelsNumber(row.pixels, locale)}
+      </span>
+    </>
+  );
+};
 
 const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
+  const locale = useLocale();
+  const moderation = useTexts(MODERATION_TEXTS);
   const { rank, pixels, player, isMe } = row;
   return (
     <li
@@ -80,7 +82,7 @@ const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
       <button
         type="button"
         className="lp-rank-main"
-        aria-label={rowLabel(row)}
+        aria-label={rowLabel(row, locale)}
         tabIndex={isFirst ? 0 : -1}
         onKeyDown={moveFocus}
       >
@@ -97,7 +99,7 @@ const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
         <span className="lp-rank-tip" aria-hidden="true">
           <span className="lp-rank-tip-name lp-type-body">{player.displayName}</span>
           <span className="lp-rank-tip-meta lp-type-caption lp-muted">
-            <Ordinal rank={rank} /> · {pixelCountLabel(pixels)}
+            <Ordinal rank={rank} /> · {moderation.pixelCount(pixels)}
           </span>
         </span>
       )}
@@ -106,6 +108,7 @@ const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
 };
 
 export const ScoreboardPill = ({ rows, isCollapsed, onToggle, isDocked = true }: ScoreboardPillProps) => {
+  const t = useTexts(SCOREBOARD_TEXTS);
   const list = useRef<HTMLOListElement>(null);
   useSlideOnReorder(list, isCollapsed);
   const isVisible = rows.top.length > 0;
@@ -115,7 +118,7 @@ export const ScoreboardPill = ({ rows, isCollapsed, onToggle, isDocked = true }:
   const items = shown.outside ? [...shown.top, shown.outside] : shown.top;
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={isVisible}>
-      <ol ref={list} className="lp-scoreboard" aria-label="Classement" data-collapsed={isCollapsed}>
+      <ol ref={list} className="lp-scoreboard" aria-label={t.label} data-collapsed={isCollapsed}>
         {items.map((row, index) => (
           <RankItem
             key={row.player.login}
@@ -129,7 +132,7 @@ export const ScoreboardPill = ({ rows, isCollapsed, onToggle, isDocked = true }:
       <Button
         icon={isCollapsed ? ChevronsUpDown : ChevronsDownUp}
         variant="ghost"
-        title={isCollapsed ? TOGGLE_EXPAND : TOGGLE_COLLAPSE}
+        title={isCollapsed ? t.expand : t.collapse}
         isExpanded={!isCollapsed}
         onPress={onToggle}
       />

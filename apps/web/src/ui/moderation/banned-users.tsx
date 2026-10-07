@@ -5,10 +5,12 @@
 import type { BannedUser, Pixel } from "@liveplace/domain/ports";
 import { Eye } from "lucide-react";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { SmallWindow, useShownWhileClosing, WindowRow } from "../design/window";
+import { useTexts } from "../locale/use-locale";
 import { MarkedProfile } from "./marked-profile";
-import { banMention, CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 
 export type BannedList =
@@ -30,29 +32,34 @@ export type BannedUsersProps = {
 
 type BannedRowProps = Omit<BannedUsersProps, "list" | "canvas"> & { user: BannedUser };
 
-const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: BannedRowProps) => (
-  <WindowRow
-    label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={banMention(user.isFromTwitch)} />}
-    hasProfile
-  >
-    <div className="lp-row">
-      <span className="lp-type-caption lp-muted">{pixelCountLabel(user.pixelCount)}</span>
-      <Button
-        icon={Eye}
-        variant="ghost"
-        title="Voir ses pixels"
-        isPressed={preview?.userId === user.userId}
-        isDisabled={user.pixelCount === 0}
-        onPress={() => onPreview(user.userId)}
-      />
-      <Button
-        label="Débannir"
-        isDisabled={unbanningUserId === user.userId}
-        onPress={() => onUnban(user.userId)}
-      />
-    </div>
-  </WindowRow>
-);
+const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: BannedRowProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  return (
+    <WindowRow
+      label={
+        <MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.banMention(user.isFromTwitch)} />
+      }
+      hasProfile
+    >
+      <div className="lp-row">
+        <span className="lp-type-caption lp-muted">{t.pixelCount(user.pixelCount)}</span>
+        <Button
+          icon={Eye}
+          variant="ghost"
+          title={t.seeTheirPixels}
+          isPressed={preview?.userId === user.userId}
+          isDisabled={user.pixelCount === 0}
+          onPress={() => onPreview(user.userId)}
+        />
+        <Button
+          label={t.unban}
+          isDisabled={unbanningUserId === user.userId}
+          onPress={() => onUnban(user.userId)}
+        />
+      </div>
+    </WindowRow>
+  );
+};
 
 // Ce que la fenêtre affiche : déjà résolu (le nom de l'auteur, pas juste son id), pour qu'elle n'ait plus qu'à montrer.
 type ShownPreview = { displayName: string; pixels: readonly Pixel[] | null };
@@ -66,27 +73,31 @@ type PreviewWindowProps = {
 
 // L'œil ouvre cette fenêtre par-dessus la fenêtre du jeu, jamais un aperçu qui pousse la liste (JOURNAL 2026-09-27).
 const PreviewWindow = ({ isOpen, shown, canvas, onClose }: PreviewWindowProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   if (!shown) return null;
   return (
     <SmallWindow
       isOpen={isOpen}
-      title={`Les pixels de ${shown.displayName}`}
+      title={t.pixelsOf(shown.displayName)}
       onClose={onClose}
-      actions={<Button label="Fermer" kbd="Échap" onPress={onClose} />}
+      actions={<Button label={design.close} kbd={design.escapeKey} onPress={onClose} />}
     >
       {shown.pixels ? (
-        <PixelPreview {...canvas} pixels={shown.pixels} label={`Les pixels de ${shown.displayName}`} />
+        <PixelPreview {...canvas} pixels={shown.pixels} label={t.pixelsOf(shown.displayName)} />
       ) : (
-        <span className="lp-type-caption lp-muted">Chargement de l'aperçu…</span>
+        <span className="lp-type-caption lp-muted">{t.previewLoading}</span>
       )}
     </SmallWindow>
   );
 };
 
-const listContent = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{CONNECTION_LOST}</span>;
-  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">Personne n'est banni.</span>;
+const BannedRows = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
+  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{t.connectionLost}</span>;
+  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">{t.nobodyBanned}</span>;
   return list.users.map((user) => (
     <BannedRow
       key={user.userId}
@@ -101,6 +112,7 @@ const listContent = ({ list, preview, unbanningUserId, onPreview, onUnban }: Ban
 
 export const BannedUsers = (props: BannedUsersProps) => {
   const { list, preview, canvas, onPreview } = props;
+  const t = useTexts(MODERATION_TEXTS);
   const matched =
     list.status === "ready" ? list.users.find(({ userId }) => userId === preview?.userId) : undefined;
   const shown = useShownWhileClosing(
@@ -111,8 +123,8 @@ export const BannedUsers = (props: BannedUsersProps) => {
   };
   return (
     <>
-      <span className="lp-type-body">Utilisateurs bannis</span>
-      {listContent(props)}
+      <span className="lp-type-body">{t.bannedUsers}</span>
+      <BannedRows {...props} />
       {list.status === "ready" && (
         <PreviewWindow isOpen={preview !== null} shown={shown} canvas={canvas} onClose={close} />
       )}

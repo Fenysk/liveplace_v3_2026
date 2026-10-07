@@ -29,15 +29,15 @@ describe("switchToast (Écart §15, JOURNAL 2026-10-06)", () => {
 
   // Le streamer a changé de canvas : vrai pour un archivage comme pour une réouverture, donc sans « le nouveau »
   it("says the streamer changed canvas, which is true of an archiving as of a reopening", () => {
-    expect(switchToast(live, archived, context)).toBe("Kalyss a changé de canvas.");
+    expect(switchToast(live, archived, context, "fr")).toBe("Kalyss a changé de canvas.");
   });
 
   // Un brouillon non vide ne suit pas : il reste sur l'ancien canvas, et le toast le dit
   it("says a draft that is not empty stays on the old canvas", () => {
-    expect(switchToast(live, archived, { ...context, draftSize: 1 })).toBe(
+    expect(switchToast(live, archived, { ...context, draftSize: 1 }, "fr")).toBe(
       "Kalyss a changé de canvas : ton brouillon reste sur l'ancien.",
     );
-    expect(switchToast(live, archived, { ...context, draftSize: 40 })).toBe(
+    expect(switchToast(live, archived, { ...context, draftSize: 40 }, "fr")).toBe(
       "Kalyss a changé de canvas : ton brouillon reste sur l'ancien.",
     );
   });
@@ -45,11 +45,20 @@ describe("switchToast (Écart §15, JOURNAL 2026-10-06)", () => {
   // Rien pour celui qui l'a demandé, ni pour une arrivée sur un canvas déjà archivé, brouillon ou non
   it("says nothing to whoever asked for it, nor on arrival on an archived canvas, draft or not", () => {
     for (const draftSize of [0, 3]) {
-      expect(switchToast(live, archived, { ...context, draftSize, hasAskedHere: true })).toBeNull();
-      expect(switchToast(archived, archived, { ...context, draftSize })).toBeNull();
+      expect(switchToast(live, archived, { ...context, draftSize, hasAskedHere: true }, "fr")).toBeNull();
+      expect(switchToast(archived, archived, { ...context, draftSize }, "fr")).toBeNull();
       expect(
-        switchToast({ status: "connecting", isArchived: false }, archived, { ...context, draftSize }),
+        switchToast({ status: "connecting", isArchived: false }, archived, { ...context, draftSize }, "fr"),
       ).toBeNull();
     }
+  });
+
+  // En anglais, la même règle et les mêmes deux phrases
+  it("says the same two sentences in English, and nothing in the same cases", () => {
+    expect(switchToast(live, archived, context, "en")).toBe("Kalyss switched canvas.");
+    expect(switchToast(live, archived, { ...context, draftSize: 2 }, "en")).toBe(
+      "Kalyss switched canvas: your draft stays on the old one.",
+    );
+    expect(switchToast(live, archived, { ...context, hasAskedHere: true }, "en")).toBeNull();
   });
 });

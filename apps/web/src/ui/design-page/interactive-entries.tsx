@@ -4,7 +4,7 @@ import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { LocateFixed, Minus, Plus, User } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
-import { ownerToast } from "../archive/archive-texts";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { switchToast } from "../canvas/switch-toast";
 import { Button } from "../design/button";
 import { Grabber } from "../design/grabber";
@@ -286,12 +286,17 @@ const ToastButtons = () => {
 const LIVE = { status: "live", isArchived: false } as const;
 const ARCHIVED = { status: "live", isArchived: true } as const;
 const viewerToast = (draftSize: number): string =>
-  switchToast(LIVE, ARCHIVED, { hasAskedHere: false, ownerName: SAMPLE_OWNER.displayName, draftSize }) ?? "";
+  switchToast(
+    LIVE,
+    ARCHIVED,
+    { hasAskedHere: false, ownerName: SAMPLE_OWNER.displayName, draftSize },
+    "fr",
+  ) ?? "";
 
 const GAME_TOASTS = [
-  { name: "Le streamer archive", text: ownerToast("archive") },
-  { name: "Le streamer rouvre une archive", text: ownerToast("reopen") },
-  { name: "Le streamer supprime une archive", text: ownerToast("discard") },
+  { name: "Le streamer archive", text: ARCHIVE_TEXTS.fr.ownerToast.archive },
+  { name: "Le streamer rouvre une archive", text: ARCHIVE_TEXTS.fr.ownerToast.reopen },
+  { name: "Le streamer supprime une archive", text: ARCHIVE_TEXTS.fr.ownerToast.discard },
   { name: "Le lien d'une archive est copié", text: "Lien copié" },
   { name: "Ses viewers, sans brouillon", text: viewerToast(0) },
   { name: "Ses viewers, avec un brouillon non vide", text: viewerToast(3) },

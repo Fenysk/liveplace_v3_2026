@@ -8,8 +8,10 @@ import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toClearActions } from "./cleared-pixels";
 import { moderateInOrder } from "./moderate-in-order";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import type {
   ModeratedAuthor,
   ModerationStatus,
@@ -36,6 +38,7 @@ export function useModeration(canvas: CanvasStore): {
 } {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const toast = useToast();
+  const t = useTexts(MODERATION_TEXTS);
   const [request, setRequest] = useState<ModeratorRequest | null>(null);
   const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
   const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
@@ -86,7 +89,7 @@ export function useModeration(canvas: CanvasStore): {
     // La preuve du ban qui suivrait : tous ses pixels d'avant le retrait, que le serveur garde une heure.
     if (active.kind === "clear") return show({ kind: "banAfterClear", author: active.author });
     finish();
-    toast("success", `${active.author.displayName} est banni·e de ce canvas`);
+    toast("success", t.bannedToast(active.author.displayName));
   };
 
   // La pill se relit après : elle montre alors le nouveau rôle de l'auteur.
@@ -94,8 +97,8 @@ export function useModeration(canvas: CanvasStore): {
     void canvas.setModerator(author.userId, isModerator).then((result) => {
       const { inspection } = canvas.getView();
       if (inspection) canvas.inspect(inspection.x, inspection.y);
-      if (!result.ok) return toast("error", "Le rôle n'a pas changé : réessaie dans un instant.");
-      toast("success", `${author.displayName} ${isModerator ? "est" : "n'est plus"} modérateur·rice`);
+      if (!result.ok) return toast("error", t.roleNotChanged);
+      toast("success", t.roleChanged({ name: author.displayName, isModerator }));
     });
   };
 

@@ -10,7 +10,9 @@ import { AvatarButton, type ProfileUser } from "../design/profile";
 import type { ThemeChoice } from "../design/theme";
 import { ThemeButton } from "../design/theme-controls";
 import { SignInButton } from "../design/twitch";
-import { reportCountLabel } from "../moderation/moderation-texts";
+import { useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "../moderation/moderation-texts";
+import { ACCOUNT_TEXTS } from "./account-texts";
 
 const DOCK: PillDock = "tr";
 
@@ -55,26 +57,30 @@ export const AccountPill = ({
       <LocaleButton />
     </>
   );
+  const t = useTexts(ACCOUNT_TEXTS);
+  const moderation = useTexts(MODERATION_TEXTS);
   const hasLeftIcons = Boolean(onOpenDeveloper || onOpenSettings);
   return (
     <Pill dock={isDocked ? DOCK : undefined} isVisible={isVisible}>
       {onOpenDeveloper && (
         <Button icon={Activity} variant="ghost" title="Développeur" onPress={onOpenDeveloper} />
       )}
-      {onOpenSettings && <Button icon={Settings} variant="ghost" title="Réglages" onPress={onOpenSettings} />}
+      {onOpenSettings && (
+        <Button icon={Settings} variant="ghost" title={t.settings} onPress={onOpenSettings} />
+      )}
       {!hasLeftIcons && preferences}
       {identity.kind === "guest" &&
         // Sur mobile, l'icône seule : la place manque en haut de l'écran.
         (isCompact ? (
           <SignInButton href={signInHref} onPress={onSignIn} />
         ) : (
-          <SignInButton href={signInHref} label="Se connecter" onPress={onSignIn} />
+          <SignInButton href={signInHref} label={t.signIn} onPress={onSignIn} />
         ))}
       {identity.kind === "signedIn" && (
         <AvatarButton
           user={identity.user}
           title={
-            pendingReports > 0 ? `Mon compte · ${reportCountLabel(pendingReports)} en attente` : "Mon compte"
+            pendingReports > 0 ? t.myAccountPending(moderation.reportCount(pendingReports)) : t.myAccount
           }
           hasDot={pendingReports > 0}
           onPress={onOpenAccount}

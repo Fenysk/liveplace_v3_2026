@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LOCALE,
+  formatDateTime,
   formatNumber,
   isSingular,
   LOCALE_COOKIE,
   LOCALES,
   localeCookie,
+  localeOfMatches,
   nextLocale,
   resolveLocale,
+  resolveRequestLocale,
   toLocale,
 } from "./locale";
 
@@ -68,6 +71,37 @@ describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () 
     expect(resolveFrom(`${LOCALE_COOKIE}=`, "en-US")).toBe("en");
     expect(resolveFrom(`${LOCALE_COOKIE}=EN`, "en-US")).toBe("en");
     expect(resolveFrom(`other_${LOCALE_COOKIE}=en`, "fr")).toBe("fr");
+  });
+});
+
+describe("la langue d'une requête et d'une page déjà rendue (Écart §14, JOURNAL 2026-10-07)", () => {
+  // Une route serveur en texte brut lit les mêmes en-têtes que la page
+  it("reads the cookie and Accept-Language of a request like the page does", () => {
+    const request = (headers: Record<string, string>) => ({ headers: new Headers(headers) });
+
+    expect(resolveRequestLocale(request({ "accept-language": "en-GB,en;q=0.8" }))).toBe("en");
+    expect(resolveRequestLocale(request({ "accept-language": "en", cookie: "lp_locale=fr" }))).toBe("fr");
+    expect(resolveRequestLocale(request({}))).toBe("fr");
+  });
+
+  // Le titre de l'onglet, écrit par le serveur, suit la langue que la racine a rendue
+  it("finds the language the root rendered among the matches of a route", () => {
+    expect(
+      localeOfMatches([{ loaderData: { betaLabel: null, locale: "en" } }, { loaderData: undefined }]),
+    ).toBe("en");
+    expect(localeOfMatches([{ loaderData: undefined }, { loaderData: { locale: "fr" } }])).toBe("fr");
+    expect(localeOfMatches([{ loaderData: { locale: "de" } }, { loaderData: "en" }, {}])).toBe("fr");
+    expect(localeOfMatches([])).toBe("fr");
+  });
+
+  // La date et l'heure en toutes lettres suivent la langue
+  it("writes a date and its time the way each language does", () => {
+    const timestamp = Date.UTC(2026, 9, 12, 12, 30);
+
+    expect(formatDateTime(timestamp, "fr")).toBe(
+      new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(timestamp),
+    );
+    expect(formatDateTime(timestamp, "en")).toMatch(/^October 12, 2026 at \d{1,2}:30\s?(AM|PM)$/);
   });
 });
 

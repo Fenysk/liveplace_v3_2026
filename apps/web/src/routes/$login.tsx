@@ -13,6 +13,7 @@ import { createOwnSwitchTracker } from "../ui/archive/own-switch";
 import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
+import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
@@ -27,6 +28,7 @@ import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
+import { FixedLocale, useTexts } from "../ui/locale/use-locale";
 import { BannedWindow } from "../ui/moderation/banned-window";
 import { ModerationTab } from "../ui/moderation/moderation-tab";
 import { ModerationWindow } from "../ui/moderation/moderation-window";
@@ -108,18 +110,21 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
         onSignIn={signingIn.onSignIn}
       />
       {developer.onOpen && (
-        <DeveloperWindow
-          isOpen={developer.isOpen}
-          sectionId={developer.sectionId}
-          onSelect={developer.onSelect}
-          onClose={developer.onClose}
-        >
-          <LiveActivitySection
-            canvas={stores.canvas}
+        // Écart §14 (JOURNAL 2026-10-07) : la fenêtre Développeur reste en français, quelle que soit la langue de la page.
+        <FixedLocale locale="fr">
+          <DeveloperWindow
             isOpen={developer.isOpen}
             sectionId={developer.sectionId}
-          />
-        </DeveloperWindow>
+            onSelect={developer.onSelect}
+            onClose={developer.onClose}
+          >
+            <LiveActivitySection
+              canvas={stores.canvas}
+              isOpen={developer.isOpen}
+              sectionId={developer.sectionId}
+            />
+          </DeveloperWindow>
+        </FixedLocale>
       )}
       {account.identity.kind === "signedIn" && (
         <AccountWindow
@@ -176,6 +181,7 @@ const GamePage = () => {
   const { canvasId, owner, isOwnerSession = false } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
+  const t = useTexts(CANVAS_TEXTS);
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
@@ -202,7 +208,7 @@ const GamePage = () => {
   // `lp-game` : caché dès la première image en vue OBS (JOURNAL 2026-09-25).
   return (
     <main className="lp-game">
-      <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
+      <h1 className="lp-visually-hidden">{t.pageTitle(owner.displayName)}</h1>
       {stores?.canvasId === canvasId && (
         <PixelCanvas
           store={stores.canvas}

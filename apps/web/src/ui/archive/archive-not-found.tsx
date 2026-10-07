@@ -3,18 +3,24 @@
 // `lp-game` : caché en vue OBS, aucun texte sur le stream.
 
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { NoticePill } from "../design/pill";
-import { ownerCanvasLabel } from "./archive-texts";
+import { useTexts } from "../locale/use-locale";
+import { ARCHIVE_TEXTS } from "./archive-texts";
 
 // `displayName` : absent quand le pseudo n'existe pas du tout, le bouton dit alors le pseudo.
 type ArchiveNotFoundProps = { login: string; displayName?: string | undefined };
 
-export const ArchiveNotFound = ({ login, displayName }: ArchiveNotFoundProps) => (
-  <main className="lp-game">
-    <NoticePill title="Cette archive n'existe pas, ou elle a été supprimée.">
-      <div className="lp-row">
-        <Button label={ownerCanvasLabel({ login, displayName })} href={`/${login}`} />
-      </div>
-    </NoticePill>
-  </main>
-);
+export const ArchiveNotFound = ({ login, displayName }: ArchiveNotFoundProps) => {
+  const t = useTexts(ARCHIVE_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  return (
+    <main className="lp-game">
+      <NoticePill title={t.archiveNotFound}>
+        <div className="lp-row">
+          <Button label={design.viewCanvasOf(displayName ?? login)} href={`/${login}`} />
+        </div>
+      </NoticePill>
+    </main>
+  );
+};

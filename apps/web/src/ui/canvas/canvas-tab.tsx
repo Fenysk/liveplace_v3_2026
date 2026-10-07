@@ -4,8 +4,10 @@
 import { useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import { CanvasSettings, type ResizeStatus, ResizeWindow } from "./canvas-settings";
 import { listOutsidePixels, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
+import { CANVAS_TEXTS } from "./canvas-texts";
 import { useCanvasName } from "./use-canvas-name";
 
 type CanvasTabProps = { canvas: CanvasStore };
@@ -22,6 +24,7 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const chosen = toCanvasSize(choice);
   const toast = useToast();
+  const t = useTexts(CANVAS_TEXTS);
   const name = useCanvasName();
 
   const confirm = () => {
@@ -30,7 +33,7 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
       setStatus(result.ok ? "idle" : "failed");
       if (!result.ok) return;
       setIsConfirming(false);
-      toast("success", `Taille changée : ${chosen.width} × ${chosen.height} cases`);
+      toast("success", t.sizeChanged(chosen));
     });
   };
 

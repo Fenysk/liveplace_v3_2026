@@ -1,12 +1,15 @@
 // Les phrases des canvas archivés (Écart §15, JOURNAL 2026-10-06) : les dates, le titre d'une ligne, le bandeau.
+// Écart §14 (JOURNAL 2026-10-07) : chacune en français et en anglais.
 
-import type { Timestamp } from "@liveplace/domain";
+import { MAX_ARCHIVES, type Timestamp } from "@liveplace/domain";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import type { ChoiceOption } from "../design/choice-list";
+import { formatNumber, isSingular, type Locale } from "../locale/locale";
+import { defineTexts, localized } from "../locale/texts";
 
 export const archiveHref = (login: string, linkCode: string): string => `/${login}/archives/${linkCode}`;
 
-const MONTHS = [
+const FRENCH_MONTHS = [
   "janvier",
   "février",
   "mars",
@@ -21,7 +24,23 @@ const MONTHS = [
   "décembre",
 ] as const;
 
+const ENGLISH_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
 // Les jours de Paris, comme `toParisDay` : le serveur et le navigateur écrivent la même date, sans écart d'hydratation.
+// `en-CA` n'est que la façon d'obtenir année, mois et jour : l'affichage est dans les phrases ci-dessous.
 const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Paris",
   year: "numeric",
@@ -29,7 +48,7 @@ const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
   day: "numeric",
 });
 
-type ParisDate = { year: number; month: number; day: number };
+export type ParisDate = { year: number; month: number; day: number };
 
 const toParisDate = (timestamp: Timestamp): ParisDate => {
   const parts = PARIS_DATE.formatToParts(timestamp);
@@ -37,181 +56,21 @@ const toParisDate = (timestamp: Timestamp): ParisDate => {
   return { year: part("year"), month: part("month"), day: part("day") };
 };
 
-const dayLabel = ({ day }: ParisDate): string => (day === 1 ? "1er" : String(day));
-const monthLabel = ({ month }: ParisDate): string => MONTHS[month - 1] ?? "";
-const fullLabel = (date: ParisDate): string => `${dayLabel(date)} ${monthLabel(date)} ${date.year}`;
+const frenchDay = ({ day }: ParisDate): string => (day === 1 ? "1er" : String(day));
+const frenchMonth = ({ month }: ParisDate): string => FRENCH_MONTHS[month - 1] ?? "";
+const frenchFull = (date: ParisDate): string => `${frenchDay(date)} ${frenchMonth(date)} ${date.year}`;
 
-// « du 12 au 18 octobre 2026 », « le 12 octobre 2026 » ; sans date d'archivage, « depuis le 12 octobre 2026 ».
-export function datesLabel(createdAt: Timestamp, archivedAt?: Timestamp): string {
-  const from = toParisDate(createdAt);
-  if (archivedAt === undefined) return `depuis le ${fullLabel(from)}`;
-  const to = toParisDate(archivedAt);
-  if (from.year !== to.year) return `du ${fullLabel(from)} au ${fullLabel(to)}`;
-  if (from.month !== to.month) return `du ${dayLabel(from)} ${monthLabel(from)} au ${fullLabel(to)}`;
-  if (from.day === to.day) return `le ${fullLabel(to)}`;
-  return `du ${dayLabel(from)} au ${fullLabel(to)}`;
-}
+const englishMonth = ({ month }: ParisDate): string => ENGLISH_MONTHS[month - 1] ?? "";
+const englishFull = (date: ParisDate): string => `${englishMonth(date)} ${date.day}, ${date.year}`;
 
-const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
-
-// Les dates, en tête de phrase : « Du 12 au 18 octobre 2026 ».
-export const datesTitle = (createdAt: Timestamp, archivedAt?: Timestamp): string =>
-  capitalized(datesLabel(createdAt, archivedAt));
-
-// Le nom d'abord ; sans nom, ce sont ses dates.
-export function canvasTitle({
-  name,
-  createdAt,
-  archivedAt,
-}: {
-  name?: string;
-  createdAt: Timestamp;
-  archivedAt?: Timestamp;
-}): string {
-  return name ?? datesTitle(createdAt, archivedAt);
-}
-
-// Le libellé du canvas en cours, et son bouton : l'icône d'archive dit le reste.
-export const CURRENT_CANVAS_LABEL = "Canvas en cours";
-export const ARCHIVE_ACTION = "Archiver";
-
-// La ligne du canvas en cours : le nom en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
-// le dit déjà.
-export const currentCanvasTitle = ({
-  name,
-  createdAt,
-}: {
-  name?: string | undefined;
-  createdAt: Timestamp;
-}): string => name ?? datesTitle(createdAt);
-
-export const currentCanvasCaption = ({
-  name,
-  createdAt,
-}: {
-  name?: string | undefined;
-  createdAt: Timestamp;
-}): string | null => (name ? datesLabel(createdAt) : null);
-
-// La légende d'une archive : ses dates, sauf si elles sont déjà son titre.
-export const archiveCaption = ({
-  name,
-  createdAt,
-  archivedAt,
-}: {
-  name?: string | undefined;
-  createdAt: Timestamp;
-  archivedAt: Timestamp;
-}): string | null => (name ? datesTitle(createdAt, archivedAt) : null);
-
-// Le nom du lien d'une archive pour un lecteur d'écran : son titre, et qu'il ouvre un nouvel onglet.
-export const openArchiveLabel = (title: string): string => `Ouvrir l'archive ${title} dans un nouvel onglet`;
-
-// Le libellé de la liste, « Archives · 1 sur 5 » : de 0 à 5.
-export const archivesCounter = (count: number, max: number): string => `Archives · ${count} sur ${max}`;
-
-export const NO_CURRENT_CANVAS = "Aucun canvas en cours.";
-
-// Sans archive, une seule phrase : ce qu'il n'y a pas, et ce que fait archiver.
-export const NO_ARCHIVE_SENTENCE =
-  "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur un canvas vide.";
-
+type Named = { name?: string | undefined };
+type Dated = { createdAt: Timestamp; archivedAt?: Timestamp | undefined };
 type NameRequest =
   | { kind: "archive"; canvas: { name?: string } }
   | { kind: "reopen"; archive: { name?: string } };
 
-// Écart §15 (JOURNAL 2026-10-06) : en archivant, le champ propose le nom du canvas actif, qu'une archive rouverte a
-// gardé ; vide, il l'effacerait. Rouvrir n'a pas de nom à donner.
-export const startingName = (request: NameRequest): string =>
-  request.kind === "archive" ? (request.canvas.name ?? "") : "";
-
-// Le nom du champ propose un exemple, jamais une consigne.
-export const NAME_PLACEHOLDER = "Ex. : Pixel war de la rentrée";
-
-// Le champ de l'onglet Canvas : le nom du canvas en cours, enregistré quand le champ perd le focus, sans bouton.
-export const CANVAS_NAME_LABEL = "Nom du canvas";
-export const NAME_SAVED = "Nom enregistré";
-
 // Pourquoi le nom n'a pas été enregistré, en un toast. `network` : pas de réponse, comme `failed` pour le streamer.
 export type RenameFailure = "not_active" | "failed" | "network" | "unauthenticated";
-
-export function renameFailureLabel(failure: RenameFailure): string {
-  switch (failure) {
-    case "not_active":
-      return "Le canvas en cours a changé : son nom est rechargé.";
-    case "failed":
-    case "network":
-      return "Le nom n'a pas pu être enregistré. Réessaie dans un instant.";
-    case "unauthenticated":
-      return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
-  }
-}
-
-// Ce que dit la fenêtre : archiver tient en une phrase sans dimension ; rouvrir et supprimer nomment l'archive.
-export const ARCHIVE_SENTENCE =
-  "Ton dessin est figé et garde son lien. Tes viewers passent sur un canvas vide.";
-
-export const reopenSentence = (title: string): string =>
-  `« ${title} » remplace ton canvas actuel, qui part dans les archives.`;
-
-export const discardSentence = (title: string): string => `« ${title} » sera supprimé pour de bon.`;
-
-// Le choix des deux fenêtres parle des jauges des viewers, jamais de « progression » : garder leurs jauges actuelles, ou
-// les remettre au départ (archiver) / reprendre celles de l'archive (rouvrir). Libellés courts, sans note.
-export const PROGRESS_LABEL = "Les jauges des viewers";
-
-export const progressOptions = (kind: "archive" | "reopen"): readonly ChoiceOption<ProgressChoice>[] => [
-  { value: "keep", label: "Garder leurs jauges actuelles" },
-  {
-    value: "restart",
-    label: kind === "archive" ? "Remettre les jauges au départ" : "Reprendre leurs jauges de cette archive",
-  },
-];
-
-type BannerArchive = {
-  displayName: string;
-  name?: string | undefined;
-  createdAt: Timestamp;
-  archivedAt: Timestamp;
-};
-
-// Le bandeau d'une archive : le nom en titre, sinon à qui elle est ; la légende dit les dates, et à qui elle est quand
-// le nom a pris le titre.
-export const bannerTitle = ({ displayName, name }: Pick<BannerArchive, "displayName" | "name">): string =>
-  name ?? `Archive de ${displayName}`;
-
-export const bannerCaption = ({ displayName, name, createdAt, archivedAt }: BannerArchive): string =>
-  name
-    ? `Archive de ${displayName} · ${datesLabel(createdAt, archivedAt)}`
-    : datesTitle(createdAt, archivedAt);
-
-// Le bouton de l'archive introuvable : le nom affiché de son streamer, et le pseudo quand il n'existe pas du tout.
-export const ownerCanvasLabel = ({
-  login,
-  displayName,
-}: {
-  login: string;
-  displayName?: string | undefined;
-}): string => `Voir le canvas de ${displayName ?? login}`;
-
-// Le nom affiché que le loader joint à l'introuvable quand le propriétaire existe : `data` n'est connu que comme `unknown`.
-export const missingDisplayName = (attached: unknown): string | undefined =>
-  typeof attached === "object" &&
-  attached !== null &&
-  "displayName" in attached &&
-  typeof attached.displayName === "string"
-    ? attached.displayName
-    : undefined;
-
-export const CANVASES_UNAVAILABLE = "Impossible de lire tes canvas pour l'instant. Réessaie dans un instant.";
-
-// Ce que devient ce que les viewers ont signalé sur le canvas qui part : classé sans suite, sans décision. Aucun
-// signalement, aucune ligne.
-export function reportsSentence(count: number): string | null {
-  if (count === 0) return null;
-  if (count === 1) return "1 signalement en attente sera classé sans suite.";
-  return `${count.toLocaleString("fr-FR")} signalements en attente seront classés sans suite.`;
-}
 
 // Pourquoi un changement n'a pas eu lieu, dit au streamer dans la fenêtre qui l'a demandé. `network` : la page n'a
 // pas eu de réponse du tout.
@@ -224,35 +83,307 @@ export type SwitchFailure =
   | "unauthenticated"
   | "network";
 
-// Un `switch` exhaustif : le compilateur signale toute raison laissée sans phrase.
-export function switchFailureLabel(failure: SwitchFailure): string {
-  switch (failure) {
-    case "busy":
-      return "Un autre changement est en cours. Réessaie dans un instant.";
-    case "not_active":
-    case "not_archive":
-      return "La liste a changé : la voici à jour.";
-    case "archives_full":
-      return "Tu as déjà 5 archives : supprime-en une avant d'archiver.";
-    case "failed":
-      return "Le changement n'a pas pu se faire, et rien n'a bougé. Réessaie dans un instant.";
-    case "unauthenticated":
-      return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
-    case "network":
-      return "Pas de réponse du serveur. La liste est rechargée : vérifie-la avant de réessayer.";
-  }
-}
-
 // Les toasts du streamer qui agit : archiver lui dit où sont ses viewers ; rouvrir et supprimer gardent leurs mots.
 export type OwnerAction = "archive" | "reopen" | "discard";
 
-const OWNER_TOASTS: Record<OwnerAction, string> = {
-  archive: "Canvas archivé : tes viewers sont sur le nouveau.",
-  reopen: "Archive rouverte",
-  discard: "Archive supprimée",
-};
+export const ARCHIVE_TEXTS = defineTexts({
+  // « du 12 au 18 octobre 2026 », « le 12 octobre 2026 » ; sans date d'archivage, « depuis le 12 octobre 2026 ».
+  datesRange: localized({
+    fr: (from: ParisDate, to: ParisDate) => {
+      if (from.year !== to.year) return `du ${frenchFull(from)} au ${frenchFull(to)}`;
+      if (from.month !== to.month) return `du ${frenchDay(from)} ${frenchMonth(from)} au ${frenchFull(to)}`;
+      if (from.day === to.day) return `le ${frenchFull(to)}`;
+      return `du ${frenchDay(from)} au ${frenchFull(to)}`;
+    },
+    en: (from, to) => {
+      if (from.year !== to.year) return `${englishFull(from)} – ${englishFull(to)}`;
+      if (from.month !== to.month) return `${englishMonth(from)} ${from.day} – ${englishFull(to)}`;
+      if (from.day === to.day) return englishFull(to);
+      return `${englishMonth(from)} ${from.day}–${to.day}, ${to.year}`;
+    },
+  }),
+  datesSince: localized({
+    fr: (from: ParisDate) => `depuis le ${frenchFull(from)}`,
+    en: (from) => `since ${englishFull(from)}`,
+  }),
 
-export const ownerToast = (action: OwnerAction): string => OWNER_TOASTS[action];
+  // Le libellé du canvas en cours, et son bouton : l'icône d'archive dit le reste.
+  currentCanvasLabel: { fr: "Canvas en cours", en: "Current canvas" },
+  archiveAction: { fr: "Archiver", en: "Archive" },
+  noCurrentCanvas: { fr: "Aucun canvas en cours.", en: "No current canvas." },
+  currentThumbnail: { fr: "Miniature du canvas en cours", en: "Thumbnail of the current canvas" },
+  archiveThumbnail: localized({
+    fr: (title: string) => `Miniature de l'archive ${title}`,
+    en: (title) => `Thumbnail of the ${title} archive`,
+  }),
+  unavailable: localized({
+    fr: (label: string) => `${label} (indisponible)`,
+    en: (label) => `${label} (unavailable)`,
+  }),
+  viewArchive: { fr: "Voir l'archive", en: "View the archive" },
+  // Le nom du lien d'une archive pour un lecteur d'écran : son titre, et qu'il ouvre un nouvel onglet.
+  openArchive: localized({
+    fr: (title: string) => `Ouvrir l'archive ${title} dans un nouvel onglet`,
+    en: (title) => `Open the ${title} archive in a new tab`,
+  }),
+  reopen: { fr: "Rouvrir", en: "Reopen" },
+  copyLink: { fr: "Copier le lien", en: "Copy link" },
+  discard: { fr: "Supprimer", en: "Delete" },
+  retry: { fr: "Réessayer", en: "Try again" },
+  linkCopied: { fr: "Lien copié", en: "Link copied" },
+  copyRefused: {
+    fr: "Copie impossible : le navigateur refuse le presse-papiers.",
+    en: "Copy failed: the browser refuses clipboard access.",
+  },
+
+  // Le libellé de la liste, « Archives · 1 sur 5 » : de 0 à 5.
+  archivesCounter: localized({
+    fr: ({ count, max }: { count: number; max: number }) => `Archives · ${count} sur ${max}`,
+    en: ({ count, max }) => `Archives · ${count} of ${max}`,
+  }),
+
+  // Sans archive, une seule phrase : ce qu'il n'y a pas, et ce que fait archiver.
+  noArchive: {
+    fr: "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur un canvas vide.",
+    en: "No archive yet. Archiving freezes your drawing, with its link, and starts over on an empty canvas.",
+  },
+  canvasesUnavailable: {
+    fr: "Impossible de lire tes canvas pour l'instant. Réessaie dans un instant.",
+    en: "Can't read your canvases right now. Try again in a moment.",
+  },
+
+  // Le nom du champ propose un exemple, jamais une consigne.
+  namePlaceholder: { fr: "Ex. : Pixel war de la rentrée", en: "E.g. Autumn pixel war" },
+
+  // Le champ de l'onglet Canvas : le nom du canvas en cours, enregistré quand le champ perd le focus, sans bouton.
+  canvasNameLabel: { fr: "Nom du canvas", en: "Canvas name" },
+  nameSaved: { fr: "Nom enregistré", en: "Name saved" },
+  // Des `switch` exhaustifs : le compilateur signale toute raison laissée sans phrase.
+  renameFailure: localized({
+    fr: (failure: RenameFailure) => {
+      switch (failure) {
+        case "not_active":
+          return "Le canvas en cours a changé : son nom est rechargé.";
+        case "failed":
+        case "network":
+          return "Le nom n'a pas pu être enregistré. Réessaie dans un instant.";
+        case "unauthenticated":
+          return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
+      }
+    },
+    en: (failure) => {
+      switch (failure) {
+        case "not_active":
+          return "The current canvas changed: its name was reloaded.";
+        case "failed":
+        case "network":
+          return "The name couldn't be saved. Try again in a moment.";
+        case "unauthenticated":
+          return "Your session expired. Sign in again, then try again.";
+      }
+    },
+  }),
+
+  // Ce que dit la fenêtre : archiver tient en une phrase sans dimension ; rouvrir et supprimer nomment l'archive.
+  archiveTitle: { fr: "Archiver ce canvas ?", en: "Archive this canvas?" },
+  reopenTitle: { fr: "Rouvrir cette archive ?", en: "Reopen this archive?" },
+  discardTitle: { fr: "Supprimer cette archive ?", en: "Delete this archive?" },
+  archiveName: { fr: "Nom de l'archive (facultatif)", en: "Archive name (optional)" },
+  archiveSentence: {
+    fr: "Ton dessin est figé et garde son lien. Tes viewers passent sur un canvas vide.",
+    en: "Your drawing is frozen and keeps its link. Your viewers move to an empty canvas.",
+  },
+  reopenSentence: localized({
+    fr: (title: string) => `« ${title} » remplace ton canvas actuel, qui part dans les archives.`,
+    en: (title) => `“${title}” replaces your current canvas, which moves to the archives.`,
+  }),
+  discardSentence: localized({
+    fr: (title: string) => `« ${title} » sera supprimé pour de bon.`,
+    en: (title) => `“${title}” will be deleted for good.`,
+  }),
+
+  // Le choix des deux fenêtres parle des jauges des viewers, jamais de « progression » : garder leurs jauges actuelles,
+  // ou les remettre au départ (archiver) / reprendre celles de l'archive (rouvrir). Libellés courts, sans note.
+  progressLabel: { fr: "Les jauges des viewers", en: "Your viewers' gauges" },
+  progressOptions: localized<Record<"archive" | "reopen", readonly ChoiceOption<ProgressChoice>[]>>({
+    fr: {
+      archive: [
+        { value: "keep", label: "Garder leurs jauges actuelles" },
+        { value: "restart", label: "Remettre les jauges au départ" },
+      ],
+      reopen: [
+        { value: "keep", label: "Garder leurs jauges actuelles" },
+        { value: "restart", label: "Reprendre leurs jauges de cette archive" },
+      ],
+    },
+    en: {
+      archive: [
+        { value: "keep", label: "Keep their current gauges" },
+        { value: "restart", label: "Reset the gauges to the start" },
+      ],
+      reopen: [
+        { value: "keep", label: "Keep their current gauges" },
+        { value: "restart", label: "Restore their gauges from this archive" },
+      ],
+    },
+  }),
+
+  // Ce que devient ce que les viewers ont signalé sur le canvas qui part : classé sans suite, sans décision. Aucun
+  // signalement, aucune ligne.
+  reportsSentence: localized({
+    fr: (count: number) =>
+      isSingular(count, "fr")
+        ? `${count} signalement en attente sera classé sans suite.`
+        : `${formatNumber(count, "fr")} signalements en attente seront classés sans suite.`,
+    en: (count) =>
+      isSingular(count, "en")
+        ? `${count} pending report will be closed without action.`
+        : `${formatNumber(count, "en")} pending reports will be closed without action.`,
+  }),
+
+  switchFailure: localized({
+    fr: (failure: SwitchFailure) => {
+      switch (failure) {
+        case "busy":
+          return "Un autre changement est en cours. Réessaie dans un instant.";
+        case "not_active":
+        case "not_archive":
+          return "La liste a changé : la voici à jour.";
+        case "archives_full":
+          return `Tu as déjà ${MAX_ARCHIVES} archives : supprime-en une avant d'archiver.`;
+        case "failed":
+          return "Le changement n'a pas pu se faire, et rien n'a bougé. Réessaie dans un instant.";
+        case "unauthenticated":
+          return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
+        case "network":
+          return "Pas de réponse du serveur. La liste est rechargée : vérifie-la avant de réessayer.";
+      }
+    },
+    en: (failure) => {
+      switch (failure) {
+        case "busy":
+          return "Another change is in progress. Try again in a moment.";
+        case "not_active":
+        case "not_archive":
+          return "The list changed: here it is, up to date.";
+        case "archives_full":
+          return `You already have ${MAX_ARCHIVES} archives: delete one before archiving.`;
+        case "failed":
+          return "The change couldn't be made, and nothing moved. Try again in a moment.";
+        case "unauthenticated":
+          return "Your session expired. Sign in again, then try again.";
+        case "network":
+          return "No response from the server. The list was reloaded: check it before trying again.";
+      }
+    },
+  }),
+
+  ownerToast: localized<Record<OwnerAction, string>>({
+    fr: {
+      archive: "Canvas archivé : tes viewers sont sur le nouveau.",
+      reopen: "Archive rouverte",
+      discard: "Archive supprimée",
+    },
+    en: {
+      archive: "Canvas archived: your viewers are on the new one.",
+      reopen: "Archive reopened",
+      discard: "Archive deleted",
+    },
+  }),
+
+  // Le bandeau d'une archive : le nom en titre, sinon à qui elle est ; la légende dit les dates, et à qui elle est quand
+  // le nom a pris le titre.
+  archiveOf: localized({
+    fr: (displayName: string) => `Archive de ${displayName}`,
+    en: (displayName) => `${displayName}'s archive`,
+  }),
+  pageTitle: localized({
+    fr: (displayName: string) => `Archive du canvas de ${displayName}`,
+    en: (displayName) => `${displayName}'s canvas archive`,
+  }),
+  downloadAsPng: { fr: "Télécharger en PNG", en: "Download as PNG" },
+  download: { fr: "Télécharger", en: "Download" },
+  downloadFailed: {
+    fr: "Téléchargement impossible : le navigateur n'a pas produit l'image.",
+    en: "Download failed: the browser couldn't produce the image.",
+  },
+  pngBackgroundSentence: {
+    fr: "Seules les cases vides du dessin prennent le fond ; les cases colorées ne changent pas.",
+    en: "Only the empty cells of the drawing take the background; colored cells stay as they are.",
+  },
+  pngBackgroundLabel: { fr: "Fond de l'image", en: "Image background" },
+
+  // Une archive introuvable (son bouton est « Voir le canvas de … », celui des profils).
+  archiveNotFound: {
+    fr: "Cette archive n'existe pas, ou elle a été supprimée.",
+    en: "This archive doesn't exist, or it was deleted.",
+  },
+});
+
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+export function datesLabel(createdAt: Timestamp, archivedAt: Timestamp | undefined, locale: Locale): string {
+  const from = toParisDate(createdAt);
+  return archivedAt === undefined
+    ? ARCHIVE_TEXTS[locale].datesSince(from)
+    : ARCHIVE_TEXTS[locale].datesRange(from, toParisDate(archivedAt));
+}
+
+// Les dates, en tête de phrase : « Du 12 au 18 octobre 2026 ».
+export const datesTitle = (createdAt: Timestamp, archivedAt: Timestamp | undefined, locale: Locale): string =>
+  capitalized(datesLabel(createdAt, archivedAt, locale));
+
+// Le nom d'abord ; sans nom, ce sont ses dates.
+export function canvasTitle({ name, createdAt, archivedAt }: Named & Dated, locale: Locale): string {
+  return name ?? datesTitle(createdAt, archivedAt, locale);
+}
+
+// La ligne du canvas en cours : le nom en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
+// le dit déjà.
+export const currentCanvasTitle = ({ name, createdAt }: Named & Dated, locale: Locale): string =>
+  name ?? datesTitle(createdAt, undefined, locale);
+
+export const currentCanvasCaption = ({ name, createdAt }: Named & Dated, locale: Locale): string | null =>
+  name ? datesLabel(createdAt, undefined, locale) : null;
+
+// La légende d'une archive : ses dates, sauf si elles sont déjà son titre.
+export const archiveCaption = (
+  { name, createdAt, archivedAt }: Named & Required<Dated>,
+  locale: Locale,
+): string | null => (name ? datesTitle(createdAt, archivedAt, locale) : null);
+
+// Écart §15 (JOURNAL 2026-10-06) : en archivant, le champ propose le nom du canvas actif, qu'une archive rouverte a
+// gardé ; vide, il l'effacerait. Rouvrir n'a pas de nom à donner.
+export const startingName = (request: NameRequest): string =>
+  request.kind === "archive" ? (request.canvas.name ?? "") : "";
+
+type BannerArchive = Named & Required<Dated> & { displayName: string };
+
+export const bannerTitle = (
+  { displayName, name }: Pick<BannerArchive, "displayName" | "name">,
+  locale: Locale,
+): string => name ?? ARCHIVE_TEXTS[locale].archiveOf(displayName);
+
+export const bannerCaption = (
+  { displayName, name, createdAt, archivedAt }: BannerArchive,
+  locale: Locale,
+): string =>
+  name
+    ? `${ARCHIVE_TEXTS[locale].archiveOf(displayName)} · ${datesLabel(createdAt, archivedAt, locale)}`
+    : datesTitle(createdAt, archivedAt, locale);
+
+// Ce que devient ce que les viewers ont signalé sur le canvas qui part : aucun signalement, aucune ligne.
+export const reportsSentence = (count: number, locale: Locale): string | null =>
+  count === 0 ? null : ARCHIVE_TEXTS[locale].reportsSentence(count);
+
+// Le nom affiché que le loader joint à l'introuvable quand le propriétaire existe : `data` n'est connu que comme `unknown`.
+export const missingDisplayName = (attached: unknown): string | undefined =>
+  typeof attached === "object" &&
+  attached !== null &&
+  "displayName" in attached &&
+  typeof attached.displayName === "string"
+    ? attached.displayName
+    : undefined;
 
 // La liste se recharge d'elle-même quand la page n'était plus à jour, ou quand le serveur a pu finir sans qu'elle le
 // sache : un refus du serveur, ou son échec défait, ne change rien à ce qu'elle montre.

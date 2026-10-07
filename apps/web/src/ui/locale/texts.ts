@@ -5,8 +5,15 @@ import { LOCALES, type Locale } from "./locale";
 
 export type Localized<Value> = Record<Locale, Value>;
 
-// Une phrase qui prend des valeurs (un nombre, un nom) : la version anglaise reprend les paramètres de la française.
-export const localized = <Value>(value: Localized<Value>): Localized<Value> => value;
+// Une phrase qui prend des valeurs (un nombre, un nom) : la version anglaise reprend les paramètres de la française,
+// et rend une chaîne comme elle. Toute autre valeur (un tableau, une table de phrases) se type à la main : `localized<…>`.
+export function localized<Args extends readonly unknown[]>(
+  value: Localized<(...args: Args) => string>,
+): Localized<(...args: Args) => string>;
+export function localized<Value>(value: Localized<Value>): Localized<Value>;
+export function localized(value: Localized<unknown>): Localized<unknown> {
+  return value;
+}
 
 type Entries = Record<string, Localized<unknown>>;
 type TextsOf<Phrases extends Entries> = { [Key in keyof Phrases]: Phrases[Key][Locale] };

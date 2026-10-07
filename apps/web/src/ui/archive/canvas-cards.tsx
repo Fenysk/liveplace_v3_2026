@@ -7,21 +7,17 @@ import { Archive, ArchiveRestore, ExternalLink, Link2, Trash2 } from "lucide-rea
 import { useMemo } from "react";
 import type { ListedArchive, ListedCanvas, ListedCanvases } from "../../usecase/list-canvases";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { WindowRow } from "../design/window";
+import { useLocale, useTexts } from "../locale/use-locale";
 import {
-  ARCHIVE_ACTION,
+  ARCHIVE_TEXTS,
   archiveCaption,
   archiveHref,
-  archivesCounter,
-  CANVASES_UNAVAILABLE,
-  CURRENT_CANVAS_LABEL,
   canvasTitle,
   currentCanvasCaption,
   currentCanvasTitle,
-  NO_ARCHIVE_SENTENCE,
-  NO_CURRENT_CANVAS,
-  openArchiveLabel,
 } from "./archive-texts";
 import { toThumbnailPixels } from "./thumbnail-pixels";
 
@@ -29,6 +25,7 @@ import { toThumbnailPixels } from "./thumbnail-pixels";
 type CanvasThumbnailProps = { canvas: ListedCanvas; label: string; isDecorative?: boolean };
 
 const CanvasThumbnail = ({ canvas, label, isDecorative = false }: CanvasThumbnailProps) => {
+  const t = useTexts(ARCHIVE_TEXTS);
   const { thumbnail } = canvas;
   const pixels = useMemo(
     () => (thumbnail ? toThumbnailPixels(fromBase64(thumbnail.state), thumbnail.width) : []),
@@ -40,7 +37,7 @@ const CanvasThumbnail = ({ canvas, label, isDecorative = false }: CanvasThumbnai
       <div
         className="lp-canvas-thumb lp-canvas-thumb--empty"
         role="img"
-        aria-label={`${label} (indisponible)`}
+        aria-label={t.unavailable(label)}
         aria-hidden={isDecorative ? true : undefined}
       />
     );
@@ -76,32 +73,35 @@ type ActiveCanvasRowProps = {
   onArchive: () => void;
 };
 
-export const ActiveCanvasRow = ({ canvas, isArchiveFull, onArchive }: ActiveCanvasRowProps) => (
-  <>
-    <WindowRow
-      hasProfile
-      label={
-        <span className="lp-canvas-id">
-          <CanvasThumbnail canvas={canvas} label="Miniature du canvas en cours" />
-          <CanvasText title={currentCanvasTitle(canvas)} caption={currentCanvasCaption(canvas)} />
-        </span>
-      }
-    >
-      <Button
-        icon={Archive}
-        label={ARCHIVE_ACTION}
-        variant="primary"
-        isDisabled={isArchiveFull}
-        onPress={onArchive}
-      />
-    </WindowRow>
-    {isArchiveFull && (
-      <p className="lp-type-caption lp-muted">
-        Tu as déjà {MAX_ARCHIVES} archives : supprime-en une avant d'archiver.
-      </p>
-    )}
-  </>
-);
+export const ActiveCanvasRow = ({ canvas, isArchiveFull, onArchive }: ActiveCanvasRowProps) => {
+  const locale = useLocale();
+  const t = useTexts(ARCHIVE_TEXTS);
+  return (
+    <>
+      <WindowRow
+        hasProfile
+        label={
+          <span className="lp-canvas-id">
+            <CanvasThumbnail canvas={canvas} label={t.currentThumbnail} />
+            <CanvasText
+              title={currentCanvasTitle(canvas, locale)}
+              caption={currentCanvasCaption(canvas, locale)}
+            />
+          </span>
+        }
+      >
+        <Button
+          icon={Archive}
+          label={t.archiveAction}
+          variant="primary"
+          isDisabled={isArchiveFull}
+          onPress={onArchive}
+        />
+      </WindowRow>
+      {isArchiveFull && <p className="lp-type-caption lp-muted">{t.switchFailure("archives_full")}</p>}
+    </>
+  );
+};
 
 type ArchiveRowProps = {
   archive: ListedArchive;
@@ -114,7 +114,9 @@ type ArchiveRowProps = {
 // La miniature et le titre ne font qu'un lien, qui ouvre l'archive dans un nouvel onglet. Rouvrir est le seul bouton
 // écrit : copier le lien et supprimer n'ont que leur icône, dans la variante la plus sobre.
 export const ArchiveRow = ({ archive, login, onCopyLink, onReopen, onDiscard }: ArchiveRowProps) => {
-  const title = canvasTitle(archive);
+  const locale = useLocale();
+  const t = useTexts(ARCHIVE_TEXTS);
+  const title = canvasTitle(archive, locale);
   return (
     <li>
       <WindowRow
@@ -123,20 +125,20 @@ export const ArchiveRow = ({ archive, login, onCopyLink, onReopen, onDiscard }: 
           <a
             className="lp-canvas-id lp-canvas-link"
             href={archiveHref(login, archive.linkCode)}
-            title="Voir l'archive"
-            aria-label={openArchiveLabel(title)}
+            title={t.viewArchive}
+            aria-label={t.openArchive(title)}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <CanvasThumbnail canvas={archive} label={`Miniature de l'archive ${title}`} isDecorative />
-            <CanvasText title={title} caption={archiveCaption(archive)} hasOpenIcon />
+            <CanvasThumbnail canvas={archive} label={t.archiveThumbnail(title)} isDecorative />
+            <CanvasText title={title} caption={archiveCaption(archive, locale)} hasOpenIcon />
           </a>
         }
       >
         <div className="lp-row">
-          <Button icon={ArchiveRestore} label="Rouvrir" onPress={onReopen} />
-          <Button icon={Link2} variant="ghost" title="Copier le lien" onPress={onCopyLink} />
-          <Button icon={Trash2} variant="ghost" title="Supprimer" onPress={onDiscard} />
+          <Button icon={ArchiveRestore} label={t.reopen} onPress={onReopen} />
+          <Button icon={Link2} variant="ghost" title={t.copyLink} onPress={onCopyLink} />
+          <Button icon={Trash2} variant="ghost" title={t.discard} onPress={onDiscard} />
         </div>
       </WindowRow>
     </li>
@@ -167,13 +169,15 @@ export const ArchivesSection = ({
   onDiscard,
   onRetry,
 }: ArchivesSectionProps) => {
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
+  const t = useTexts(ARCHIVE_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
   if (list.status === "failed")
     return (
       <div className="lp-setting">
-        <span className="lp-type-caption lp-danger">{CANVASES_UNAVAILABLE}</span>
+        <span className="lp-type-caption lp-danger">{t.canvasesUnavailable}</span>
         <div className="lp-row">
-          <Button label="Réessayer" onPress={onRetry} />
+          <Button label={t.retry} onPress={onRetry} />
         </div>
       </div>
     );
@@ -181,7 +185,7 @@ export const ArchivesSection = ({
   return (
     <>
       <div className="lp-setting">
-        <span className="lp-type-body">{CURRENT_CANVAS_LABEL}</span>
+        <span className="lp-type-body">{t.currentCanvasLabel}</span>
         {active ? (
           <ActiveCanvasRow
             canvas={active}
@@ -189,13 +193,15 @@ export const ArchivesSection = ({
             onArchive={onArchive}
           />
         ) : (
-          <p className="lp-type-caption lp-muted">{NO_CURRENT_CANVAS}</p>
+          <p className="lp-type-caption lp-muted">{t.noCurrentCanvas}</p>
         )}
       </div>
       <div className="lp-setting">
-        <span className="lp-type-body">{archivesCounter(archives.length, MAX_ARCHIVES)}</span>
+        <span className="lp-type-body">
+          {t.archivesCounter({ count: archives.length, max: MAX_ARCHIVES })}
+        </span>
         {archives.length === 0 ? (
-          <p className="lp-type-caption lp-muted">{NO_ARCHIVE_SENTENCE}</p>
+          <p className="lp-type-caption lp-muted">{t.noArchive}</p>
         ) : (
           <ul className="lp-canvas-list">
             {archives.map((archive) => (

@@ -3,7 +3,11 @@ import type { Transport, TransportListeners } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
 import { createCanvasStore } from "../../state/canvas-store";
-import { CONNECTION_LOST_TOAST, connectionToast, RECONNECTED_TOAST } from "./connection-toast";
+import { CANVAS_TEXTS } from "./canvas-texts";
+import { connectionToast } from "./connection-toast";
+
+const CONNECTION_LOST_TOAST = CANVAS_TEXTS.fr.connectionLost;
+const RECONNECTED_TOAST = CANVAS_TEXTS.fr.reconnected;
 
 const welcome: ServerFrame = {
   t: "welcome",
@@ -42,7 +46,7 @@ const setup = () => {
   let seen = store.getView();
   store.subscribe(() => {
     const next = store.getView();
-    const toast = connectionToast(seen, next);
+    const toast = connectionToast(seen, next, "fr");
     if (toast) toasts.push(toast);
     seen = next;
   });
@@ -58,17 +62,21 @@ const setup = () => {
 describe("connectionToast (CDC 2026, Toasts)", () => {
   // Dit la connexion perdue, puis revenue ; rien pour les autres passages
   it("says the connection lost, then back, and nothing for the other changes", () => {
-    expect(connectionToast({ status: "live" }, { status: "reconnecting" })).toEqual({
+    expect(connectionToast({ status: "live" }, { status: "reconnecting" }, "fr")).toEqual({
       tone: "error",
       text: CONNECTION_LOST_TOAST,
     });
-    expect(connectionToast({ status: "reconnecting" }, { status: "live" })).toEqual({
+    expect(connectionToast({ status: "reconnecting" }, { status: "live" }, "fr")).toEqual({
       tone: "success",
       text: RECONNECTED_TOAST,
     });
-    expect(connectionToast({ status: "connecting" }, { status: "live" })).toBeNull();
-    expect(connectionToast({ status: "live" }, { status: "live" })).toBeNull();
-    expect(connectionToast({ status: "live" }, { status: "closed" })).toBeNull();
+    expect(connectionToast({ status: "connecting" }, { status: "live" }, "fr")).toBeNull();
+    expect(connectionToast({ status: "live" }, { status: "live" }, "fr")).toBeNull();
+    expect(connectionToast({ status: "live" }, { status: "closed" }, "fr")).toBeNull();
+    expect(connectionToast({ status: "live" }, { status: "reconnecting" }, "en")?.text).toBe(
+      "Connection lost: the page is reconnecting.",
+    );
+    expect(connectionToast({ status: "reconnecting" }, { status: "live" }, "en")?.text).toBe("Reconnected");
   });
 });
 

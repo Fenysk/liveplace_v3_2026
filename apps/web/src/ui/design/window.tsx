@@ -5,8 +5,10 @@
 import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { useTexts } from "../locale/use-locale";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
+import { DESIGN_TEXTS } from "./design-texts";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
 
@@ -80,6 +82,7 @@ const WindowShell = ({
   children,
 }: WindowShellProps) => {
   const { dialog, isShown } = useWindowMotion(isOpen);
+  const t = useTexts(DESIGN_TEXTS);
   return (
     <dialog
       ref={dialog}
@@ -105,7 +108,7 @@ const WindowShell = ({
     >
       {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
       <div className="lp-window-grabber">
-        <Grabber label="Fermer" onUp={doNothing} onDown={onClose} onTap={doNothing} />
+        <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
       </div>
       {children}
     </dialog>
@@ -114,14 +117,17 @@ const WindowShell = ({
 
 type WindowHeadProps = { titleId: string; title: ReactNode; onClose: () => void };
 
-const WindowHead = ({ titleId, title, onClose }: WindowHeadProps) => (
-  <header className="lp-window-head">
-    <h2 id={titleId} className="lp-type-heading">
-      {title}
-    </h2>
-    <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
-  </header>
-);
+const WindowHead = ({ titleId, title, onClose }: WindowHeadProps) => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <header className="lp-window-head">
+      <h2 id={titleId} className="lp-type-heading">
+        {title}
+      </h2>
+      <Button icon={X} variant="ghost" title={t.closeTip} onPress={onClose} />
+    </header>
+  );
+};
 
 export const Window = <Id extends string>({
   isOpen,
@@ -134,10 +140,11 @@ export const Window = <Id extends string>({
 }: WindowProps<Id>) => {
   // Un identifiant par fenêtre : une petite fenêtre peut exister à côté (JOURNAL 2026-09-25).
   const titleId = useId();
+  const t = useTexts(DESIGN_TEXTS);
   const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
   return (
     <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId} isLarge={isLarge}>
-      <nav className="lp-window-nav" aria-label="Sections">
+      <nav className="lp-window-nav" aria-label={t.sections}>
         <ul>
           {sections.map(({ id, label, icon: Icon }) => (
             <li key={id}>

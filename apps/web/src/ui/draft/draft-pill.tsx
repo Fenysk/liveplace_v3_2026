@@ -6,11 +6,14 @@ import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
 import { SignInButton, SignInNote } from "../design/twitch";
+import { useTexts } from "../locale/use-locale";
+import { DRAFT_TEXTS, type DraftTexts, type RefusalCode } from "./draft-texts";
 
 export type DraftPillState =
   | { kind: "connecting" }
@@ -19,7 +22,7 @@ export type DraftPillState =
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
-  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: string }
+  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: RefusalCode }
   | {
       kind: "draft";
       gauge: GaugeProps;
@@ -32,7 +35,7 @@ export type DraftPillState =
       isTouchScreen: boolean;
       isTouchTracing: boolean;
       isPicking: boolean;
-      refusal?: string;
+      refusal?: RefusalCode;
     };
 
 export type DraftPillActions = {
@@ -67,65 +70,79 @@ type DraftPillContent = {
 
 const DOCK: PillDock = "bc";
 
-const Refusal = ({ code }: { code: string | undefined }) =>
-  code ? <span className="lp-type-caption lp-danger">Refusé : {code}</span> : null;
+const Refusal = ({ code }: { code: RefusalCode | undefined }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return code ? <span className="lp-type-caption lp-danger">{t.refusal(code)}</span> : null;
+};
 
-const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => (
-  <Button label="Dessiner" kbd="D" variant="primary" title="Passer en mode Dessin" onPress={onEnter} />
-);
+const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return <Button label={t.draw} kbd="D" variant="primary" title={t.drawTip} onPress={onEnter} />;
+};
 
-const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => (
-  <Button
-    label="Annuler"
-    kbd="Échap"
-    title="Sortir du mode Dessin (le brouillon est gardé)"
-    onPress={onExit}
-  />
-);
+const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
+  const t = useTexts(DRAFT_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  return <Button label={design.cancel} kbd={design.escapeKey} title={t.cancelTip} onPress={onExit} />;
+};
 
-const SubmitButton = ({ canSubmit, onSubmit }: { canSubmit: boolean; onSubmit: () => void }) => (
-  <Button
-    label="Valider"
-    kbd="⏎"
-    variant="primary"
-    title="Poser le brouillon"
-    isDisabled={!canSubmit}
-    onPress={onSubmit}
-  />
-);
+const SubmitButton = ({ canSubmit, onSubmit }: { canSubmit: boolean; onSubmit: () => void }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return (
+    <Button
+      label={t.confirm}
+      kbd="⏎"
+      variant="primary"
+      title={t.confirmTip}
+      isDisabled={!canSubmit}
+      onPress={onSubmit}
+    />
+  );
+};
 
-const DiscardButton = ({ canDiscard, onDiscard }: { canDiscard: boolean; onDiscard: () => void }) => (
-  <Button
-    icon={Trash}
-    variant="ghost"
-    title="Vider le brouillon"
-    isDisabled={!canDiscard}
-    onPress={onDiscard}
-  />
-);
+const DiscardButton = ({ canDiscard, onDiscard }: { canDiscard: boolean; onDiscard: () => void }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return (
+    <Button
+      icon={Trash}
+      variant="ghost"
+      title={t.clearDraftTip}
+      isDisabled={!canDiscard}
+      onPress={onDiscard}
+    />
+  );
+};
 
-const TraceButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => (
-  <Button
-    icon={Brush}
-    variant="ghost"
-    title="Tracé : un doigt dessine, deux doigts déplacent"
-    isPressed={state.isTouchTracing}
-    onPress={actions.onToggleTouchTracing}
-  />
-);
+const TraceButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return (
+    <Button
+      icon={Brush}
+      variant="ghost"
+      title={t.traceTip}
+      isPressed={state.isTouchTracing}
+      onPress={actions.onToggleTouchTracing}
+    />
+  );
+};
 
-const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => (
-  <Button
-    icon={Pipette}
-    variant="ghost"
-    title="Pipette (I) : prend la couleur d'un pixel posé"
-    isPressed={state.isPicking}
-    onPress={actions.onTogglePicker}
-  />
-);
+const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return (
+    <Button
+      icon={Pipette}
+      variant="ghost"
+      title={t.eyedropperTip}
+      isPressed={state.isPicking}
+      onPress={actions.onTogglePicker}
+    />
+  );
+};
 
 // La feuille Dessin, sur mobile. Repliée ou dépliée, c'est son affaire : elle repart repliée à chaque entrée en Dessin.
 const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   const [isExpanded, setIsExpanded] = useState(false);
   const isEraser = state.colorIndex === TRANSPARENT_COLOR_INDEX;
   const toggle = () => setIsExpanded((expanded) => !expanded);
@@ -137,7 +154,7 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
   return (
     <>
       <Grabber
-        label={isExpanded ? "Réduire la feuille" : "Déplier la palette"}
+        label={isExpanded ? t.collapseSheet : t.expandPalette}
         onUp={() => setIsExpanded(true)}
         onDown={() => setIsExpanded(false)}
         onTap={toggle}
@@ -166,7 +183,7 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
         <Button
           icon={Eraser}
           variant="ghost"
-          title="Gomme"
+          title={design.eraser}
           isPressed={isEraser}
           onPress={actions.onToggleEraser}
         />
@@ -189,11 +206,11 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
 };
 
 // Un seul bouton, qui dit tout. Empilée : au téléphone, la barre prend toute la largeur, et le bouton aussi.
-const guestContent = (signInHref: string, onSignIn: () => void): DraftPillContent => ({
+const guestContent = (signInHref: string, onSignIn: () => void, t: DraftTexts): DraftPillContent => ({
   layout: "stack",
   content: (
     <div className="lp-invitation">
-      <SignInButton href={signInHref} label="Se connecter pour dessiner" onPress={onSignIn} />
+      <SignInButton href={signInHref} label={t.signInToDraw} onPress={onSignIn} />
       <SignInNote />
     </div>
   ),
@@ -229,35 +246,36 @@ const contentOf = (
   state: DraftPillState,
   actions: DraftPillActions,
   isCompact: boolean,
+  t: DraftTexts,
 ): DraftPillContent => {
   switch (state.kind) {
     case "connecting":
       return {
         content: <EnterButton onEnter={actions.onEnter} />,
-        pillState: { kind: "reconnecting", label: "Connexion" },
+        pillState: { kind: "reconnecting", label: t.connecting },
       };
     case "reconnecting":
       return {
-        ...contentOf(state.shown, actions, isCompact),
-        pillState: { kind: "reconnecting", label: "Reconnexion" },
+        ...contentOf(state.shown, actions, isCompact, t),
+        pillState: { kind: "reconnecting", label: t.reconnecting },
       };
     case "closed":
       return {
         content: (
           <>
-            <span className="lp-type-body lp-prompt">Connexion perdue</span>
-            <Button label="Recharger" onPress={actions.onReload} />
+            <span className="lp-type-body lp-prompt">{t.connectionLost}</span>
+            <Button label={t.reload} onPress={actions.onReload} />
           </>
         ),
       };
     case "banned":
-      return { content: <span className="lp-type-body lp-prompt">Tu es banni·e de ce canvas</span> };
+      return { content: <span className="lp-type-body lp-prompt">{t.banned}</span> };
     case "guest":
-      return guestContent(state.signInHref, actions.onSignIn);
+      return guestContent(state.signInHref, actions.onSignIn, t);
     case "signingIn":
       return {
-        ...guestContent(state.signInHref, actions.onSignIn),
-        pillState: { kind: "reconnecting", label: "Connexion à Twitch" },
+        ...guestContent(state.signInHref, actions.onSignIn, t),
+        pillState: { kind: "reconnecting", label: t.connectingToTwitch },
       };
     case "view":
       return {
@@ -279,7 +297,8 @@ const contentOf = (
 };
 
 export const DraftPill = ({ state, actions, isCompact = false, isDocked = true }: DraftPillProps) => {
-  const { content, layout, pillState } = contentOf(state, actions, isCompact);
+  const t = useTexts(DRAFT_TEXTS);
+  const { content, layout, pillState } = contentOf(state, actions, isCompact, t);
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout={layout} state={pillState}>
       {content}

@@ -7,11 +7,13 @@
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
 import { Checkbox } from "../design/checkbox";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { Slider } from "../design/slider";
 import { SmallWindow, useShownWhileClosing } from "../design/window";
+import { useLocale, useTexts } from "../locale/use-locale";
 import { type ClearScope, type ClearTarget, clearSpanSteps } from "./cleared-pixels";
-import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 
 // Retirer ses pixels, bannir (qui les retire aussi), bannir juste après un retrait, ou signaler.
 export type ModerationKind = "clear" | "ban" | "banAfterClear" | "report";
@@ -52,47 +54,39 @@ export type ModerationWindowProps = {
 const placementCountOf = (request: ModerationRequest): number =>
   request.kind === "clear" ? (request.author.placementIds?.length ?? 1) : 1;
 
-const titleOf = (request: ModerationRequest, { isAll, spanMs }: ClearScope): string => {
+type Texts = (typeof MODERATION_TEXTS)["fr"];
+
+const titleOf = (request: ModerationRequest, { isAll, spanMs }: ClearScope, t: Texts): string => {
   const { kind, author } = request;
   const name = author.displayName;
-  if (kind === "ban") return `Bannir ${name} ?`;
-  if (kind === "banAfterClear") return `C'est retiré. Bannir aussi ${name} ?`;
-  if (kind === "report")
-    return spanMs === 0 ? `Signaler cette pose de ${name} ?` : `Signaler ces poses de ${name} ?`;
-  if (isAll) return `Retirer tous les pixels de ${name} ?`;
-  return spanMs === 0 && placementCountOf(request) <= 1
-    ? `Retirer cette pose de ${name} ?`
-    : `Retirer ces poses de ${name} ?`;
+  if (kind === "ban") return t.banTitle(name);
+  if (kind === "banAfterClear") return t.banAfterClearTitle(name);
+  if (kind === "report") return t.reportTitle({ name, isSingle: spanMs === 0 });
+  if (isAll) return t.clearAllTitle(name);
+  return t.clearTitle({ name, isSingle: spanMs === 0 && placementCountOf(request) <= 1 });
 };
 
-const BAN_CONSEQUENCE = "Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.";
-
-const TEXTS: Record<
-  ModerationKind,
-  { consequence: string; confirm: string; cancel: string; variant: "danger" | "primary" }
-> = {
-  clear: {
-    consequence: "Ceux du dessous reviendront.",
-    confirm: "Retirer",
-    cancel: "Annuler",
-    variant: "danger",
-  },
-  ban: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Annuler", variant: "danger" },
-  banAfterClear: { consequence: BAN_CONSEQUENCE, confirm: "Bannir", cancel: "Non", variant: "danger" },
-  report: {
-    consequence: "Assez de signalements, et la pose quitte le stream jusqu'à la décision d'un modérateur.",
-    confirm: "Signaler",
-    cancel: "Annuler",
-    variant: "primary",
-  },
+// Ce que dit la fenêtre selon l'action : sa conséquence, ses boutons, et la couleur du principal.
+const wordsOf = (
+  kind: ModerationKind,
+  t: Texts,
+  cancel: string,
+): { consequence: string; confirm: string; cancel: string; variant: "danger" | "primary" } => {
+  if (kind === "clear")
+    return { consequence: t.clearConsequence, confirm: t.clear, cancel, variant: "danger" };
+  if (kind === "ban") return { consequence: t.banConsequence, confirm: t.ban, cancel, variant: "danger" };
+  if (kind === "banAfterClear")
+    return { consequence: t.banConsequence, confirm: t.ban, cancel: t.no, variant: "danger" };
+  return { consequence: t.reportConsequence, confirm: t.report, cancel, variant: "primary" };
 };
 
 type PreviewProps = Pick<ModerationWindowProps, "pixels" | "canvas"> & { name: string };
 
 const Preview = ({ pixels, canvas, name }: PreviewProps) => {
-  if (!pixels) return <span className="lp-type-caption lp-muted">Chargement de l'aperçu…</span>;
+  const t = useTexts(MODERATION_TEXTS);
+  if (!pixels) return <span className="lp-type-caption lp-muted">{t.previewLoading}</span>;
   if (pixels.length === 0) return null;
-  return <PixelPreview {...canvas} pixels={pixels} label={`Les pixels de ${name}`} />;
+  return <PixelPreview {...canvas} pixels={pixels} label={t.pixelsOf(name)} />;
 };
 
 type ScopeControlsProps = Pick<ModerationWindowProps, "scope" | "onScope"> & {
@@ -103,12 +97,14 @@ type ScopeControlsProps = Pick<ModerationWindowProps, "scope" | "onScope"> & {
 
 // Cochée, la plage disparaît et tous ses pixels partent (CDC 2026, Inspection).
 const ScopeControls = ({ scope, onScope, isDisabled, hasAll, placementCount }: ScopeControlsProps) => {
+  const locale = useLocale();
+  const t = useTexts(MODERATION_TEXTS);
   const pickSpan = (spanMs: number) => onScope({ ...scope, spanMs });
   return (
     <>
       {hasAll && (
         <Checkbox
-          label="Retirer tous ses pixels"
+          label={t.clearAllPixels}
           isChecked={scope.isAll}
           isDisabled={isDisabled}
           onToggle={(isAll) => onScope({ ...scope, isAll })}
@@ -116,8 +112,8 @@ const ScopeControls = ({ scope, onScope, isDisabled, hasAll, placementCount }: S
       )}
       {!scope.isAll && (
         <Slider
-          label="Plage de temps"
-          steps={clearSpanSteps(placementCount)}
+          label={t.timeRange}
+          steps={clearSpanSteps(placementCount, locale)}
           value={scope.spanMs}
           isDisabled={isDisabled}
           onPick={pickSpan}
@@ -138,20 +134,22 @@ export const ModerationWindow = ({
   onConfirm,
   onClose,
 }: ModerationWindowProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   const shown = useShownWhileClosing(request);
   if (!shown) return null;
-  const texts = TEXTS[shown.kind];
+  const words = wordsOf(shown.kind, t, design.cancel);
   const hasScope = shown.kind === "clear" || shown.kind === "report";
   return (
     <SmallWindow
       isOpen={request !== null}
-      title={titleOf(shown, scope)}
+      title={titleOf(shown, scope, t)}
       onClose={onClose}
       isLocked={status === "running"}
       actions={
         <>
-          <Button label={texts.cancel} kbd="Échap" onPress={onClose} />
-          <Button label={texts.confirm} variant={texts.variant} isDisabled={!pixels} onPress={onConfirm} />
+          <Button label={words.cancel} kbd={design.escapeKey} onPress={onClose} />
+          <Button label={words.confirm} variant={words.variant} isDisabled={!pixels} onPress={onConfirm} />
         </>
       }
     >
@@ -167,10 +165,10 @@ export const ModerationWindow = ({
       <Preview pixels={pixels} canvas={canvas} name={shown.author.displayName} />
       {pixels && (
         <p className="lp-type-body lp-prompt">
-          {pixelCountLabel(pixels.length)}. {texts.consequence}
+          {t.pixelCount(pixels.length)}. {words.consequence}
         </p>
       )}
-      {status === "failed" && <p className="lp-type-caption lp-danger lp-prompt">{CONNECTION_LOST}</p>}
+      {status === "failed" && <p className="lp-type-caption lp-danger lp-prompt">{t.connectionLost}</p>}
     </SmallWindow>
   );
 };

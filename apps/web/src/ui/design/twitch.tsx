@@ -1,7 +1,9 @@
 // Twitch dans le design system : son logo (le « glitch »), et le bouton de connexion à ses couleurs.
 // Le tracé vient de Simple Icons (CC0). Les couleurs de marque sont des tokens : --twitch, --on-twitch.
 
+import { useTexts } from "../locale/use-locale";
 import { Button } from "./button";
+import { DESIGN_TEXTS } from "./design-texts";
 
 export const TwitchGlyph = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -14,11 +16,12 @@ export const TwitchGlyph = () => (
 type SignInButtonProps = { href: string; label?: string; onPress?: (() => void) | undefined };
 
 export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
+  const t = useTexts(DESIGN_TEXTS);
   const action = { href, ...(onPress ? { onPress } : {}) };
   return label ? (
-    <Button label={label} icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" {...action} />
+    <Button label={label} icon={TwitchGlyph} variant="twitch" title={t.signInWithTwitch} {...action} />
   ) : (
-    <Button icon={TwitchGlyph} variant="twitch" title="Se connecter avec Twitch" {...action} />
+    <Button icon={TwitchGlyph} variant="twitch" title={t.signInWithTwitch} {...action} />
   );
 };
 
@@ -26,11 +29,14 @@ export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
 const PRIVACY_PATH = "/confidentialite";
 
 // Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
-export const SignInNote = () => (
-  <p className="lp-sign-in-note lp-type-caption lp-muted">
-    En te connectant, tu acceptes la{" "}
-    <a href={PRIVACY_PATH} target="_blank" rel="noopener">
-      politique de confidentialité
-    </a>
-  </p>
-);
+export const SignInNote = () => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <p className="lp-sign-in-note lp-type-caption lp-muted">
+      {t.signInNote}
+      <a href={PRIVACY_PATH} target="_blank" rel="noopener">
+        {t.privacyPolicy}
+      </a>
+    </p>
+  );
+};

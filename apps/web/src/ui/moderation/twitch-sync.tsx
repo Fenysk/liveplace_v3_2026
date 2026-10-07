@@ -3,37 +3,41 @@
 
 import type { TwitchSync } from "@liveplace/domain/ports";
 import { SignInButton } from "../design/twitch";
+import { formatDateTime } from "../locale/locale";
+import { useLocale, useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "./moderation-texts";
 
 // `never` : jamais synchronisé. `loading` : la réponse du gateway n'est pas encore là.
 export type TwitchSyncView = { status: "loading" } | { status: "never" } | TwitchSync;
 
-const SYNCED_AT_FORMAT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
-
-const syncText = (sync: TwitchSyncView): string => {
-  switch (sync.status) {
-    case "loading":
-      return "…";
-    case "never":
-      return "Tes modérateurs et tes bannis Twitch le deviennent ici, et le restent quand tu changes quelque chose sur Twitch. LivePlace ne fait que les lire.";
-    case "ok":
-      return `Synchronisé le ${SYNCED_AT_FORMAT.format(sync.syncedAt)}. Chaque changement sur Twitch arrive ici tout seul.`;
-    case "revoked":
-      return "Tu as retiré l'accès de LivePlace sur Twitch : les changements n'arrivent plus. Synchronise de nouveau.";
-  }
-};
-
 type TwitchSyncBlockProps = { sync: TwitchSyncView; syncHref: string; onSync?: (() => void) | undefined };
 
-export const TwitchSyncBlock = ({ sync, syncHref, onSync }: TwitchSyncBlockProps) => (
-  <div className="lp-setting">
-    <span className="lp-type-body">Synchronisation Twitch</span>
-    <p className="lp-type-caption lp-muted">{syncText(sync)}</p>
-    <div className="lp-row">
-      <SignInButton
-        href={syncHref}
-        label={sync.status === "never" ? "Synchroniser avec Twitch" : "Synchroniser de nouveau"}
-        onPress={onSync}
-      />
+export const TwitchSyncBlock = ({ sync, syncHref, onSync }: TwitchSyncBlockProps) => {
+  const locale = useLocale();
+  const t = useTexts(MODERATION_TEXTS);
+  const syncText = (): string => {
+    switch (sync.status) {
+      case "loading":
+        return "…";
+      case "never":
+        return t.syncNever;
+      case "ok":
+        return t.syncOk(formatDateTime(sync.syncedAt, locale));
+      case "revoked":
+        return t.syncRevoked;
+    }
+  };
+  return (
+    <div className="lp-setting">
+      <span className="lp-type-body">{t.twitchSync}</span>
+      <p className="lp-type-caption lp-muted">{syncText()}</p>
+      <div className="lp-row">
+        <SignInButton
+          href={syncHref}
+          label={sync.status === "never" ? t.syncWithTwitch : t.syncAgain}
+          onPress={onSync}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};

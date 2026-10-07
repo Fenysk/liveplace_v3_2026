@@ -3,13 +3,16 @@
 
 import type { ScoreboardRow, ScoreboardRows } from "../../state/scoreboard";
 import { classNames } from "../design/class-names";
-import { pixelCountLabel } from "../moderation/moderation-texts";
+import { useLocale, useTexts } from "../locale/use-locale";
+import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import { RankAvatar } from "./rank-avatar";
-import { ordinalSuffix, rowLabel } from "./scoreboard-texts";
+import { ordinalSuffix, rowLabel, SCOREBOARD_TEXTS } from "./scoreboard-texts";
 
 type ScoreboardListProps = { rows: ScoreboardRows };
 
 const ListRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean }) => {
+  const locale = useLocale();
+  const moderation = useTexts(MODERATION_TEXTS);
   const { rank, pixels, player, isMe } = row;
   return (
     <li
@@ -17,7 +20,7 @@ const ListRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean })
       aria-current={isMe ? "true" : undefined}
     >
       {/* Lu d'un trait : l'avatar, le nom et le détail à l'écran, découpés, se liraient mal. */}
-      <span className="lp-visually-hidden">{rowLabel(row)}</span>
+      <span className="lp-visually-hidden">{rowLabel(row, locale)}</span>
       <span className="lp-scoreboard-avatar" aria-hidden="true">
         <RankAvatar player={player} rank={rank} />
       </span>
@@ -26,16 +29,17 @@ const ListRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean })
       </span>
       <span className="lp-scoreboard-meta lp-type-caption lp-muted" aria-hidden="true">
         {rank}
-        <sup className="lp-rank-sup">{ordinalSuffix(rank)}</sup> · {pixelCountLabel(pixels)}
+        <sup className="lp-rank-sup">{ordinalSuffix(rank, locale)}</sup> · {moderation.pixelCount(pixels)}
       </span>
     </li>
   );
 };
 
 export const ScoreboardList = ({ rows }: ScoreboardListProps) => {
+  const t = useTexts(SCOREBOARD_TEXTS);
   const items = rows.outside ? [...rows.top, rows.outside] : rows.top;
   return (
-    <ol className="lp-scoreboard-list" aria-label="Classement">
+    <ol className="lp-scoreboard-list" aria-label={t.label}>
       {items.map((row) => (
         <ListRow key={row.player.login} row={row} isOutside={row === rows.outside} />
       ))}

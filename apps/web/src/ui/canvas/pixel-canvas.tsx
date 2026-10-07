@@ -5,7 +5,9 @@ import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { useDraftKeys } from "../draft/use-draft-keys";
+import { useTexts } from "../locale/use-locale";
 import { type CanvasScene, createCanvasScene } from "./canvas-scene";
+import { CANVAS_TEXTS } from "./canvas-texts";
 import { createViewportSaver, getSavedViewport } from "./saved-viewport";
 import type { Framing } from "./viewport";
 import { ViewportPill } from "./viewport-pill";
@@ -27,6 +29,7 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
   const { inspection, width, height } = useSyncExternalStore(store.subscribe, store.getView, store.getView);
   const { mode } = useSyncExternalStore(draftStore.subscribe, draftStore.getView, draftStore.getView);
   const keysHintId = useId();
+  const t = useTexts(CANVAS_TEXTS);
   // Un seul écouteur du clavier (use-draft-keys.ts) : il reçoit la scène, qui porte la case visée.
   const keyStores = useMemo(() => ({ canvas: store, draft: draftStore }), [store, draftStore]);
   useDraftKeys(keyStores, scene);
@@ -61,14 +64,12 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
         ref={surface}
         className="lp-canvas"
         role="img"
-        aria-label={width > 0 ? `Canvas de ${ownerName}, ${width} × ${height}` : `Canvas de ${ownerName}`}
+        aria-label={t.surfaceLabel({ ownerName, size: width > 0 ? { width, height } : undefined })}
         aria-describedby={keysHintId}
       />
       {/* Les touches, pour un lecteur d'écran seulement : aucun raccourci ne s'affiche (CDC 2026). */}
       <p id={keysHintId} className="lp-visually-hidden">
-        Au clavier : les flèches visent une case, Maj pour aller dix fois plus loin. D, Entrée ou Espace pour
-        dessiner. En Dessin : Espace ajoute la case visée, Retour arrière la retire, E prend la gomme, I la
-        pipette, Entrée valide, Échap annule.
+        {t.keysHint}
       </p>
       {scene && (
         <ViewportPill

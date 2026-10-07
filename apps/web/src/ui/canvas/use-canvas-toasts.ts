@@ -7,13 +7,10 @@ import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { OwnSwitchTracker } from "../archive/own-switch";
 import { useToast } from "../design/toast";
+import { useLocale } from "../locale/use-locale";
+import { CANVAS_TEXTS } from "./canvas-texts";
 import { connectionToast } from "./connection-toast";
 import { switchToast } from "./switch-toast";
-
-const refusedLabel = (count: number): string =>
-  count === 1
-    ? "1 pixel refusé : il reste dans le brouillon."
-    : `${count.toLocaleString("fr-FR")} pixels refusés : ils restent dans le brouillon.`;
 
 // `ownerName` : le nom affiché du streamer, que le toast d'un changement de canvas dit.
 export function useCanvasToasts(
@@ -22,18 +19,24 @@ export function useCanvasToasts(
   ownerName: string,
 ): void {
   const toast = useToast();
+  const locale = useLocale();
   useEffect(() => {
     let seen = canvas.getView();
     const onCanvas = () => {
       const next = canvas.getView();
-      const connection = connectionToast(seen, next);
+      const connection = connectionToast(seen, next, locale);
       if (connection) toast(connection.tone, connection.text);
       // Le brouillon se lit ici, à l'instant de la bascule : la page ferme ce store un peu après.
-      const switched = switchToast(seen, next, {
-        hasAskedHere: tracker.isRecent(Date.now()),
-        ownerName,
-        draftSize: draft.getView().draft.size,
-      });
+      const switched = switchToast(
+        seen,
+        next,
+        {
+          hasAskedHere: tracker.isRecent(Date.now()),
+          ownerName,
+          draftSize: draft.getView().draft.size,
+        },
+        locale,
+      );
       if (switched) toast("success", switched);
       seen = next;
     };
@@ -43,7 +46,7 @@ export function useCanvasToasts(
       const { isSending, draft: remaining } = draft.getView();
       const { status: current, isBanned } = canvas.getView();
       if (wasSending && !isSending && remaining.size > 0 && current === "live" && !isBanned)
-        toast("error", refusedLabel(remaining.size));
+        toast("error", CANVAS_TEXTS[locale].refused(remaining.size));
       wasSending = isSending;
     };
     const unsubscribeCanvas = canvas.subscribe(onCanvas);
@@ -52,5 +55,5 @@ export function useCanvasToasts(
       unsubscribeCanvas();
       unsubscribeDraft();
     };
-  }, [canvas, draft, toast, tracker, ownerName]);
+  }, [canvas, draft, toast, tracker, ownerName, locale]);
 }

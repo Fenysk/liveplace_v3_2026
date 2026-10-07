@@ -4,8 +4,11 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeader } from "@tanstack/react-start/server";
+import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
+import { DESIGN_TEXTS } from "../ui/design/design-texts";
 import { NoticePill } from "../ui/design/pill";
 import { SignInButton, SignInNote } from "../ui/design/twitch";
+import { useTexts } from "../ui/locale/use-locale";
 import { type ResolvedCanvas, resolveCanvas } from "../usecase/resolve-canvas";
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
@@ -40,11 +43,15 @@ export const resolveGameCanvasPage = async ({ params }: CanvasPageLoaderArgs) =>
 export const noStoreHeaders = () => ({ "Cache-Control": "no-store" });
 
 // `lp-game` : caché en vue OBS, aucun texte sur le stream (JOURNAL 2026-09-25).
-export const CanvasNotFound = () => (
-  <main className="lp-game">
-    <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
-      <SignInButton href="/auth/twitch" label="Se connecter avec Twitch" />
-      <SignInNote />
-    </NoticePill>
-  </main>
-);
+export const CanvasNotFound = () => {
+  const t = useTexts(CANVAS_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  return (
+    <main className="lp-game">
+      <NoticePill title={t.notFound}>
+        <SignInButton href="/auth/twitch" label={design.signInWithTwitch} />
+        <SignInNote />
+      </NoticePill>
+    </main>
+  );
+};

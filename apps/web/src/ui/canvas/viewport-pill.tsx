@@ -4,6 +4,8 @@
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { Button } from "../design/button";
 import { Pill, type PillDock, PillSeparator } from "../design/pill";
+import { useTexts } from "../locale/use-locale";
+import { CANVAS_TEXTS } from "./canvas-texts";
 import type { Framing } from "./viewport";
 
 const DOCK: PillDock = "br";
@@ -27,10 +29,9 @@ export const ViewportPill = ({
   isSheetOpen = false,
   isDocked = true,
 }: ViewportPillProps) => {
+  const t = useTexts(CANVAS_TEXTS);
   const dock = isDocked ? DOCK : undefined;
-  const recenter = (
-    <Button icon={LocateFixed} variant="ghost" title="Recentrer la vue" onPress={onRecenter} />
-  );
+  const recenter = <Button icon={LocateFixed} variant="ghost" title={t.recenter} onPress={onRecenter} />;
   if (isCompact)
     return (
       <Pill dock={dock} isVisible={framing !== null && !framing.isArrival && !isSheetOpen}>
@@ -39,12 +40,11 @@ export const ViewportPill = ({
     );
   return (
     <Pill dock={dock} layout="rail">
-      <Button icon={Plus} variant="ghost" title="Zoomer" onPress={onZoomIn} />
+      <Button icon={Plus} variant="ghost" title={t.zoomIn} onPress={onZoomIn} />
       <span className="lp-zoom lp-type-numeric" aria-live="polite">
-        {/* À quatre chiffres, sans espace : il tient dans la largeur d'un contrôle. */}
-        {framing && (framing.zoomPercent < 1000 ? `${framing.zoomPercent} %` : `${framing.zoomPercent}%`)}
+        {framing && t.zoomPercent(framing.zoomPercent)}
       </span>
-      <Button icon={Minus} variant="ghost" title="Dézoomer" onPress={onZoomOut} />
+      <Button icon={Minus} variant="ghost" title={t.zoomOut} onPress={onZoomOut} />
       <PillSeparator />
       {recenter}
     </Pill>
