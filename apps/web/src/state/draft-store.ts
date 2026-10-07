@@ -228,8 +228,9 @@ export function createDraftStore(
       if (!isEditable() || !view.isTracing) return;
       const pixels = cells.map(({ x, y }) => ({ x, y, colorIndex: view.colorIndex }));
       const edit = traceDraftCells(view.draft, pixels, context());
-      applyEdit(edit, !hasShakenThisTrace);
-      if (edit.isCapped) hasShakenThisTrace = true;
+      const canShake = !hasShakenThisTrace;
+      if (edit.isCapped) hasShakenThisTrace = true; // avant la publication : un abonné qui retrace ne revibre pas
+      applyEdit(edit, canShake);
     },
     endTrace() {
       if (view.isTracing) publish({ isTracing: false });

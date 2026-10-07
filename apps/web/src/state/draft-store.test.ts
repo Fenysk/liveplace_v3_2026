@@ -293,6 +293,19 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
     expect(store.getView().shakeCount).toBe(2);
   });
 
+  // Un abonné qui retrace à chaque publication (la scène, au début d'un tracé) ne boucle pas au plafond
+  it("does not loop when a listener traces again on every publish with the gauge empty", () => {
+    const { store } = setup({
+      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0 } }),
+    });
+    store.enterDraftMode();
+    store.subscribe(() => store.traceCells([{ x: 0, y: 0 }]));
+
+    store.startTrace();
+
+    expect(store.getView().shakeCount).toBe(1);
+  });
+
   // N'allume le Toggle tracé qu'en Dessin, et l'éteint en sortant du Dessin
   it("turns touch tracing on only in draft mode, and off when leaving draft mode", () => {
     const { store } = setup();

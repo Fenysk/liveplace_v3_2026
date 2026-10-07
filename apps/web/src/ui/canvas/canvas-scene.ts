@@ -301,8 +301,8 @@ export function createCanvasScene(
     const { isTracing, mode } = draftStore.getView();
     if (isTracing !== wasTracing) {
       lastTracedCell = null;
+      wasTracing = isTracing; // avant traceTo : il republie, et l'abonnement rentre à nouveau
       if (isTracing) traceTo(targetCell);
-      wasTracing = isTracing;
     }
     // En Dessin, un clic ne vise plus l'auteur d'une case : l'inspection se ferme.
     if (mode === "draft" && store.getView().inspection) store.closeInspection();
