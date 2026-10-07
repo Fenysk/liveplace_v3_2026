@@ -5,7 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
-import { type AccountSection, AccountWindow, SETTINGS_SECTION } from "../ui/account/account-window";
+import { accountPillOpeners } from "../ui/account/account-pill-openers";
+import { type AccountSection, AccountWindow } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
 import { ArchivesTab } from "../ui/archive/archives-tab";
@@ -103,8 +104,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
         {...account}
         isCompact={isCompact}
         isVisible={!isWaitingForOwner}
-        onOpenAccount={() => openWindow(account.pendingReports ? "moderation" : "account")}
-        onOpenSettings={isOwner ? () => openWindow(SETTINGS_SECTION) : undefined}
+        {...accountPillOpeners(role, account.pendingReports, openWindow)}
         onOpenDeveloper={developer.onOpen}
         onSignIn={signingIn.onSignIn}
       />

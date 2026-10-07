@@ -87,6 +87,11 @@
   padding: 0;
 }
 
+/* Le point rouge (.lp-avatar-dot, profile.css) se pose dans l'angle du bouton */
+.lp-btn--dot {
+  position: relative;
+}
+
 .lp-btn:disabled {
   opacity: 0.45;
   cursor: default;

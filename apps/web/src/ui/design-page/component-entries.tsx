@@ -2,7 +2,7 @@
 
 import { toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
-import { Brush, Eraser, LogOut, Trash, X } from "lucide-react";
+import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import { NAME_PLACEHOLDER, PROGRESS_LABEL, progressOptions } from "../archive/archive-texts";
 import { PNG_BACKGROUND_OPTIONS } from "../archive/download-window";
@@ -185,6 +185,10 @@ const ICON_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
     },
   },
   { name: "Fermer", props: { icon: X, variant: "ghost", title: "Fermer (Échap)", onPress: noop } },
+  {
+    name: "Quelque chose attend",
+    props: { icon: Shield, variant: "ghost", title: "Modération", hasDot: true, onPress: noop },
+  },
 ];
 
 export const ButtonEntry = () => (

@@ -43,6 +43,7 @@ type AccountScene = {
   isCompact?: boolean;
   pendingReports?: number;
   hasSettings?: boolean;
+  hasModeration?: boolean;
   isDeveloper?: boolean; // écart §10.3 (JOURNAL 2026-10-06) : le bouton Développeur
 };
 
@@ -58,13 +59,23 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
   },
   {
     title: "Connecté",
+    scenes: [{ name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN }],
+  },
+  {
+    title: "Qui modère sur le canvas d'un autre",
     scenes: [
-      { name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN },
       {
-        name: "Qui modère, un signalement attend",
-        detail: "Sa photo ouvre Modération.",
+        name: "Qui modère",
+        detail: "Modération ouvre la fenêtre sur Modération.",
+        identity: SIGNED_IN,
+        hasModeration: true,
+      },
+      {
+        name: "Qui modère, des signalements attendent",
+        detail: "Le point sur Modération, pas sur sa photo.",
         identity: SIGNED_IN,
         pendingReports: 2,
+        hasModeration: true,
       },
     ],
   },
@@ -98,6 +109,13 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
     scenes: [
       { name: "Invité", identity: { kind: "guest" }, isCompact: true },
       { name: "Le streamer sur son canvas", identity: SIGNED_IN, isCompact: true, hasSettings: true },
+      {
+        name: "Qui modère, des signalements attendent",
+        identity: SIGNED_IN,
+        isCompact: true,
+        pendingReports: 2,
+        hasModeration: true,
+      },
     ],
   },
 ];
@@ -114,22 +132,34 @@ export const AccountPillEntry = () => {
     >
       {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
         <Block key={title} title={title}>
-          {scenes.map(({ name, detail, identity, isCompact, pendingReports, hasSettings, isDeveloper }) => (
-            <StateRow key={name} name={name} detail={detail}>
-              <AccountPill
-                identity={identity}
-                signInHref="#"
-                themeChoice={themeChoice}
-                onPickTheme={pickTheme}
-                onOpenAccount={noop}
-                onOpenSettings={hasSettings ? noop : undefined}
-                onOpenDeveloper={isDeveloper ? noop : undefined}
-                pendingReports={pendingReports ?? 0}
-                isCompact={isCompact ?? false}
-                isDocked={false}
-              />
-            </StateRow>
-          ))}
+          {scenes.map(
+            ({
+              name,
+              detail,
+              identity,
+              isCompact,
+              pendingReports,
+              hasSettings,
+              hasModeration,
+              isDeveloper,
+            }) => (
+              <StateRow key={name} name={name} detail={detail}>
+                <AccountPill
+                  identity={identity}
+                  signInHref="#"
+                  themeChoice={themeChoice}
+                  onPickTheme={pickTheme}
+                  onOpenAccount={noop}
+                  onOpenSettings={hasSettings ? noop : undefined}
+                  onOpenModeration={hasModeration ? noop : undefined}
+                  onOpenDeveloper={isDeveloper ? noop : undefined}
+                  pendingReports={pendingReports ?? 0}
+                  isCompact={isCompact ?? false}
+                  isDocked={false}
+                />
+              </StateRow>
+            ),
+          )}
         </Block>
       ))}
     </Entry>
