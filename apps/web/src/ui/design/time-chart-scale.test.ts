@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHART_HEIGHT, chartMax, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
+import { CHART_HEIGHT, chartMax, chartScale, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
 
 describe("the scale of the curves (écart §4.3, JOURNAL 2026-10-06)", () => {
   // Monte jusqu'à la plus grande valeur, et jamais sous 1 : une courbe à zéro reste au sol
@@ -7,6 +7,14 @@ describe("the scale of the curves (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(chartMax([3, null, 12, 7])).toBe(12);
     expect(chartMax([0, 0, null])).toBe(1);
     expect(chartMax([])).toBe(1);
+  });
+
+  // Une courbe d'un taux garde son échelle fixe, de 0 à 100 % : un taux de 3 % reste près du sol, un taux de 140 % dépasse
+  it("keeps a ratio curve on a fixed scale from 0 to 100 %: 3 % stays near the ground, 140 % goes past", () => {
+    expect(chartScale([3, null, 1], 100)).toBe(100);
+    expect(chartScale([3, 140], 100)).toBe(140);
+    expect(chartScale([3, 12], 0)).toBe(12);
+    expect(chartScale([null, null], 100)).toBe(100);
   });
 
   // Place chaque valeur sur son créneau, le zéro en bas, le maximum presque en haut

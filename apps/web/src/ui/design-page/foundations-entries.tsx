@@ -29,7 +29,7 @@ type Usages = Readonly<Record<string, string>>;
 
 const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g, "$1-$2").toLowerCase();
 
-// Les 37 couleurs de `tokens.css`, rangées par famille.
+// Les 39 couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le vide et le canvas",
@@ -65,6 +65,13 @@ const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
       danger: "La modération : retirer, bannir. Un refus.",
       onDanger: "Le texte sur la modération.",
       focusRing: "L'anneau du focus clavier.",
+    },
+  },
+  {
+    title: "Les états de la capacité",
+    usages: {
+      success: "Un taux sous 50 % : large. Le vert de la jauge ; au-delà de 80 %, le rouge de la modération.",
+      warning: "Un taux de 50 à 80 % : à surveiller. Et « sans nouvelles ».",
     },
   },
   {
@@ -145,6 +152,11 @@ const MOTION_USAGES: Usages = {
 };
 
 const TYPE_STYLES = [
+  {
+    className: "lp-type-display",
+    sample: "62 %",
+    usage: "Un seul grand chiffre : la saturation de la capacité. Chiffres tabulaires.",
+  },
   { className: "lp-type-heading", sample: "Vue OBS", usage: "Le titre de la section ouverte d'une fenêtre." },
   { className: "lp-type-title", sample: "Kalyss", usage: "Un nom d'affichage, une initiale." },
   { className: "lp-type-body", sample: "Dessiner", usage: "Boutons, lignes de réglage, texte des pills." },

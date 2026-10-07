@@ -1,5 +1,6 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
+import type { Timestamp } from "@liveplace/domain";
 import type { CanvasCore, LiveControl, ScoreboardRank, Unsubscribe } from "@liveplace/domain/ports";
 import type { Event, ServerFrame } from "@liveplace/protocol";
 import { conflate } from "./conflate";
@@ -26,7 +27,12 @@ export interface Broadcast {
   // JOURNAL 2026-10-06 : une fenêtre du classement. Ne relit que les canvas où une pose, un ban ou un déban a eu lieu.
   tickScoreboard(): Promise<void>;
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
+  // Écart §5.1 (JOURNAL 2026-10-07) : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
+  countConnections(): { total: number; largestCanvas: number };
 }
+
+// Écart §5.1 (JOURNAL 2026-10-07) : la capacité mesure, à l'envoi de chaque frame, le délai de chaque pose qu'elle porte.
+export type DelayRecorder = { now(): Timestamp; record(delayMs: number): void };
 
 type Member = { onControl: ControlListener; accountId: string | undefined };
 
@@ -87,7 +93,10 @@ const refreshScoreboard = async (core: ScoreboardCore, canvasId: string, canvas:
   canvas.scoreboardRankKeys = rankKeys;
 };
 
-export function createBroadcast(core: Pick<CanvasCore, "subscribe"> & ScoreboardCore): Broadcast {
+export function createBroadcast(
+  core: Pick<CanvasCore, "subscribe"> & ScoreboardCore,
+  delays?: DelayRecorder,
+): Broadcast {
   const canvases = new Map<string, CanvasBroadcast>();
 
   const start = (canvasId: string): CanvasBroadcast => {
@@ -124,6 +133,13 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe"> & Scoreboard
     }
   };
 
+  // Une pose reçue et partie dans une frame : un seul compteur de plus, et l'horloge lue une fois par frame.
+  const recordDelays = (events: readonly Event[]): void => {
+    if (!delays) return;
+    const sentAt = delays.now();
+    for (const { kind, occurredAt } of events) if (kind === "place") delays.record(sentAt - occurredAt);
+  };
+
   return {
     // S'abonner avant que l'appelant lise l'état : le pub/sub n'a aucune mémoire (§6.1).
     async join(canvasId, listener, onControl, accountId) {
@@ -148,11 +164,13 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe"> & Scoreboard
         canvas.ticksWaited += 1;
         if (canvas.ticksWaited < ticksBetweenFrames(canvas.listeners.size)) continue;
         canvas.ticksWaited = 0;
-        const conflated = conflate(canvas.pendingEvents);
+        const events = canvas.pendingEvents;
+        const conflated = conflate(events);
         canvas.pendingEvents = [];
         if (!conflated) continue;
         const frame = { t: "cells" as const, ...conflated };
         for (const listener of canvas.listeners.keys()) listener(frame);
+        recordDelays(events);
       }
     },
 
@@ -165,6 +183,11 @@ export function createBroadcast(core: Pick<CanvasCore, "subscribe"> & Scoreboard
 
     countAccounts(canvasId) {
       return accountIdsOf(canvases.get(canvasId)).size;
+    },
+
+    countConnections() {
+      const sizes = [...canvases.values()].map(({ listeners }) => listeners.size);
+      return { total: sizes.reduce((sum, size) => sum + size, 0), largestCanvas: Math.max(0, ...sizes) };
     },
   };
 }

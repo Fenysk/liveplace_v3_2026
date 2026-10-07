@@ -939,6 +939,66 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
   });
 });
 
+describe("the capacity of the developer (écart §4.2, JOURNAL 2026-10-07)", () => {
+  const capacity: ServerFrame = {
+    t: "capacity",
+    saturation: { percent: 62.1, resource: "redisMemory", isIncomplete: false },
+    resources: [],
+  };
+
+  // Dit au gateway de commencer ou d'arrêter, et le redit à chaque reprise tant qu'il regarde
+  it("tells the gateway to start or stop, and says it again at each resumption while watching", () => {
+    const { store, sent, receive, close, open } = setup();
+    const watching = () => sent.filter((frame) => frame.t === "watchCapacity");
+
+    store.watchCapacity(true);
+    close();
+    open();
+    receive(welcome);
+    expect(watching()).toEqual([
+      { t: "watchCapacity", isWatching: true },
+      { t: "watchCapacity", isWatching: true },
+    ]);
+
+    store.watchCapacity(false);
+    close();
+    open();
+    receive(welcome);
+    expect(watching()).toHaveLength(3);
+    expect(watching().at(-1)).toEqual({ t: "watchCapacity", isWatching: false });
+  });
+
+  // Rend l'historique de la période demandée, réglé par la réponse de sa requête, ou la coupure
+  it("gives the history of the asked period, settled by the answer of its request, or the drop", async () => {
+    const { store, sent, receive, close } = setup();
+    const point = { at: 60_000, saturation: 62.1, resource: "redisMemory", redis: 62.1 } as const;
+
+    const listed = store.listCapacityHistory("month");
+    const asked = sent.at(-1);
+    if (asked?.t !== "listCapacityHistory") throw new Error("aucune frame listCapacityHistory");
+    receive({ t: "capacityHistory", requestId: asked.requestId, points: [point] });
+    const dropped = store.listCapacityHistory("day");
+    close();
+
+    expect(asked.period).toBe("month");
+    expect(await listed).toEqual({ ok: true, value: { points: [point] } });
+    expect(await dropped).toEqual({ ok: false, error: "closed" });
+  });
+
+  // Donne chaque frame capacity à qui écoute, jusqu'à ce qu'il se retire
+  it("hands each capacity frame to its listeners, until they stop listening", () => {
+    const { store, receive } = setup();
+    const heard: ServerFrame[] = [];
+    const stop = store.listenCapacity((frame) => heard.push(frame));
+
+    receive(capacity);
+    stop();
+    receive(capacity);
+
+    expect(heard).toEqual([capacity]);
+  });
+});
+
 describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
   const top = [
     { login: "ada", displayName: "Ada", pixels: 9 },

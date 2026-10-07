@@ -7,7 +7,7 @@ import type { ActivityPeriod } from "@liveplace/domain";
 import type { ActivityFrame, ActivityHistory } from "@liveplace/domain/ports";
 import type { CanvasStore } from "./canvas-store";
 
-const HISTORY_REFRESH_MS = 60_000;
+export const HISTORY_REFRESH_MS = 60_000; // la capacité relit son historique à la même cadence
 
 // Du store du canvas, ce que la section lit et appelle : un ajout au store n'a pas à toucher ses tests.
 export type ActivityWatchCanvas = Pick<

@@ -12,8 +12,10 @@ import type {
   ActivityStore,
   BannedUser,
   CanvasCore,
+  CapacityStore,
   ClientSocket,
   GaugeClaim,
+  HostProbe,
   InspectEntry,
   LiveControl,
   LiveMessage,
@@ -34,7 +36,9 @@ import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/proto
 import { describe, expect, it } from "vitest";
 import { createActivity } from "./activity";
 import { createBroadcast } from "./broadcast";
+import { createCapacity } from "./capacity";
 import { createConnection } from "./connection";
+import { createDelayTally } from "./delay-tally";
 
 const canvasId = "canvas-1";
 const now = 1_700_000_000_000;
@@ -73,6 +77,29 @@ const activityStore: ActivityStore = {
   listCanvasHistory: async () => [],
   getCanvasAudience: async () => ({ today: noCanvasAudience, month: noCanvasAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
+};
+// La capacité non plus : rien à relire, la machine est celle d'un test (écart §5.1, JOURNAL 2026-10-07).
+const capacityStore: CapacityStore = {
+  getRedisUsage: async () => ({
+    usedMemoryBytes: 1,
+    maxMemoryBytes: 2,
+    cpuSeconds: 0,
+    outOfMemoryRefusals: 0,
+  }),
+  getWebMeasure: async () => null,
+  getConvexDeposit: async () => null,
+  listCeilingsReached: async () => new Map(),
+  storeCeilingReached: async () => undefined,
+  storeCapacityMinute: async () => undefined,
+  pruneCapacity: async () => undefined,
+  listCapacityHistory: async () => [],
+};
+const quietHost: HostProbe = {
+  getMemory: () => ({ usedBytes: 1, totalBytes: 2 }),
+  getCpuPercent: () => null,
+  getCoreCount: () => 4,
+  getDisk: async () => ({ usedBytes: 1, totalBytes: 2 }),
+  getUtilizationPercent: () => 0,
 };
 const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
 
@@ -324,6 +351,14 @@ const setup = (options: SetupOptions = {}) => {
     now: () => clock.nowMs,
     isProduction: false,
   });
+  const capacity = createCapacity({
+    store: capacityStore,
+    host: quietHost,
+    broadcast,
+    delays: createDelayTally(),
+    now: () => clock.nowMs,
+    isProduction: false,
+  });
   // Une connexion de plus sur le même noyau : un autre onglet, ou un autre joueur.
   const open = (opened: Session | null, device: Device = "desktop") => {
     const sent: (ServerFrame | { snapshot: Uint8Array })[] = [];
@@ -341,7 +376,7 @@ const setup = (options: SetupOptions = {}) => {
     };
     return {
       connection: createConnection(
-        { core, broadcast, activity, now: () => clock.nowMs },
+        { core, broadcast, activity, capacity, now: () => clock.nowMs },
         socket,
         opened,
         device,
@@ -356,6 +391,7 @@ const setup = (options: SetupOptions = {}) => {
     connection,
     broadcast,
     activity,
+    capacity,
     sent,
     closed,
     placements,
@@ -1391,6 +1427,22 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
     expect(sent.at(-1)).toMatchObject({ t: "activity", canvases: [{ canvasId }], here: { canvasId } });
   });
 
+  // Laisse aussi le suivi de la capacité du développeur : lui non plus ne touche pas au canvas
+  it("keeps the capacity of the developer too, which does not touch the canvas either", async () => {
+    const { connection, sent, capacity } = setup({ session: developer, archivedAt });
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "watchCapacity", isWatching: true }));
+    await connection.receive(
+      JSON.stringify({ t: "listCapacityHistory", requestId: "history-1", period: "month" }),
+    );
+    capacity.tick();
+
+    expect(sent.some((frame) => "t" in frame && frame.t === "error")).toBe(false);
+    expect(sent.at(-2)).toEqual({ t: "capacityHistory", requestId: "history-1", points: [] });
+    expect(sent.at(-1)).toMatchObject({ t: "capacity" });
+  });
+
   // Une inspection d'archive ne donne ni l'identifiant de l'auteur, ni le droit de signaler, ni l'origine du modérateur
   it("gives an archive inspection no author id, no right to report and no moderator origin, whoever looks", async () => {
     const asOwner = setup({ session: owner, archivedAt, isModerator: true });
@@ -1585,6 +1637,52 @@ describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", ()
 
     expect(sent).toHaveLength(count);
     expect(sent.at(-1)).toMatchObject({ t: "activity" });
+  });
+});
+
+describe("the capacity in the connection (écart §4.2, JOURNAL 2026-10-07)", () => {
+  const watch = JSON.stringify({ t: "watchCapacity", isWatching: true });
+  const listHistory = JSON.stringify({ t: "listCapacityHistory", requestId: "history-1", period: "day" });
+
+  // Ignore les frames de capacité d'une session qui n'est pas celle du développeur, et d'un invité, sans fermer
+  it("ignores the capacity frames of a session that is not the developer's, without closing", async () => {
+    for (const opened of [setup(), setup({ session: null })]) {
+      await opened.connection.receive(hello());
+      const before = opened.sent.length;
+
+      await opened.connection.receive(watch);
+      await opened.connection.receive(listHistory);
+      opened.capacity.tick();
+
+      expect(opened.sent).toHaveLength(before);
+      expect(opened.closed).toEqual([]);
+    }
+  });
+
+  // Rend l'historique au développeur, avec sa requête
+  it("answers the history to the developer, with its request", async () => {
+    const { connection, sent } = setup({ session: developer });
+    await connection.receive(hello());
+
+    await connection.receive(listHistory);
+
+    expect(sent.at(-1)).toEqual({ t: "capacityHistory", requestId: "history-1", points: [] });
+  });
+
+  // Envoie la capacité au développeur qui la regarde, et plus rien une fois sa page fermée
+  it("sends the capacity to the developer who watches, and nothing more once his page is closed", async () => {
+    const { capacity, connection, sent } = setup({ session: developer });
+    await connection.receive(hello());
+    await connection.receive(watch);
+
+    capacity.tick();
+    expect(sent.at(-1)).toMatchObject({ t: "capacity", saturation: expect.any(Object) });
+    const count = sent.length;
+
+    await connection.close();
+    capacity.tick();
+
+    expect(sent).toHaveLength(count);
   });
 });
 

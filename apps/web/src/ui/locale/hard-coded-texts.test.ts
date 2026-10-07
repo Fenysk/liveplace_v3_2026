@@ -15,6 +15,7 @@ const FRENCH_BY_DESIGN = [
   "ui/design-page/",
   "ui/locale/",
   "ui/design/canvas-activity-card.tsx",
+  "ui/design/capacity-row.tsx",
   "ui/design/stat-table.tsx",
   "ui/design/stat-tile.tsx",
   "ui/design/time-charts.tsx",

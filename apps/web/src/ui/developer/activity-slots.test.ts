@@ -134,7 +134,7 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
 
     expect(slots).toHaveLength(720);
     expect(slots.at(-1)?.values).toEqual([1, 5, 30, 2, 3, 4]);
-    expect(slots.filter((slot) => slot?.values.some((value) => value > 0))).toHaveLength(1);
+    expect(slots.filter((slot) => slot?.values.some((value) => (value ?? 0) > 0))).toHaveLength(1);
   });
 
   // Tout : du premier jour du canvas jusqu'aujourd'hui, les jours sans point à zéro, les joueurs actifs en plus

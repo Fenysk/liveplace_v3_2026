@@ -35,6 +35,7 @@ import {
   userKey,
   WITHOUT_DISCOVERED_VIA,
 } from "./keys";
+import { DAY_MINUTES, execAll, MONTH_HOURS, pointStarts, pruneHash } from "./pyramid";
 
 declare module "ioredis" {
   interface RedisCommander<Context> {
@@ -44,15 +45,7 @@ declare module "ioredis" {
 
 type ActivityKeys = ReturnType<typeof buildActivityKeys>;
 
-// §5.1 : 24 h d'un point par minute, 30 jours d'un point par heure.
-const DAY_MINUTES = 1440;
-const MONTH_HOURS = 720;
 const POINT_FIELD = /^\d+$/; // le début d'un point ; celui de ses nouveaux comptes a un suffixe
-
-// Un MULTI ne lève pas pour une commande refusée : ioredis la rend à sa place.
-const execAll = async (transaction: ChainableCommander): Promise<void> => {
-  for (const [error] of (await transaction.exec()) ?? []) if (error) throw error;
-};
 
 // `stored` : `people,streamed,pixels,visits,phoneVisits,visitMinutes`, écrit par activity.lua ; un point d'avant l'audience
 // n'a que les trois premiers.
@@ -114,10 +107,6 @@ const toCanvasPoint = ({
   visitMinutes,
   signups,
 });
-
-// Les débuts, du plus ancien au plus récent, de `count` points espacés de `stepMs` jusqu'à `lastAt`.
-const pointStarts = (lastAt: Timestamp, stepMs: number, count: number): Timestamp[] =>
-  Array.from({ length: count }, (_, index) => lastAt - (count - 1 - index) * stepMs);
 
 // Les trois HASH d'un historique, celui du global ou celui d'un canvas.
 type PointHashes = { minutes: string; hours: string; days: string };
@@ -240,13 +229,6 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     await redis.hset(days, toActiveField(toActivityPointStarts(at).day), await redis.pfcount(key));
   };
 
-  // Le champ d'un point, celui de ses nouveaux comptes et celui de ses distincts commencent tous par son début.
-  const pruneHash = async (hash: string, retentionMs: number, nowMs: Timestamp): Promise<void> => {
-    const fields = await redis.hkeys(hash);
-    const expired = fields.filter((field) => Number.parseInt(field, 10) < nowMs - retentionMs);
-    if (expired.length > 0) await redis.hdel(hash, ...expired);
-  };
-
   return {
     // Les distincts d'abord, qui se rejouent sans dégât : une minute qui échoue plus loin revient au tic suivant, et ses
     // sommes ne s'écrivent qu'une fois, celles des canvas avec les siennes.
@@ -284,12 +266,12 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     },
 
     async pruneActivity(nowMs, canvasIds = []) {
-      await pruneHash(keys.minutes, ACTIVITY_MINUTES_RETENTION_MS, nowMs);
-      await pruneHash(keys.hours, ACTIVITY_HOURS_RETENTION_MS, nowMs);
+      await pruneHash(redis, keys.minutes, ACTIVITY_MINUTES_RETENTION_MS, nowMs);
+      await pruneHash(redis, keys.hours, ACTIVITY_HOURS_RETENTION_MS, nowMs);
       for (const canvasId of canvasIds) {
         const { minutes, hours } = keys.canvas(canvasId);
-        await pruneHash(minutes, ACTIVITY_CANVAS_MINUTES_RETENTION_MS, nowMs);
-        await pruneHash(hours, ACTIVITY_HOURS_RETENTION_MS, nowMs);
+        await pruneHash(redis, minutes, ACTIVITY_CANVAS_MINUTES_RETENTION_MS, nowMs);
+        await pruneHash(redis, hours, ACTIVITY_HOURS_RETENTION_MS, nowMs);
       }
     },
 

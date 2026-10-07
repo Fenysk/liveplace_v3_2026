@@ -1,0 +1,135 @@
+/* Les ressources de la capacité : des lignes sous filet, le nom à gauche, la valeur, une fine barre, le taux en couleur. */
+
+/* Les groupes, les uns sous les autres */
+.lp-capacity-links {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lp-capacity-link {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-capacity-link-head {
+  margin: 0;
+}
+
+.lp-capacity-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Le motif de `.lp-window-row`, posé sur une grille : nom, valeur, barre, taux */
+.lp-capacity-row {
+  --lp-tone: var(--muted);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 112px 56px;
+  grid-template-areas: "name value bar rate";
+  align-items: center;
+  column-gap: var(--space-3);
+  border-bottom: 1px solid var(--chip-hover);
+}
+
+.lp-capacity-rows > :last-child {
+  border-bottom: 0;
+}
+
+.lp-capacity-row.is-ok {
+  --lp-tone: var(--success);
+}
+
+.lp-capacity-row.is-warning {
+  --lp-tone: var(--warning);
+}
+
+.lp-capacity-row.is-danger {
+  --lp-tone: var(--danger);
+}
+
+.lp-capacity-name {
+  grid-area: name;
+  display: grid;
+}
+
+/* Les chiffres changent toutes les 2 s : leurs chiffres gardent leur largeur, la ligne ne tremble pas */
+.lp-capacity-value,
+.lp-capacity-rate {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lp-capacity-value {
+  grid-area: value;
+  text-align: right;
+}
+
+.lp-capacity-rate {
+  grid-area: rate;
+  text-align: right;
+  transition: color var(--lp-dur-fast) ease;
+}
+
+/* Sans nouvelles ou non mesurée : le texte tient la place de la valeur, de la barre et du taux */
+.lp-capacity-missing {
+  grid-row: 1;
+  grid-column: 2 / -1;
+  text-align: right;
+}
+
+/* La fine barre du taux : un `<meter>`, sans son apparence native. Sa teinte est celle de la ligne ; elle glisse vers sa
+   nouvelle valeur comme le niveau de la jauge. */
+.lp-capacity-meter {
+  grid-area: bar;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gauge-empty);
+  overflow: hidden;
+}
+
+.lp-capacity-meter::-webkit-meter-bar {
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gauge-empty);
+}
+
+.lp-capacity-meter::-webkit-meter-optimum-value,
+.lp-capacity-meter::-webkit-meter-suboptimum-value,
+.lp-capacity-meter::-webkit-meter-even-less-good-value {
+  border-radius: var(--radius-pill);
+  background: var(--lp-tone);
+  transition:
+    width var(--lp-dur) var(--lp-ease),
+    background var(--lp-dur-fast) ease;
+}
+
+.lp-capacity-meter::-moz-meter-bar {
+  border-radius: var(--radius-pill);
+  background: var(--lp-tone);
+  transition: width var(--lp-dur) var(--lp-ease);
+}
+
+/* Dans une section étroite (la feuille d'un téléphone), le taux passe sous le nom, la barre à côté de lui */
+@container (max-width: 560px) {
+  .lp-capacity-row {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name value"
+      "rate bar bar";
+    row-gap: var(--space-1);
+    padding: var(--space-2) 0;
+  }
+
+  .lp-capacity-rate {
+    text-align: left;
+  }
+
+  .lp-capacity-missing {
+    grid-area: value;
+  }
+}

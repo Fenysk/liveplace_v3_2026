@@ -69,3 +69,43 @@ describe("parseWebConfig (§11.5)", () => {
     );
   });
 });
+
+// Écart §2 et §9 (JOURNAL 2026-10-07) : les déploiements Convex dont le web lit l'usage, facultatifs.
+describe("CONVEX_USAGE_DEPLOYMENTS (JOURNAL 2026-10-07)", () => {
+  const prod = "https://watchful-spider-409.eu-west-1.convex.cloud";
+  const dev = "https://happy-otter-123.convex.cloud";
+
+  // Absente, vide ou faite d'espaces : aucun déploiement, donc Convex « non configuré »
+  it("is no deployment when missing, empty or made of spaces: Convex is then not configured", () => {
+    expect(parseWebConfig(env).convexUsageDeployments).toEqual([]);
+    expect(parseWebConfig({ ...env, CONVEX_USAGE_DEPLOYMENTS: "" }).convexUsageDeployments).toEqual([]);
+    expect(parseWebConfig({ ...env, CONVEX_USAGE_DEPLOYMENTS: "  \n " }).convexUsageDeployments).toEqual([]);
+  });
+
+  // Lit des paires « URL clé » séparées par des espaces, et nomme chaque déploiement par le premier mot de son hôte
+  it("reads pairs of URL and key separated by whitespace, and names each deployment by the first word of its host", () => {
+    const raw = `${prod} prod:watchful-spider-409|abc123  ${dev}\tdev:happy-otter-123|def456\n`;
+
+    expect(parseWebConfig({ ...env, CONVEX_USAGE_DEPLOYMENTS: raw }).convexUsageDeployments).toEqual([
+      { name: "watchful-spider-409", url: prod, key: "prod:watchful-spider-409|abc123" },
+      { name: "happy-otter-123", url: dev, key: "dev:happy-otter-123|def456" },
+    ]);
+  });
+
+  // Refuse une paire incomplète, une URL qui n'est pas en https, ou deux fois le même déploiement, en nommant la variable seule
+  it("refuses an incomplete pair, a URL that is not https, or the same deployment twice, naming only the variable", () => {
+    const key = "prod:secret-key|do-not-print";
+    for (const raw of [
+      `${prod}`,
+      `${prod} ${key} ${dev}`,
+      `http://x.convex.cloud ${key}`,
+      `${prod} ${key} ${prod} ${key}`,
+    ]) {
+      const message = messageOf(() => parseWebConfig({ ...env, CONVEX_USAGE_DEPLOYMENTS: raw }));
+
+      expect(message).toContain("CONVEX_USAGE_DEPLOYMENTS");
+      expect(message).not.toContain("do-not-print");
+      expect(message).not.toContain("watchful-spider");
+    }
+  });
+});

@@ -4,13 +4,22 @@
 
 import { type KeyboardEvent, type PointerEvent, useMemo, useState } from "react";
 import { classNames } from "./class-names";
-import { CHART_HEIGHT, chartMax, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
+import { CHART_HEIGHT, chartMax, chartScale, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
 
-// Un créneau de l'axe du temps : son instant en toutes lettres, et une valeur par courbe. `null` : aucun point.
-export type ChartSlot = { title: string; values: readonly number[] } | null;
+// Un créneau de l'axe du temps : son instant en toutes lettres, et une valeur par courbe. `null` : aucun point ; une valeur
+// `null` : ce point n'a rien mesuré pour cette courbe, qui y fait un trou (Écart §4.3, JOURNAL 2026-10-07).
+export type ChartSlot = { title: string; values: readonly (number | null)[] } | null;
 
 // Une courbe : son titre, et sa valeur telle que l'infobulle la dit, accordée (« 2 personnes connectées »).
-export type TimeChartLine = { title: string; countLabel: (count: number) => string };
+// Un taux (la capacité) a une échelle fixe `scaleMax`, sa manière de dire son pic (`maxLabel`), et dit « sans mesure » dans
+// l'infobulle quand son créneau n'a rien mesuré (`emptyLabel`).
+export type TimeChartLine = {
+  title: string;
+  countLabel: (count: number) => string;
+  scaleMax?: number;
+  maxLabel?: (max: number) => string;
+  emptyLabel?: string;
+};
 
 type TimeChartsProps = {
   lines: readonly TimeChartLine[]; // de haut en bas
@@ -20,15 +29,20 @@ type TimeChartsProps = {
 };
 
 const formatValue = (value: number): string => value.toLocaleString("fr-FR");
+const formatMax = (max: number): string => `max ${formatValue(max)}`;
 
 export const TimeCharts = ({ lines, slots, emptyText, isLoading = false }: TimeChartsProps) => {
   const [shownIndex, setShownIndex] = useState<number | null>(null);
   const charts = useMemo(
     () =>
-      lines.map(({ title }, chartIndex) => {
+      lines.map(({ title, scaleMax = 0, maxLabel = formatMax }, chartIndex) => {
         const values = slots.map((slot) => slot?.values[chartIndex] ?? null);
-        const max = chartMax(values);
-        return { title, max, ...toChartPaths(values, max) };
+        const hasValue = values.some((value) => value !== null);
+        return {
+          title,
+          peak: hasValue ? maxLabel(chartMax(values)) : "aucune mesure",
+          ...toChartPaths(values, chartScale(values, scaleMax)),
+        };
       }),
     [lines, slots],
   );
@@ -72,11 +86,11 @@ export const TimeCharts = ({ lines, slots, emptyText, isLoading = false }: TimeC
       onBlur={() => setShownIndex(null)}
       onKeyDown={step}
     >
-      {charts.map(({ title, max, line, area }) => (
+      {charts.map(({ title, peak, line, area }) => (
         <figure key={title} className="lp-time-chart">
           <figcaption className="lp-time-chart-head lp-type-caption">
             <span>{title}</span>
-            <span className="lp-muted">max {formatValue(max)}</span>
+            <span className="lp-muted">{peak}</span>
           </figcaption>
           <svg viewBox={`0 0 ${lastIndex} ${CHART_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true">
             <path className="lp-time-chart-area" d={area} />
@@ -93,11 +107,14 @@ export const TimeCharts = ({ lines, slots, emptyText, isLoading = false }: TimeC
             role="status"
           >
             <span className="lp-type-caption lp-muted">{shown.title}</span>
-            {lines.map(({ title, countLabel }, chartIndex) => (
-              <span key={title} className="lp-type-caption">
-                {countLabel(shown.values[chartIndex] ?? 0)}
-              </span>
-            ))}
+            {lines.map(({ title, countLabel, emptyLabel }, chartIndex) => {
+              const value = shown.values[chartIndex];
+              return (
+                <span key={title} className="lp-type-caption">
+                  {value === null ? (emptyLabel ?? countLabel(0)) : countLabel(value ?? 0)}
+                </span>
+              );
+            })}
           </div>
         </>
       )}

@@ -152,16 +152,16 @@ describe("protocol frames", () => {
     });
   });
 
-  // Refuse une page du protocole 11, 12 ou 13 : elle se recharge pour reprendre le protocole du moment, 14 depuis le
-  // canvas archivé (écart §4.3, JOURNAL 2026-10-06)
-  it("refuses a page of protocol 11, 12 or 13, which reloads to take the current protocol", () => {
+  // Refuse une page du protocole 11, 12, 13 ou 14 : elle se recharge pour reprendre le protocole du moment, 15 depuis la
+  // capacité (écart §4.3, JOURNAL 2026-10-07)
+  it("refuses a page of protocol 11, 12, 13 or 14, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
 
     expect(hello(11).ok).toBe(false);
     expect(hello(12).ok).toBe(false);
     expect(hello(13).ok).toBe(false);
-    expect(hello(14).ok).toBe(true);
+    expect(hello(14).ok).toBe(false);
     expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
@@ -305,13 +305,13 @@ describe("protocol 14: the archive", () => {
     you: { role: "guest" },
   };
 
-  // Refuse un hello resté au protocole 13, celui de l'activité
-  it("refuses a hello still on protocol 13", () => {
-    const hello = { t: "hello", protocolVersion: 13, canvasId: "abc123", mode: "ui" };
+  // Refuse un hello resté au protocole 14, celui de l'archive (JOURNAL 2026-10-07 : la capacité passe à 15)
+  it("refuses a hello still on protocol 14", () => {
+    const hello = { t: "hello", protocolVersion: 14, canvasId: "abc123", mode: "ui" };
 
     expect(decodeClientFrame(hello).ok).toBe(false);
-    expect(decodeClientFrame({ ...hello, protocolVersion: 14 }).ok).toBe(true);
-    expect(PROTOCOL_VERSION).toBe(14);
+    expect(decodeClientFrame({ ...hello, protocolVersion: 15 }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBe(15);
   });
 
   // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
@@ -668,5 +668,129 @@ describe("the canvas of the socket in the activity frames", () => {
 
     expect(before.safeParse({ ...history, canvasPoints: [canvasPoint] }).data).toEqual(history);
     expect(beforeActivity.safeParse({ ...activity, here }).data).toEqual({ t: "activity", canvases: [] });
+  });
+});
+
+// Protocole 15 (écart §4.2 et §4.3, JOURNAL 2026-10-07) : le développeur suit la capacité par le WebSocket.
+describe("capacity frames", () => {
+  const measured = {
+    link: "redis",
+    id: "redisMemory",
+    unit: "bytes",
+    state: "measured",
+    value: 318_000_000,
+    ceiling: 512_000_000,
+    ratio: 62.1,
+  };
+  const monthly = {
+    link: "convex",
+    id: "convexCalls",
+    unit: "calls",
+    state: "measured",
+    value: 1_550_000,
+    ceiling: 1_000_000,
+    ratio: 155,
+    fullAt: 1_760_000_000_000,
+    deployments: ["watchful-spider-409", "dev-deployment"],
+  };
+  const withoutNews = { link: "web", id: "webUtilization", unit: "percent", state: "withoutNews" };
+  const capacity = {
+    t: "capacity",
+    saturation: { percent: 155, resource: "convexCalls", isIncomplete: false },
+    resources: [
+      measured,
+      withoutNews,
+      { link: "convex", id: "convexEgress", unit: "gigabytes", state: "unmeasured" },
+      { link: "redis", id: "redisCpu", unit: "cores", state: "measured", value: 0.09, ceiling: 1, ratio: 9 },
+      monthly,
+    ],
+  };
+  const point = {
+    at: 1_760_000_000_000,
+    saturation: 62.1,
+    resource: "redisMemory",
+    redis: 62.1,
+    gateway: 10,
+  };
+  const history = { t: "capacityHistory", requestId: "r", points: [point] };
+
+  // Regarde la capacité ou non, rien d'autre dans la frame, comme l'activité
+  it("accepts watching the capacity or not, and nothing else in the frame", () => {
+    expect(decodeClientFrame({ t: "watchCapacity", isWatching: false }).ok).toBe(true);
+    expect(decodeClientFrame({ t: "watchCapacity", isWatching: "yes" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "watchCapacity" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "watchCapacity", isWatching: true, canvasId: "c1" }).ok).toBe(false);
+  });
+
+  // Demande l'historique d'une des trois périodes, avec sa requête, et rien d'autre
+  it("asks for the history of one of the three periods, with its request, and nothing else", () => {
+    const list = (period: string) => decodeClientFrame({ t: "listCapacityHistory", requestId: "r", period });
+
+    for (const period of ["day", "month", "all"]) expect(list(period).ok).toBe(true);
+    expect(list("week").ok).toBe(false);
+    expect(decodeClientFrame({ t: "listCapacityHistory", period: "day" }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "listCapacityHistory", requestId: "r", period: "day", x: 1 }).ok).toBe(
+      false,
+    );
+  });
+
+  // Porte la saturation et chaque ressource, mesurée, sans nouvelles ou non mesurée
+  it("carries the saturation and each resource, measured, without news or not measured", () => {
+    expect(decodeServerFrame(capacity)).toEqual({ ok: true, value: capacity });
+  });
+
+  // Une ressource mesurée a sa valeur, son plafond et son taux ; un état inconnu est refusé
+  it("gives a measured resource its value, ceiling and ratio, and refuses an unknown state", () => {
+    const { value, ...withoutValue } = measured;
+    const { ceiling, ...withoutCeiling } = measured;
+
+    expect(decodeServerFrame({ ...capacity, resources: [withoutValue] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...capacity, resources: [withoutCeiling] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...capacity, resources: [{ ...measured, ratio: -1 }] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...capacity, resources: [{ ...withoutNews, state: "unknown" }] }).ok).toBe(
+      false,
+    );
+  });
+
+  // Refuse un maillon, une ressource ou une unité hors des listes du cahier des charges
+  it("refuses a link, a resource or a unit outside the lists of the specification", () => {
+    for (const wrong of [{ link: "vps" }, { id: "redisDisk" }, { unit: "megabytes" }])
+      expect(decodeServerFrame({ ...capacity, resources: [{ ...measured, ...wrong }] }).ok).toBe(false);
+    const unknown = { ...capacity.saturation, resource: "nope" };
+
+    expect(decodeServerFrame({ ...capacity, saturation: unknown }).ok).toBe(false);
+  });
+
+  // Dit les déploiements Convex par leur nom, en liste de textes
+  it("lists the Convex deployments by name, as a list of texts", () => {
+    expect(decodeServerFrame({ ...capacity, resources: [{ ...monthly, deployments: [1] }] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...capacity, resources: [{ ...monthly, deployments: "dev" }] }).ok).toBe(
+      false,
+    );
+  });
+
+  // Une saturation sans ressource porteuse reste valide : rien n'est mesuré
+  it("accepts a saturation without a carrying resource: nothing is measured", () => {
+    const empty = { ...capacity, saturation: { percent: 0, isIncomplete: true }, resources: [] };
+
+    expect(decodeServerFrame(empty)).toEqual({ ok: true, value: empty });
+    expect(decodeServerFrame({ ...empty, saturation: { percent: 0 } }).ok).toBe(false);
+  });
+
+  // Rend l'historique avec sa requête : des nombres seulement, un taux par maillon quand il y en a un
+  it("answers the history with its request: numbers only, a ratio per link when there is one", () => {
+    const { saturation, ...withoutSaturation } = point;
+
+    expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
+    expect(decodeServerFrame({ t: "capacityHistory", points: [point] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...history, points: [{ ...point, redis: "62" }] }).ok).toBe(false);
+    expect(decodeServerFrame({ ...history, points: [{ at: 1, saturation: 0 }] }).ok).toBe(true);
+    expect(decodeServerFrame({ ...history, points: [withoutSaturation] }).ok).toBe(false);
+  });
+
+  // Une page d'avant ignore les clés qu'elle ne connaît pas : ses schémas ne sont pas stricts
+  it("lets a page from before ignore the keys it does not know", () => {
+    expect(decodeServerFrame({ ...capacity, later: true }).ok).toBe(true);
+    expect(decodeServerFrame({ ...history, points: [{ ...point, later: 1 }] }).ok).toBe(true);
   });
 });

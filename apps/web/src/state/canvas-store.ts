@@ -15,6 +15,8 @@ import type {
   ActivityHistory,
   AuthoredPixel,
   BannedUser,
+  CapacityFrame,
+  CapacityHistory,
   InspectEntry,
   Moderation,
   Moderator,
@@ -133,6 +135,10 @@ export type CanvasStore = {
   watchActivity(isWatching: boolean): void;
   listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityHistory>>;
   listenActivity(listener: (frame: ActivityFrame) => void): () => void;
+  // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, avec ses propres frames.
+  watchCapacity(isWatching: boolean): void;
+  listCapacityHistory(period: ActivityPeriod): Promise<RequestResult<CapacityHistory>>;
+  listenCapacity(listener: (frame: CapacityFrame) => void): () => void;
   close(): void;
 };
 
@@ -161,12 +167,18 @@ type ReplyFrame = Extract<
       | "reports"
       | "authorPixels"
       | "resized"
-      | "activityHistory";
+      | "activityHistory"
+      | "capacityHistory";
   }
 >;
 
 // Une requête en attente : `receive` rend vrai quand la réponse est complète.
 type PendingRequest = { receive(reply: ReplyFrame): boolean; fail(error: ErrorCode | "closed"): void };
+
+// Une frame du suivi du développeur, donnée à chacun de ses écouteurs.
+const notify = <Frame>(listeners: ReadonlySet<(frame: Frame) => void>, frame: Frame): void => {
+  for (const listener of listeners) listener(frame);
+};
 
 const toInspection = ({ x, y, entry }: Extract<ServerFrame, { t: "inspected" }>): Inspection =>
   entry ? { status: "found", x, y, entry } : { status: "empty", x, y };
@@ -210,6 +222,8 @@ export function createCanvasStore(
   const staleListeners = new Set<(list: StaleList) => void>();
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
+  const capacityListeners = new Set<(frame: CapacityFrame) => void>();
+  let isWatchingCapacity = false;
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
   // Écart §15 (JOURNAL 2026-10-06) : fermé par la page qui change de canvas, le socket qui tombe ensuite
   // n'est pas une coupure : rien ne reprendra, et rien ne l'annonce.
@@ -351,6 +365,7 @@ export function createCanvasStore(
       emitStale("moderators");
       // La nouvelle connexion ne sait pas que le développeur regarde (écart §4.2, JOURNAL 2026-10-06).
       if (isWatchingActivity) transport.send({ t: "watchActivity", isWatching: true });
+      if (isWatchingCapacity) transport.send({ t: "watchCapacity", isWatching: true });
     }
     hasWelcomed = true;
   };
@@ -433,10 +448,14 @@ export function createCanvasStore(
       case "authorPixels":
       case "resized":
       case "activityHistory":
+      case "capacityHistory":
         answer(frame);
         break;
       case "activity":
-        for (const listener of activityListeners) listener(frame);
+        notify(activityListeners, frame);
+        break;
+      case "capacity":
+        notify(capacityListeners, frame);
         break;
       case "reportCount":
         publish({ reportCount: frame.count });
@@ -600,6 +619,18 @@ export function createCanvasStore(
     listenActivity(listener) {
       activityListeners.add(listener);
       return () => activityListeners.delete(listener);
+    },
+    watchCapacity(isWatching) {
+      isWatchingCapacity = isWatching;
+      transport.send({ t: "watchCapacity", isWatching });
+    },
+    listCapacityHistory: (period) =>
+      request({ t: "listCapacityHistory", requestId: crypto.randomUUID(), period }, (reply) =>
+        reply.t === "capacityHistory" ? { points: reply.points } : undefined,
+      ),
+    listenCapacity(listener) {
+      capacityListeners.add(listener);
+      return () => capacityListeners.delete(listener);
     },
     close() {
       isClosedByPage = true;

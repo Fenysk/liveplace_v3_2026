@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedOrigin, toDevice } from "./ws-server";
+import { isAllowedOrigin, toClientSocket, toDevice } from "./ws-server";
 
 const publicOrigin = "https://liveplace.tv";
 
@@ -24,6 +24,38 @@ describe("isAllowedOrigin (audit de sécurité §4, JOURNAL 2026-09-29)", () => 
   // Sans `Origin`, ce n'est pas un navigateur : les bots des preuves et le test de charge passent
   it("accepts a handshake without Origin", () => {
     expect(isAllowedOrigin(undefined, publicOrigin)).toBe(true);
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-07) : le débit sortant du gateway se compte aux octets envoyés par socket.
+describe("toClientSocket (JOURNAL 2026-10-07)", () => {
+  const silent = { send: () => undefined, close: () => undefined };
+
+  // Compte les octets de chaque envoi : une frame partagée compte pour chaque socket, un snapshot aussi
+  it("counts the bytes of each send: a shared frame counts for each socket, and a snapshot too", () => {
+    const counted: number[] = [];
+    const sockets = [silent, silent].map((socket) => toClientSocket(socket, (bytes) => counted.push(bytes)));
+    const frame = { t: "pong" } as const; // `{"t":"pong"}` : 12 octets
+
+    for (const socket of sockets) socket.sendFrame(frame);
+    sockets[0]?.sendSnapshot(new Uint8Array(2500));
+
+    expect(counted).toEqual([12, 12, 2500]);
+  });
+
+  // Envoie ce qu'il compte : la même frame, en texte, et le snapshot, en binaire
+  it("sends what it counts: the same frame as text, and the snapshot as binary", () => {
+    const sent: unknown[][] = [];
+    const socket = toClientSocket(
+      { send: (...args: unknown[]) => sent.push(args), close: () => undefined },
+      () => undefined,
+    );
+
+    socket.sendFrame({ t: "pong" });
+    socket.sendSnapshot(new Uint8Array(3));
+
+    expect(sent.map(([, options]) => options)).toEqual([{ binary: false }, { binary: true }]);
+    expect(String(sent[0]?.[0])).toBe('{"t":"pong"}');
   });
 });
 

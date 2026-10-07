@@ -26,6 +26,8 @@
 @import "./stat-table.css";
 @import "./time-charts.css";
 @import "./canvas-activity-card.css";
+@import "./saturation-figure.css";
+@import "./capacity-row.css";
 
 html,
 body {

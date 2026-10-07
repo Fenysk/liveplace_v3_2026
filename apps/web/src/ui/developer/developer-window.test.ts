@@ -29,19 +29,24 @@ const toNavButtons = (markup: string) =>
       isCurrent: button.includes('aria-current="page"'),
       text: button.replace(/<[^>]*>/g, " "),
     }))
-    .filter(({ text }) => text.includes("Ce canvas") || text.includes("Tout LivePlace"));
+    .filter(
+      ({ text }) =>
+        text.includes("Ce canvas") || text.includes("Tout LivePlace") || text.includes("Capacité"),
+    );
 
 describe("the developer window (JOURNAL 2026-10-07)", () => {
-  // Offre deux sections, Ce canvas puis Tout LivePlace, dans la grande fenêtre
-  it("offers two sections, Ce canvas then Tout LivePlace, in the large window", () => {
+  // Offre trois sections, Ce canvas, Tout LivePlace puis Capacité, dans la grande fenêtre
+  it("offers three sections, Ce canvas, Tout LivePlace then Capacité, in the large window", () => {
     const markup = render("here");
 
     expect(DEVELOPER_SECTIONS.map(({ id, label }) => `${id}:${label}`)).toEqual([
       "here:Ce canvas",
       "all:Tout LivePlace",
+      "capacity:Capacité",
     ]);
     expect(markup).toContain("lp-window--large");
     expect(markup.indexOf("Ce canvas")).toBeLessThan(markup.indexOf("Tout LivePlace"));
+    expect(markup.indexOf("Tout LivePlace")).toBeLessThan(markup.indexOf("Capacité"));
     expect(markup).toContain("contenu");
   });
 
@@ -50,6 +55,7 @@ describe("the developer window (JOURNAL 2026-10-07)", () => {
     for (const [sectionId, label] of [
       ["here", "Ce canvas"],
       ["all", "Tout LivePlace"],
+      ["capacity", "Capacité"],
     ] as const) {
       const markup = render(sectionId);
 
