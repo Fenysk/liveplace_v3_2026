@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §5.1 : une notification EventSub n'est appliquée qu'une fois, `twitch:message:<id>` en `SET NX EX 660`
+
+**Contexte.** Twitch livre « au moins une fois » et demande de dédupliquer sur `Twitch-Eventsub-Message-Id` ; deux `channel.ban` au même identifiant donnaient deux actions en file, donc deux entrées de plus dans le flux et deux versions consommées (prouvé en local).
+**Décision.** Après la signature et la fraîcheur, le web réserve l'identifiant (`reserveTwitchMessage`, 11 minutes : les 10 de fraîcheur + 1) ; déjà pris, il répond 204 sans rien appliquer. Si l'action échoue, il rend l'identifiant (`releaseTwitchMessage`) pour que la redélivrance passe. Seules les notifications sont retenues : la vérification et la révocation gardent leur comportement.
+**Renoncement.** Réserver et mettre en file dans une même opération : l'action passe par Convex et helix, pas seulement Redis.
+
 ## 2026-10-08 — Écart §4.3 et §5.4 : un modérateur nommé ici ne se bannit pas, un banni ne modère plus
 
 **Contexte.** Sur la bêta, un modérateur nommé sur LivePlace a pu être banni et restait modérateur : `moderate.lua` ne contrôlait que `mods`, et le gateway donnait le rôle sur ce seul ensemble. Il aurait pu retirer des pixels, bannir, se débannir.

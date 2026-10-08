@@ -61,6 +61,25 @@ const applyChannelEvent = async (deps: TwitchWebhookDeps, event: ChannelEvent): 
   await deps.twitchWrites.queueTwitchCommands([command]);
 };
 
+type AppliedEvent = Exclude<TwitchWebhookEvent, { kind: "verification" }>;
+
+const applyEvent = async (deps: TwitchWebhookDeps, event: AppliedEvent): Promise<void> => {
+  if (isLiveEvent(event)) await deps.tracker.apply(event);
+  else if (event.kind !== "ignored") await applyChannelEvent(deps, event);
+};
+
+// Écart §5.1 (JOURNAL 2026-10-08) : Twitch livre « au moins une fois ». Un identifiant déjà reçu ne rejoue rien ; si
+// l'action échoue, il est rendu, pour que la redélivrance de Twitch passe.
+const applyOnce = async (deps: TwitchWebhookDeps, messageId: string, event: AppliedEvent): Promise<void> => {
+  if (!(await deps.twitchWrites.reserveTwitchMessage(messageId))) return;
+  try {
+    await applyEvent(deps, event);
+  } catch (error) {
+    await deps.twitchWrites.releaseTwitchMessage(messageId);
+    throw error;
+  }
+};
+
 export async function receiveTwitchWebhook(
   deps: TwitchWebhookDeps,
   message: TwitchWebhookMessage,
@@ -68,7 +87,8 @@ export async function receiveTwitchWebhook(
   const event = deps.webhook.read(message, deps.now());
   if (!event) return { status: 403 };
   if (event.kind === "verification") return { status: 200, challenge: event.challenge };
-  if (isLiveEvent(event)) await deps.tracker.apply(event);
-  else if (event.kind !== "ignored") await applyChannelEvent(deps, event);
+  // Après la signature et la fraîcheur : un message non signé ne réserve jamais un identifiant. Une révocation garde son comportement.
+  if (message.type === "notification") await applyOnce(deps, message.id, event);
+  else await applyEvent(deps, event);
   return { status: 204 };
 }

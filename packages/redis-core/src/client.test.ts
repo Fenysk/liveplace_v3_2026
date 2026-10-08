@@ -15,7 +15,14 @@ import type { LiveMessage, Placement, TwitchCommand } from "@liveplace/domain/po
 import type { Event } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
 import { createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
-import { buildCanvasKeys, HIST_DEPTH, TWITCH_COMMANDS_KEY, userKey } from "./keys";
+import {
+  buildCanvasKeys,
+  HIST_DEPTH,
+  TWITCH_COMMANDS_KEY,
+  TWITCH_MESSAGE_TTL_SECONDS,
+  twitchMessageKey,
+  userKey,
+} from "./keys";
 import { createRedisHarness } from "./test-harness";
 
 const harness = createRedisHarness();
@@ -83,6 +90,32 @@ describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
 
     expect(await core.getTwitchSync(synced)).toEqual({ status: "ok", syncedAt: 5678 });
     expect(await core.getTwitchSync(never)).toBeNull();
+  });
+});
+
+describe("the Twitch message ids (JOURNAL 2026-10-08)", () => {
+  // Retient un identifiant 11 minutes, et refuse de le réserver une seconde fois
+  it("keeps a message id for 11 minutes, and refuses to reserve it a second time", async () => {
+    const writes = createTwitchWrites(redis);
+    const messageId = `${runId}-first`;
+
+    expect(await writes.reserveTwitchMessage(messageId)).toBe(true);
+    expect(await writes.reserveTwitchMessage(messageId)).toBe(false);
+
+    expect(await redis.ttl(twitchMessageKey(messageId))).toBeGreaterThan(TWITCH_MESSAGE_TTL_SECONDS - 5);
+    expect(await redis.ttl(twitchMessageKey(messageId))).toBeLessThanOrEqual(TWITCH_MESSAGE_TTL_SECONDS);
+  });
+
+  // Réserve un autre identifiant sans gêne, et rend le sien quand on le relâche
+  it("reserves another id freely, and hands its own back when released", async () => {
+    const writes = createTwitchWrites(redis);
+    const [kept, other] = [`${runId}-kept`, `${runId}-other`];
+    await writes.reserveTwitchMessage(kept);
+
+    expect(await writes.reserveTwitchMessage(other)).toBe(true);
+    await writes.releaseTwitchMessage(kept);
+
+    expect(await writes.reserveTwitchMessage(kept)).toBe(true);
   });
 });
 

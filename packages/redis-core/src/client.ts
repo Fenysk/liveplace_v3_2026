@@ -64,9 +64,11 @@ import {
   TWITCH_COMMANDS_KEY,
   TWITCH_COMMANDS_MAXLEN,
   TWITCH_COMMANDS_READER,
+  TWITCH_MESSAGE_TTL_SECONDS,
   toPlacementKey,
   toPlacementRef,
   toScorePixels,
+  twitchMessageKey,
   userKey,
 } from "./keys";
 import { getTwitchLiveState, listTwitchLives } from "./twitch-live";
@@ -226,6 +228,17 @@ export function createTwitchWrites(redis: Redis): TwitchWrites {
           JSON.stringify(command),
         );
       await transaction.exec();
+    },
+
+    // `NX` : le premier message de cet identifiant gagne, une redélivrance trouve la clé posée (JOURNAL 2026-10-08).
+    async reserveTwitchMessage(messageId) {
+      return (
+        (await redis.set(twitchMessageKey(messageId), 1, "EX", TWITCH_MESSAGE_TTL_SECONDS, "NX")) === "OK"
+      );
+    },
+
+    async releaseTwitchMessage(messageId) {
+      await redis.del(twitchMessageKey(messageId));
     },
   };
 }

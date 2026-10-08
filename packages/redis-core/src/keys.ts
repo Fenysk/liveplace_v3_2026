@@ -27,6 +27,13 @@ export const TWITCH_COMMANDS_MAXLEN = 10_000; // `MAXLEN ~` : une action acquitt
 export const TWITCH_COMMANDS_READER = "gateway";
 export const TWITCH_COMMANDS_CONSUMER = "gateway"; // un seul gateway : au redémarrage, il retrouve ce qu'il n'a pas fini
 
+// Écart §5.1 (JOURNAL 2026-10-08) : un message EventSub déjà reçu, retenu 10 minutes (la fraîcheur que le web accepte) + 1 de marge.
+export const TWITCH_MESSAGE_TTL_SECONDS = 11 * 60;
+
+export function twitchMessageKey(messageId: string): string {
+  return `twitch:message:${messageId}`;
+}
+
 // §5.1 : une pose se nomme par son auteur, `placementId` n'est unique que pour lui.
 export function toPlacementKey({ authorId, placementId }: PlacementRef): string {
   return `${authorId}:${placementId}`;

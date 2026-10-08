@@ -113,6 +113,10 @@ export interface TwitchWrites {
   setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
   queueTwitchCommands(commands: readonly TwitchCommand[]): Promise<void>;
   setTwitchSync(canvasId: string, sync: TwitchSync): Promise<void>; // dans `meta`
+  // Écart §5.1 (JOURNAL 2026-10-08) : Twitch livre « au moins une fois ». `false` : ce message a déjà été reçu ; `release`
+  // rend l'identifiant quand l'action a échoué, pour que la redélivrance de Twitch passe.
+  reserveTwitchMessage(messageId: string): Promise<boolean>;
+  releaseTwitchMessage(messageId: string): Promise<void>;
 }
 
 // Ce que le gateway lit : les actions pas encore acquittées d'abord (un arrêt en plein travail), puis les nouvelles.
