@@ -15,7 +15,7 @@ import {
   toActivityAccounts,
   toCanvasAudienceRows,
   toGuestsLine,
-  toObsTitle,
+  toStreamedTitle,
 } from "./activity-labels";
 import { canvasChartLinesFor, toCanvasSlots } from "./activity-slots";
 import { HistoryBlock, LOADING, type ShownChart, type ShownHistory } from "./history-block";
@@ -43,7 +43,7 @@ const toChart = ({ canvasPoints, period }: ShownHistory): ShownChart | null =>
 
 const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & { here: ActivityHere }) => (
   <>
-    <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={here.isLive} />
+    <CanvasActivityOwner owner={here.owner} streamedTitle={toStreamedTitle(here)} />
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Maintenant</h3>
       <NowBlock here={here} />

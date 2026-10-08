@@ -253,16 +253,15 @@ export type ActivityHistory = Pick<ActivityHistoryFrame, "points" | "canvasPoint
 export type ActiveIds = {
   accountIds: ReadonlySet<string>; // les comptes qui ont ouvert le jeu
   playerIds: ReadonlySet<string>; // les comptes dont une pose a été acceptée
-  streamedCanvasIds: ReadonlySet<string>; // les canvas où une vue OBS était ouverte
+  streamedCanvasIds: ReadonlySet<string>; // les canvas streamés : une vue OBS ouverte et le streamer en live (JOURNAL 2026-10-08)
 };
 
-// Ce qu'un canvas a vécu dans une minute (JOURNAL 2026-10-07) : le pic de ses personnes et de ses vues OBS, 1 s'il a été en
-// live, ses pixels, ses visites dont celles au téléphone, son temps passé, et les comptes qui y ont posé un pixel. Les
-// nouveaux comptes viennent du web, pas du gateway.
-export type CanvasMinute = Pick<
-  CanvasActivityPoint,
-  "people" | "obsViews" | "live" | "pixels" | "visits" | "visitMinutes"
-> & {
+// Ce qu'un canvas a vécu dans une minute (JOURNAL 2026-10-07 et 2026-10-08) : le pic de ses personnes, celui de ses vues OBS
+// (un détail), 1 s'il a été streamé, ses pixels, ses visites dont celles au téléphone, son temps passé, et les comptes qui
+// y ont posé un pixel. Les nouveaux comptes viennent du web, pas du gateway.
+export type CanvasMinute = Pick<CanvasActivityPoint, "people" | "pixels" | "visits" | "visitMinutes"> & {
+  obsViews: number;
+  streamedMinutes: number;
   phoneVisits: number;
   playerIds: ReadonlySet<string>;
 };
@@ -283,11 +282,8 @@ export type ActivityMinute = Omit<
 export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
 
 // Écart §5.1 (JOURNAL 2026-10-08) : les minutes d'une coupure de moins de `STREAM_GRACE_MS` (`toGapMinutes`), à compter
-// comme streamées ou en live pour ce canvas : sa vue OBS, ou son live, est revenu.
-export type ActivityGap = { canvasId: string; kind: "streamed" | "live"; minutes: readonly Timestamp[] };
-
-// La dernière fois qu'une vue OBS de ce canvas était ouverte, et qu'il était en live : un redémarrage du gateway les relit.
-export type CanvasSeen = { obsSeenAt?: Timestamp; liveSeenAt?: Timestamp };
+// comme streamées pour ce canvas : sa vue OBS, ou son live, est revenu.
+export type ActivityGap = { canvasId: string; minutes: readonly Timestamp[] };
 
 // Un nouveau compte, à sa première connexion, le streamer depuis la page duquel il s'est connecté (§8.1), et le canvas actif
 // de ce streamer à cet instant : c'est dans ses points que le compte se compte (JOURNAL 2026-10-07).
@@ -326,11 +322,12 @@ export interface ActivityStore {
     openedPlayerIds: ReadonlySet<string>,
   ): Promise<CanvasAudience>;
   getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
-  // Écart §5.1 (JOURNAL 2026-10-08) : compte un canvas comme streamé ou en live dans les minutes d'une coupure, pour lui seul et
-  // pour tout LivePlace là où la minute existe. Atomique, et sans effet pour une minute déjà comptée : on le rejoue sans dégât.
+  // Écart §5.1 (JOURNAL 2026-10-08) : compte un canvas comme streamé dans les minutes d'une coupure, pour lui seul et pour tout
+  // LivePlace là où la minute existe. Atomique, et sans effet pour une minute déjà comptée : on le rejoue sans dégât.
   storeActivityGap(gap: ActivityGap): Promise<void>;
-  storeSeen(seen: ReadonlyMap<string, CanvasSeen>): Promise<void>; // remplace les heures de ces canvas
-  listSeen(): Promise<Map<string, CanvasSeen>>; // au démarrage du gateway
+  // Par canvas, l'heure où il a été vu streamé pour la dernière fois.
+  storeSeen(seen: ReadonlyMap<string, Timestamp>): Promise<void>; // remplace les heures de ces canvas
+  listSeen(): Promise<Map<string, Timestamp>>; // au démarrage du gateway
   pruneSeen(nowMs: Timestamp): Promise<void>; // ce qui a été vu il y a plus de 10 minutes
 }
 

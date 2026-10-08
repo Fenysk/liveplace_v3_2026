@@ -12,7 +12,6 @@ import {
   AUDIENCE_COLUMNS,
   formatCount,
   guestsNote,
-  liveNote,
   toAudienceRows,
   toCanvasActivityCard,
 } from "./activity-labels";
@@ -27,11 +26,11 @@ export type ActivitySectionProps = {
 
 const NowBlock = ({ view }: { view: ActivityWatchView }) => {
   if (!view.activity) return LOADING;
-  const { people, guests, streamed, live, pixels, signups } = view.activity.now;
+  const { people, guests, streamed, pixels, signups } = view.activity.now;
   return (
     <StatTiles>
       <StatTile label="Personnes connectées" value={formatCount(people)} note={guestsNote(guests)} />
-      <StatTile label="Canvas streamés" value={formatCount(streamed)} note={liveNote(live)} />
+      <StatTile label="Canvas streamés" value={formatCount(streamed)} />
       <StatTile label="Pixels de la dernière minute" value={formatCount(pixels)} />
       <StatTile label="Nouveaux comptes aujourd'hui" value={formatCount(signups)} />
     </StatTiles>

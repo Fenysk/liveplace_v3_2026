@@ -1,11 +1,11 @@
-// Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, la pastille OBS s'il est streamé, la
-// pastille « En live » s'il l'est (JOURNAL 2026-10-08), ses chiffres, et, déplié, ses comptes connectés puis ses invités.
-// Une ligne sur grand écran, une carte sur mobile.
+// Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, la pastille « Streamé » s'il l'est
+// (JOURNAL 2026-10-08), ses chiffres, et, déplié, ses comptes connectés puis ses invités. Une ligne sur grand écran, une carte
+// sur mobile.
 // Avatars et noms suivent la règle des profils (profile.tsx) : ils mènent au canvas de la personne.
 // Le streamer et la liste des comptes servent aussi seuls, dans la section Ce canvas (JOURNAL 2026-10-07).
 
 import type { Device } from "@liveplace/domain";
-import { ChevronDown, Monitor, MonitorPlay, Smartphone } from "lucide-react";
+import { ChevronDown, Monitor, Smartphone } from "lucide-react";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { classNames } from "./class-names";
@@ -21,8 +21,7 @@ export type CanvasActivityAccount = {
 
 export type CanvasActivityCardProps = {
   owner: ProfileUser;
-  obsTitle: string | null; // streamé : la pastille, et ses vues OBS en infobulle
-  isLive: boolean; // son streamer est en live : la pastille « En live », après celle d'OBS
+  streamedTitle: string | null; // streamé : la pastille « Streamé », et ses vues OBS ouvertes en infobulle
   facts: readonly string[]; // personnes, température, nouveaux comptes
   accounts: readonly CanvasActivityAccount[];
   guestsLine: string | null; // « + 2 invités », après les comptes
@@ -45,14 +44,13 @@ const DeviceIcon = ({ device }: { device: Device }) => {
   );
 };
 
-type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner" | "obsTitle" | "isLive">;
+type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner" | "streamedTitle">;
 
-// Le streamer d'un canvas, sa pastille OBS s'il est streamé, et « En live » s'il l'est.
-export const CanvasActivityOwner = ({ owner, obsTitle, isLive }: CanvasActivityOwnerProps) => (
+// Le streamer d'un canvas, et « Streamé » s'il l'est, aux teintes du live.
+export const CanvasActivityOwner = ({ owner, streamedTitle }: CanvasActivityOwnerProps) => (
   <span className="lp-canvas-activity-owner">
     <Profile user={owner} />
-    {obsTitle && <Badge label="OBS" icon={MonitorPlay} title={obsTitle} />}
-    {isLive && <Badge label="En live" icon={TwitchGlyph} tone="live" />}
+    {streamedTitle && <Badge label="Streamé" icon={TwitchGlyph} tone="live" title={streamedTitle} />}
   </span>
 );
 
@@ -83,8 +81,7 @@ export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: Connected
 
 export const CanvasActivityCard = ({
   owner,
-  obsTitle,
-  isLive,
+  streamedTitle,
   facts,
   accounts,
   guestsLine,
@@ -94,7 +91,7 @@ export const CanvasActivityCard = ({
   <article className={classNames("lp-canvas-activity", isOpen && "is-open")}>
     <div className="lp-canvas-activity-head">
       <span className="lp-canvas-activity-summary">
-        <CanvasActivityOwner owner={owner} obsTitle={obsTitle} isLive={isLive} />
+        <CanvasActivityOwner owner={owner} streamedTitle={streamedTitle} />
         <span className="lp-canvas-activity-facts lp-type-caption lp-muted">
           {facts.map((fact) => (
             <span key={fact}>{fact}</span>

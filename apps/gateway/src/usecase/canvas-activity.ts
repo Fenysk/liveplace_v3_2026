@@ -53,14 +53,14 @@ type OpenCanvas = {
   accruedAt: Timestamp;
 };
 
-// La minute en cours d'un canvas : le pic de ses personnes et de ses vues OBS, 1 s'il a été vu en live, ses visites, les
+// La minute en cours d'un canvas : le pic de ses personnes et de ses vues OBS, 1 s'il a été vu streamé, ses visites, les
 // comptes qui y ont posé.
 type MinuteCounts = Omit<CanvasMinute, "pixels" | "playerIds"> & { playerIds: Set<string> };
 
 const emptyMinute = (): MinuteCounts => ({
   people: 0,
   obsViews: 0,
-  live: 0,
+  streamedMinutes: 0,
   visits: 0,
   phoneVisits: 0,
   visitMinutes: 0,
@@ -135,13 +135,17 @@ export function createCanvasCounts() {
     if (visitMinutes > 0) getMinute(canvasId).visitMinutes = visitMinutes;
   };
 
-  // La minute d'un canvas n'est écrite que s'il s'y est passé quelque chose : des personnes, une vue OBS, un live, un pixel ou une visite.
+  // La minute d'un canvas n'est écrite que s'il s'y est passé quelque chose : des personnes, une vue OBS, un stream, un pixel ou une visite.
   const closeMinute = (pixelsByCanvas: ReadonlyMap<string, number>): Map<string, CanvasMinute> => {
     const closed = new Map<string, CanvasMinute>();
     for (const [canvasId, counts] of minute) {
       const pixels = pixelsByCanvas.get(canvasId) ?? 0;
       const isActive =
-        counts.people > 0 || counts.obsViews > 0 || counts.live > 0 || counts.visits > 0 || pixels > 0;
+        counts.people > 0 ||
+        counts.obsViews > 0 ||
+        counts.streamedMinutes > 0 ||
+        counts.visits > 0 ||
+        pixels > 0;
       if (isActive) closed.set(canvasId, { ...counts, pixels });
     }
     minute.clear();
@@ -173,9 +177,9 @@ export function createCanvasCounts() {
       if (device === "phone") counts.phoneVisits += 1;
     },
 
-    // Une lecture de cette minute l'a vu en live (Écart §5.1, JOURNAL 2026-10-08) : sa minute vaut 1, et s'écrit.
-    markLive(canvasId: string): void {
-      getMinute(canvasId).live = 1;
+    // Une lecture de cette minute l'a vu streamé (Écart §5.1, JOURNAL 2026-10-08) : sa minute vaut 1, et s'écrit.
+    markStreamed(canvasId: string): void {
+      getMinute(canvasId).streamedMinutes = 1;
     },
 
     countPixels(canvasId: string, userId: string, pixels: number, nowMs: Timestamp): void {

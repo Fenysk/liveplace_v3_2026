@@ -43,17 +43,12 @@ export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pi
 export const obsViewsLabel = (obsViews: number): string =>
   counted(obsViews, "vue OBS ouverte", "vues OBS ouvertes");
 
-// Écart §5.1 (JOURNAL 2026-10-08) : « canvas » ne prend pas de s ; les minutes en live sont celles d'un canvas.
-export const liveCanvasesLabel = (live: number): string => counted(live, "canvas en live", "canvas en live");
+// Écart §5.1 (JOURNAL 2026-10-08) : les minutes streamées sont celles d'un canvas.
+export const streamedMinutesLabel = (minutes: number): string =>
+  counted(minutes, "minute streamée", "minutes streamées");
 
-export const liveMinutesLabel = (minutes: number): string =>
-  counted(minutes, "minute en live", "minutes en live");
-
-// Sous les canvas streamés de l'instant : combien le sont en live.
-export const liveNote = (live: number): string => `dont ${formatCount(live)} en live`;
-
-// La pastille OBS d'un canvas n'existe que s'il est streamé ; ses vues OBS se lisent en infobulle.
-export const toObsTitle = ({
+// La pastille « Streamé » d'un canvas n'existe que s'il l'est ; ses vues OBS ouvertes se lisent en infobulle.
+export const toStreamedTitle = ({
   isStreamed,
   obsViews,
 }: Pick<ActivityCanvas, "isStreamed" | "obsViews">): string | null =>
@@ -217,11 +212,10 @@ export function toCanvasActivityCard(
   canvas: ActivityCanvas,
   nowMs: Timestamp,
 ): Omit<CanvasActivityCardProps, "isOpen" | "onToggle"> {
-  const { owner, isLive, people, guests, heat, signups, accounts } = canvas;
+  const { owner, people, guests, heat, signups, accounts } = canvas;
   return {
     owner,
-    obsTitle: toObsTitle(canvas),
-    isLive,
+    streamedTitle: toStreamedTitle(canvas),
     facts: [peopleLabel(people, guests), heatLabel(heat), signupsLabel(signups)],
     accounts: toActivityAccounts(accounts, nowMs),
     guestsLine: toGuestsLine(guests),

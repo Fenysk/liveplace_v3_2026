@@ -11,13 +11,10 @@ describe("the owner of a canvas in the developer's activity (Écart §4, JOURNAL
     const live = renderToString(
       createElement(CanvasActivityOwner, {
         owner: { ...owner, twitchLive: { category: "Art" } },
-        obsTitle: null,
-        isLive: false,
+        streamedTitle: null,
       }),
     );
-    const notLive = renderToString(
-      createElement(CanvasActivityOwner, { owner, obsTitle: null, isLive: false }),
-    );
+    const notLive = renderToString(createElement(CanvasActivityOwner, { owner, streamedTitle: null }));
 
     expect(live).toContain("lp-btn--live");
     expect(live).toContain('title="Kalyss est en live sur Twitch : Art"');
@@ -25,20 +22,20 @@ describe("the owner of a canvas in the developer's activity (Écart §4, JOURNAL
     expect(notLive).not.toContain("twitch.tv");
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : la pastille « En live » vient après la pastille OBS, teintée du live ; sans live, elle n'existe pas
-  it("puts the live badge after the OBS badge, tinted as the live is, and none when the canvas is not live", () => {
-    const render = (obsTitle: string | null, isLive: boolean) =>
-      renderToString(createElement(CanvasActivityOwner, { owner, obsTitle, isLive }));
+  // Écart §5.1 (JOURNAL 2026-10-08) : une seule pastille « Streamé », teintée du live, ses vues OBS en infobulle ; sans stream, elle n'existe pas
+  it("shows a single Streamé badge, tinted as the live is, with the OBS views as its tooltip, and none when the canvas is not streamed", () => {
+    const render = (streamedTitle: string | null) =>
+      renderToString(createElement(CanvasActivityOwner, { owner, streamedTitle }));
 
-    const both = render("1 vue OBS ouverte", true);
-    const streamed = render("1 vue OBS ouverte", false);
-    const neither = render(null, false);
+    const streamed = render("2 vues OBS ouvertes");
+    const notStreamed = render(null);
 
-    expect(both.indexOf(">OBS<")).toBeGreaterThan(-1);
-    expect(both.indexOf(">OBS<")).toBeLessThan(both.indexOf(">En live<"));
-    expect(both).toContain("lp-badge--live");
-    expect(streamed).toContain(">OBS<");
+    expect(streamed).toContain(">Streamé<");
+    expect(streamed).toContain("lp-badge--live");
+    expect(streamed).toContain('title="2 vues OBS ouvertes"');
+    expect(streamed.match(/<span class="lp-badge/g)).toHaveLength(1);
+    expect(streamed).not.toContain(">OBS<");
     expect(streamed).not.toContain("En live");
-    expect(neither).not.toContain("lp-badge");
+    expect(notStreamed).not.toContain("lp-badge");
   });
 });

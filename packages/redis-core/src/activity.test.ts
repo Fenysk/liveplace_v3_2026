@@ -1,5 +1,5 @@
 import { AUDIENCE_DAYS, HOUR_MS, MINUTE_MS, toActivityPointStarts, toParisDay } from "@liveplace/domain";
-import type { ActiveIds, ActivityMinute, CanvasMinute, CanvasSeen } from "@liveplace/domain/ports";
+import type { ActiveIds, ActivityMinute, CanvasMinute } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { createActivityStore, createSignupWrites } from "./activity";
 import {
@@ -41,7 +41,6 @@ const minute = (at: number, counts: Partial<ActivityMinute> = {}): ActivityMinut
   at,
   people: 0,
   streamed: 0,
-  live: 0,
   pixels: 0,
   ...noVisits,
   ...ids(),
@@ -53,7 +52,7 @@ const minute = (at: number, counts: Partial<ActivityMinute> = {}): ActivityMinut
 const canvasMinute = (counts: Partial<CanvasMinute> = {}): CanvasMinute => ({
   people: 0,
   obsViews: 0,
-  live: 0,
+  streamedMinutes: 0,
   pixels: 0,
   visits: 0,
   phoneVisits: 0,
@@ -69,15 +68,15 @@ const inMinute = (at: number, canvases: Record<string, CanvasMinute>) =>
 describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
   // Garde le pic des personnes et des canvas streamés, et la somme des pixels, sur la minute, l'heure et le jour
   it("keeps the peak of people and streamed canvases, and the sum of pixels, on the minute, hour and day", async () => {
-    const { store } = stores();
+    const { keys, store } = stores();
 
     await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { people: 5, streamed: 2, pixels: 30 }));
     await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { people: 3, streamed: 1, pixels: 4 }));
     await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, { people: 8, streamed: 1, pixels: 10 }));
 
-    const point = { streamed: 2, live: 0, signups: 0, ...noVisits };
+    const point = { streamed: 2, signups: 0, ...noVisits };
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: minuteAt - 2 * MINUTE_MS, people: 8, streamed: 1, live: 0, pixels: 10, signups: 0, ...noVisits },
+      { at: minuteAt - 2 * MINUTE_MS, people: 8, streamed: 1, pixels: 10, signups: 0, ...noVisits },
       { at: minuteAt - MINUTE_MS, people: 5, pixels: 34, ...point },
     ]);
     expect(await store.listActivityHistory("month", now)).toEqual([
@@ -86,6 +85,7 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
     expect(await store.listActivityHistory("all", now)).toEqual([
       { at: dayAt, people: 8, pixels: 44, activeAccounts: 0, activePlayers: 0, activeStreamers: 0, ...point },
     ]);
+    expect(await redis.hget(keys.minutes, String(minuteAt - MINUTE_MS))).toBe("5,2,34,0,0,0,2");
   });
 
   // Écrit un point même à zéro, et laisse absent celui d'une minute sans serveur : aucun zéro inventé
@@ -146,7 +146,7 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
 
     expect((await store.listActivityHistory("day", now)).map(({ signups: count }) => count)).toEqual([0]);
     expect(await store.listActivityHistory("month", now)).toEqual([
-      { at: hourAt, people: 1, streamed: 0, live: 0, pixels: 0, signups: 1, ...noVisits },
+      { at: hourAt, people: 1, streamed: 0, pixels: 0, signups: 1, ...noVisits },
     ]);
   });
 
@@ -287,7 +287,7 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
       await redis.hset(hash, String(at), "5,2,30");
 
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: before, people: 5, streamed: 2, live: 0, pixels: 30, signups: 0, ...noVisits },
+      { at: before, people: 5, streamed: 2, pixels: 30, signups: 0, ...noVisits },
     ]);
 
     await store.storeActivityMinute(
@@ -297,7 +297,6 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
     const after = {
       people: 5,
       streamed: 3,
-      live: 0,
       pixels: 34,
       signups: 0,
       visits: 2,
@@ -307,7 +306,7 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
     expect(await store.listActivityHistory("day", now)).toEqual([{ at: before, ...after }]);
     expect(await store.listActivityHistory("month", now)).toMatchObject([{ at: hourAt, ...after }]);
     expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, ...after }]);
-    expect(await redis.hget(keys.minutes, String(before))).toBe("5,3,34,2,1,6,0");
+    expect(await redis.hget(keys.minutes, String(before))).toBe("5,3,34,2,1,6,3");
   });
 
   // Compte une fois un compte, un joueur et un canvas streamé que plusieurs minutes d'un jour revoient
@@ -475,7 +474,7 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
 // Écart §5.1 (JOURNAL 2026-10-07) : l'historique d'un canvas, ses trois niveaux, ses joueurs actifs et son audience.
 describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
   const players = (...playerIds: string[]) => ({ playerIds: new Set(playerIds) });
-  const quiet = { live: 0, visits: 0, visitMinutes: 0, signups: 0 };
+  const quiet = { streamedMinutes: 0, visits: 0, visitMinutes: 0, signups: 0 };
 
   // Garde le pic des personnes et des vues OBS d'un canvas, et les sommes du reste, sur la minute, l'heure et le jour
   it("keeps the peak of people and OBS views of a canvas, and the sums of the rest, on the minute, hour and day", async () => {
@@ -496,9 +495,9 @@ describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", 
       inMinute(minuteAt - 2 * MINUTE_MS, { c1: canvasMinute({ people: 8, pixels: 10 }) }),
     );
 
-    const summed = { obsViews: 2, live: 0, visits: 5, visitMinutes: 17, signups: 0 };
+    const summed = { streamedMinutes: 0, visits: 5, visitMinutes: 17, signups: 0 };
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
-      { at: minuteAt - 2 * MINUTE_MS, people: 8, obsViews: 0, pixels: 10, ...quiet },
+      { at: minuteAt - 2 * MINUTE_MS, people: 8, pixels: 10, ...quiet },
       { at, people: 5, pixels: 34, ...summed },
     ]);
     expect(await store.listCanvasHistory("c1", "month", now)).toEqual([
@@ -521,10 +520,10 @@ describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", 
     expect(await store.listCanvasHistory("c3", "day", now)).toEqual([]);
     expect(await redis.exists(keys.canvas("c3").minutes, keys.canvas("c3").days)).toBe(0);
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
-      { at: minuteAt - MINUTE_MS, people: 2, obsViews: 0, pixels: 0, ...quiet },
+      { at: minuteAt - MINUTE_MS, people: 2, pixels: 0, ...quiet },
     ]);
     expect(await store.listCanvasHistory("c2", "day", now)).toEqual([
-      { at: minuteAt - MINUTE_MS, people: 0, obsViews: 0, pixels: 9, ...quiet },
+      { at: minuteAt - MINUTE_MS, people: 0, pixels: 9, ...quiet },
     ]);
     expect((await store.listActivityHistory("day", now)).map(({ people }) => people)).toEqual([4, 0]);
   });
@@ -538,7 +537,7 @@ describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", 
     await signups.storeSignup({ nowMs, discoveredViaUserId: "owner-2" });
     await signups.storeSignup({ nowMs });
 
-    const point = { people: 0, obsViews: 0, live: 0, pixels: 0, visits: 0, visitMinutes: 0, signups: 1 };
+    const point = { people: 0, streamedMinutes: 0, pixels: 0, visits: 0, visitMinutes: 0, signups: 1 };
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
       { at: toActivityPointStarts(nowMs).minute, ...point },
     ]);
@@ -701,41 +700,66 @@ describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", 
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : les canvas en live, un pic pour tout LivePlace, une somme de minutes pour un canvas.
-describe("the live in the points (écart §5.1, JOURNAL 2026-10-08)", () => {
-  // Garde le pic des canvas en live de tout LivePlace, jamais leur somme, sur la minute, l'heure et le jour
-  it("keeps the peak of the live canvases of the whole of LivePlace, never their sum, on the minute, hour and day", async () => {
-    const { store } = stores();
+/// Écart §5.1 (JOURNAL 2026-10-08) : le seul état, « streamé » : un pic de canvas pour tout LivePlace, une somme de minutes pour un canvas.
+describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", () => {
+  // Garde le pic des canvas streamés de tout LivePlace, jamais leur somme, sur la minute, l'heure et le jour, dans ses deux champs
+  it("keeps the peak of the streamed canvases of the whole of LivePlace, never their sum, on the minute, hour and day, in both fields", async () => {
+    const { keys, store } = stores();
 
-    await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, { streamed: 3, live: 2 }));
-    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { streamed: 3, live: 1 }));
-    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { streamed: 3, live: 1 }));
+    await store.storeActivityMinute(minute(minuteAt - 2 * MINUTE_MS, { streamed: 2 }));
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { streamed: 1 }));
+    await store.storeActivityMinute(minute(minuteAt - MINUTE_MS, { streamed: 1 }));
 
-    expect((await store.listActivityHistory("day", now)).map(({ live }) => live)).toEqual([2, 1]);
-    expect(await store.listActivityHistory("month", now)).toMatchObject([{ at: hourAt, live: 2 }]);
-    expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, live: 2 }]);
+    expect((await store.listActivityHistory("day", now)).map(({ streamed }) => streamed)).toEqual([2, 1]);
+    expect(await store.listActivityHistory("month", now)).toMatchObject([{ at: hourAt, streamed: 2 }]);
+    expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, streamed: 2 }]);
+    expect(await redis.hget(keys.hours, String(hourAt))).toBe("0,2,0,0,0,0,2");
   });
 
-  // Somme les minutes en live d'un canvas à l'heure et au jour : 0 ou 1 à la minute, jamais un pic
-  it("sums the minutes in live of a canvas on its hour and day: 0 or 1 on the minute, never a peak", async () => {
-    const { store } = stores();
-    const live = canvasMinute({ people: 1, obsViews: 1, live: 1 });
+  // Somme les minutes streamées d'un canvas à l'heure et au jour : 0 ou 1 à la minute, jamais un pic, ses vues OBS restant un pic
+  it("sums the streamed minutes of a canvas on its hour and day: 0 or 1 on the minute, never a peak, its OBS views staying a peak", async () => {
+    const { keys, store } = stores();
+    const streamed = canvasMinute({ people: 1, obsViews: 2, streamedMinutes: 1 });
 
     for (const minutesAgo of [4, 3, 2])
-      await store.storeActivityMinute(inMinute(minuteAt - minutesAgo * MINUTE_MS, { c1: live }));
+      await store.storeActivityMinute(inMinute(minuteAt - minutesAgo * MINUTE_MS, { c1: streamed }));
     await store.storeActivityMinute(
       inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 1, obsViews: 1 }) }),
     );
 
-    expect((await store.listCanvasHistory("c1", "day", now)).map(({ live: minutes }) => minutes)).toEqual([
-      1, 1, 1, 0,
+    expect(
+      (await store.listCanvasHistory("c1", "day", now)).map(({ streamedMinutes }) => streamedMinutes),
+    ).toEqual([1, 1, 1, 0]);
+    expect(await store.listCanvasHistory("c1", "month", now)).toMatchObject([
+      { at: hourAt, streamedMinutes: 3 },
     ]);
-    expect(await store.listCanvasHistory("c1", "month", now)).toMatchObject([{ at: hourAt, live: 3 }]);
-    expect(await store.listCanvasHistory("c1", "all", now)).toMatchObject([{ at: dayAt, live: 3 }]);
+    expect(await store.listCanvasHistory("c1", "all", now)).toMatchObject([
+      { at: dayAt, streamedMinutes: 3 },
+    ]);
+    expect(await redis.hget(keys.canvas("c1").hours, String(hourAt))).toBe("1,2,0,0,0,0,3");
   });
 
-  // Lit un point d'avant le live, à six champs, avec zéro minute en live, et le réécrit à sept champs avec le nouveau
-  it("reads a point from before the live, with six fields, as zero, and writes it again with seven", async () => {
+  // Lit le « streamé » d'un point selon son format : le champ live à sept champs, le champ streamé à six ou trois
+  it("reads the streamed state of a point by its format: the live field with seven fields, the streamed field with six or three", async () => {
+    const { keys, store } = stores();
+    const [seven, six, three] = [minuteAt - 3 * MINUTE_MS, minuteAt - 2 * MINUTE_MS, minuteAt - MINUTE_MS];
+    await redis.hset(keys.minutes, {
+      [seven]: "5,4,30,4,1,9,2",
+      [six]: "5,4,30,4,1,9",
+      [three]: "5,4,30",
+    });
+
+    const points = await store.listActivityHistory("day", now);
+    expect(points.map(({ at, streamed }) => [at, streamed])).toEqual([
+      [seven, 2],
+      [six, 4],
+      [three, 4],
+    ]);
+    expect(points[0]).not.toHaveProperty("live");
+  });
+
+  // Lit un point d'avant le live, à six champs, avec zéro minute streamée pour un canvas, et le réécrit à sept champs avec le nouveau
+  it("reads a point from before the live, with six fields, as zero streamed minutes for a canvas, and writes it again with seven", async () => {
     const { keys, store } = stores();
     const before = minuteAt - MINUTE_MS;
     const canvas = keys.canvas("c1");
@@ -751,27 +775,27 @@ describe("the live in the points (écart §5.1, JOURNAL 2026-10-08)", () => {
 
     const seen = { people: 5, pixels: 30, visits: 4, visitMinutes: 9, signups: 0 };
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: before, ...seen, streamed: 2, live: 0, phoneVisits: 1 },
+      { at: before, ...seen, streamed: 2, phoneVisits: 1 },
     ]);
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
-      { at: before, ...seen, obsViews: 2, live: 0 },
+      { at: before, ...seen, streamedMinutes: 0 },
     ]);
 
     await store.storeActivityMinute({
-      ...inMinute(before, { c1: canvasMinute({ obsViews: 3, live: 1, pixels: 1 }) }),
+      ...inMinute(before, { c1: canvasMinute({ obsViews: 3, streamedMinutes: 1, pixels: 1 }) }),
       streamed: 3,
-      live: 2,
       pixels: 1,
     });
 
-    expect(await redis.hget(keys.minutes, String(before))).toBe("5,3,31,4,1,9,2");
-    expect(await redis.hget(keys.hours, String(hourAt))).toBe("5,3,31,4,1,9,2");
-    expect(await redis.hget(keys.days, String(dayAt))).toBe("5,3,31,4,1,9,2");
+    expect(await redis.hget(keys.minutes, String(before))).toBe("5,3,31,4,1,9,3");
+    expect(await redis.hget(keys.hours, String(hourAt))).toBe("5,3,31,4,1,9,3");
+    expect(await redis.hget(keys.days, String(dayAt))).toBe("5,3,31,4,1,9,3");
     expect(await redis.hget(canvas.minutes, String(before))).toBe("5,3,31,4,1,9,1");
     expect(await redis.hget(canvas.days, String(dayAt))).toBe("5,3,31,4,1,9,1");
-    expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, streamed: 3, live: 2 }]);
+    expect(await store.listActivityHistory("all", now)).toMatchObject([{ at: dayAt, streamed: 3 }]);
+    expect((await store.listCanvasHistory("c1", "all", now))[0]).not.toHaveProperty("obsViews");
     expect(await store.listCanvasHistory("c1", "all", now)).toMatchObject([
-      { at: dayAt, obsViews: 3, live: 1 },
+      { at: dayAt, streamedMinutes: 1 },
     ]);
   });
 });
@@ -782,55 +806,63 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
   const streamedBy = (...ats: number[]) =>
     ats.map((minuteStart) => minute(minuteStart, { people: 1, streamed: 1 }));
   const globalOf = async (store: ReturnType<typeof stores>["store"], period: "day" | "month" | "all") =>
-    (await store.listActivityHistory(period, now)).map(({ at: pointAt, streamed, live }) => [
-      pointAt,
-      streamed,
-      live,
-    ]);
+    (await store.listActivityHistory(period, now)).map(({ at: pointAt, streamed }) => [pointAt, streamed]);
   const canvasOf = async (
     store: ReturnType<typeof stores>["store"],
     period: "day" | "month" | "all",
     canvasId = "c1",
   ) =>
-    (await store.listCanvasHistory(canvasId, period, now)).map(({ at: pointAt, obsViews, live }) => [
+    (await store.listCanvasHistory(canvasId, period, now)).map(({ at: pointAt, streamedMinutes }) => [
       pointAt,
-      obsViews,
-      live,
+      streamedMinutes,
     ]);
 
-  // Compte le canvas comme streamé dans les minutes du trou : un de plus pour tout LivePlace, une vue OBS pour le canvas, créant son point
-  it("counts the canvas as streamed in the minutes of the gap: one more for the whole, an OBS view for the canvas, creating its point", async () => {
+  // Compte le canvas comme streamé dans les minutes du trou : un de plus pour tout LivePlace, une minute streamée pour le canvas, créant son point
+  it("counts the canvas as streamed in the minutes of the gap: one more for the whole, a streamed minute for the canvas, creating its point", async () => {
     const { store } = stores();
     for (const closed of streamedBy(at(4), at(3), at(1))) await store.storeActivityMinute(closed);
     await store.storeActivityMinute(minute(at(2), { people: 1 }));
-    await store.storeActivityMinute(inMinute(at(4), { c1: canvasMinute({ people: 1, obsViews: 1 }) }));
+    await store.storeActivityMinute(inMinute(at(4), { c1: canvasMinute({ people: 1, streamedMinutes: 1 }) }));
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
 
     expect(await globalOf(store, "day")).toEqual([
-      [at(4), 1, 0],
-      [at(3), 2, 0],
-      [at(2), 1, 0],
-      [at(1), 1, 0],
+      [at(4), 1],
+      [at(3), 2],
+      [at(2), 1],
+      [at(1), 1],
     ]);
     expect(await canvasOf(store, "day")).toEqual([
-      [at(4), 1, 0],
-      [at(3), 1, 0],
-      [at(2), 1, 0],
+      [at(4), 1],
+      [at(3), 1],
+      [at(2), 1],
     ]);
   });
 
-  // Monte le pic de l'heure et du jour à la valeur comblée, sans la sommer
-  it("raises the peak of the hour and the day to the filled value, without summing it", async () => {
+  // Monte le pic de l'heure et du jour à la valeur comblée, sans la sommer, et somme les minutes streamées du canvas
+  it("raises the peak of the hour and the day to the filled value, without summing it, and sums the canvas's streamed minutes", async () => {
     const { store } = stores();
     for (const closed of streamedBy(at(4), at(3), at(2))) await store.storeActivityMinute(closed);
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
 
-    expect(await globalOf(store, "month")).toEqual([[hourAt, 2, 0]]);
-    expect(await globalOf(store, "all")).toEqual([[dayAt, 2, 0]]);
-    expect(await canvasOf(store, "month")).toEqual([[hourAt, 1, 0]]);
-    expect(await canvasOf(store, "all")).toEqual([[dayAt, 1, 0]]);
+    expect(await globalOf(store, "month")).toEqual([[hourAt, 2]]);
+    expect(await globalOf(store, "all")).toEqual([[dayAt, 2]]);
+    expect(await canvasOf(store, "month")).toEqual([[hourAt, 2]]);
+    expect(await canvasOf(store, "all")).toEqual([[dayAt, 2]]);
+  });
+
+  // Remplit les deux champs de tout LivePlace, le streamé et le live, pour que la lecture donne le même état
+  it("fills both fields of the whole of LivePlace, the streamed and the live one, so that they read as the same state", async () => {
+    const { keys, store } = stores();
+    for (const closed of streamedBy(at(2))) await store.storeActivityMinute(closed);
+
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(2)] });
+
+    expect(await redis.hget(keys.minutes, String(at(2)))).toBe("1,2,0,0,0,0,2");
+    expect(await redis.hget(keys.hours, String(hourAt))).toBe("1,2,0,0,0,0,2");
+    expect(await redis.hget(keys.days, String(dayAt))).toBe("1,2,0,0,0,0,2");
+    expect(await globalOf(store, "day")).toEqual([[at(2), 2]]);
   });
 
   // Ne crée aucun point pour tout LivePlace là où le serveur était arrêté, mais crée celui du canvas
@@ -838,12 +870,12 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
     const { store } = stores();
     await store.storeActivityMinute(minute(at(2), { people: 1 }));
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
 
-    expect(await globalOf(store, "day")).toEqual([[at(2), 1, 0]]);
+    expect(await globalOf(store, "day")).toEqual([[at(2), 1]]);
     expect(await canvasOf(store, "day")).toEqual([
-      [at(3), 1, 0],
-      [at(2), 1, 0],
+      [at(3), 1],
+      [at(2), 1],
     ]);
   });
 
@@ -851,68 +883,43 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
   it("counts a filled minute once, even replayed, and does not count again a minute the canvas was already streamed", async () => {
     const { store } = stores();
     for (const closed of streamedBy(at(3), at(2))) await store.storeActivityMinute(closed);
-    await store.storeActivityMinute(inMinute(at(3), { c1: canvasMinute({ obsViews: 2 }) }));
+    await store.storeActivityMinute(inMinute(at(3), { c1: canvasMinute({ streamedMinutes: 1 }) }));
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
     const once = [await globalOf(store, "day"), await canvasOf(store, "month")];
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
 
     expect(once).toEqual([
       [
-        [at(3), 1, 0],
-        [at(2), 2, 0],
+        [at(3), 1],
+        [at(2), 2],
       ],
-      [[hourAt, 2, 0]],
+      [[hourAt, 2]],
     ]);
     expect([await globalOf(store, "day"), await canvasOf(store, "month")]).toEqual(once);
     expect(await canvasOf(store, "day")).toEqual([
-      [at(3), 2, 0],
-      [at(2), 1, 0],
+      [at(3), 1],
+      [at(2), 1],
     ]);
   });
 
-  // Compte le canvas comme en live dans les minutes du trou : un de plus pour tout LivePlace, une minute en live pour le canvas, sommée à l'heure et au jour
-  it("counts the canvas as live in the minutes of the gap: one more for the whole, a minute in live for the canvas, summed on the hour and day", async () => {
-    const { store } = stores();
-    for (const closed of streamedBy(at(4), at(3), at(2), at(1)))
-      await store.storeActivityMinute({ ...closed, live: 1 });
-
-    await store.storeActivityGap({ canvasId: "c1", kind: "live", minutes: [at(3), at(2)] });
-    await store.storeActivityGap({ canvasId: "c1", kind: "live", minutes: [at(3), at(2)] });
-
-    expect(await globalOf(store, "day")).toEqual([
-      [at(4), 1, 1],
-      [at(3), 1, 2],
-      [at(2), 1, 2],
-      [at(1), 1, 1],
-    ]);
-    expect(await globalOf(store, "all")).toEqual([[dayAt, 1, 2]]);
-    expect(await canvasOf(store, "day")).toEqual([
-      [at(3), 0, 1],
-      [at(2), 0, 1],
-    ]);
-    expect(await canvasOf(store, "month")).toEqual([[hourAt, 0, 2]]);
-    expect(await canvasOf(store, "all")).toEqual([[dayAt, 0, 2]]);
-  });
-
-  // Compte à part les minutes streamées et en live d'un même trou, et un canvas à la fois
-  it("counts the streamed and the live minutes of one gap apart, and one canvas at a time", async () => {
+  // Compte les minutes d'un trou canvas par canvas : chacun ajoute les siennes à tout LivePlace, sans toucher à celles d'un autre
+  it("counts the minutes of a gap one canvas at a time: each adds its own to the whole of LivePlace, leaving another's alone", async () => {
     const { store } = stores();
     for (const closed of streamedBy(at(3), at(2))) await store.storeActivityMinute(closed);
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [at(3), at(2)] });
-    await store.storeActivityGap({ canvasId: "c1", kind: "live", minutes: [at(3), at(2)] });
-    await store.storeActivityGap({ canvasId: "c2", kind: "streamed", minutes: [at(2)] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [at(3), at(2)] });
+    await store.storeActivityGap({ canvasId: "c2", minutes: [at(2)] });
 
     expect(await globalOf(store, "day")).toEqual([
-      [at(3), 2, 1],
-      [at(2), 3, 1],
+      [at(3), 2],
+      [at(2), 3],
     ]);
     expect(await canvasOf(store, "day")).toEqual([
-      [at(3), 1, 1],
-      [at(2), 1, 1],
+      [at(3), 1],
+      [at(2), 1],
     ]);
-    expect(await canvasOf(store, "day", "c2")).toEqual([[at(2), 1, 0]]);
+    expect(await canvasOf(store, "day", "c2")).toEqual([[at(2), 1]]);
   });
 
   // Range les minutes d'un trou qui passe l'heure dans leur propre heure
@@ -921,16 +928,16 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
     const minutes = [hourAt - MINUTE_MS, hourAt];
     for (const closed of streamedBy(...minutes)) await store.storeActivityMinute(closed);
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "live", minutes });
+    await store.storeActivityGap({ canvasId: "c1", minutes });
 
     expect(await canvasOf(store, "month")).toEqual([
-      [hourAt - HOUR_MS, 0, 1],
-      [hourAt, 0, 1],
+      [hourAt - HOUR_MS, 1],
+      [hourAt, 1],
     ]);
   });
 
-  // Compte aussi le canvas parmi les streamers actifs du nouveau jour quand le trou passe minuit, et ne touche pas aux streamers pour un live
-  it("also counts the canvas among the active streamers of the new day when the gap crosses midnight, and leaves the streamers alone for a live", async () => {
+  // Compte aussi le canvas parmi les streamers actifs du nouveau jour quand le trou passe minuit
+  it("also counts the canvas among the active streamers of the new day when the gap crosses midnight", async () => {
     const { keys, store } = stores();
     const midnight = toActivityPointStarts(now + DAY_MS).day;
     const minutes = [midnight - MINUTE_MS, midnight];
@@ -938,10 +945,7 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
     const yesterday = toParisDay(midnight - MINUTE_MS);
     const today = toParisDay(midnight);
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "live", minutes });
-    expect(await redis.exists(keys.activeStreamers(yesterday), keys.activeStreamers(today))).toBe(0);
-
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes });
+    await store.storeActivityGap({ canvasId: "c1", minutes });
 
     expect(await redis.pfcount(keys.activeStreamers(yesterday))).toBe(1);
     expect(await redis.pfcount(keys.activeStreamers(today))).toBe(1);
@@ -954,38 +958,46 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
   it("writes nothing for a gap without a minute", async () => {
     const { keys, store } = stores();
 
-    await store.storeActivityGap({ canvasId: "c1", kind: "streamed", minutes: [] });
+    await store.storeActivityGap({ canvasId: "c1", minutes: [] });
 
     expect(await redis.exists(keys.canvas("c1").minutes, keys.canvas("c1").days, keys.minutes)).toBe(0);
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : la dernière vue OBS et le dernier live vus de chaque canvas survivent à un redémarrage.
-describe("the times a canvas was seen, in Redis (écart §5.1, JOURNAL 2026-10-08)", () => {
-  // Verse les heures vues d'un canvas et les relit, un champ vide pour ce qui n'a jamais été vu, et les remplace au versement suivant
-  it("stores the times a canvas was seen and reads them back, a field left out for what was never seen, replaced at the next storing", async () => {
+// Écart §5.1 (JOURNAL 2026-10-08) : la dernière heure où chaque canvas a été vu streamé survit à un redémarrage.
+describe("the time a canvas was seen streamed, in Redis (écart §5.1, JOURNAL 2026-10-08)", () => {
+  // Verse l'heure vue de chaque canvas et la relit, en la remplaçant au versement suivant
+  it("stores the time each canvas was seen and reads it back, replaced at the next storing", async () => {
     const { keys, store } = stores();
 
     await store.storeSeen(
-      new Map<string, CanvasSeen>([
-        ["c1", { obsSeenAt: now, liveSeenAt: now - 2000 }],
-        ["c2", { obsSeenAt: now }],
-        ["c3", { liveSeenAt: now }],
+      new Map([
+        ["c1", now],
+        ["c2", now - 2000],
       ]),
     );
-    await store.storeSeen(
-      new Map<string, CanvasSeen>([["c1", { obsSeenAt: now + 60_000, liveSeenAt: now - 2000 }]]),
-    );
+    await store.storeSeen(new Map([["c1", now + 60_000]]));
 
     expect(await store.listSeen()).toEqual(
-      new Map<string, CanvasSeen>([
-        ["c1", { obsSeenAt: now + 60_000, liveSeenAt: now - 2000 }],
-        ["c2", { obsSeenAt: now }],
-        ["c3", { liveSeenAt: now }],
+      new Map([
+        ["c1", now + 60_000],
+        ["c2", now - 2000],
       ]),
     );
-    expect(await redis.hget(keys.seen, "c2")).toBe(`${now},`);
-    expect(await redis.hget(keys.seen, "c3")).toBe(`,${now}`);
+    expect(await redis.hget(keys.seen, "c2")).toBe(String(now - 2000));
+  });
+
+  // Relit sans erreur l'ancien format à deux heures, vue OBS puis live : la dernière est celle où le canvas était streamé
+  it("reads without error the old format with two times, the OBS view then the live: the last is when the canvas was streamed", async () => {
+    const { keys, store } = stores();
+    await redis.hset(keys.seen, { c1: `${now - 5000},${now - 2000}`, c2: `${now},`, c3: `,${now}` });
+
+    expect(await store.listSeen()).toEqual(
+      new Map([
+        ["c1", now - 2000],
+        ["c3", now],
+      ]),
+    );
   });
 
   // Ne lit rien, ni n'écrit, quand aucun canvas n'a été vu
@@ -998,30 +1010,33 @@ describe("the times a canvas was seen, in Redis (écart §5.1, JOURNAL 2026-10-0
     expect(await redis.exists(keys.seen)).toBe(0);
   });
 
-  // Élague ce qui a été vu il y a plus de 10 minutes, d'après la plus récente de ses deux heures, et jamais le reste
-  it("prunes what was seen more than 10 minutes ago, by the more recent of its two times, and nothing else", async () => {
-    const { store } = stores();
+  // Élague ce qui a été vu il y a plus de 10 minutes, ancien format compris, et jamais le reste
+  it("prunes what was seen more than 10 minutes ago, the old format included, and nothing else", async () => {
+    const { keys, store } = stores();
     await store.storeSeen(
-      new Map<string, CanvasSeen>([
-        ["1-old", { obsSeenAt: now - 11 * MINUTE_MS, liveSeenAt: now - 12 * MINUTE_MS }],
-        ["2-old", { liveSeenAt: now - 10 * MINUTE_MS - 1 }],
-        ["3-kept", { obsSeenAt: now - 11 * MINUTE_MS, liveSeenAt: now - 9 * MINUTE_MS }],
-        ["4-kept", { obsSeenAt: now - 10 * MINUTE_MS }],
+      new Map([
+        ["1-old", now - 10 * MINUTE_MS - 1],
+        ["2-kept", now - 10 * MINUTE_MS],
+        ["3-kept", now - MINUTE_MS],
       ]),
     );
+    await redis.hset(keys.seen, {
+      "4-old": `${now - 11 * MINUTE_MS},${now - 12 * MINUTE_MS}`,
+      "5-kept": `${now - 11 * MINUTE_MS},${now - 9 * MINUTE_MS}`,
+    });
 
     await store.pruneSeen(now);
 
-    expect([...(await store.listSeen()).keys()].sort()).toEqual(["3-kept", "4-kept"]);
+    expect((await redis.hkeys(keys.seen)).sort()).toEqual(["2-kept", "3-kept", "5-kept"]);
   });
 
   // Ne garde que des identifiants de canvas et des heures : un HASH, aucun nom
   it("keeps canvas ids and times only: a hash, no name", async () => {
     const { keys, store } = stores();
 
-    await store.storeSeen(new Map<string, CanvasSeen>([["canvas-4242", { obsSeenAt: now }]]));
+    await store.storeSeen(new Map([["canvas-4242", now]]));
 
     expect(await redis.type(keys.seen)).toBe("hash");
-    expect(await redis.hgetall(keys.seen)).toEqual({ "canvas-4242": `${now},` });
+    expect(await redis.hgetall(keys.seen)).toEqual({ "canvas-4242": String(now) });
   });
 });

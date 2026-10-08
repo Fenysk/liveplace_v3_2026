@@ -34,7 +34,7 @@ import {
   toCanvasActivityCard,
   toCanvasAudienceRows,
   toGuestsLine,
-  toObsTitle,
+  toStreamedTitle,
 } from "../developer/activity-labels";
 import {
   canvasChartLinesFor,
@@ -196,11 +196,11 @@ export const BadgeEntry = () => (
         </div>
       </StateRow>
       <StateRow
-        name="En live"
-        detail="Aux teintes du live Twitch : un canvas streamé dont le streamer l'est."
+        name="Streamé"
+        detail="Aux teintes du live Twitch : un canvas dont une vue OBS est ouverte et dont le streamer est en live."
       >
         <div className="lp-row">
-          <Badge label="En live" icon={TwitchGlyph} tone="live" />
+          <Badge label="Streamé" icon={TwitchGlyph} tone="live" />
         </div>
       </StateRow>
     </Block>
@@ -301,7 +301,7 @@ const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
 
 export const ActivityCardEntry = () => {
   const nowMs = useNowMs();
-  const [kalyss, guestsOnly, hotOnly, streamedOnly] = sampleCanvases(nowMs);
+  const [kalyss, guestsOnly, hotOnly, obsOnly] = sampleCanvases(nowMs);
   const here = sampleHere(nowMs);
   const accounts = toActivityAccounts(here.accounts, nowMs);
   return (
@@ -314,20 +314,23 @@ export const ActivityCardEntry = () => {
       <Block title="Carte">
         {kalyss && (
           <StateRow
-            name="Streamé et en live, déplié"
-            detail="Les pastilles OBS et « En live » ; rôles, depuis quand, PC ou téléphone, puis les invités."
+            name="Streamé, déplié"
+            detail="La pastille « Streamé », ses vues OBS en infobulle ; rôles, depuis quand, PC ou téléphone, puis les invités."
           >
             <ActivityCardScene canvas={kalyss} nowMs={nowMs} isOpen />
           </StateRow>
         )}
         {kalyss && (
-          <StateRow name="Streamé et en live, replié">
+          <StateRow name="Streamé, replié">
             <ActivityCardScene canvas={kalyss} nowMs={nowMs} isOpen={false} />
           </StateRow>
         )}
-        {streamedOnly && (
-          <StateRow name="Streamé, pas en live" detail="La pastille OBS seule.">
-            <ActivityCardScene canvas={streamedOnly} nowMs={nowMs} isOpen={false} />
+        {obsOnly && (
+          <StateRow
+            name="Vue OBS ouverte, streamer hors live"
+            detail="Aucune pastille : sans live, ce n'est pas un stream."
+          >
+            <ActivityCardScene canvas={obsOnly} nowMs={nowMs} isOpen={false} />
           </StateRow>
         )}
         {guestsOnly && (
@@ -343,24 +346,21 @@ export const ActivityCardEntry = () => {
       </Block>
       <Block
         title="Streamer"
-        note="Le streamer d'un canvas, sa pastille OBS quand il est streamé et « En live » quand son streamer l'est : en tête de Ce canvas, et dans chaque carte."
+        note="Le streamer d'un canvas, et « Streamé » quand une vue OBS est ouverte et que son streamer est en live : en tête de Ce canvas, et dans chaque carte."
       >
-        <StateRow name="Streamé" detail="La pastille OBS, ses vues OBS en infobulle.">
+        <StateRow
+          name="Streamé"
+          detail="La pastille aux teintes du live, ses vues OBS ouvertes en infobulle."
+        >
           <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={false} />
+            <CanvasActivityOwner owner={here.owner} streamedTitle={toStreamedTitle(here)} />
           </Pill>
         </StateRow>
-        <StateRow name="Streamé et en live" detail="« En live » après la pastille OBS, aux teintes du live.">
-          <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={here.isLive} />
-          </Pill>
-        </StateRow>
-        <StateRow name="Pas streamé" detail="Aucune pastille.">
+        <StateRow name="Pas streamé" detail="Aucune pastille, même avec une vue OBS ouverte.">
           <Pill>
             <CanvasActivityOwner
               owner={here.owner}
-              obsTitle={toObsTitle({ isStreamed: false, obsViews: 0 })}
-              isLive={false}
+              streamedTitle={toStreamedTitle({ isStreamed: false, obsViews: 1 })}
             />
           </Pill>
         </StateRow>

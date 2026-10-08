@@ -18,7 +18,6 @@ const point = (at: number, people = 1): ActivityPoint => ({
   at,
   people,
   streamed: 2,
-  live: 1,
   pixels: 3,
   signups: 4,
   visits: 5,
@@ -32,9 +31,9 @@ describe("the time axis of the history (écart §4.3, JOURNAL 2026-10-06)", () =
     const slots = toActivitySlots([point(minute - 3 * MINUTE_MS), point(minute - MINUTE_MS, 7)], "day", now);
 
     expect(slots).toHaveLength(1440);
-    expect(slots.at(-1)?.values).toEqual([7, 5, 30, 2, 1, 3, 4]);
+    expect(slots.at(-1)?.values).toEqual([7, 5, 30, 2, 3, 4]);
     expect(slots.at(-2)).toBeNull();
-    expect(slots.at(-3)?.values).toEqual([1, 5, 30, 2, 1, 3, 4]);
+    expect(slots.at(-3)?.values).toEqual([1, 5, 30, 2, 3, 4]);
     expect(slots.filter((slot) => slot !== null)).toHaveLength(2);
   });
 
@@ -57,14 +56,13 @@ describe("the time axis of the history (écart §4.3, JOURNAL 2026-10-06)", () =
     expect(toActivitySlots([], "all", now)).toEqual([]);
   });
 
-  // Nomme les sept courbes dans l'ordre des valeurs de chaque créneau, les visites et le temps passé après les personnes, les canvas en live après les streamés
-  it("names the seven curves in the order of each slot's values, the visits and the time spent after the people, the live canvases after the streamed ones", () => {
+  // Nomme les six courbes dans l'ordre des valeurs de chaque créneau, les visites et le temps passé après les personnes, une seule courbe de canvas
+  it("names the six curves in the order of each slot's values, the visits and the time spent after the people, a single canvas curve", () => {
     expect(CHART_LABELS).toEqual([
       "Personnes connectées",
       "Visites",
       "Temps passé (min)",
       "Canvas streamés",
-      "Canvas en live",
       "Pixels posés",
       "Nouveaux comptes",
     ]);
@@ -93,11 +91,11 @@ describe("the time axis of the history (écart §4.3, JOURNAL 2026-10-06)", () =
 
     const [first, second] = toActivitySlots([withActive, point(Date.UTC(2026, 9, 24, 22))], "all", now);
 
-    expect(first?.values).toEqual([1, 5, 30, 2, 1, 3, 4, 9, 6, 2]);
-    expect(second?.values).toEqual([1, 5, 30, 2, 1, 3, 4, 0, 0, 0]);
+    expect(first?.values).toEqual([1, 5, 30, 2, 3, 4, 9, 6, 2]);
+    expect(second?.values).toEqual([1, 5, 30, 2, 3, 4, 0, 0, 0]);
     expect(
       toActivitySlots([{ ...withActive, at: minute - MINUTE_MS }], "day", now).at(-1)?.values,
-    ).toHaveLength(7);
+    ).toHaveLength(6);
   });
 });
 
@@ -105,14 +103,13 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
   const canvasPoint = (at: number, people = 1): CanvasActivityPoint => ({
     at,
     people,
-    obsViews: 2,
-    live: 1,
+    streamedMinutes: 1,
     pixels: 3,
     visits: 5,
     visitMinutes: 30,
     signups: 4,
   });
-  const zeros = [0, 0, 0, 0, 0, 0, 0];
+  const zeros = [0, 0, 0, 0, 0, 0];
 
   // Laisse à zéro un créneau sans point, jamais vide : un moment sans activité sur ce canvas vaut zéro
   it("leaves at zero a slot without a point, never empty: a moment without activity on the canvas is worth zero", () => {
@@ -124,10 +121,10 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
 
     expect(slots).toHaveLength(1440);
     expect(slots.every((slot) => slot !== null)).toBe(true);
-    expect(slots.at(-1)?.values).toEqual([7, 5, 30, 2, 1, 3, 4]);
+    expect(slots.at(-1)?.values).toEqual([7, 5, 30, 1, 3, 4]);
     expect(slots.at(-2)?.values).toEqual(zeros);
     expect(slots.at(-2)?.title).toBe(slotTitle(minute - 2 * MINUTE_MS, "day"));
-    expect(slots.at(-3)?.values).toEqual([1, 5, 30, 2, 1, 3, 4]);
+    expect(slots.at(-3)?.values).toEqual([1, 5, 30, 1, 3, 4]);
     expect(slots.at(0)?.values).toEqual(zeros);
   });
 
@@ -136,7 +133,7 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
     const slots = toCanvasSlots([canvasPoint(hour - 800 * HOUR_MS), canvasPoint(hour)], "month", now);
 
     expect(slots).toHaveLength(720);
-    expect(slots.at(-1)?.values).toEqual([1, 5, 30, 2, 1, 3, 4]);
+    expect(slots.at(-1)?.values).toEqual([1, 5, 30, 1, 3, 4]);
     expect(slots.filter((slot) => slot?.values.some((value) => (value ?? 0) > 0))).toHaveLength(1);
   });
 
@@ -147,10 +144,10 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
     const slots = toCanvasSlots([{ ...canvasPoint(firstDay), activePlayers: 6 }], "all", now);
 
     expect(slots).toHaveLength(4);
-    expect(slots[0]?.values).toEqual([1, 5, 30, 2, 1, 3, 4, 6]);
+    expect(slots[0]?.values).toEqual([1, 5, 30, 1, 3, 4, 6]);
     expect(slots[1]?.values).toEqual([...zeros, 0]);
     expect(slots[3]?.title).toBe(slotTitle(toActivityPointStarts(now).day, "all"));
-    expect(toCanvasSlots([canvasPoint(minute - MINUTE_MS)], "day", now).at(-1)?.values).toHaveLength(7);
+    expect(toCanvasSlots([canvasPoint(minute - MINUTE_MS)], "day", now).at(-1)?.values).toHaveLength(6);
   });
 
   // Nomme le jour de Paris sans point par son vrai jour, même autour du changement d'heure
@@ -168,16 +165,15 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
     for (const period of ["day", "month", "all"] as const) expect(toCanvasSlots([], period, now)).toEqual([]);
   });
 
-  // Nomme les sept courbes d'un canvas, les vues OBS à la place des canvas streamés, ses minutes en live à la place des canvas en live, et les joueurs actifs de plus sur Tout
-  it("names the seven curves of a canvas, the OBS views in place of the streamed canvases, its minutes in live in place of the live canvases, and the active players on top for All", () => {
+  // Nomme les six courbes d'un canvas, ses minutes streamées à la place des canvas streamés, sans courbe de ses vues OBS, et les joueurs actifs de plus sur Tout
+  it("names the six curves of a canvas, its streamed minutes in place of the streamed canvases, none for its OBS views, and the active players on top for All", () => {
     const titles = (period: "day" | "month" | "all") => canvasChartLinesFor(period).map(({ title }) => title);
 
     expect(titles("day")).toEqual([
       "Personnes connectées",
       "Visites",
       "Temps passé (min)",
-      "Vues OBS ouvertes",
-      "Temps en live (min)",
+      "Temps streamé (min)",
       "Pixels posés",
       "Nouveaux comptes venus de sa page",
     ]);

@@ -1,10 +1,12 @@
 -- Les minutes d'une coupure de moins de 5 minutes, comblées d'un coup (écart §5.1, JOURNAL 2026-10-08) : le canvas compte comme
--- streamé (une vue OBS) ou en live (une minute en live) dans chacune. Le point du canvas dit si la minute était déjà comptée :
--- sinon le script la rejoue sans dégât. Pour tout LivePlace, le canvas s'ajoute à une minute qui existe, jamais là où le serveur
--- était arrêté ; l'heure et le jour prennent le pic de la minute comblée.
+-- streamé dans chacune. Le point du canvas dit si la minute était déjà comptée : sinon le script la rejoue sans dégât. Pour tout
+-- LivePlace, le canvas s'ajoute à une minute qui existe, jamais là où le serveur était arrêté ; l'heure et le jour prennent le
+-- pic de la minute comblée.
 -- KEYS : les HASH des minutes, des heures, des jours de tout LivePlace, puis ceux du canvas.
--- ARGV : 'streamed' ou 'live', puis pour chaque minute comblée son début, celui de son heure et celui de son jour.
--- Un point est `people,streamed,pixels,visits,phoneVisits,visitMinutes,live` : la même lecture que activity.lua.
+-- ARGV : pour chaque minute comblée son début, celui de son heure et celui de son jour.
+-- Un point est `people,streamed,pixels,visits,phoneVisits,visitMinutes,live` : la même lecture que activity.lua. L'état
+-- streamé de tout LivePlace est écrit dans les deux champs `streamed` et `live` ; pour un canvas, le septième est la somme de ses
+-- minutes streamées.
 
 local function read(key, field)
   local point = { 0, 0, 0, 0, 0, 0, 0 }
@@ -32,34 +34,26 @@ local function write(key, field, point)
   redis.call('HSET', key, field, table.concat(point, ','))
 end
 
--- Le deuxième champ de la minute d'un canvas est ses vues OBS, le septième ses minutes en live.
-local counted = 7
-if ARGV[1] == 'streamed' then
-  counted = 2
-end
-
-for minute = 0, (#ARGV - 1) / 3 - 1 do
-  local starts = { ARGV[2 + 3 * minute], ARGV[3 + 3 * minute], ARGV[4 + 3 * minute] }
+for minute = 0, #ARGV / 3 - 1 do
+  local starts = { ARGV[1 + 3 * minute], ARGV[2 + 3 * minute], ARGV[3 + 3 * minute] }
   local canvas = read(KEYS[4], starts[1])
-  if canvas[counted] == 0 then
-    canvas[counted] = 1
+  if canvas[7] == 0 then
+    canvas[7] = 1
     write(KEYS[4], starts[1], canvas)
     for level = 2, 3 do
       local point = read(KEYS[3 + level], starts[level])
-      if counted == 2 then
-        point[2] = math.max(point[2], 1)
-      else
-        point[7] = point[7] + 1
-      end
+      point[7] = point[7] + 1
       write(KEYS[3 + level], starts[level], point)
     end
     local global, exists = read(KEYS[1], starts[1])
     if exists then
-      global[counted] = global[counted] + 1
+      global[2] = global[2] + 1
+      global[7] = global[7] + 1
       write(KEYS[1], starts[1], global)
       for level = 2, 3 do
         local point = read(KEYS[level], starts[level])
-        point[counted] = math.max(point[counted], global[counted])
+        point[2] = math.max(point[2], global[2])
+        point[7] = math.max(point[7], global[7])
         write(KEYS[level], starts[level], point)
       end
     end

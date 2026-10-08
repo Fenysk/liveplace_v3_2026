@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §5.1 : un seul indice, « streamé », vue OBS ouverte et streamer en live
+
+**Contexte.** L'entrée précédente (même jour) a gardé deux notions, « streamé » (vue OBS ouverte) et « en live » (et streamer en live) ; Alexis n'en veut qu'une : une vue OBS ouverte hors live n'est pas un stream.
+**Décision.** « Streamé » = au moins une vue OBS ouverte **et** le streamer en live (`listTwitchLives`). C'est le seul état suivi : à l'instant, dans la liste des canvas, chez les streamers actifs, et dans l'historique, où la coupure de moins de 5 minutes se comble sur cet état seul (`activity:seen` garde son heure). Les points écrivent cet état dans `streamed` et dans `live` ; à la lecture, un point à 7 champs donne `live`, un point d'avant (3 ou 6 champs, avant `be45208`) donne `streamed`, qui n'y était que la vue OBS. Le canvas garde ses vues OBS comme détail, sans courbe.
+**Renoncement.** Pas de réécriture des points d'avant : on ne sait pas, après coup, qui était en live.
+
 ## 2026-10-08 — Écart §5.1 : une coupure de moins de 5 minutes se comble dans l'historique, sans jamais prolonger un stream
 
 **Contexte.** Le suivi d'activité croise la vue OBS et le live Twitch (cahier des charges dédié, §2) ; une coupure de quelques minutes, côté LivePlace (redéploiement, reconnexion d'OBS) ou côté Twitch (stream qui retombe), ne doit pas couper un stream en deux, mais la fin d'un stream ne doit pas s'allonger.

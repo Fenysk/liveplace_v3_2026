@@ -585,8 +585,7 @@ const CountSchema = z.number().int().nonnegative();
 // Ce que l'historique garde, et ce que disent les chiffres de l'instant : des nombres, aucun nom (écart §5.1, JOURNAL 2026-10-06).
 const ActivityCountsSchema = z.object({
   people: CountSchema,
-  streamed: CountSchema, // les canvas où une vue OBS est ouverte
-  live: CountSchema, // parmi eux, ceux dont le streamer est en live (Écart §5.1, JOURNAL 2026-10-08)
+  streamed: CountSchema, // les canvas streamés : une vue OBS ouverte et le streamer en live (Écart §5.1, JOURNAL 2026-10-08)
   pixels: CountSchema,
   signups: CountSchema,
 });
@@ -606,14 +605,14 @@ const ConnectedAccountSchema = ActivityUserSchema.extend({
   devices: z.array(z.enum(DEVICES)),
 });
 
-// `isStreamed` : une vue OBS est ouverte (`obsViews` au-dessus de zéro) ; `isLive` : et son streamer est en live. L'état de
-// l'instant, sans la tolérance de l'historique (Écart §5.1, JOURNAL 2026-10-08). `heat` : ses pixels de la dernière heure.
-// Le streamer porte son live Twitch quand il en a un (Écart §4.3, JOURNAL 2026-10-07) ; les comptes connectés, eux, n'en portent pas.
+// `isStreamed` : une vue OBS est ouverte et son streamer est en live, l'état de l'instant sans la tolérance de l'historique
+// (Écart §5.1, JOURNAL 2026-10-08) ; `obsViews`, ses vues OBS ouvertes, n'en est qu'un détail. `heat` : ses pixels de la dernière
+// heure. Le streamer porte son live Twitch quand il en a un (Écart §4.3, JOURNAL 2026-10-07) ; les comptes connectés, eux, n'en
+// portent pas.
 const ActivityCanvasSchema = z.object({
   canvasId: CanvasIdSchema,
   owner: ActivityUserSchema.extend({ twitchLive: TwitchLiveSchema.optional() }),
   isStreamed: z.boolean(),
-  isLive: z.boolean(),
   obsViews: CountSchema,
   people: CountSchema,
   guests: CountSchema,
@@ -660,8 +659,8 @@ const ActivityFrameSchema = z.object({
   here: ActivityHereSchema.optional(),
 });
 
-// Un point, à `at` son début : le pic des personnes, des canvas streamés et en live, la somme des pixels, des comptes, des visites
-// et du temps passé. Un point d'avant l'audience se lit à zéro ; les distincts ne se gardent que par jour.
+// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels, des comptes, des visites et du
+// temps passé. Un point d'avant l'audience se lit à zéro ; les distincts ne se gardent que par jour.
 const ActivityPointSchema = ActivityCountsSchema.extend({
   at: TimestampSchema,
   visits: CountSchema.default(0),
@@ -672,14 +671,13 @@ const ActivityPointSchema = ActivityCountsSchema.extend({
   activeStreamers: CountSchema.optional(),
 });
 
-// Un point d'un canvas (JOURNAL 2026-10-07), à `at` son début : le pic des personnes et des vues OBS, la somme des pixels,
-// des visites, du temps passé, des minutes en live (0 ou 1 à la minute, JOURNAL 2026-10-08) et des nouveaux comptes venus
-// de sa page. Les joueurs actifs ne se gardent que par jour.
+// Un point d'un canvas (JOURNAL 2026-10-07), à `at` son début : le pic des personnes, la somme des pixels, des visites, du
+// temps passé, des minutes streamées (0 ou 1 à la minute, JOURNAL 2026-10-08) et des nouveaux comptes venus de sa page. Les
+// joueurs actifs ne se gardent que par jour.
 const CanvasPointSchema = z.object({
   at: TimestampSchema,
   people: CountSchema,
-  obsViews: CountSchema,
-  live: CountSchema,
+  streamedMinutes: CountSchema,
   pixels: CountSchema,
   visits: CountSchema,
   visitMinutes: CountSchema,

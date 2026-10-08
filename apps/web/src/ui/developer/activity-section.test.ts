@@ -20,14 +20,13 @@ const audienceDay = {
 
 const frame: ActivityFrame = {
   t: "activity",
-  now: { people: 6, guests: 3, streamed: 1, live: 0, pixels: 87, signups: 2 },
+  now: { people: 6, guests: 3, streamed: 1, pixels: 87, signups: 2 },
   audience: { today: audienceDay, month: audienceDay },
   canvases: [
     {
       canvasId: "c1",
       owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
       isStreamed: true,
-      isLive: false,
       obsViews: 1,
       people: 4,
       guests: 1,
@@ -54,7 +53,6 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
             at: lastMinute,
             people: 6,
             streamed: 1,
-            live: 0,
             pixels: 87,
             signups: 2,
             visits: 0,
@@ -80,7 +78,7 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((left, right) => left - right)).toEqual(positions);
     expect(markup).toContain("lp-time-chart-line");
-    expect(markup).toContain(">OBS<");
+    expect(markup).toContain(">Streamé<");
   });
 
   // Montre l'audience dans un tableau, une ligne par chiffre, aujourd'hui et 30 jours en colonnes
@@ -107,9 +105,9 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
       expect(table).toContain(text);
   });
 
-  // Ne montre que sept courbes sur 24 h, et dix sur Tout avec les comptes, joueurs et streamers actifs
-  it("shows seven curves over 24 h, and ten over All with the active accounts, players and streamers", () => {
-    const point = { at: lastMinute, people: 6, streamed: 1, live: 0, pixels: 87, signups: 2 };
+  // Ne montre que six courbes sur 24 h, et neuf sur Tout avec les comptes, joueurs et streamers actifs
+  it("shows six curves over 24 h, and nine over All with the active accounts, players and streamers", () => {
+    const point = { at: lastMinute, people: 6, streamed: 1, pixels: 87, signups: 2 };
     const day = { ...point, visits: 3, phoneVisits: 1, visitMinutes: 9 };
     const ready = (period: "day" | "all", extra: object) => ({
       activity: frame,
@@ -119,42 +117,42 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
 
     const charts = (markup: string) => markup.match(/<figure/g)?.length;
 
-    expect(charts(render(ready("day", {})))).toBe(7);
-    expect(charts(render(ready("all", { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 })))).toBe(
-      10,
-    );
+    expect(charts(render(ready("day", {})))).toBe(6);
+    expect(charts(render(ready("all", { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 })))).toBe(9);
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : « dont N en live » sous les canvas streamés, la pastille « En live » à côté de la pastille OBS, et la courbe des canvas en live
-  it("tells how many streamed canvases are live, puts the live badge next to the OBS badge, and draws the live canvases curve", () => {
-    const live = {
-      ...frame,
-      now: { ...frame.now, streamed: 3, live: 2 },
-      canvases: frame.canvases.map((canvas) => ({ ...canvas, isLive: true })),
-    };
-
+  // Écart §5.1 (JOURNAL 2026-10-08) : un seul état, « streamé » : une tuile sans « dont N en live », une pastille « Streamé » aux teintes du live, une seule courbe de canvas
+  it("tells the streamed canvases alone, with a single Streamé badge tinted as the live is, and draws no live curve", () => {
     const point = {
       at: lastMinute,
       people: 6,
       streamed: 3,
-      live: 2,
       pixels: 87,
       signups: 2,
       visits: 0,
       phoneVisits: 0,
       visitMinutes: 0,
     };
+    const idle = {
+      ...frame,
+      now: { ...frame.now, streamed: 0 },
+      canvases: frame.canvases.map((canvas) => ({ ...canvas, isStreamed: false })),
+    };
 
-    const markup = render({ activity: live, period: "day", history: { status: "ready", points: [point] } });
-    const notLive = render({ activity: frame, period: "day", history: { status: "loading" } });
+    const markup = render({ activity: frame, period: "day", history: { status: "ready", points: [point] } });
+    const notStreamed = render({ activity: idle, period: "day", history: { status: "loading" } });
 
-    expect(markup).toContain("dont 2 en live");
-    expect(markup.indexOf(">OBS<")).toBeGreaterThan(-1);
-    expect(markup.indexOf(">OBS<")).toBeLessThan(markup.indexOf(">En live<"));
+    expect(markup).toContain("Canvas streamés");
+    expect(markup).not.toContain("en live");
+    expect(markup).not.toContain("En live");
+    expect(markup).not.toContain("Canvas en live");
+    expect(markup).toContain(">Streamé<");
     expect(markup).toContain("lp-badge--live");
-    expect(markup).toContain("Canvas en live");
-    expect(notLive).toContain("dont 0 en live");
-    expect(notLive).not.toContain("lp-badge--live");
+    expect(markup).toContain('title="1 vue OBS ouverte"');
+    expect(markup.match(/<figure/g)).toHaveLength(6);
+    expect(markup).not.toContain(">OBS<");
+    expect(notStreamed).not.toContain("lp-badge");
+    expect(notStreamed).toContain("Canvas streamés");
   });
 
   // Dit quand personne n'est sur LivePlace, et attend la première frame sans rien inventer

@@ -130,7 +130,7 @@ export const DeveloperEntry = () => {
           </InLargeWindow>
         </StateRow>
         <StateRow
-          name="Ce canvas sans streamer OBS ni personne dessus"
+          name="Ce canvas ni streamé ni personne dessus"
           detail="« Personne sur ce canvas en ce moment »."
         >
           <InWindow>
