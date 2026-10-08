@@ -275,8 +275,8 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
     ]);
   });
 
-  // Lit un point d'avant l'audience, à trois champs, avec des zéros, et lui ajoute les sommes nouvelles
-  it("reads a point from before the audience, with three fields, as zeros, and adds the new sums to it", async () => {
+  // Lit un point d'avant l'audience, à trois champs, avec des zéros et sans canvas streamé, et lui ajoute les sommes nouvelles
+  it("reads a point from before the audience, with three fields, as zeros and no streamed canvas, and adds the new sums to it", async () => {
     const { keys, store } = stores();
     const before = minuteAt - MINUTE_MS;
     for (const [hash, at] of [
@@ -287,7 +287,7 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
       await redis.hset(hash, String(at), "5,2,30");
 
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: before, people: 5, streamed: 2, pixels: 30, signups: 0, ...noVisits },
+      { at: before, people: 5, streamed: 0, pixels: 30, signups: 0, ...noVisits },
     ]);
 
     await store.storeActivityMinute(
@@ -739,8 +739,8 @@ describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", 
     expect(await redis.hget(keys.canvas("c1").hours, String(hourAt))).toBe("1,2,0,0,0,0,3");
   });
 
-  // Lit le « streamé » d'un point selon son format : le champ live à sept champs, le champ streamé à six ou trois
-  it("reads the streamed state of a point by its format: the live field with seven fields, the streamed field with six or three", async () => {
+  // Lit le « streamé » d'un point selon son format : le champ live à sept champs, zéro à six ou trois malgré une vue OBS stockée
+  it("reads the streamed state of a point by its format: the live field with seven fields, zero with six or three whatever the OBS view stored", async () => {
     const { keys, store } = stores();
     const [seven, six, three] = [minuteAt - 3 * MINUTE_MS, minuteAt - 2 * MINUTE_MS, minuteAt - MINUTE_MS];
     await redis.hset(keys.minutes, {
@@ -752,14 +752,19 @@ describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", 
     const points = await store.listActivityHistory("day", now);
     expect(points.map(({ at, streamed }) => [at, streamed])).toEqual([
       [seven, 2],
-      [six, 4],
-      [three, 4],
+      [six, 0],
+      [three, 0],
+    ]);
+    expect(points.map(({ people, pixels }) => [people, pixels])).toEqual([
+      [5, 30],
+      [5, 30],
+      [5, 30],
     ]);
     expect(points[0]).not.toHaveProperty("live");
   });
 
-  // Lit un point d'avant le live, à six champs, avec zéro minute streamée pour un canvas, et le réécrit à sept champs avec le nouveau
-  it("reads a point from before the live, with six fields, as zero streamed minutes for a canvas, and writes it again with seven", async () => {
+  // Lit un point d'avant le live, à six champs, avec zéro canvas streamé pour tout LivePlace et zéro minute pour un canvas, et le réécrit à sept champs avec le nouveau
+  it("reads a point from before the live, with six fields, as zero streamed canvases and zero streamed minutes for a canvas, and writes it again with seven", async () => {
     const { keys, store } = stores();
     const before = minuteAt - MINUTE_MS;
     const canvas = keys.canvas("c1");
@@ -775,7 +780,7 @@ describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", 
 
     const seen = { people: 5, pixels: 30, visits: 4, visitMinutes: 9, signups: 0 };
     expect(await store.listActivityHistory("day", now)).toEqual([
-      { at: before, ...seen, streamed: 2, phoneVisits: 1 },
+      { at: before, ...seen, streamed: 0, phoneVisits: 1 },
     ]);
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
       { at: before, ...seen, streamedMinutes: 0 },

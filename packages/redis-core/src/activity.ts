@@ -53,17 +53,14 @@ const POINT_FIELD = /^\d+$/; // le début d'un point ; celui de ses nouveaux com
 // n'a que les trois premiers champs, un point d'avant le live (JOURNAL 2026-10-08) les six premiers : les autres valent 0.
 const toFields = (stored: string) => {
   const fields = stored.split(",").map(Number);
-  const [people = 0, streamed = 0, pixels = 0, visits = 0, phoneVisits = 0, visitMinutes = 0, live = 0] =
-    fields;
-  return { people, streamed, pixels, visits, phoneVisits, visitMinutes, live, hasLive: fields.length > 6 };
+  const [people = 0, , pixels = 0, visits = 0, phoneVisits = 0, visitMinutes = 0, live = 0] = fields;
+  return { people, pixels, visits, phoneVisits, visitMinutes, live };
 };
 
-// Écart §5.1 (JOURNAL 2026-10-08) : avec sept champs, `live` dit l'état streamé (vue OBS ouverte et streamer en live) ; sans lui,
-// `streamed` n'était que la vue OBS, qu'on garde pour un point d'avant.
+// Écart §5.1 (JOURNAL 2026-10-08) : `live` dit l'état streamé (vue OBS ouverte et streamer en live), 0 pour un point d'avant lui.
 const toPoint = (at: Timestamp, stored: string, signups: string | null | undefined): ActivityPoint => {
-  const { streamed, live, hasLive, ...counts } = toFields(stored);
-  const state = hasLive ? live : streamed;
-  return { at, ...counts, streamed: state, signups: Number(signups ?? 0) };
+  const { live, ...counts } = toFields(stored);
+  return { at, ...counts, streamed: live, signups: Number(signups ?? 0) };
 };
 
 // `stored` : `accounts,players,streamers` d'un jour, écrit à côté de son point ; sans lui, le jour est d'avant l'audience.

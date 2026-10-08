@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §5.1 : un point d'avant le live compte 0 canvas streamé, comme un canvas seul
+
+**Contexte.** L'entrée suivante (même jour) relisait un point global d'avant `be45208` par sa vue OBS seule, alors qu'un point de canvas du même moment vaut 0 : la courbe de tout LivePlace montrait 1 canvas streamé quand celle du canvas n'en montrait aucun.
+**Décision.** Un point global à 3 ou 6 champs se lit avec 0 canvas streamé : sans live connu, pas de stream. Les autres chiffres de ces points ne changent pas.
+**Renoncement.** La courbe globale d'avant `be45208` perd ses canvas streamés : on ne peut pas savoir après coup qui était en live.
+
 ## 2026-10-08 — Écart §5.1 : un seul indice, « streamé », vue OBS ouverte et streamer en live
 
 **Contexte.** L'entrée précédente (même jour) a gardé deux notions, « streamé » (vue OBS ouverte) et « en live » (et streamer en live) ; Alexis n'en veut qu'une : une vue OBS ouverte hors live n'est pas un stream.
