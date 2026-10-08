@@ -78,7 +78,7 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((left, right) => left - right)).toEqual(positions);
     expect(markup).toContain("lp-time-chart-line");
-    expect(markup).toContain(">Streamé<");
+    expect(markup).not.toContain("lp-badge");
   });
 
   // Montre l'audience dans un tableau, une ligne par chiffre, aujourd'hui et 30 jours en colonnes
@@ -121,8 +121,8 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(charts(render(ready("all", { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 })))).toBe(9);
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : un seul état, « streamé » : une tuile sans « dont N en live », une pastille « Streamé » aux teintes du live, une seule courbe de canvas
-  it("tells the streamed canvases alone, with a single Streamé badge tinted as the live is, and draws no live curve", () => {
+  // Écart §5.1 (JOURNAL 2026-10-08) : un seul état, « streamé » : une tuile sans « dont N en live », aucune pastille sur la ligne, une seule courbe de canvas
+  it("tells the streamed canvases alone, with no badge on the row, and draws no live curve", () => {
     const point = {
       at: lastMinute,
       people: 6,
@@ -146,9 +146,9 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(markup).not.toContain("en live");
     expect(markup).not.toContain("En live");
     expect(markup).not.toContain("Canvas en live");
-    expect(markup).toContain(">Streamé<");
-    expect(markup).toContain("lp-badge--live");
-    expect(markup).toContain('title="1 vue OBS ouverte"');
+    expect(markup).not.toContain(">Streamé<");
+    expect(markup).not.toContain("lp-badge");
+    expect(markup).not.toContain('title="1 vue OBS ouverte"');
     expect(markup.match(/<figure/g)).toHaveLength(6);
     expect(markup).not.toContain(">OBS<");
     expect(notStreamed).not.toContain("lp-badge");

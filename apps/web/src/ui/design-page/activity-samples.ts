@@ -138,7 +138,7 @@ export const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
     signups: 1,
     accounts: [],
   },
-  // Une vue OBS ouverte, mais son streamer n'est pas en live : pas streamé, aucune pastille.
+  // Une vue OBS ouverte, mais son streamer n'est pas en live : pas streamé.
   {
     canvasId: "nuagelle",
     owner: { userId: "3", ...SAMPLE_BROKEN_PHOTO },

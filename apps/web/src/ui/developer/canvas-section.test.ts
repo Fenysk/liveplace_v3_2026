@@ -75,13 +75,12 @@ const render = (view: ActivityWatchView): string =>
   renderToStaticMarkup(createElement(CanvasSection, { view, nowMs: now, onSelectPeriod: () => undefined }));
 
 describe("the canvas section (JOURNAL 2026-10-07)", () => {
-  // Montre, de haut en bas, le streamer avec sa pastille Streamé, les chiffres de l'instant, l'audience, qui est là, puis les courbes
-  it("shows, top to bottom, the owner with the Streamé badge, the numbers of the moment, the audience, who is there, then the curves", () => {
+  // Montre, de haut en bas, le streamer, les chiffres de l'instant, l'audience, qui est là, puis les courbes
+  it("shows, top to bottom, the owner, the numbers of the moment, the audience, who is there, then the curves", () => {
     const markup = render(ready("day", [canvasPoint]));
 
     const order = [
       "Kalyss",
-      ">Streamé<",
       "Maintenant",
       "dont 2 invités",
       "Vues OBS ouvertes",
@@ -122,15 +121,15 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(table).not.toContain("Streamers actifs");
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : en tête, une seule pastille « Streamé » aux teintes du live, ses vues OBS en infobulle ; une courbe de ses minutes streamées, aucune de ses vues OBS
-  it("puts a single Streamé badge at the top, tinted as the live is, the OBS views as its tooltip, and draws its streamed minutes, not its OBS views", () => {
+  // Écart §5.1 (JOURNAL 2026-10-08) : en tête, le streamer seul, sans pastille ; une courbe de ses minutes streamées, aucune de ses vues OBS
+  it("puts the owner alone at the top, with no badge, and draws its streamed minutes, not its OBS views", () => {
     const streamed = render(ready("day", [{ ...canvasPoint, streamedMinutes: 1 }]));
 
     const top = streamed.slice(0, streamed.indexOf("Maintenant"));
-    expect(top).toContain(">Streamé<");
-    expect(top).toContain("lp-badge--live");
-    expect(top).toContain('title="1 vue OBS ouverte"');
-    expect(top.match(/<span class="lp-badge/g)).toHaveLength(1);
+    expect(top).toContain("Kalyss");
+    expect(top).not.toContain(">Streamé<");
+    expect(top).not.toContain("lp-badge");
+    expect(top).not.toContain('title="1 vue OBS ouverte"');
     expect(top).not.toContain(">OBS<");
     expect(top).not.toContain("En live");
     expect(streamed).toContain("Temps streamé (min)");
