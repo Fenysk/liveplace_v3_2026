@@ -3,6 +3,7 @@
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { CapacityResourceId, Saturation } from "./capacity";
+import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
   ActivityPeriod,
   CanvasMeta,
@@ -14,6 +15,8 @@ import type {
   Timestamp,
   User,
 } from "./index";
+import type { ChunkSize, TierRow } from "./retention";
+import type { CanvasSnapshot, SnapshotTier } from "./snapshot";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 export type Placement = {
@@ -174,6 +177,9 @@ export interface CanvasCore {
   ): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
   isModerator(canvasId: string, userId: string): Promise<boolean>; // Écart §10.3 (JOURNAL 2026-10-08) : `false` pour un banni
+  // Écart §4.2 (JOURNAL 2026-10-08) : `meta.ready` à 0, le canvas est remis en place. Absent, ou sans `ready` (le canvas neuf
+  // d'un archivage), il ne l'est pas : `getCanvas` rend `null` dans les trois cas, seul celui-ci se dit `canvas_recovering`.
+  isRecovering(canvasId: string): Promise<boolean>;
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   // §5.6 : lue sans être écrite, pour le `welcome`.
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
@@ -364,7 +370,11 @@ export type ConvexUsage = {
   databaseIoGb: number;
   egressGb: number;
   computeGbHours: number;
+  filesBytes?: number; // Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers, absent quand le déploiement ne l'a pas dit
 };
+
+// Ce que le worker dépose pour la capacité (Écart §8.1, JOURNAL 2026-10-08) : le retard de la sauvegarde, à l'instant de sa mesure.
+export type SnapshotMeasure = { at: Timestamp; delayMs: number };
 
 // Un déploiement dont le web lit l'usage (Écart §2 et §9, JOURNAL 2026-10-07) : son nom, l'URL de son API et la clé de
 // déploiement qui l'ouvre. La clé ne sort jamais de l'adaptateur : ni dans un journal, ni dans Redis, ni dans une frame.
@@ -374,7 +384,10 @@ export type ConvexDeployment = { name: string; url: string; key: string };
 // le résultat dit en quelques mots pourquoi, sans jamais nommer la clé.
 export interface ConvexUsageSource {
   name: string;
-  getUsage(): Promise<Result<Omit<ConvexUsage, "at">>>;
+  getUsage(): Promise<Result<Omit<ConvexUsage, "at" | "filesBytes">>>;
+  // Le stock de fichiers du déploiement, en octets, par un compteur que Convex tient lui-même (usage.ts) : l'API de
+  // déploiement ne le donne pas. Un échec ne retient pas le reste de l'usage.
+  getFilesBytes(): Promise<Result<number>>;
 }
 
 // Ce que le web a déposé pour Convex : rien (`null`), qu'aucun déploiement n'est configuré, ou l'usage de chacun par son nom.
@@ -390,6 +403,7 @@ export interface CapacityStore {
   getRedisUsage(): Promise<RedisUsage>;
   getWebMeasure(): Promise<WebMeasure | null>; // `null` : le web n'a rien déposé
   getConvexDeposit(): Promise<ConvexDeposit | null>;
+  getSnapshotMeasure(): Promise<SnapshotMeasure | null>; // `null` : le worker n'a rien déposé
   // Le plafond atteint le plus récemment, par ressource : il survit à un redémarrage du gateway.
   listCeilingsReached(): Promise<Map<CapacityResourceId, Timestamp>>;
   storeCeilingReached(id: CapacityResourceId, at: Timestamp): Promise<void>;
@@ -403,6 +417,11 @@ export interface CapacityWrites {
   storeWebUtilization(measure: WebMeasure): Promise<void>;
   storeConvexUsage(deployment: string, usage: ConvexUsage): Promise<void>; // `deployment` : son nom, jamais une clé
   storeConvexUnconfigured(): Promise<void>;
+}
+
+// Ce que le worker écrit pour la capacité : un nombre, comme le web.
+export interface SnapshotDelayWrites {
+  storeSnapshotDelay(measure: SnapshotMeasure): Promise<void>;
 }
 
 // Ce que le process mesure de sa machine et de lui-même, par `node:os` et `node:fs` : les chiffres de l'hôte, même
@@ -523,6 +542,157 @@ export interface DurableStore {
   discardArchive(ownerId: string, canvasId: string): Promise<Result<void, "not_archive">>;
   // `null` : aucun canvas de ce propriétaire n'a ce code. Rendu sans session : le lien suffit à voir une archive.
   getArchiveByLinkCode(ownerId: string, linkCode: string): Promise<LinkedCanvas | null>;
+}
+
+// Ce qui s'est passé sur un canvas, vu du worker : une pose seule (elle attend le tour de cinq minutes), ou tout le
+// reste (modération, réglage, taille : le snapshot suit en moins de 2 s). Écart §7.2 (JOURNAL 2026-10-06). `status` : le
+// `canvasStatus` publié par le web, `version` la version de l'événement (JOURNAL 2026-10-08).
+export type CanvasActivity = {
+  canvasId: string;
+  isPlacement: boolean;
+  status?: CanvasStatus;
+  version?: number;
+};
+
+// Ce que le worker lit de Redis pour sauvegarder (§7.2). `getCanvasSnapshot` rend `null` pour un canvas absent, pas prêt,
+// ou sans pose ni modération (version 0, sans banni, modérateur ni progression : JOURNAL 2026-10-08).
+export interface SnapshotSource {
+  // Chaque canvas de Redis, avec les joueurs qui y ont une progression : un balayage, jamais un par canvas.
+  listCanvases(): Promise<Map<string, string[]>>;
+  // Les joueurs d'un seul canvas, pour celui que le dernier balayage n'a pas vu.
+  listPlayers(canvasId: string): Promise<string[]>;
+  // Le canvas qui a pris la place de celui-ci en l'archivant (`successorId`), ou `null`.
+  getSuccessorId(canvasId: string): Promise<string | null>;
+  getVersion(canvasId: string): Promise<number | null>;
+  getCanvasSnapshot(
+    canvasId: string,
+    players: readonly string[],
+    takenAt: Timestamp,
+  ): Promise<CanvasSnapshot | null>;
+  watch(onActivity: (activity: CanvasActivity) => void): Promise<Unsubscribe>;
+}
+
+// Ce que le worker lit du flux d'un canvas pour en archiver l'historique (Écart §7.2, JOURNAL 2026-10-08).
+export type HistoryRead = {
+  entries: ChunkEntry[]; // dans l'ordre des versions
+  resizedAtVersion: number | null; // la version sans événement de la dernière taille, `null` : jamais redimensionné
+  // La dernière récupération (`meta.recoveredAt` et `recoveredAtVersion`) : son saut de version n'est pas un trou.
+  recovered: Recovered | null;
+};
+
+export interface HistorySource {
+  getVersion(canvasId: string): Promise<number | null>;
+  // La dernière récupération du canvas : ses versions n'ont pas toutes une entrée, le saut ne compte pas parmi celles qui attendent.
+  getRecovery(canvasId: string): Promise<{ at: Timestamp; version: number } | null>;
+  // Les entrées après `afterVersion` (exclue), `maxCount` au plus : un XRANGE, aucun groupe de consommateurs.
+  listHistory(canvasId: string, afterVersion: number, maxCount: number): Promise<HistoryRead>;
+  watch(onActivity: (activity: CanvasActivity) => void): Promise<Unsubscribe>;
+}
+
+// L'historique d'un seul environnement (`DURABLE_SCOPE`), comme les snapshots.
+export interface HistoryStore {
+  // Le dernier `toVersion` rangé de chaque canvas : le curseur du worker à son démarrage.
+  listChunkCursors(): Promise<{ canvasId: string; version: number }[]>;
+  // `overlap` : Convex garde déjà des versions de cet intervalle.
+  storeChunk(file: ChunkFile): Promise<"stored" | "overlap">;
+}
+
+// Un snapshot rangé dans Convex : ses octets compressés, et ce que l'index en dit (Écart §8.1, JOURNAL 2026-10-06).
+export type SnapshotFile = {
+  canvasId: string;
+  tier: SnapshotTier;
+  version: number;
+  takenAt: Timestamp;
+  schemaVersion: number;
+  bytes: Uint8Array;
+};
+
+// Le stockage des snapshots d'un seul environnement (`DURABLE_SCOPE`) : un autre scope n'y est jamais visible.
+export interface SnapshotStore {
+  // `refused` : Convex garde déjà un snapshot plus récent de ce canvas.
+  storeSnapshot(file: SnapshotFile): Promise<"stored" | "refused">;
+  listLatestSnapshots(tier: SnapshotTier): Promise<Pick<SnapshotFile, "canvasId" | "version" | "takenAt">[]>;
+  getLatestSnapshot(canvasId: string, tier: SnapshotTier): Promise<SnapshotFile | null>;
+}
+
+// Écart §7.3 (JOURNAL 2026-10-08) : la rétention des sauvegardes d'un seul environnement. Une ligne se nomme par son palier
+// et sa date ; une promotion lui ajoute une ligne qui partage le fichier de sa source.
+export type PromotedTier = Exclude<SnapshotTier, "working">;
+export type CanvasTiers = { canvasId: string; rows: TierRow[] };
+export type TierFile = { isStateOnly: boolean; bytes: Uint8Array };
+export type StateOnlyFile = Pick<TierRow, "version" | "takenAt"> & {
+  canvasId: string;
+  tier: PromotedTier;
+  schemaVersion: number;
+  bytes: Uint8Array;
+};
+
+export interface RetentionStore {
+  // Les paliers de `maxCanvases` canvas à la suite de `afterCanvasId` ("" : depuis le premier) ; `next` : où reprendre, `null` : fini.
+  listTiers(
+    afterCanvasId: string,
+    maxCanvases: number,
+  ): Promise<{ canvases: CanvasTiers[]; next: string | null }>;
+  // `missing` : la source n'existe plus dans Convex ; `exists` : le palier a déjà sa ligne.
+  promote(canvasId: string, from: TierRow, to: PromotedTier): Promise<"promoted" | "exists" | "missing">;
+  getFile(canvasId: string, row: TierRow): Promise<TierFile | null>;
+  storeStateOnly(file: StateOnlyFile): Promise<"stored" | "exists">; // un fichier neuf, plus petit : le palier tiré d'une sauvegarde complète
+  degrade(canvasId: string, row: TierRow, bytes: Uint8Array): Promise<"degraded" | "missing">; // la ligne passe à un fichier en `state` seul
+  discard(canvasId: string, row: TierRow): Promise<void>;
+}
+
+// Écart §8.1 (JOURNAL 2026-10-08) : le budget de l'historique d'un seul environnement, lu sur les compteurs de Convex.
+export interface BudgetStore {
+  ensureUsage(): Promise<{ isRecounted: boolean }>; // les compteurs d'un déploiement d'avant la rétention se font une fois
+  getHistoryBytes(): Promise<number>; // le total des chunks de ce scope
+  listOldestChunks(limit: number): Promise<ChunkSize[]>; // les plus anciens d'abord, canvas confondus
+  // Les chunks du canvas avant `beforeVersion` (exclue) et finis avant `floorTs`, `maxChunks` au plus ; `isDone` : le préfixe est parti.
+  purgeChunks(
+    canvasId: string,
+    beforeVersion: number,
+    floorTs: Timestamp,
+    maxChunks: number,
+  ): Promise<{ removed: number; bytes: number; isDone: boolean }>;
+}
+
+// Le miroir `user:<id>` d'une personne, perdu avec Redis et gardé par la table `users` de Convex.
+export type RestoredUser = Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>;
+
+// Ce qu'il faut pour remettre un canvas : sa sauvegarde, les noms de ses personnes, sa nouvelle version et l'heure.
+export type Restoration = {
+  snapshot: CanvasSnapshot;
+  users: readonly RestoredUser[];
+  version: number;
+  at: Timestamp;
+};
+
+// Ce que le worker écrit dans Redis pour remettre un canvas perdu (Écart §7.2, JOURNAL 2026-10-08).
+export interface RecoveryTarget {
+  // Ceux de ces canvas qui n'ont plus de `version` : perdus. Un pipeline Redis, jamais Convex.
+  listLostCanvases(canvasIds: readonly string[]): Promise<string[]>;
+  // `meta.ready` à 0 : le canvas est en récupération. `already_live` : il existe, revenu ou neuf, et rien n'y touche.
+  beginRestore(canvasId: string): Promise<"begun" | "already_live">;
+  cancelRestore(canvasId: string): Promise<void>; // le canvas n'existe plus dans Convex : il n'est plus en récupération
+  restore(canvasId: string, restoration: Restoration): Promise<"restored" | "already_live">;
+}
+
+// Une sauvegarde parmi les deux dernières d'un canvas : ses octets ne se lisent que si on en a besoin.
+export type RecentSnapshot = Pick<SnapshotFile, "version" | "takenAt" | "schemaVersion"> & {
+  getBytes(): Promise<Uint8Array>;
+};
+
+// Ce que la récupération lit de Convex, pour un seul `DURABLE_SCOPE` : seulement pour un canvas perdu, jamais en boucle.
+export interface RecoveryStore {
+  hasSnapshot(canvasId: string): Promise<boolean>; // ce scope garde au moins une sauvegarde de ce canvas
+  hasCanvas(canvasId: string): Promise<boolean>; // il existe encore dans `canvases` (une archive supprimée, non)
+  listRecentSnapshots(canvasId: string): Promise<RecentSnapshot[]>; // du plus récent au plus ancien, au plus deux
+  listUsers(userIds: readonly string[]): Promise<RestoredUser[]>; // ceux que Convex connaît
+}
+
+// Ce que le web écrit pour qu'une page dise « en récupération » dès son rendu, avant que le worker ait vu la perte.
+export interface RecoveryMarks {
+  isCanvasLive(canvasId: string): Promise<boolean>;
+  markRecovering(canvasId: string): Promise<void>;
 }
 
 // `null` = invité (§10.2).

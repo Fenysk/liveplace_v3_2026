@@ -1,7 +1,15 @@
-// Le schéma Convex (§8.1) : `users` et `canvases`. `chunks`, `snapshots` et `moderationLog` arrivent avec le worker.
+// Le schéma Convex (§8.1) : `users`, `canvases` et `snapshots`. `chunks` et `moderationLog` arrivent avec l'archive.
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+
+// Les paliers de `SNAPSHOT_TIERS` (domain) : Convex ne le voit pas, un test garde les deux listes ensemble.
+export const snapshotTier = v.union(
+  v.literal("working"),
+  v.literal("hourly"),
+  v.literal("daily"),
+  v.literal("weekly"),
+);
 
 export default defineSchema({
   // Le pseudo n'est jamais un identifiant : il peut changer chez Twitch.
@@ -39,4 +47,52 @@ export default defineSchema({
   })
     .index("by_canvasId", ["canvasId"])
     .index("by_owner_active", ["ownerId", "isActive"]),
+
+  // Une ligne par snapshot : le contenu est un fichier (Écart §8.1, JOURNAL 2026-10-06). `scope` nomme l'environnement :
+  // le poste et les bêtas partagent ce déploiement, et un même `canvasId` existe dans plusieurs Redis.
+  snapshots: defineTable({
+    scope: v.string(),
+    canvasId: v.string(),
+    tier: snapshotTier,
+    version: v.number(),
+    takenAt: v.number(),
+    schemaVersion: v.number(),
+    size: v.number(), // octets du fichier
+    storageId: v.id("_storage"),
+    // Écart §7.3 (JOURNAL 2026-10-08) : le dessin seul, sans auteurs. Absent : une sauvegarde complète. Un fichier peut servir
+    // plusieurs lignes (une promotion en ajoute une sans le copier) : `by_storage` compte ses références.
+    isStateOnly: v.optional(v.boolean()),
+  })
+    .index("by_scope_canvas_tier_takenAt", ["scope", "canvasId", "tier", "takenAt"])
+    .index("by_canvas", ["canvasId"]) // le ménage d'un canvas supprimé, tous scopes (JOURNAL 2026-10-08)
+    .index("by_storage", ["storageId"]),
+
+  // Une ligne par chunk de l'historique : les entrées du flux sont dans le fichier (Écart §7.2, JOURNAL 2026-10-08). Les
+  // chunks d'un canvas se suivent sans se recouvrir, des trous permis.
+  chunks: defineTable({
+    scope: v.string(),
+    canvasId: v.string(),
+    fromVersion: v.number(),
+    toVersion: v.number(),
+    fromTs: v.number(),
+    toTs: v.number(),
+    count: v.number(),
+    schemaVersion: v.number(),
+    size: v.number(), // octets du fichier
+    storageId: v.id("_storage"),
+    gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))), // des versions perdues
+    resizedAt: v.optional(v.number()), // la version sans événement d'un changement de taille
+    recoveredAt: v.optional(v.number()), // la date d'une récupération : posé par l'étape E, jamais par le worker
+  })
+    .index("by_scope_canvas_version", ["scope", "canvasId", "fromVersion"])
+    .index("by_scope_toTs", ["scope", "toTs"]) // le budget retire le plus ancien d'abord, canvas confondus
+    .index("by_canvas", ["canvasId"]),
+
+  // Écart §8.1 (JOURNAL 2026-10-08) : les octets des fichiers, comptés à chaque ajout et retrait pour qu'une lecture n'en coûte
+  // qu'une ligne. `files` : tous les fichiers du déploiement ; `chunks:<scope>` : l'historique d'un scope, que le budget borne.
+  storageUsage: defineTable({
+    key: v.string(),
+    bytes: v.number(),
+    count: v.number(),
+  }).index("by_key", ["key"]),
 });

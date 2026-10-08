@@ -13,6 +13,7 @@ import { ArchivesTab } from "../ui/archive/archives-tab";
 import { createOwnSwitchTracker } from "../ui/archive/own-switch";
 import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
+import { CanvasRecovering, useIsCanvasRecovering } from "../ui/canvas/canvas-recovering";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
@@ -199,6 +200,7 @@ const GamePage = () => {
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
+  const isCanvasRecovering = useIsCanvasRecovering(stores?.canvas);
   // Écart §15 (JOURNAL 2026-10-06) : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
   useFollowActiveCanvas(stores?.canvas);
 
@@ -215,7 +217,10 @@ const GamePage = () => {
     };
   }, [canvasId, openCanvas]);
 
-  // Le gateway ne connaît pas ce canvas : la page du canvas introuvable. Les stores restent ouverts, la page se rétablit seule.
+  // Redis remet ce canvas en place (Écart §4.2, JOURNAL 2026-10-08) : le message d'attente, pour tous. Puis, comme le canvas
+  // introuvable, la page se rétablit seule : les stores restent ouverts.
+  if (isCanvasRecovering) return <CanvasRecovering />;
+  // Le gateway ne connaît pas ce canvas : la page du canvas introuvable.
   if (isCanvasMissing) return <CanvasNotFound />;
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.

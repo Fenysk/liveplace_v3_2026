@@ -152,8 +152,11 @@ export function buildCapacityKeys(prefix = "capacity:") {
     days: `${prefix}day`, // le début du jour de Paris, sans limite
     // Déposé par le web : `STRING` `at,utilization`, son occupation à l'instant de sa mesure.
     web: `${prefix}web`,
-    // Déposé par le web : `HASH` nom du déploiement → `at,calls,databaseIoGb,egressGb,computeGbHours`, l'usage du mois.
+    // Déposé par le web : `HASH` nom du déploiement → `at,calls,databaseIoGb,egressGb,computeGbHours[,filesBytes]`, l'usage du
+    // mois et le stock de fichiers (absent tant que le déploiement ne le dit pas : JOURNAL 2026-10-08).
     convex: `${prefix}convex`,
+    // Déposé par le worker (JOURNAL 2026-10-08) : `STRING` `at,delayMs`, le retard de la sauvegarde à l'instant de sa mesure.
+    snapshot: `${prefix}snapshot`,
     convexUnconfigured: `${prefix}convex:unconfigured`, // posé quand aucun déploiement n'est configuré
     reached: `${prefix}reached`, // `HASH` ressource → instant du dernier plafond atteint, sans EXPIRE : il survit au redémarrage
   };

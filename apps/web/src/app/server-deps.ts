@@ -2,11 +2,12 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { generateLinkCode } from "@liveplace/domain";
-import { createDurableStore } from "@liveplace/durable";
+import { createDurableStore, createRecoveryStore } from "@liveplace/durable";
 import {
   createAccountList,
   createArchiveWrites,
   createCapacityWrites,
+  createRecoveryMarks,
   createSignInWrites,
   createTwitchLiveStore,
   createTwitchWrites,
@@ -42,6 +43,12 @@ const buildServerDeps = () => {
     }),
     durable: createDurableStore(config.convexUrl, config.convexServiceKey),
     redis: createSignInWrites(redis),
+    // Écart §7.2 (JOURNAL 2026-10-08) : sans `DURABLE_SCOPE`, rien n'est demandé à Convex et aucune page n'est marquée.
+    recovery:
+      config.durableScope === null
+        ? undefined
+        : createRecoveryStore(config.convexUrl, config.convexServiceKey, config.durableScope),
+    recoveryMarks: createRecoveryMarks(redis),
     twitchWrites,
     archiveWrites: createArchiveWrites(redis), // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
     capacityWrites: createCapacityWrites(redis), // Écart §2 et §9 (JOURNAL 2026-10-07) : l'occupation du web, l'usage de Convex

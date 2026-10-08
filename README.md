@@ -101,8 +101,9 @@ Au 30 septembre 2026, fin du bloc 1 : LivePlace est en ligne sur `liveplace.tv`,
 | `packages/protocol` | Les frames client ↔ serveur, leurs schémas Zod, les codecs. |
 | `packages/domain` | Les règles pures (jauge, palette, formats, coordonnées, rôles, délai OBS) et les ports (`@liveplace/domain/ports`). |
 | `packages/shared` | Le type `Result` et la lecture d'env fail-closed. |
-| `packages/redis-core` | Les scripts Lua (pose, modération, signalement, taille, jauge) et le client typé. Testé contre un vrai Redis. |
-| `packages/durable` | Convex : les comptes et leurs canvas. |
+| `packages/redis-core` | Les scripts Lua (pose, modération, signalement, taille, jauge, restauration) et le client typé. Testé contre un vrai Redis. |
+| `packages/durable` | Convex : les comptes et leurs canvas, et les snapshots (un fichier par snapshot, une ligne d'index). |
 | `apps/gateway` | Le serveur WebSocket : arrivée, reprise, diffusion au tick, modération, et les actions venues de Twitch. |
 | `apps/web` | La page canvas, la vue OBS, la connexion Twitch, la synchro de la modération Twitch, le design system (`/design`). |
-| `apps/worker`, `tools/bench` | Vides : le worker ouvre le bloc 2 ; le bench s'efface après chaque test de charge. |
+| `apps/worker` | La sauvegarde : un snapshot complet de chaque canvas dans Convex, l'historique des poses par chunks, et la récupération d'un canvas que Redis a perdu, sous le `DURABLE_SCOPE` de l'environnement. |
+| `tools/bench` | Vide : le bench s'efface après chaque test de charge. |

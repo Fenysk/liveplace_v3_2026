@@ -71,6 +71,7 @@ import {
   twitchMessageKey,
   userKey,
 } from "./keys";
+import { parsePileEntry } from "./pile-entry";
 import { getTwitchLiveState, listTwitchLives } from "./twitch-live";
 
 declare module "ioredis" {
@@ -89,22 +90,12 @@ declare module "ioredis" {
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
 
-// §5.1 : une entrée de pile, lue par la fin comme dans pile.lua.
+type PileHead = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
+
 // Un pixel d'avant le protocole 6 a pour pose sa version.
-const PILE_ENTRY = /^(.*):(\d+):(\d+):(\d+)(?::([A-Za-z][A-Za-z0-9]*))?$/;
-
-type PileEntry = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
-
-const parseEntry = (entry: string): PileEntry => {
-  const [, authorId, colorIndex, placedAt, version, placementId] = PILE_ENTRY.exec(entry) ?? [];
-  if (authorId === undefined || colorIndex === undefined || placedAt === undefined || version === undefined)
-    throw new Error(`entrée d'historique illisible (${entry})`);
-  return {
-    authorId,
-    colorIndex: Number(colorIndex),
-    placedAt: Number(placedAt),
-    placementId: placementId ?? version,
-  };
+const parseEntry = (entry: string): PileHead => {
+  const { authorId, colorIndex, placedAt, version, placementId } = parsePileEntry(entry);
+  return { authorId, colorIndex, placedAt, placementId: placementId ?? String(version) };
 };
 
 // Un pixel visible d'un auteur : son heure et sa pose sont connues.
@@ -264,6 +255,7 @@ const TWITCH_COMMANDS_READ_COUNT = 50;
 export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   let hasReader = false;
   let isRecovered = false; // ce qu'un arrêt a laissé lu mais pas acquitté passe avant les nouvelles actions
+  let pendingFrom = "0"; // après la dernière action non acquittée rendue : une action gardée sans acquit ne bloque pas la suite
 
   // Ce qui a été lu par ce consommateur sans être acquitté : rendu tout de suite, sans attendre.
   const listUnacknowledged = () =>
@@ -275,7 +267,7 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
       TWITCH_COMMANDS_READ_COUNT,
       "STREAMS",
       TWITCH_COMMANDS_KEY,
-      "0",
+      pendingFrom,
     );
 
   // Ce qu'aucun consommateur n'a encore lu : attend au plus `blockMs`.
@@ -303,15 +295,34 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
     hasReader = true;
   };
 
+  const listNext = async (blockMs: number) => {
+    await ensureReader();
+    if (!isRecovered) {
+      const pending = streamEntriesOf(await listUnacknowledged());
+      const last = pending.at(-1);
+      if (last) {
+        pendingFrom = last.id;
+        return pending;
+      }
+      isRecovered = true;
+    }
+    return streamEntriesOf(await listUnread(blockMs));
+  };
+
   return {
     async listTwitchCommands(blockMs) {
-      await ensureReader();
-      if (!isRecovered) {
-        const pending = streamEntriesOf(await listUnacknowledged());
-        if (pending.length > 0) return pending;
-        isRecovered = true;
+      try {
+        return await listNext(blockMs);
+      } catch (error) {
+        // NOGROUP : le groupe est parti. UNBLOCKED : le flux est supprimé pendant que la lecture l'attendait.
+        const isReaderLost = error instanceof Error && /^(NOGROUP|UNBLOCKED)/.test(error.message);
+        if (!isReaderLost) throw error;
+        // Écart §7.2 (JOURNAL 2026-10-08) : Redis a tout perdu, le groupe avec : il se refait, sans arrêter le gateway.
+        hasReader = false;
+        isRecovered = false;
+        pendingFrom = "0";
+        return listNext(blockMs);
       }
-      return streamEntriesOf(await listUnread(blockMs));
     },
 
     async ackTwitchCommand(id) {
@@ -414,6 +425,9 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     setUser,
 
     getCanvas: (canvasId: string): Promise<CanvasMeta | null> => getCanvasMeta(redis, canvasId),
+    // `ready` à 0, posé par la récupération : un canvas absent, ou neuf d'un archivage (sans `ready`), n'en est pas un.
+    isRecovering: async (canvasId: string): Promise<boolean> =>
+      (await redis.hget(buildCanvasKeys(canvasId).meta, "ready")) === "0",
 
     // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère pas, même modérateur Twitch ; un MULTI, comme getModeratorOrigin.
     async isModerator(canvasId: string, userId: string): Promise<boolean> {

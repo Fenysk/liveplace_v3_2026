@@ -1,7 +1,12 @@
 import { HOUR_MS, MINUTE_MS, toActivityPointStarts } from "@liveplace/domain";
 import type { CapacityMinute, ConvexUsage } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
-import { createCapacityStore, createCapacityWrites, parseRedisUsage } from "./capacity";
+import {
+  createCapacityStore,
+  createCapacityWrites,
+  createSnapshotDelayWrites,
+  parseRedisUsage,
+} from "./capacity";
 import { CAPACITY_HOURS_RETENTION_MS, CAPACITY_MINUTES_RETENTION_MS } from "./keys";
 import { createRedisHarness } from "./test-harness";
 
@@ -195,6 +200,22 @@ describe("what the web deposits (écart §2 et §9, JOURNAL 2026-10-07)", () => 
     });
   });
 
+  // Le stock de fichiers de Convex suit l'usage du mois quand le web le dit, et son absence ne casse pas le reste (JOURNAL 2026-10-08)
+  it("keeps the file stock of a deployment when the web says it, and reads a deposit without it as before", async () => {
+    const { store, writes } = stores();
+
+    await writes.storeConvexUsage("with-files", usage({ calls: 3, filesBytes: 312 * 1024 ** 2 }));
+    await writes.storeConvexUsage("without-files", usage({ calls: 4 }));
+
+    expect(await store.getConvexDeposit()).toEqual({
+      status: "configured",
+      deployments: new Map([
+        ["with-files", usage({ calls: 3, filesBytes: 312 * 1024 ** 2 })],
+        ["without-files", usage({ calls: 4 })],
+      ]),
+    });
+  });
+
   // Dit « non configuré » en retirant les déploiements d'avant, et la première lecture d'un déploiement le rend configuré
   it("says unconfigured by dropping the deployments from before, and the first reading of a deployment makes it configured", async () => {
     const { store, writes, keys } = stores();
@@ -222,6 +243,21 @@ describe("what the web deposits (écart §2 et §9, JOURNAL 2026-10-07)", () => 
     const stored = await redis.hgetall(keys.convex);
     expect(Object.keys(stored)).toEqual(["watchful-spider-409"]);
     expect(stored["watchful-spider-409"]).toMatch(/^[\d.,]+$/);
+  });
+});
+
+describe("what the worker deposits (JOURNAL 2026-10-08)", () => {
+  // Garde le retard de la sauvegarde avec l'instant de sa mesure, et dit que le worker n'a rien déposé quand c'est le cas
+  it("keeps the snapshot delay with the instant of its measure, and says nothing was deposited when it was not", async () => {
+    const { keys, store } = stores();
+    const writes = createSnapshotDelayWrites(redis, keys);
+    expect(await store.getSnapshotMeasure()).toBeNull();
+
+    await writes.storeSnapshotDelay({ at: now - 10_000, delayMs: 12_000 });
+    await writes.storeSnapshotDelay({ at: now, delayMs: 0 });
+
+    expect(await store.getSnapshotMeasure()).toEqual({ at: now, delayMs: 0 });
+    expect(await redis.ttl(keys.snapshot)).toBe(-1); // sans EXPIRE : l'instant de la mesure dit si le worker est là
   });
 });
 

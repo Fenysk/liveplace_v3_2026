@@ -59,6 +59,9 @@ const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
     async getCanvas(asked: string) {
       return asked === canvasId ? meta : null;
     },
+    async isRecovering() {
+      return false;
+    },
     async moderate(_asked: string, moderation: Moderation) {
       moderations.push(moderation);
       const { action } = moderation;
@@ -327,6 +330,9 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
         const next = answers[asked];
         return next && next.length > 1 ? (next.shift() ?? null) : (next?.[0] ?? null);
       },
+      async isRecovering() {
+        return false;
+      },
       async listModerators() {
         return [];
       },
@@ -526,5 +532,130 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
     expect(acknowledged).toEqual(["id-1"]);
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
+  });
+});
+
+// Écart §4.2 (JOURNAL 2026-10-08) : le canvas est perdu et Redis le remet en place ; une action Twitch ne s'oublie pas.
+describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+  const ban: TwitchCommand = { kind: "ban", canvasId, userId: "troll" };
+
+  // Un noyau dont le canvas manque `missingFor` lectures, en récupération pendant ce temps, puis prêt
+  const recovering = (missingFor: number, isRecoveringWhileMissing = true) => {
+    let reads = 0;
+    const moderations: Moderation[] = [];
+    const core = {
+      async getCanvas(asked: string) {
+        if (asked !== canvasId) return null;
+        reads += 1;
+        return reads > missingFor ? meta : null;
+      },
+      async isRecovering() {
+        return isRecoveringWhileMissing && reads <= missingFor;
+      },
+      async listModerators() {
+        return [];
+      },
+      async listBans() {
+        return [];
+      },
+      async moderate(_asked: string, moderation: Moderation) {
+        moderations.push(moderation);
+        return { ok: true as const, value: { version: 1, cells: 0, isDone: true } };
+      },
+      async setModerator() {
+        return { ok: true as const, value: undefined };
+      },
+      async copyTwitchUsers() {
+        return undefined;
+      },
+    };
+    const deps = {
+      core,
+      broadcast: { announce: () => undefined },
+      now: () => now,
+      wait: async () => undefined,
+    };
+    return { deps, moderations };
+  };
+
+  // L'action d'un canvas en récupération n'est ni appliquée ni oubliée : elle attend
+  it("neither applies nor forgets the action of a canvas being recovered: it waits", async () => {
+    const { deps, moderations } = recovering(5);
+
+    expect(await applyTwitchCommand(deps, ban)).toBe("recovering");
+
+    expect(moderations).toEqual([]);
+  });
+
+  // Un canvas absent qui n'est pas en récupération reste oublié, comme avant
+  it("still forgets the action of a canvas that is missing and not being recovered", async () => {
+    const { deps, moderations } = recovering(5, false);
+
+    expect(await applyTwitchCommand(deps, ban)).toBe("done");
+
+    expect(moderations).toEqual([]);
+  });
+
+  // La file garde l'action sans l'acquitter, la rejoue à chaque tour, l'applique quand le canvas revient, puis l'acquitte
+  it("keeps the action unacknowledged, replays it each turn, applies it when the canvas is back, then acknowledges it", async () => {
+    const { deps, moderations } = recovering(2);
+    const batches: TwitchCommand[][] = [[ban], [], [], [], []];
+    const acknowledged: string[] = [];
+    const turns: number[] = [];
+    let turn = 0;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        turns.push(acknowledged.length);
+        const batch = batches[turn] ?? [];
+        turn += 1;
+        return batch.map((command) => ({ id: `id-${turn}`, command }));
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(deps, queue, () => turn < batches.length);
+
+    expect(turns.slice(0, 2)).toEqual([0, 0]);
+    expect(acknowledged).toEqual(["id-1"]);
+    expect(moderations.map(({ action }) => action)).toEqual([
+      { action: "ban", target: "troll" },
+      { action: "clearUser", target: "troll" },
+    ]);
+  });
+
+  // Une action en attente ne retient pas celles des autres canvas
+  it("does not hold back the actions of the other canvases while one waits", async () => {
+    const { deps, moderations } = recovering(100);
+    const elsewhere = {
+      ...deps,
+      core: {
+        ...deps.core,
+        getCanvas: async (asked: string) => (asked === "canvas-2" ? meta : deps.core.getCanvas(asked)),
+      },
+    };
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [
+          { id: "waiting", command: ban },
+          {
+            id: "other",
+            command: { kind: "moderator", canvasId: "canvas-2", userId: "mod-1", isModerator: true },
+          },
+        ];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(elsewhere, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["other"]);
+    expect(moderations).toEqual([]);
   });
 });

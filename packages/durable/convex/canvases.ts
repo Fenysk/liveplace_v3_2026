@@ -14,6 +14,7 @@ import {
   toOwnerCanvases,
 } from "../src/canvas-plan";
 import { requireServiceKey } from "../src/service-key";
+import { internal } from "./_generated/api";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 
 const activeCanvasOf = (db: QueryCtx["db"], ownerId: string) =>
@@ -94,6 +95,19 @@ export const listForOwner = query({
   handler: async (ctx, { serviceKey, ownerId }) => {
     requireServiceKey(serviceKey);
     return toOwnerCanvases(await canvasesOf(ctx.db, ownerId));
+  },
+});
+
+// Écart §7.2 (JOURNAL 2026-10-08) : ce canvas existe-t-il encore ? Une archive supprimée n'est pas récupérée. Un seul index.
+export const exists = query({
+  args: { serviceKey: v.string(), canvasId: v.string() },
+  handler: async (ctx, { serviceKey, canvasId }) => {
+    requireServiceKey(serviceKey);
+    const found = await ctx.db
+      .query("canvases")
+      .withIndex("by_canvasId", (q) => q.eq("canvasId", canvasId))
+      .first();
+    return found !== null;
   },
 });
 
@@ -182,11 +196,22 @@ export const moveNameToTheme = internalMutation({
   },
 });
 
+// Écart §8.1 (JOURNAL 2026-10-08) : le ménage n'est jamais une raison de refuser la suppression.
+const purgeLater = async (ctx: MutationCtx, canvasId: string): Promise<void> => {
+  try {
+    await ctx.scheduler.runAfter(0, internal.purge.byCanvas, { canvasId });
+  } catch (error) {
+    console.error(`purge de ${canvasId} non planifiée`, error);
+  }
+};
+
 export const discard = mutation({
   args: { serviceKey: v.string(), ownerId: v.string(), canvasId: v.string() },
   handler: async (ctx, { serviceKey, ownerId, canvasId }) => {
     requireServiceKey(serviceKey);
     const docs = await canvasesOf(ctx.db, ownerId);
-    return settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
+    const settled = await settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
+    if (settled.ok) await purgeLater(ctx, canvasId);
+    return settled;
   },
 });

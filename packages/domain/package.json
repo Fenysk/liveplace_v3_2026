@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./ports": "./src/ports.ts",
+    "./snapshot": "./src/snapshot.ts",
+    "./chunk": "./src/chunk.ts",
+    "./retention": "./src/retention.ts",
     "./capacity": "./src/capacity.ts"
   }
 }

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { CanvasPill } from "../canvas/canvas-pill";
+import { RECOVERING_TITLE } from "../canvas/canvas-recovering";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
 import { Button } from "../design/button";
@@ -492,9 +493,9 @@ export const ViewportPillEntry = () => (
 export const NoticeEntry = () => (
   <Entry
     slug="message-seul"
-    components={["NoticePill", "ArchiveNotFound"]}
-    file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx"
-    note="La page d'accueil, un canvas introuvable."
+    components={["NoticePill", "ArchiveNotFound", "CanvasRecovering"]}
+    file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx, ui/canvas/canvas-recovering.tsx"
+    note="La page d'accueil, un canvas introuvable, un canvas que Redis remet en place."
     where="Au centre"
   >
     <Block title="États">
@@ -504,6 +505,14 @@ export const NoticeEntry = () => (
             <SignInButton href="#" label="Se connecter avec Twitch" />
             <SignInNote />
           </NoticePill>
+        </InNotice>
+      </StateRow>
+      <StateRow
+        name="Canvas en récupération"
+        detail="Pour tous, à la place du canvas ; la page reprend seule. Rien en vue OBS."
+      >
+        <InNotice>
+          <NoticePill title={RECOVERING_TITLE} />
         </InNotice>
       </StateRow>
       <StateRow name="Une archive supprimée, ou un lien inconnu" detail="Le bouton dit le nom affiché.">

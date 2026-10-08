@@ -12,6 +12,7 @@ import { AccountWindow } from "../account/account-window";
 import { useAccountPillProps } from "../account/use-account-pill";
 import { useSigningIn } from "../account/use-signing-in";
 import { useIsCanvasMissing } from "../canvas/canvas-missing";
+import { CanvasRecovering, useIsCanvasRecovering } from "../canvas/canvas-recovering";
 import { useIsCanvasDiscarded, useIsCanvasReopened } from "../canvas/canvas-status";
 import { useOwnerProfile } from "../canvas/owner-profile";
 import { PixelCanvas } from "../canvas/pixel-canvas";
@@ -141,6 +142,7 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const navigate = useNavigate();
   const isMissing = useIsCanvasMissing(stores?.canvas);
+  const isRecovering = useIsCanvasRecovering(stores?.canvas);
   const isDiscarded = useIsCanvasDiscarded(stores?.canvas);
   const isReopened = useIsCanvasReopened(stores?.canvas);
 
@@ -160,6 +162,8 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
     if (isReopened) void navigate({ to: "/$login", params: { login: owner.login } });
   }, [isReopened, navigate, owner.login]);
 
+  // Redis remet cette archive en place (Écart §4.2, JOURNAL 2026-10-08) : le même message, la page reprend seule.
+  if (isRecovering) return <CanvasRecovering />;
   if (isMissing || isDiscarded)
     return <ArchiveNotFound login={owner.login} displayName={owner.displayName} />;
 

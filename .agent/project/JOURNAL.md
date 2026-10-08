@@ -32,6 +32,48 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §7.2 (amende celui du 08/10 sur la récupération) : le premier chunk d'après une récupération note les versions perdues avant elle
+
+**Contexte.** Panne simulée en bêta : un canvas dessiné jusqu'à la version 275, un seul chunk rangé (1 à 3), la sauvegarde à 275, `FLUSHALL`, reprise à 1 000 275. Les versions 4 à 275 n'ont jamais été archivées et le chunk suivant ne le disait pas : le saut de la reprise n'est pas un trou, mais ce qui le précédait en était un, et un trou se note, jamais un silence.
+**Décision.** `restore.lua` pose `meta.recoveredSnapshotVersion` à côté de `recoveredAt` et `recoveredAtVersion` : la version de la sauvegarde remise en place. `listChunkGaps` (domain) note, sur le premier chunk d'après la récupération, `[curseur + 1, version de la sauvegarde]` quand la sauvegarde dépasse le curseur d'archive ; entre elle et la reprise aucune version n'a existé, donc aucun trou ; une sauvegarde au plus égale au curseur n'a rien perdu. Une récupération d'avant ce champ n'a pas la version de sa sauvegarde : elle se tire de la reprise, qui vaut toujours max(sauvegarde, curseur) + 1 000 000, donc exacte dès que la sauvegarde dépasse le curseur.
+**Renoncement.** Aucun trou inventé entre la sauvegarde et la reprise. Deux récupérations avant qu'un chunk soit rangé ne notent qu'un trou, du curseur à la dernière sauvegarde, sans y distinguer le saut de la première.
+
+## 2026-10-08 — Écart §7.3 et §8.1 : la rétention en pyramide, le budget de l'historique, et deux lignes de Capacité (protocole 19)
+
+**Contexte.** Sans rétention, snapshots et chunks grossissent contre 1 Go de fichiers pour la prod et le dev ensemble, et l'API d'usage de Convex ne donne que des flux, jamais ce stock. La section Capacité ne dit ni le stock ni le retard de la sauvegarde.
+**Décision.** `planRetention` (domain, pure) décide la pyramide d'un canvas : travail ×2 ; `hourly` 24 h ; `daily` complète 7 j puis `state` seul jusqu'à 30 j ; `weekly` `state` seul sans limite. Une promotion partage le fichier (une ligne de plus, l'index `by_storage` compte les références) : seuls un `daily` dégradé et un `weekly` tiré d'un complet écrivent un petit fichier. Le worker garde les paliers en mémoire (une lecture au démarrage) et applique en lots à curseur. `purgeableRanges` : budget des chunks par scope (700 Mo en `prod`, 50 Mo ailleurs), le plus ancien d'abord, plancher de 7 j, lots de 50 chunks, `purgedBeforeVersion` et `purgedBeforeTs` posés sur `canvases`. Un `daily` déjà plus vieux que 7 jours entre directement en `state` seul : le plan suivant n'a pas à le dégrader. Les octets se comptent dans `storageUsage` (une ligne lue, jamais un `collect`), complétés une fois par `usage:ensure` au premier démarrage d'un worker (marqueur `ready`) ; `snapshots.listLatest` saute d'index. Capacité gagne « Stockage des fichiers » (un stock, sans projection, lu par la clé de déploiement sur la fonction interne `usage:files`) et « Sauvegarde » (retard de la plus vieille modification pas rangée, plafond 15 min, déposé par le worker) : deux identifiants de ressource, protocole 19. Le plan d'historique compte les entrées : un saut de récupération n'en est pas. Au-delà de 7 jours, un retour en arrière rend le dessin mais pas ses auteurs.
+**Renoncement.** Le recompte `usage:recount` lit toutes les lignes dans une transaction : sûr jusqu'à environ 16 000 lignes, à paginer au-delà. Un fichier envoyé puis jamais rangé (échec entre l'envoi et `record`) n'est pas compté. Aucune lecture de `_storage` ; aucun retard compté sur l'âge de la dernière sauvegarde (un canvas calme n'est pas en retard) ; aucun fichier copié par une promotion ; aucun `collect()` de scope, ni périodique ni au démarrage hors des paliers.
+
+## 2026-10-08 — Écart §4.2 : un canvas en récupération se dit `canvas_recovering`, protocole 18, et les actions Twitch l'attendent
+
+**Contexte.** Pendant une récupération, `getCanvas` rend `null` comme pour un canvas inconnu : la page dirait « introuvable » d'un canvas que Convex connaît. Le gateway ne parle jamais à Convex, et `twitch-commands.ts` acquittait une action sur un canvas absent.
+**Décision.** L'état « en récupération » est `meta.ready` à `0` (`getCanvasMeta` le disait déjà : on ne sert jamais un canvas en cours de restore), posé par le worker et, au rendu d'une page, par le web. Un canvas sans `ready` mais avec `version` (le canvas neuf d'un archivage) n'en est pas un. Le gateway répond `canvas_recovering`, un code d'erreur de plus : protocole 18 ; la page reprend seule au `welcome`. Une action Twitch sur un canvas en récupération reste non acquittée, rejouée toutes les 5 s, appliquée après.
+**Renoncement.** Pas de marqueur à part, ni de texte rendu par le gateway : la page dit son message, le gateway seulement le code.
+
+## 2026-10-08 — Écart §7.2 : la récupération d'un canvas perdu, `restore.lua`, version +1 000 000, jamais né vide
+
+**Contexte.** Sans récupération, les sauvegardes ne servent qu'à un humain. Et un canvas recréé vide par la connexion du streamer (`createCanvas`) donnerait à `restore.lua` une `version` existante : il ne reviendrait jamais.
+**Décision.** Le worker connaît ses canvas sauvegardés (Convex une fois au démarrage, puis sa mémoire) et, toutes les 5 s, un pipeline `EXISTS cv:<id>:version` sur Redis nomme ceux qui manquent : jamais de lecture Convex périodique. Pour chacun : `ready` à 0, vérifier qu'il existe encore dans `canvases` (A3), la dernière sauvegarde lisible (sinon la précédente, sinon il reste bloqué et le worker le journalise), `user:<id>` depuis `users`, piles et `cells:` en pipeline, puis `restore.lua` : `state`, modération, classement, progressions, `meta`, `version` = max(snapshot, curseur de l'historique) + 1 000 000 (toute page revenue prend un snapshot), `ready` à 1 en dernier, `ctl resize`. `meta.recoveredAt` et `recoveredAtVersion` disent la récupération : le premier chunk d'après note `recoveredAt`, le saut n'est pas un trou. Le web reçoit `DURABLE_SCOPE` : la connexion ne crée pas un canvas dont ce scope a une sauvegarde. Pour que la perte n'arrête rien : le worker reprend son bail si personne ne le tient, et la file des actions Twitch refait son groupe (`NOGROUP`, `UNBLOCKED`) au lieu d'arrêter le gateway.
+**Renoncement.** 5 s et non 30 s : le seul coût est un pipeline Redis, et la fenêtre d'un « introuvable » se réduit. Ni rejeu des chunks ni couches recouvertes d'avant la panne (acceptés), ni classement refait pour une sauvegarde d'avant le champ.
+
+## 2026-10-08 — Écart §7.2 : l'historique des poses part dans Convex par `chunk`, lu dans le flux sans groupe de consommateurs
+
+**Contexte.** Le flux `events` ne garde que 20 000 entrées (`MAXLEN ~`), et l'entrée d'une pose ne dit pas sa `placementId` (elle vit dans la pile) : sans archive, ni la récupération au-delà du dernier snapshot ni un timelapse ne sont possibles.
+**Décision.** `place.lua` ajoute le champ `p` (la `placementId`) à côté de `e` : ce que reçoivent les clients ne change pas, le protocole reste 17. Le worker lit `XRANGE` après un curseur (le dernier `toVersion` rangé, demandé à Convex au démarrage), au tour de 5 min ou dès 5 000 entrées non archivées, et range un `chunk` par tour : un `payload` brotli de tuples `[version, placementId, événement]` (poses et modération), une ligne `chunks` (scope, canvas, versions, dates, `count`, taille) qui refuse tout chevauchement. Une version sans entrée est notée dans `gaps`, sauf la dernière taille connue (`resizedAt`) ; `recoveredAt` attend la récupération (étape E). Un canvas archivé vide son reste une fois, puis ne produit plus rien ; `purge:byCanvas` efface aussi ses chunks.
+**Renoncement.** Ni groupe de consommateurs ni acquittement : le curseur de Convex suffit, un doublon est refusé au rangement. Ni pyramide ni budget de l'historique (A4, étape F).
+
+## 2026-10-08 — Écart §8.1 : supprimer une archive efface aussi ses sauvegardes dans Convex, en tâche de fond
+
+**Contexte.** Un canvas supprimé n'a plus de clés Redis, mais ses sauvegardes resteraient dans Convex : des fichiers qui ne servent à personne et pèsent sur le 1 Go du plan Starter.
+**Décision.** `canvases.discard` répond comme avant, puis planifie `purge:byCanvas` (planificateur Convex) : par lots de 100, lignes et fichiers, tous scopes confondus pour ce `canvasId` ; un dernier passage une minute après rattrape une sauvegarde partie pendant la suppression. Un échec de planification n'échoue jamais la suppression. Le worker abandonne un canvas dès son `canvasStatus` `discarded`.
+**Renoncement.** Pas de file de ménage ni de table de suivi : l'index `by_canvas` suffit à savoir s'il reste quelque chose.
+
+## 2026-10-08 — Écart §7.2 : un canvas sans pose ni modération n'est pas sauvegardé, et le snapshot porte le classement
+
+**Contexte.** « Version 0 : pas de snapshot » perdait le canvas neuf d'un archivage, qui recopie bannis, modérateurs et progressions de son prédécesseur ; et `scoreboard` et `scoreboard:banned` (JOURNAL 2026-10-06) n'entraient pas dans le snapshot.
+**Décision.** Un canvas en version 0 est sauvegardé s'il a un banni, un modérateur ou une progression, jamais sans rien. `scoreboard` et `scoreboardBanned` entrent en champs facultatifs : `schemaVersion` reste 1, les sauvegardes d'avant restent lisibles. Sur chaque `canvasStatus` `archived`, le worker suit `successorId` : le canvas neuf est sauvegardé sans que le flux d'archivage publie rien de plus.
+**Renoncement.** Aucun `publish` ajouté au web ni à `archive-writes` : les tests de l'archivage ne changent pas.
+
 ## 2026-10-08 — Écart §5.1 : une notification EventSub n'est appliquée qu'une fois, `twitch:message:<id>` en `SET NX EX 660`
 
 **Contexte.** Twitch livre « au moins une fois » et demande de dédupliquer sur `Twitch-Eventsub-Message-Id` ; deux `channel.ban` au même identifiant donnaient deux actions en file, donc deux entrées de plus dans le flux et deux versions consommées (prouvé en local).
@@ -170,6 +212,36 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 **Contexte.** L'audience compte des pages du jeu ouvertes ; aucun mot du lexique ne les nomme, et `session` est réservé au cookie.
 **Décision.** `visit` : une page du jeu ouverte, hors vue OBS ; un rechargement en fait une nouvelle, une reprise de la même page (`hello` avec `lastVersion`) non. Bannis : `pageview`, `hit`.
 **Renoncement.** Pas de mot pour le temps passé : `visitMinutes` le dit.
+
+## 2026-10-06 — Écart §7.1 : le worker découvre les canvas par Redis, pas par `canvases.list`
+
+**Contexte.** §7.1 prévoyait `canvases.list` toutes les 60 s : des lectures Convex qui grandissent avec les comptes, pour un résultat qui peut différer de Redis (un canvas d'avant la progression n'a aucun joueur, un compte n'a pas toujours son canvas ici). Le canvas local de `fenysk` l'a montré : sans clé `progress`, il aurait été ignoré.
+**Décision.** Deux balayages de Redis toutes les 5 min : `cv:*:meta` pour les canvas, `cv:*:progress:*` pour leurs joueurs. Tout canvas de Redis dont la version dépasse zéro est sauvegardé, dessiné depuis le 30/09 ou non.
+**Renoncement.** Pas de `canvases.list`. Le coût des deux balayages à l'échelle de la prod n'est pas mesuré ; le jour où il pèse, un ensemble des joueurs tenu par `place.lua` le remplace.
+
+## 2026-10-06 — `apps/worker/tsup.config.ts` rejoint `unlayeredFilesAllowed`
+
+**Contexte.** Le worker se construit comme le gateway, par `tsup`, et sa configuration n'appartient à aucune couche.
+**Décision.** Ce chemin exact entre dans `unlayeredFilesAllowed` d'`architecture.json`, à côté de celui du gateway.
+**Renoncement.** Aucun glob : la liste reste lisible d'un coup d'œil.
+
+## 2026-10-06 — Écart §11.5 : `DURABLE_SCOPE` obligatoire, un seul worker
+
+**Contexte.** Le poste et les bêtas partagent le Convex de dev, et un même `canvasId` existe dans plusieurs Redis : sans nom d'environnement, leurs sauvegardes se mélangeraient.
+**Décision.** `DURABLE_SCOPE` (`prod`, `beta`, `poste-2`…, ou `off` écrit exprès) est lu sans défaut et entre dans chaque ligne d'index. Un bail `worker:lease` (30 s) garde un seul worker : le second refuse de démarrer. `worker:heartbeat` porte la santé (§7.5).
+**Renoncement.** Pas de Convex à part pour les bêtas : une seule bêta sauvegarde à la fois, les autres sont `off`.
+
+## 2026-10-06 — Écart §8.1 : un snapshot est un fichier Convex, indexé par une table `snapshots`
+
+**Contexte.** Des documents relus en entier à chaque remplacement dépassent le plan Starter (doc Convex relue le 06/10 : 1 Mio par document, 1 Go d'E/S par mois, 1 Go de fichiers, envoi non limité mais coupé à 2 min).
+**Décision.** Le fichier (JSON compressé en brotli) part par une URL d'envoi (`generateUploadUrl`, puis `POST`) ; `snapshots.record` range la ligne d'index (scope, canvas, version, date, palier, taille), refuse une version plus basse et garde les deux derniers. Toute fonction exige `serviceKey`. L'URL d'envoi plutôt que l'action HTTP prévue : pas de surface d'authentification de plus.
+**Renoncement.** Aucun pixel dans un document ; ni R2, ni second fournisseur.
+
+## 2026-10-06 — Écart §7.2 : le worker commence par un snapshot complet de chaque canvas
+
+**Contexte.** Le plan commençait par drainer le flux, et son snapshot (`state`, `version`, `bans`, `cleared`) laissait de côté tout le reste de ce qui lie un canvas à son streamer. La promesse du 06/10 : après une perte totale, le canvas revient à cinq minutes de poses près, et la modération n'est jamais oubliée.
+**Décision.** Un snapshot `schemaVersion: 1` par canvas : `meta`, la tête de chaque pile (auteur, pose, date, version, cases hors cadre comprises, filtrée par les pierres tombales ; `state` se refait à la restauration), toute la modération, les noms Twitch, la progression des joueurs. Il part moins de 2 s après une modération ou un `ctl` (rebond d'une demi-seconde, un par 5 s au plus), 5 min après une pose, par un balayage de rattrapage et un rafraîchissement quotidien.
+**Renoncement.** Ni jauges (elles repartent pleines), ni couches recouvertes, ni drainage ni rejeu des chunks : ce sont J3 à J5 et J6 à J9.
 
 ## 2026-10-06 — Écart §10.3 et §11.5 : le développeur est nommé dans `domain`, et le gateway lit `BETA_LABEL`
 

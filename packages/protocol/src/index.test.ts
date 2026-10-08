@@ -315,7 +315,7 @@ describe("protocol 14: the archive", () => {
     expect(decodeClientFrame({ ...hello, protocolVersion: 16 }).ok).toBe(false);
     expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
     expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(15);
-    expect(PROTOCOL_VERSION).toBe(17);
+    expect(PROTOCOL_VERSION).toBe(19);
   });
 
   // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
@@ -347,6 +347,16 @@ describe("protocol 14: the archive", () => {
 
     expect(decodeServerFrame(refused)).toEqual({ ok: true, value: refused });
     expect(decodeServerFrame({ t: "error", code: "canvas_archived" }).ok).toBe(true);
+  });
+
+  // Nomme un canvas en récupération : le code seul, la page reprend à son `welcome` (JOURNAL 2026-10-08, protocole 18)
+  it("names a canvas being recovered, and refuses a hello still on protocol 17", () => {
+    const recovering = { t: "error", code: "canvas_recovering" };
+
+    expect(decodeServerFrame(recovering)).toEqual({ ok: true, value: recovering });
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 17, canvasId: "abc123", mode: "ui" }).ok).toBe(
+      false,
+    );
   });
 });
 
@@ -581,7 +591,7 @@ describe("activity frames", () => {
       canvases: z.array(z.object({ canvasId: z.string(), obsViews: z.number() })),
     });
 
-    expect(PROTOCOL_VERSION).toBe(17);
+    expect(PROTOCOL_VERSION).toBe(19);
     expect(decodeServerFrame(activity)).toEqual({ ok: true, value: activity });
     expect(beforeActivity.safeParse(activity).data).toEqual({
       t: "activity",
@@ -858,6 +868,37 @@ describe("capacity frames", () => {
   // Porte la saturation et chaque ressource, mesurée, sans nouvelles ou non mesurée
   it("carries the saturation and each resource, measured, without news or not measured", () => {
     expect(decodeServerFrame(capacity)).toEqual({ ok: true, value: capacity });
+  });
+
+  // Protocole 19 : le stock de fichiers de Convex et le retard de la sauvegarde, en secondes, sont des ressources de la frame
+  it("carries the Convex file stock and the snapshot delay in seconds, since protocol 19", () => {
+    const files = {
+      link: "convex",
+      id: "convexFiles",
+      unit: "bytes",
+      state: "measured",
+      value: 3e8,
+      ceiling: 1.07e9,
+      ratio: 28,
+    };
+    const delay = {
+      link: "convex",
+      id: "snapshotDelay",
+      unit: "seconds",
+      state: "measured",
+      value: 270,
+      ceiling: 900,
+      ratio: 30,
+    };
+    const frame = {
+      ...capacity,
+      saturation: { ...capacity.saturation, resource: "snapshotDelay" },
+      resources: [files, delay],
+    };
+
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(19);
+    expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeServerFrame({ ...frame, resources: [{ ...delay, unit: "minutes" }] }).ok).toBe(false);
   });
 
   // Une ressource mesurée a sa valeur, son plafond et son taux ; un état inconnu est refusé

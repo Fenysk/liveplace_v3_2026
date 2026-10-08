@@ -56,6 +56,8 @@ const base = (): Resource[] => [
   measured("convexDatabaseIo", 0.35, 1, { deployments: DEPLOYMENTS }),
   measured("convexEgress", 0.12, 1, { deployments: DEPLOYMENTS }),
   measured("convexCompute", 4.2, 20, { deployments: DEPLOYMENTS }),
+  measured("convexFiles", 312 * MIB, GIB, { deployments: DEPLOYMENTS }),
+  measured("snapshotDelay", 270, 900),
 ];
 
 // Une ressource de l'exemple, remplacée.
@@ -107,6 +109,7 @@ export const sampleCapacityFrame = (variant: CapacityVariant, nowMs: number): Ca
           missing("redisMemory", "withoutNews"),
           missing("redisCpu", "withoutNews"),
           missing("webUtilization", "withoutNews"),
+          missing("snapshotDelay", "withoutNews"),
         ),
         nowMs,
       );
@@ -114,9 +117,16 @@ export const sampleCapacityFrame = (variant: CapacityVariant, nowMs: number): Ca
       return toFrame(
         replaced(
           CALM,
-          ...(["convexCalls", "convexDatabaseIo", "convexEgress", "convexCompute"] as const).map((id) =>
-            missing(id, "unmeasured"),
-          ),
+          ...(
+            [
+              "convexCalls",
+              "convexDatabaseIo",
+              "convexEgress",
+              "convexCompute",
+              "convexFiles",
+              "snapshotDelay",
+            ] as const
+          ).map((id) => missing(id, "unmeasured")),
         ),
         nowMs,
       );

@@ -37,6 +37,8 @@ const stubConvex = (response: () => Response | Promise<Response>) => {
     authorization: string | null;
     method: string | undefined;
     hasSignal: boolean;
+    body?: unknown;
+    contentType?: string | null;
   }[] = [];
   vi.stubGlobal("fetch", async (input: URL | string, init?: RequestInit) => {
     asked.push({
@@ -44,6 +46,9 @@ const stubConvex = (response: () => Response | Promise<Response>) => {
       authorization: new Headers(init?.headers).get("Authorization"),
       method: init?.method,
       hasSignal: init?.signal !== undefined,
+      ...(init?.body === undefined
+        ? {}
+        : { body: init.body, contentType: new Headers(init.headers).get("Content-Type") }),
     });
     return response();
   });
@@ -143,5 +148,77 @@ describe("createConvexUsageSource (JOURNAL 2026-10-07)", () => {
       expect(JSON.stringify(result)).not.toContain("secret-do-not-print");
       expect(JSON.stringify(result)).not.toContain("convex.cloud");
     }
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers, lu par `POST /api/query` sur la fonction interne `usage:files`.
+describe("the file stock of a deployment (JOURNAL 2026-10-08)", () => {
+  const filesReply = (bytes: number) =>
+    `{"status":"success","value":{"bytes":${bytes},"count":12},"logLines":[]}`;
+
+  // Appelle la fonction interne par l'API de requête, avec la même clé, dans un délai borné
+  it("calls the internal function through the query API with the same key, within a bounded time", async () => {
+    const asked = stubConvex(() => new Response(filesReply(1000)));
+
+    await createConvexUsageSource(deployment).getFilesBytes();
+
+    expect(asked).toEqual([
+      {
+        url: "https://watchful-spider-409.eu-west-1.convex.cloud/api/query",
+        authorization: `Convex ${deployment.key}`,
+        method: "POST",
+        hasSignal: true,
+        body: JSON.stringify({ path: "usage:files", args: {}, format: "json" }),
+        contentType: "application/json",
+      },
+    ]);
+  });
+
+  // Rend les octets du stock, tels que le compteur les a
+  it("gives the bytes of the stock as the counter holds them", async () => {
+    stubConvex(() => new Response(filesReply(327_155_712)));
+
+    expect(await createConvexUsageSource(deployment).getFilesBytes()).toEqual({
+      ok: true,
+      value: 327_155_712,
+    });
+  });
+
+  // Une réponse en erreur (fonction absente, pas encore déployée), un autre corps ou un nombre négatif : un échec dit en peu de mots
+  it("says a failure in a few words for an error reply, another body or a negative number", async () => {
+    const bodies = [
+      '{"status":"error","errorMessage":"Could not find public function for usage:files"}',
+      '{"status":"success","value":{"bytes":-1}}',
+      '{"status":"success","value":{}}',
+      '{"status":"success"}',
+      "[]",
+      "null",
+    ];
+
+    for (const body of bodies) {
+      stubConvex(() => new Response(body));
+
+      expect(await createConvexUsageSource(deployment).getFilesBytes(), body).toEqual({
+        ok: false,
+        error: "forme de réponse inconnue",
+      });
+    }
+  });
+
+  // Dit le code HTTP d'un refus, ou un réseau coupé, sans jamais écrire la clé ni l'adresse
+  it("says the HTTP code of a refusal or a network down, never writing the key or the address", async () => {
+    stubConvex(() => new Response("Unauthorized: secret-do-not-print", { status: 401 }));
+    expect(await createConvexUsageSource(deployment).getFilesBytes()).toEqual({
+      ok: false,
+      error: "HTTP 401",
+    });
+
+    stubConvex(() => {
+      throw new TypeError(`fetch failed: ${deployment.url} ${deployment.key}`);
+    });
+    const result = await createConvexUsageSource(deployment).getFilesBytes();
+
+    expect(result).toEqual({ ok: false, error: "injoignable (TypeError)" });
+    expect(JSON.stringify(result)).not.toContain("secret-do-not-print");
   });
 });

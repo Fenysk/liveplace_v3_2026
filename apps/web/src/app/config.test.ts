@@ -109,3 +109,24 @@ describe("CONVEX_USAGE_DEPLOYMENTS (JOURNAL 2026-10-07)", () => {
     }
   });
 });
+
+describe("DURABLE_SCOPE (JOURNAL 2026-10-08)", () => {
+  // Absente, vide ou `off` : le web se comporte comme avant, la connexion crée le canvas sans rien demander à Convex
+  it("is no scope when missing, empty or off", () => {
+    expect(parseWebConfig(env).durableScope).toBeNull();
+    expect(parseWebConfig({ ...env, DURABLE_SCOPE: "" }).durableScope).toBeNull();
+    expect(parseWebConfig({ ...env, DURABLE_SCOPE: "off" }).durableScope).toBeNull();
+  });
+
+  // Un nom d'environnement valide est gardé tel quel : c'est celui du worker
+  it("keeps a valid environment name as it is", () => {
+    expect(parseWebConfig({ ...env, DURABLE_SCOPE: "poste-2" }).durableScope).toBe("poste-2");
+    expect(parseWebConfig({ ...env, DURABLE_SCOPE: "prod" }).durableScope).toBe("prod");
+  });
+
+  // Un nom que le worker refuserait est refusé aussi, en nommant la variable
+  it("refuses a name the worker would refuse, naming the variable", () => {
+    expect(messageOf(() => parseWebConfig({ ...env, DURABLE_SCOPE: "Prod" }))).toContain("DURABLE_SCOPE");
+    expect(messageOf(() => parseWebConfig({ ...env, DURABLE_SCOPE: "poste 2" }))).toContain("DURABLE_SCOPE");
+  });
+});

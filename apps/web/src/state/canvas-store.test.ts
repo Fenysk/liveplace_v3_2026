@@ -120,6 +120,34 @@ describe("a canvas the gateway does not know (§4.2)", () => {
   });
 });
 
+describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+  // Le canvas revient : le welcome démentit canvas_recovering, la page reprend d'elle-même
+  it("forgets canvas_recovering when a welcome comes, and goes on reconnecting until then", () => {
+    const { store, receive, close, open } = setup({ isWelcomed: false });
+    receive({ t: "error", code: "canvas_recovering" });
+    close();
+
+    expect(store.getView()).toMatchObject({ lastError: "canvas_recovering", status: "reconnecting" });
+
+    open();
+    receive(welcome);
+
+    expect(store.getView()).toMatchObject({ lastError: null, status: "live" });
+  });
+
+  // Une page qui jouait quand Redis a tout perdu reprend un snapshot entier au welcome suivant, sans erreur gardée
+  it("takes a whole snapshot again when the canvas comes back to a page that was playing", () => {
+    const { store, receive, close, open } = setup();
+    receive({ t: "error", code: "canvas_recovering" });
+    close();
+    open();
+
+    receive({ ...welcome, version: 1_000_275 });
+
+    expect(store.getView()).toMatchObject({ lastError: null, version: 1_000_275 });
+  });
+});
+
 describe("the gauge (§9.4)", () => {
   // Prend la jauge et l'identité dans le welcome
   it("takes the gauge and the identity from the welcome", () => {

@@ -8,7 +8,8 @@ import { HOUR_MS, MINUTE_MS, type Timestamp } from "./index";
 export const CAPACITY_LINKS = ["redis", "gateway", "web", "machine", "convex"] as const;
 export type CapacityLink = (typeof CAPACITY_LINKS)[number];
 
-// Dans l'ordre du cahier des charges, §3 : à taux égal, la première gagne la saturation.
+// Dans l'ordre du cahier des charges, §3 : à taux égal, la première gagne la saturation. La position d'une ressource est
+// écrite dans l'historique de la saturation (capacity.lua) : une nouvelle s'ajoute à la fin, jamais au milieu.
 export const CAPACITY_RESOURCE_IDS = [
   "redisMemory",
   "redisCpu",
@@ -25,6 +26,8 @@ export const CAPACITY_RESOURCE_IDS = [
   "convexDatabaseIo",
   "convexEgress",
   "convexCompute",
+  "convexFiles", // Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers de Convex, face à son quota
+  "snapshotDelay", // et le retard de la sauvegarde, face à ses 15 minutes
 ] as const;
 export type CapacityResourceId = (typeof CAPACITY_RESOURCE_IDS)[number];
 
@@ -38,6 +41,7 @@ export const CAPACITY_UNITS = [
   "calls",
   "gigabytes",
   "gigabyteHours",
+  "seconds",
 ] as const;
 export type CapacityUnit = (typeof CAPACITY_UNITS)[number];
 
@@ -56,7 +60,10 @@ export const GATEWAY_OUTBOUND_CEILING_BPS = 200_000_000; // le port du VPS, 200 
 export const BROADCAST_DELAY_CEILING_MS = 100; // la cible de 250 ms du plan d'architecture, §12.3, moins le tick et le réseau (Écart §6, JOURNAL 2026-10-07)
 export const CANVAS_CONNECTIONS_CEILING = 1000;
 export const TOTAL_CONNECTIONS_CEILING = 1750;
-export const SNAPSHOT_AGE_CEILING_MS = 15 * MINUTE_MS; // à venir, avec la sauvegarde : pas encore de ressource
+// Le retard de la sauvegarde : l'âge de la plus ancienne modification pas encore sauvegardée. Un worker sain en a cinq minutes
+// au plus (les poses attendent leur tour), quinze est une panne.
+export const SNAPSHOT_DELAY_CEILING_MS = 15 * MINUTE_MS;
+const GIB = 1024 ** 3;
 
 // Le plan Convex se règle ici, et ses plafonds mensuels suivent. Starter inclut les mêmes quantités que Free : au-delà,
 // il facture au lieu de couper (convex.dev/pricing, 07/10/2026).
@@ -69,7 +76,7 @@ export type ConvexCeilings = {
   databaseIoGb: number;
   egressGb: number;
   computeGbHours: number;
-  filesGb: number; // à venir, avec la sauvegarde
+  filesGb: number; // un stock, pas un usage du mois : fichiers des sauvegardes et de l'historique
 };
 
 const CONVEX_INCLUDED: ConvexCeilings = {
@@ -119,6 +126,15 @@ const monthly = (unit: CapacityUnit, ceiling: number) => ({
   windowMs: INSTANT_WINDOW_MS,
 });
 
+// Un stock de Convex : sa valeur du moment face à un quota, sans projection de fin de mois.
+const stock = (ceiling: number) => ({
+  link: "convex" as const,
+  unit: "bytes" as const,
+  ceiling,
+  cadenceMs: CONVEX_USAGE_MS,
+  windowMs: INSTANT_WINDOW_MS,
+});
+
 const SPECS = {
   redisMemory: instant("redis", "bytes", null),
   redisCpu: instant("redis", "cores", 1), // un cœur : Redis travaille sur un seul fil
@@ -135,6 +151,8 @@ const SPECS = {
   convexDatabaseIo: monthly("gigabytes", convexCeilings.databaseIoGb),
   convexEgress: monthly("gigabytes", convexCeilings.egressGb),
   convexCompute: monthly("gigabyteHours", convexCeilings.computeGbHours),
+  convexFiles: stock(convexCeilings.filesGb * GIB),
+  snapshotDelay: instant("convex", "seconds", SNAPSHOT_DELAY_CEILING_MS / 1000),
 } as const satisfies Record<CapacityResourceId, Omit<CapacitySpec, "id">>;
 
 export function getCapacitySpec(id: CapacityResourceId): CapacitySpec {
@@ -256,6 +274,25 @@ export function toMonthlyResource(
     ceiling,
     ratio: toRatio(projected, ceiling),
     ...(fullAt === undefined ? {} : { fullAt }),
+  };
+}
+
+// Un stock (les fichiers de Convex) : la somme des déploiements au dernier instant lu, sans projection ; absent ou plus vieux
+// que trois cadences, sans nouvelles.
+export function toStockResource(
+  spec: CapacitySpec,
+  reading: { used: number; at: Timestamp } | undefined,
+  nowMs: Timestamp,
+): CapacityResource {
+  const { ceiling } = spec;
+  if (!reading || ceiling === null || isWithoutNews(reading.at, spec.cadenceMs, nowMs))
+    return toWithoutNews(spec);
+  return {
+    ...toBase(spec),
+    state: "measured",
+    value: reading.used,
+    ceiling,
+    ratio: toRatio(reading.used, ceiling),
   };
 }
 

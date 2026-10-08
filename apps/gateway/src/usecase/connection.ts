@@ -336,6 +336,11 @@ export function createConnection(
     socket.close(CLOSE_POLICY);
   };
 
+  // Écart §4.2 (JOURNAL 2026-10-08) : Redis a perdu ce canvas et le remet en place (`meta.ready` à 0), ou il n'existe pas.
+  // La page reprend seule dans le premier cas : sa reconnexion trouve le canvas prêt.
+  const refuseMissing = async (canvasId: string): Promise<void> =>
+    refuse((await deps.core.isRecovering(canvasId)) ? "canvas_recovering" : "canvas_not_found");
+
   // La version fait la déduplication : les cases du snapshot ne repartent pas (§6.1).
   const sendHeld = (held: CellsFrame[], snapshotVersion: number): void => {
     for (const frame of held) {
@@ -492,7 +497,7 @@ export function createConnection(
     const { canvasId, mode, ownerId, role } = state;
     startJoining(canvasId, mode, ownerId, role);
     const meta = await deps.core.getCanvas(canvasId);
-    if (!meta) return refuse("canvas_not_found");
+    if (!meta) return refuseMissing(canvasId);
     const gauge = await getGaugeFor(canvasId, meta);
     await arrive({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode }, meta, role, gauge, null);
   };
@@ -523,7 +528,7 @@ export function createConnection(
 
   const greet = async (frame: HelloFrame): Promise<void> => {
     const meta = await deps.core.getCanvas(frame.canvasId);
-    if (!meta) return refuse("canvas_not_found");
+    if (!meta) return refuseMissing(frame.canvasId);
     const isModerator = session ? await deps.core.isModerator(frame.canvasId, session.userId) : false;
     const [gauge, scoreboard] = await Promise.all([
       getGaugeFor(frame.canvasId, meta),
@@ -550,7 +555,7 @@ export function createConnection(
       pixels: frame.pixels,
     });
     if (!result.ok)
-      return result.error === "canvas_archived" ? refuseArchived(frame.requestId) : refuse(result.error);
+      return result.error === "canvas_archived" ? refuseArchived(frame.requestId) : refuseMissing(canvasId);
     deps.activity.countPixels(canvasId, session.userId, result.value.accepted);
     socket.sendFrame(result.value);
   };
@@ -564,7 +569,7 @@ export function createConnection(
       nowMs: deps.now(),
     });
     if (!result.ok)
-      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuse(result.error);
+      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuseMissing(canvasId);
     socket.sendFrame(result.value);
   };
 
@@ -624,7 +629,7 @@ export function createConnection(
     const result = await deps.core.moderate(canvasId, { ...moderation, nowMs: deps.now() });
     if (!result.ok) {
       if (result.error === "forbidden") return forbid();
-      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuse(result.error);
+      return result.error === "canvas_archived" ? refuseArchived(requestId) : refuseMissing(canvasId);
     }
     const { version, cells, isDone } = result.value;
     socket.sendFrame({ t: "moderated", requestId, version, cells, done: isDone });
@@ -682,7 +687,7 @@ export function createConnection(
     });
     if (result.ok) return socket.sendFrame({ t: "reported", requestId });
     if (result.error === "canvas_archived") return refuseArchived(requestId);
-    if (result.error === "canvas_not_found") return refuse("canvas_not_found");
+    if (result.error === "canvas_not_found") return refuseMissing(ready.canvasId);
     socket.sendFrame({ t: "error", code: "forbidden", requestId });
   };
 

@@ -93,6 +93,7 @@ const capacityStore: CapacityStore = {
     outOfMemoryRefusals: 0,
   }),
   getWebMeasure: async () => null,
+  getSnapshotMeasure: async () => null,
   getConvexDeposit: async () => null,
   listCeilingsReached: async () => new Map(),
   storeCeilingReached: async () => undefined,
@@ -215,6 +216,8 @@ type SetupOptions = {
   archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
   theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
+  isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
+  isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
   twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (Écart §4, JOURNAL 2026-10-07)
@@ -252,6 +255,9 @@ const setup = (options: SetupOptions = {}) => {
     async isModerator() {
       return roles.isModerator;
     },
+    async isRecovering() {
+      return options.isRecovering ?? false;
+    },
     async getSnapshot() {
       options.duringSnapshot?.();
       return {
@@ -268,6 +274,7 @@ const setup = (options: SetupOptions = {}) => {
     },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
+      if (options.isLost) return { ok: false as const, error: "canvas_not_found" as const };
       return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: ack };
     },
     async moderate(_asked: string, moderation: Moderation) {
@@ -508,6 +515,40 @@ describe("createConnection (§6.1)", () => {
     const { connection, sent, closed } = setup();
 
     await connection.receive(hello({ canvasId: "unknown-canvas" }));
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_not_found" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Un canvas que Redis remet en place se dit « en récupération », jamais « introuvable » (Écart §4.2, JOURNAL 2026-10-08)
+  it("says a canvas being recovered is being recovered, not that it is missing", async () => {
+    const { connection, sent, closed } = setup({ isRecovering: true });
+
+    await connection.receive(hello({ canvasId: "unknown-canvas" }));
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_recovering" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Une page qui jouait quand Redis a tout perdu l'apprend à sa prochaine pose : le canvas revient, elle se reconnecte
+  it("tells a page that was playing that the canvas is being recovered when its placement finds it lost", async () => {
+    const { connection, sent, closed } = setup({ isLost: true, isRecovering: true });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(place());
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_recovering" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Le canvas qui n'est pas en récupération reste « introuvable » quand les scripts ne le trouvent plus
+  it("still says missing for a canvas the scripts no longer find when it is not being recovered", async () => {
+    const { connection, sent, closed } = setup({ isLost: true });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(place());
 
     expect(sent).toEqual([{ t: "error", code: "canvas_not_found" }]);
     expect(closed).toEqual([1008]);

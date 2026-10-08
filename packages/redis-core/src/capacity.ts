@@ -16,6 +16,8 @@ import type {
   ConvexDeposit,
   ConvexUsage,
   RedisUsage,
+  SnapshotDelayWrites,
+  SnapshotMeasure,
   WebMeasure,
 } from "@liveplace/domain/ports";
 import type { Redis, Result as RedisResult } from "ioredis";
@@ -82,14 +84,25 @@ const toPoint = (at: Timestamp, stored: string): CapacityPoint => {
   return { at, saturation, ...(resource ? { resource } : {}), ...toLinkRatios(ratios) };
 };
 
-// `at,utilization` pour le web, `at,calls,databaseIoGb,egressGb,computeGbHours` pour un déploiement Convex.
-const toWebMeasure = (stored: string | null): WebMeasure | null => {
-  const [at, utilization] = (stored ?? "").split(",").map(toNumber);
-  return at === undefined || utilization === undefined ? null : { at, utilization };
+const toPair = (stored: string | null): [number, number] | null => {
+  const [first, second] = (stored ?? "").split(",").map(toNumber);
+  return first === undefined || second === undefined ? null : [first, second];
 };
 
+// `at,utilization` pour le web, `at,delayMs` pour le worker.
+const toWebMeasure = (stored: string | null): WebMeasure | null => {
+  const pair = toPair(stored);
+  return pair ? { at: pair[0], utilization: pair[1] } : null;
+};
+
+const toSnapshotMeasure = (stored: string | null): SnapshotMeasure | null => {
+  const pair = toPair(stored);
+  return pair ? { at: pair[0], delayMs: pair[1] } : null;
+};
+
+// `at,calls,databaseIoGb,egressGb,computeGbHours[,filesBytes]` pour un déploiement Convex.
 const toConvexUsage = (stored: string): ConvexUsage | null => {
-  const [at, calls, databaseIoGb, egressGb, computeGbHours] = stored.split(",").map(toNumber);
+  const [at, calls, databaseIoGb, egressGb, computeGbHours, filesBytes] = stored.split(",").map(toNumber);
   if (
     at === undefined ||
     calls === undefined ||
@@ -98,7 +111,14 @@ const toConvexUsage = (stored: string): ConvexUsage | null => {
     computeGbHours === undefined
   )
     return null;
-  return { at, calls, databaseIoGb, egressGb, computeGbHours };
+  return {
+    at,
+    calls,
+    databaseIoGb,
+    egressGb,
+    computeGbHours,
+    ...(filesBytes === undefined ? {} : { filesBytes }),
+  };
 };
 
 export function createCapacityWrites(redis: Redis, keys: CapacityKeys = buildCapacityKeys()): CapacityWrites {
@@ -108,14 +128,33 @@ export function createCapacityWrites(redis: Redis, keys: CapacityKeys = buildCap
     },
 
     // Le premier déploiement lu efface « non configuré » : la variable vient d'être posée.
-    async storeConvexUsage(deployment, { at, calls, databaseIoGb, egressGb, computeGbHours }) {
-      const stored = [at, calls, databaseIoGb, egressGb, computeGbHours].join(",");
+    async storeConvexUsage(deployment, { at, calls, databaseIoGb, egressGb, computeGbHours, filesBytes }) {
+      const stored = [
+        at,
+        calls,
+        databaseIoGb,
+        egressGb,
+        computeGbHours,
+        ...(filesBytes === undefined ? [] : [filesBytes]),
+      ].join(",");
       await execAll(redis.multi().hset(keys.convex, deployment, stored).del(keys.convexUnconfigured));
     },
 
     // Les déploiements d'avant partent avec la variable qui les nommait.
     async storeConvexUnconfigured() {
       await execAll(redis.multi().del(keys.convex).set(keys.convexUnconfigured, "1"));
+    },
+  };
+}
+
+// Le retard de la sauvegarde : le worker le dépose, sans EXPIRE, avec l'instant de sa mesure (JOURNAL 2026-10-08).
+export function createSnapshotDelayWrites(
+  redis: Redis,
+  keys: CapacityKeys = buildCapacityKeys(),
+): SnapshotDelayWrites {
+  return {
+    async storeSnapshotDelay({ at, delayMs }) {
+      await redis.set(keys.snapshot, `${at},${delayMs}`);
     },
   };
 }
@@ -144,6 +183,10 @@ export function createCapacityStore(redis: Redis, keys: CapacityKeys = buildCapa
 
     async getWebMeasure() {
       return toWebMeasure(await redis.get(keys.web));
+    },
+
+    async getSnapshotMeasure() {
+      return toSnapshotMeasure(await redis.get(keys.snapshot));
     },
 
     async getConvexDeposit(): Promise<ConvexDeposit | null> {

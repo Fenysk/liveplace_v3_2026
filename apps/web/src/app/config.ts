@@ -39,6 +39,12 @@ const WebEnvSchema = z.object({
   REDIS_URL: z.string().min(1),
   TWITCH_EVENTSUB_SECRET: z.string().min(10).max(100), // JOURNAL 2026-09-27 : les bornes de Twitch
   BETA_LABEL: z.string().optional(), // Écart §11.1 (JOURNAL 2026-10-04) : vide en production, le compose la passe toujours
+  // Écart §7.2 (JOURNAL 2026-10-08) : le nom de l'environnement de sauvegarde, celui du worker. Absente, vide ou `off` : la
+  // connexion crée le canvas comme avant, sans demander à Convex s'il en garde une sauvegarde.
+  DURABLE_SCOPE: z
+    .string()
+    .regex(/^([a-z][a-z0-9-]{0,31})?$/)
+    .optional(),
   // Écart §2 et §9 (JOURNAL 2026-10-07) : facultative ; sans elle, Convex est « non configuré ».
   CONVEX_USAGE_DEPLOYMENTS: z
     .string()
@@ -57,6 +63,7 @@ export type WebConfig = {
   twitchEventSubSecret: string;
   betaLabel: string | null;
   convexUsageDeployments: ConvexDeployment[]; // aucun : Convex n'est pas configuré
+  durableScope: string | null; // `null` : pas de sauvegarde ici, la connexion ne demande rien à Convex
 };
 
 export function parseWebConfig(env: unknown): WebConfig {
@@ -73,5 +80,6 @@ export function parseWebConfig(env: unknown): WebConfig {
     twitchEventSubSecret: parsed.TWITCH_EVENTSUB_SECRET,
     betaLabel: parsed.BETA_LABEL || null,
     convexUsageDeployments: toConvexDeployments(parsed.CONVEX_USAGE_DEPLOYMENTS ?? "") ?? [],
+    durableScope: parsed.DURABLE_SCOPE && parsed.DURABLE_SCOPE !== "off" ? parsed.DURABLE_SCOPE : null,
   };
 }

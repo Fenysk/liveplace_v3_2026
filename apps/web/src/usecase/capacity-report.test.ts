@@ -1,7 +1,7 @@
 import { MINUTE_MS, type Timestamp } from "@liveplace/domain";
 import type { CapacityWrites, ConvexUsage, ConvexUsageSource, WebMeasure } from "@liveplace/domain/ports";
 import type { Result } from "@liveplace/shared";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCapacityReport } from "./capacity-report";
 
 const start = Date.UTC(2026, 10, 7, 12, 0, 0);
@@ -43,9 +43,19 @@ const setup = (sources: ConvexUsageSource[] = []) => {
   return { report, clock, stored, timers, meter };
 };
 
-const source = (name: string, getUsage: () => Promise<Result<Usage>>): ConvexUsageSource => ({
+// Sans autre précision, un déploiement ne dit pas son stock de fichiers : seul l'usage du mois se dépose.
+const source = (
+  name: string,
+  getUsage: () => Promise<Result<Usage>>,
+  getFilesBytes: () => Promise<Result<number>> = async () => ({ ok: false, error: "non lu" }),
+): ConvexUsageSource => ({
   name,
   getUsage,
+  getFilesBytes,
+});
+
+beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation(() => undefined); // le stock non lu se journalise, ce n'est pas le sujet ici
 });
 
 afterEach(() => {
@@ -97,6 +107,50 @@ describe("the capacity report of the web (JOURNAL 2026-10-07)", () => {
     ]);
     expect(reads).toEqual([start]);
     expect(stored.unconfiguredCount).toBe(0);
+  });
+
+  // Dépose le stock de fichiers avec l'usage du mois quand le déploiement le dit (JOURNAL 2026-10-08)
+  it("deposits the file stock with the usage of the month when the deployment says it", async () => {
+    const { report, stored } = setup([
+      source(
+        "watchful-spider-409",
+        async () => ({ ok: true, value: usage(100) }),
+        async () => ({
+          ok: true,
+          value: 327_155_712,
+        }),
+      ),
+      source("happy-otter-123", async () => ({ ok: true, value: usage(7) })),
+    ]);
+
+    await report.start();
+
+    expect(stored.usages).toEqual([
+      ["watchful-spider-409", { at: start, ...usage(100), filesBytes: 327_155_712 }],
+      ["happy-otter-123", { at: start, ...usage(7) }],
+    ]);
+  });
+
+  // Un stock qu'on ne peut pas lire n'empêche pas l'usage du mois : il se journalise par le nom du déploiement, sans clé
+  it("deposits the usage of the month without the stock when it cannot be read, and logs the reason by the name", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { report, stored } = setup([
+      source(
+        "watchful-spider-409",
+        async () => ({ ok: true, value: usage(100) }),
+        async () => ({
+          ok: false,
+          error: "HTTP 401",
+        }),
+      ),
+    ]);
+
+    await report.start();
+
+    expect(stored.usages).toEqual([["watchful-spider-409", { at: start, ...usage(100) }]]);
+    expect(logged).toHaveBeenCalledWith(
+      "web: capacité, stockage des fichiers de Convex non lu pour watchful-spider-409 : HTTP 401",
+    );
   });
 
   // Relit Convex à chaque passage de sa minuterie, et l'occupation à chaque passage de la sienne

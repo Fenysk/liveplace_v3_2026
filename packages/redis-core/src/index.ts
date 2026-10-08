@@ -3,5 +3,8 @@ export * from "./archive-writes";
 export * from "./banned-moderators";
 export * from "./capacity";
 export * from "./client";
+export * from "./history";
 export * from "./keys";
+export * from "./recovery";
+export * from "./snapshot";
 export * from "./twitch-live";

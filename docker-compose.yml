@@ -55,6 +55,27 @@ services:
       - traefik.http.routers.${ROUTER_PREFIX:-liveplace}-ws.service=${ROUTER_PREFIX:-liveplace}-ws
       - traefik.http.services.${ROUTER_PREFIX:-liveplace}-ws.loadbalancer.server.port=8080
 
+  # §7 : un seul process, sans port publié. Sa santé est son battement dans Redis (`worker:heartbeat`, §7.5).
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      args:
+        APP: worker
+    environment:
+      REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
+      CONVEX_URL: ${CONVEX_URL:?CONVEX_URL manquante}
+      CONVEX_SERVICE_KEY: ${CONVEX_SERVICE_KEY:?CONVEX_SERVICE_KEY manquante}
+      # Écart §11.5 (JOURNAL 2026-10-06) : `prod`, `beta`… ou `off` écrit exprès. Sans défaut : jamais deux environnements mêlés.
+      DURABLE_SCOPE: ${DURABLE_SCOPE:?DURABLE_SCOPE manquante}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "dist/healthcheck.js"]
+      interval: 10s
+    restart: unless-stopped
+
   web:
     build:
       context: .
@@ -73,6 +94,8 @@ services:
       BETA_LABEL: ${BETA_LABEL:-}
       # Écart §2 et §9 (JOURNAL 2026-10-07) : facultative, des paires « URL clé » ; sans elle, Convex n'est pas mesuré.
       CONVEX_USAGE_DEPLOYMENTS: ${CONVEX_USAGE_DEPLOYMENTS:-}
+      # Écart §7.2 (JOURNAL 2026-10-08) : celui du worker. La connexion ne recrée pas vide un canvas dont ce scope a une sauvegarde.
+      DURABLE_SCOPE: ${DURABLE_SCOPE:?DURABLE_SCOPE manquante}
     # Le callback OAuth crée le canvas dans Redis (§10.1).
     depends_on:
       redis:

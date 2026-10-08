@@ -34,7 +34,9 @@ import { z } from "zod";
 // 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
 // 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (Écart §4.3, JOURNAL 2026-10-07).
 // 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (Écart §4 et §10.1, JOURNAL 2026-10-07).
-export const PROTOCOL_VERSION = 17;
+// 18 : un canvas en récupération, le code d'erreur `canvas_recovering` (Écart §4.2, JOURNAL 2026-10-08).
+// 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (Écart §4.3, JOURNAL 2026-10-08).
+export const PROTOCOL_VERSION = 19;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -167,6 +169,7 @@ const ErrorCodeSchema = z.enum([
   "invalid_frame",
   "canvas_not_found",
   "canvas_archived", // Écart §15 (JOURNAL 2026-10-06) : une écriture sur une archive, refusée sans fermer la connexion
+  "canvas_recovering", // Écart §4.2 (JOURNAL 2026-10-08) : Convex le connaît, Redis le remet en place ; la page reprend seule
   "server_full",
 ]);
 
