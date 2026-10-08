@@ -309,12 +309,62 @@ html[data-panning] .lp-floating > .lp-pill,
   place-items: center;
 }
 
-/* Écran étroit ou tactile : la pill Thème passe sous la rangée des pills du haut, centrée (Écart §8.1, JOURNAL
-   2026-10-07). La rangée mesure un contrôle et ses deux marges, à 44 px ici comme dans tokens.css. */
+/* Écran étroit ou tactile (Écart §8.1, JOURNAL 2026-10-08). La rangée du haut mesure un contrôle et ses deux marges, à 44 px
+   ici comme dans tokens.css.
+   La pill Canvas ne dépasse jamais la place que la pill Compte lui laisse (sa largeur est publiée, pill.tsx), avec un espace.
+   La pill Thème devient une bande : sous la rangée, sur la même largeur qu'elle. */
 @media (max-width: 640px), (pointer: coarse) {
+  .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(
+      100vw -
+      2 *
+      var(--space-4) -
+      var(--lp-top-right, calc(2 * var(--control-size) + 3 * var(--space-2))) -
+      var(--space-2)
+    );
+  }
+
+  .lp-floating[data-dock="tl"] .lp-pill-content {
+    max-width: var(--lp-canvas-room);
+  }
+
+  /* La catégorie du live y prend toute la place qui reste (twitch.css), sans plafond de 64 px */
+  .lp-floating[data-dock="tl"] .lp-live-category {
+    max-width: none;
+  }
+
   .lp-floating[data-dock="tc"] {
-    --lp-theme-side: var(--space-4);
     top: calc(var(--space-4) + var(--control-size) + 3 * var(--space-2));
+    left: var(--space-4);
+    right: var(--space-4);
+    /* Elle monte à la place de la rangée en Dessin (plus bas) */
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      transform var(--lp-dur) var(--lp-ease);
+  }
+
+  .lp-floating[data-dock="tc"] > .lp-pill {
+    width: 100%;
+  }
+
+  .lp-floating[data-dock="tc"] .lp-pill-content {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* En Dessin, seule la bande reste en haut : les pills Canvas et Compte s'effacent en fondu, puis quittent aussi le
+     clavier et les lecteurs d'écran ; la bande monte à leur place. Elle monte par `transform` et non par `top` : le
+     cadrage du canvas (arrival-insets.ts) lit sa place de Vue, qui ne bouge donc pas. */
+  html[data-drafting] .lp-floating:is([data-dock="tl"], [data-dock="tr"]) {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      visibility 0s linear var(--lp-dur-fade);
+  }
+
+  html[data-drafting] .lp-floating[data-dock="tc"] {
+    transform: translateY(calc(-1 * (var(--control-size) + 3 * var(--space-2))));
   }
 }
 
@@ -322,6 +372,13 @@ html[data-panning] .lp-floating > .lp-pill,
    L'inspection et Recentrer se posent juste au-dessus de la barre du bas : une seule feuille à la fois. */
 @media (max-width: 640px) {
   .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(
+      100vw -
+      2 *
+      var(--space-2) -
+      var(--lp-top-right, calc(2 * var(--control-size) + 3 * var(--space-2))) -
+      var(--space-2)
+    );
     top: max(var(--space-2), env(safe-area-inset-top));
     left: var(--space-2);
   }
@@ -367,10 +424,11 @@ html[data-panning] .lp-floating > .lp-pill,
     right: var(--space-2);
   }
 
-  /* Sous la rangée des pills du haut, avec la même marge sous l'encoche qu'elles */
+  /* La bande Thème, sous la rangée des pills du haut, avec la même marge sous l'encoche et sur les côtés qu'elles */
   .lp-floating[data-dock="tc"] {
-    --lp-theme-side: var(--space-2);
     top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size) + 3 * var(--space-2));
+    left: var(--space-2);
+    right: var(--space-2);
   }
 
   /* En haut au centre, sous les pills Canvas et Compte, et sous la pill Thème quand elle est là : sa hauteur mesurée,
@@ -391,6 +449,12 @@ html[data-panning] .lp-floating > .lp-pill,
     transition:
       opacity var(--lp-dur-fade) ease,
       top var(--lp-dur) var(--lp-ease);
+  }
+
+  /* En Dessin, la bande est montée à la place de la rangée : le toast se pose sous elle, ou tout en haut sans thème
+     (--lp-theme-bar vaut alors son opposé : rien à ajouter) */
+  html[data-drafting] .lp-floating[data-dock="toast"] {
+    top: calc(max(var(--space-2), env(safe-area-inset-top)) + max(0px, var(--lp-theme-bar) + var(--space-2)));
   }
 
   /* Tant qu'une fenêtre est ouverte, la feuille couvre le dessous de la pill Thème, que le voile cache de toute façon :

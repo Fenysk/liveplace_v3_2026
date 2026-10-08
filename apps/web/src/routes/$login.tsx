@@ -30,6 +30,7 @@ import { useDeveloperWindow } from "../ui/developer/use-developer-window";
 import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
+import { useDraftingAttribute } from "../ui/draft/use-drafting-attribute";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
 import { BannedWindow } from "../ui/moderation/banned-window";
@@ -84,6 +85,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   // Écart §15 (JOURNAL 2026-10-06) : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
   const [switchTracker] = useState(createOwnSwitchTracker);
   const draft = useDraftPillProps(stores, login, signingIn);
+  useDraftingAttribute(stores.draft); // Écart §8.1 (JOURNAL 2026-10-08) : en Dessin sur mobile, seule la bande Thème reste en haut
   const moderation = useModeration(stores.canvas);
   const reporting = useReport(stores.canvas);
   useCanvasToasts(stores, switchTracker, owner.displayName);
@@ -227,6 +229,7 @@ const GamePage = () => {
           draftStore={stores.draft}
           canvasId={canvasId}
           ownerName={owner.displayName}
+          isFramedInFreeArea
         />
       )}
       {/* Le store d'un canvas qu'on quitte (le streamer vient d'archiver) ne dit plus le thème de celui-ci. */}

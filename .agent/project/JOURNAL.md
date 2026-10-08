@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §8.1 et §9.3 : sur mobile, la pill Thème devient une bande, les pills du haut s'effacent en Dessin, le canvas se cadre dans la zone libre
+
+**Contexte.** Sur un iPhone (393 px), la pill Compte passait par-dessus la pill Canvas, la catégorie du live se coupait deux fois, et la pill Thème, centrée sur deux lignes, laissait le canvas collé dessous et un vide au-dessus de la barre du bas.
+**Décision.** Sur `COMPACT_SCREEN_QUERY` seulement, le PC ne change pas. La pill Canvas ne dépasse pas la place que la pill Compte publie (`--lp-top-right`) moins un espace ; dans le bouton live la catégorie cède la première (facteur de rétrécissement énorme, passage à la ligne rogné sous trois lettres), le nom en dernier. La pill Thème est une bande de la largeur de la rangée, « Thème » devant le thème à la taille `title` (jetons `--type-title-*`). En Dessin, `<html data-drafting>` (`useDraftingAttribute`) efface la rangée en fondu, puis par `visibility`, et monte la bande à sa place par `transform` ; le toast suit. L'arrivée, Recentrer, le 100 % et le zoom minimal se cadrent à 90 % dans la zone libre (`Insets` : bas de la rangée et de la bande en Vue, haut d'une barre du bas d'une ligne), relue à chaque mesure : la vue ne suit que si elle n'a pas bougé depuis l'arrivée, un viewport retrouvé jamais.
+**Renoncement.** Monter la bande par `top` : le cadrage lit sa place de Vue, qui ne doit pas bouger. Suivre la hauteur réelle de la barre du bas : la feuille Dessin, un refus ou l'invitation d'un invité déplaceraient le canvas. Le plafond de 64 px de la catégorie reste aux autres endroits du bouton live. Recadrer à chaque redimensionnement : le PC ne l'a jamais fait.
+
 ## 2026-10-08 — Écart §5.1 : un point d'avant le live compte 0 canvas streamé, comme un canvas seul
 
 **Contexte.** L'entrée suivante (même jour) relisait un point global d'avant `be45208` par sa vue OBS seule, alors qu'un point de canvas du même moment vaut 0 : la courbe de tout LivePlace montrait 1 canvas streamé quand celle du canvas n'en montrait aucun.

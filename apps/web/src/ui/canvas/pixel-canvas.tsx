@@ -15,9 +15,22 @@ const ZOOM_STEP = 1.5;
 // Lu à chaque accès, dans un `try` : dans une fenêtre qui refuse le stockage, l'accès lui-même lève.
 const getBrowserStorage = () => window.localStorage;
 
-type PixelCanvasProps = { store: CanvasStore; draftStore: DraftStore; canvasId: string; ownerName: string };
+// `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page de jeu, dont l'arrivée se cadre sous ses pills du haut.
+type PixelCanvasProps = {
+  store: CanvasStore;
+  draftStore: DraftStore;
+  canvasId: string;
+  ownerName: string;
+  isFramedInFreeArea?: boolean;
+};
 
-export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCanvasProps) => {
+export const PixelCanvas = ({
+  store,
+  draftStore,
+  canvasId,
+  ownerName,
+  isFramedInFreeArea = false,
+}: PixelCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
   const checker = useRef<HTMLDivElement>(null);
   const checkerTiles = useRef<HTMLDivElement>(null);
@@ -37,6 +50,7 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
     const saver = createViewportSaver(getBrowserStorage, canvasId);
     const created = createCanvasScene(surface.current, store, draftStore, {
       initialViewport: getSavedViewport(getBrowserStorage, canvasId),
+      isFramedInFreeArea,
       onViewportMove: saver.save,
       onFraming: setFraming,
       checker: checker.current,
@@ -47,7 +61,7 @@ export const PixelCanvas = ({ store, draftStore, canvasId, ownerName }: PixelCan
       created.dispose();
       saver.cancel();
     };
-  }, [store, draftStore, canvasId]);
+  }, [store, draftStore, canvasId, isFramedInFreeArea]);
 
   return (
     <>

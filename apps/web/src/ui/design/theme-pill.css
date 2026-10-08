@@ -20,8 +20,31 @@
   white-space: nowrap;
 }
 
-/* Écran étroit ou tactile : « Thème » seul au-dessus, et le thème sur deux lignes au plus, coupé par « … » au-delà */
+/* Au PC, le petit texte et le thème restent les deux rangées de la grille */
+.lp-theme-line {
+  display: contents;
+}
+
+/* Écran étroit ou tactile : la bande (pill.css). « Thème » en petit juste devant le premier mot du thème, dans le même
+   flux de texte, l'ensemble centré, à la taille « title » et sur deux lignes au plus, coupé par « … » au-delà (Écart §8.1,
+   JOURNAL 2026-10-08). Le `line-clamp` tient au seul bloc que contient la boîte : un petit texte et un thème frères dans
+   elle seraient deux lignes de la boîte, pas un flux. */
 @media (max-width: 640px), (pointer: coarse) {
+  .lp-theme {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: var(--type-title-size);
+    line-height: var(--type-title-line);
+  }
+
+  .lp-theme-line {
+    display: block;
+  }
+
   .lp-theme-wide {
     display: none;
   }
@@ -30,12 +53,16 @@
     display: inline;
   }
 
-  .lp-theme-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow-wrap: anywhere;
+  .lp-theme-caption {
+    margin-inline-end: var(--space-2);
+  }
+
+  .lp-theme .lp-theme-text {
+    overflow: visible;
+    text-overflow: clip;
     white-space: normal;
+    font-size: var(--type-title-size);
+    line-height: var(--type-title-line);
+    font-weight: var(--type-title-weight);
   }
 }

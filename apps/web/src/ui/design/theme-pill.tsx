@@ -1,6 +1,7 @@
 // La pill Thème (Écart §8.1, JOURNAL 2026-10-07), en haut au centre : le thème du canvas, montré à tous dès qu'il est
-// rempli. Un petit texte discret au-dessus, le thème dessous, gros. Sur mobile, elle passe sous les pills du haut, le petit
-// texte se réduit à « Thème » et le thème tient sur deux lignes (pill.css, theme-pill.css). Jamais cliquable.
+// rempli. Un petit texte discret au-dessus, le thème dessous, gros. Sur mobile, c'est une bande sous les pills du haut, sur
+// leur largeur : « Thème » devant le thème, qui tient sur deux lignes ; en Dessin, elle monte à leur place (Écart §8.1, JOURNAL
+// 2026-10-08, pill.css, theme-pill.css). Jamais cliquable.
 
 import { Pill, type PillDock } from "./pill";
 import { useShownWhileClosing } from "./window";
@@ -18,12 +19,15 @@ export const ThemePill = ({ theme, isDocked = true }: ThemePillProps) => {
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout="title" isVisible={Boolean(theme)}>
       <p className="lp-theme">
-        <span className="lp-theme-caption lp-type-caption lp-muted">
-          {/* Les deux phrases sont dans la page : le CSS garde celle de l'écran, sans attendre React sur un téléphone. */}
-          <span className="lp-theme-wide">Dessine sur le thème</span>
-          <span className="lp-theme-narrow">Thème</span>
+        {/* Au PC, il s'efface (display: contents) ; sur mobile, c'est le seul bloc du `line-clamp`, où le petit texte et le thème coulent à la suite. */}
+        <span className="lp-theme-line">
+          <span className="lp-theme-caption lp-type-caption lp-muted">
+            {/* Les deux phrases sont dans la page : le CSS garde celle de l'écran, sans attendre React sur un téléphone. */}
+            <span className="lp-theme-wide">Dessine sur le thème</span>
+            <span className="lp-theme-narrow">Thème</span>
+          </span>
+          <span className="lp-theme-text lp-type-heading">{shown}</span>
         </span>
-        <span className="lp-theme-text lp-type-heading">{shown}</span>
       </p>
     </Pill>
   );

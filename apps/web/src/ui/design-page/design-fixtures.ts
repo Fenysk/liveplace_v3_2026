@@ -11,6 +11,11 @@ export const SAMPLE_OWNER: ProfileUser = {
   login: "kalyss",
   avatarUrl: sampleAvatarUrl,
 };
+// Écart §4 (JOURNAL 2026-10-07) : en live, dans une catégorie longue.
+export const SAMPLE_LIVE_OWNER: ProfileUser = {
+  ...SAMPLE_OWNER,
+  twitchLive: { category: "Red Dead Redemption 2" },
+};
 export const SAMPLE_VIEWER: ProfileUser = { displayName: "pixelmoth", login: "pixelmoth" };
 // Une photo qui ne charge pas : l'initiale prend le relais.
 export const SAMPLE_BROKEN_PHOTO: ProfileUser = {

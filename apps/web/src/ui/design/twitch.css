@@ -5,6 +5,21 @@
   background: var(--twitch-live-bg);
   color: var(--twitch-live-ink);
   animation: lp-live-in var(--lp-dur-fade) ease;
+  /* Quand la place manque (la pill Canvas sur mobile, Écart §4, JOURNAL 2026-10-08), il rétrécit avant tout le reste, même
+     le nom : un facteur si grand que le nom n'en perd jamais un pixel tant que le bouton peut céder. La catégorie se coupe
+     par « … » ; sous trois lettres, elle passe à la ligne, hors du bouton, qui la rogne : le logo et le rond restent. */
+  flex: 0 100000 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0;
+  min-width: calc(11px + 18px + 14px);
+  overflow: hidden;
+}
+
+/* La première ligne a la hauteur du bouton, même sans catégorie ; celle qui passe à la ligne tombe dessous, rognée */
+.lp-btn--live::before {
+  content: "";
+  height: var(--control-size);
 }
 
 /* Le survol, seulement avec une souris : au doigt, il resterait collé à ce qui passe sous le dernier toucher */
@@ -16,7 +31,10 @@
 
 /* La catégorie, coupée par « … » : plus courte sur l'écran étroit ou tactile, la même requête que --control-size */
 .lp-live-category {
+  flex: 1 1 0;
+  min-width: 3ch;
   max-width: 170px;
+  margin-inline-start: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

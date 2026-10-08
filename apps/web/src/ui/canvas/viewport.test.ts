@@ -3,6 +3,7 @@ import {
   clampCell,
   fitViewport,
   isArrivalView,
+  NO_INSETS,
   panBy,
   panToShow,
   viewportToCell,
@@ -165,5 +166,52 @@ describe("panToShow (CDC 2026, la vue suit la case visée)", () => {
       offsetX: 0,
       offsetY: -60,
     });
+  });
+});
+
+// Écart §9.3 (JOURNAL 2026-10-08) : sur mobile, l'arrivée se cadre dans la zone libre entre le haut et le bas des pills.
+describe("le cadrage avec des marges (Écart §9.3, JOURNAL 2026-10-08)", () => {
+  const FREE_AREA = { top: 130, right: 0, bottom: 70, left: 0 };
+
+  // Sans marges, le cadrage est celui de toujours
+  it("frames exactly as before without insets", () => {
+    expect(fitViewport(PHONE, CANVAS, NO_INSETS)).toEqual(fitViewport(PHONE, CANVAS));
+  });
+
+  // Dans la zone libre, 90 % du côté qui limite, centré dans cette zone et non plus sur tout l'écran
+  it("takes 90% of the limiting side of the free area, centered in it rather than on the whole screen", () => {
+    const viewport = fitViewport(PHONE, CANVAS, FREE_AREA);
+    expect(viewport.scale * 256).toBeCloseTo(351);
+    expect(viewport.offsetX).toBeCloseTo(19.5);
+    // La zone va de 130 à 774 : son milieu est 452
+    expect(viewport.offsetY + (viewport.scale * 256) / 2).toBeCloseTo(452);
+    expect(viewport.offsetY).toBeGreaterThan(FREE_AREA.top);
+    expect(viewport.offsetY + viewport.scale * 256).toBeLessThan(PHONE.height - FREE_AREA.bottom);
+  });
+
+  // Quand c'est la hauteur de la zone libre qui limite, le canvas y tient à 90 %, entre les marges de chaque côté
+  it("fits 90% of the free height when the height limits, between the insets on every side", () => {
+    const insets = { top: 200, right: 100, bottom: 100, left: 100 };
+    const viewport = fitViewport(DESKTOP, CANVAS, insets);
+    expect(viewport.scale * 256).toBeCloseTo(450);
+    expect(viewport.offsetY).toBeCloseTo(225);
+    expect(viewport.offsetX).toBeCloseTo(275);
+  });
+
+  // Des marges qui mangent l'écran ne donnent jamais une échelle nulle ou négative
+  it("never gives a null or negative scale when the insets eat the whole screen", () => {
+    const viewport = fitViewport(PHONE, CANVAS, { top: 500, right: 0, bottom: 500, left: 0 });
+    expect(viewport.scale).toBeGreaterThan(0);
+    expect(Number.isFinite(viewport.offsetY)).toBe(true);
+  });
+
+  // Le 100 % du zoom, le « la vue n'a pas bougé » et le plus petit zoom suivent le même cadrage
+  it("measures 100%, the arrival view and the smallest zoom on the same framing", () => {
+    const arrival = fitViewport(PHONE, CANVAS, FREE_AREA);
+    expect(zoomPercent(arrival, PHONE, CANVAS, FREE_AREA)).toBe(100);
+    expect(isArrivalView(arrival, PHONE, CANVAS, FREE_AREA)).toBe(true);
+    // Le cadrage sur tout l'écran n'est plus l'arrivée
+    expect(isArrivalView(fitViewport(PHONE, CANVAS), PHONE, CANVAS, FREE_AREA)).toBe(false);
+    expect(zoomLimits(PHONE, CANVAS, FREE_AREA).minScale).toBeCloseTo(arrival.scale / 2);
   });
 });

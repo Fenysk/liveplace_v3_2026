@@ -24,6 +24,16 @@ describe("la pill Thème (Écart §8.1, JOURNAL 2026-10-07)", () => {
     expect(markup.indexOf("lp-theme-caption")).toBeLessThan(markup.indexOf("lp-theme-text"));
   });
 
+  // Le petit texte et le thème sont frères dans un seul bloc : sur mobile, c'est lui que le `line-clamp` coupe, en un flux
+  it("carries the small text and the theme as siblings in one block, for the mobile line clamp to cut as one flow", () => {
+    const markup = render("Halloween");
+
+    expect(markup).toContain('<span class="lp-theme-line"><span class="lp-theme-caption');
+    expect(markup).toMatch(
+      /<\/span><span class="lp-theme-text lp-type-heading">Halloween<\/span><\/span><\/p>/,
+    );
+  });
+
   // Pose en haut au centre, dans une pill de texte ; sans dock (/design), elle reste sur place
   it("sits at the top center, as a text pill, and stays in place without a dock", () => {
     expect(render("Halloween")).toContain('data-dock="tc"');

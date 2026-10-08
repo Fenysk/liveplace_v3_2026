@@ -130,7 +130,8 @@ const PROFILE_LIVE_STATES: readonly {
   },
   {
     name: "Catégorie longue",
-    detail: "Coupée par « … » à 170 px, 64 px sur mobile.",
+    detail:
+      "Coupée par « … » à 170 px, 64 px sur mobile ; dans la pill Canvas, elle prend toute la place qui reste.",
     user: { ...SAMPLE_OWNER, twitchLive: { category: "Software and Game Development" } },
     variant: "full",
   },

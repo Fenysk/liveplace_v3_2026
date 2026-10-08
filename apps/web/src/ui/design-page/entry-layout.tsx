@@ -112,9 +112,12 @@ export const InTopRoom = ({ children }: { children: ReactNode }) => (
   <div className="design-in-top-room">{children}</div>
 );
 
-// Le haut d'un téléphone, sous la rangée des pills : ce que la pill Thème y devient, et le toast qui se pose dessous.
-export const InPhoneTop = ({ children }: { children: ReactNode }) => (
-  <div className="design-in-phone-top">{children}</div>
+// Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous (Écart §8.1, JOURNAL 2026-10-08), et
+// le toast qui se pose sous elle. `isNarrow` : un petit téléphone, où la pill Canvas manque de place.
+export const InPhoneTop = ({ isNarrow = false, children }: { isNarrow?: boolean; children: ReactNode }) => (
+  <div className={isNarrow ? "design-in-phone-top design-in-phone-top--narrow" : "design-in-phone-top"}>
+    {children}
+  </div>
 );
 
 // L'heure de la page : les exemples datent d'« il y a trois heures » par rapport à elle, et elle ne bouge pas.

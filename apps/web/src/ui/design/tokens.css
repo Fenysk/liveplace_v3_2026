@@ -102,6 +102,11 @@
   --control-size-touch: 44px;
   --font-sans: "Nunito Variable", system-ui, sans-serif;
 
+  /* La taille « title », en jetons : la pill Thème la prend sur écran étroit ou tactile (theme-pill.css) */
+  --type-title-size: 16px;
+  --type-title-line: 20px;
+  --type-title-weight: 800;
+
   /* Les pills laissent deviner ce qui passe derrière elles : très légèrement transparentes, et floutées */
   --pill-opacity: 92%;
   --pill-blur: 16px;
@@ -161,9 +166,9 @@
 
 .lp-type-title {
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 20px;
-  font-weight: 800;
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+  font-weight: var(--type-title-weight);
 }
 
 .lp-type-body {

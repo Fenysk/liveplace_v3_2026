@@ -10,15 +10,50 @@ import { ViewportPill } from "../canvas/viewport-pill";
 import { Button } from "../design/button";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
+import type { ProfileUser } from "../design/profile";
 import { ThemePill } from "../design/theme-pill";
 import { Toast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
-import { noop, SAMPLE_OWNER } from "./design-fixtures";
+import { noop, SAMPLE_LIVE_OWNER, SAMPLE_OWNER } from "./design-fixtures";
 import { Block, Entry, InNotice, InPhone, InPhoneTop, InTopRoom, StateRow, useNowMs } from "./entry-layout";
 
 const REFILL_MS = 10_000;
+
+type PhoneHeaderProps = {
+  owner: ProfileUser;
+  theme?: string | undefined;
+  isNarrow?: boolean;
+  isDrafting?: boolean;
+};
+
+// Le haut d'un téléphone en Vue : la rangée des pills Canvas et Compte, la bande Thème dessous. En Dessin (Écart §8.1, JOURNAL
+// 2026-10-08), les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut.
+const PhoneHeader = ({ owner, theme, isNarrow = false, isDrafting = false }: PhoneHeaderProps) => {
+  const appearanceChoice = useAppearanceChoice();
+  return (
+    <InPhoneTop isNarrow={isNarrow}>
+      {!isDrafting && (
+        <div className="design-phone-row">
+          <div className="design-phone-row-start">
+            <CanvasPill owner={owner} isCompact isDocked={false} />
+          </div>
+          <AccountPill
+            identity={{ kind: "guest" }}
+            signInHref="#"
+            appearanceChoice={appearanceChoice}
+            onPickAppearance={pickAppearance}
+            onOpenAccount={noop}
+            isCompact
+            isDocked={false}
+          />
+        </div>
+      )}
+      <ThemePill theme={theme} isDocked={false} />
+    </InPhoneTop>
+  );
+};
 
 export const CanvasPillEntry = () => (
   <Entry
@@ -35,6 +70,18 @@ export const CanvasPillEntry = () => (
     <Block title="Sur mobile">
       <StateRow name="Version compacte">
         <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
+      </StateRow>
+      <StateRow
+        name="En live, catégorie longue"
+        detail="Elle ne dépasse jamais la place que la pill Compte lui laisse : la catégorie prend ce qui reste et se coupe par « … »."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} />
+      </StateRow>
+      <StateRow
+        name="En live, presque plus de place"
+        detail="La catégorie disparaît, le logo et le rond restent ; le nom ne se coupe qu'en dernier."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} isNarrow />
       </StateRow>
     </Block>
   </Entry>
@@ -65,7 +112,7 @@ export const ThemePillEntry = () => (
     components={["ThemePill"]}
     file="ui/design/theme-pill.tsx"
     note="Le thème du canvas, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
-    where="En haut au centre, entre les pills Canvas et Compte · sur mobile, sous la rangée des pills du haut"
+    where="En haut au centre, entre les pills Canvas et Compte · sur mobile, une bande sous la rangée des pills du haut, qui monte à leur place en Dessin"
   >
     <Block title="États">
       <StateRow name="Un thème court" detail="Un petit texte discret au-dessus, le thème dessous, gros.">
@@ -90,20 +137,22 @@ export const ThemePillEntry = () => (
     <Block title="Sur mobile">
       <StateRow
         name="Un thème court"
-        detail="Sous la rangée des pills du haut, centrée : « Thème » au-dessus."
+        detail="Une bande sous la rangée des pills du haut, sur la même largeur : « Thème » en petit devant le thème, sur la même ligne."
       >
-        <InPhoneTop>
-          <ThemePill theme={SHORT_THEME} isDocked={false} />
-        </InPhoneTop>
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} />
       </StateRow>
-      <StateRow name="Un thème sur deux lignes" detail="Deux lignes au plus.">
-        <InPhoneTop>
-          <ThemePill theme={TWO_LINES_THEME} isDocked={false} />
-        </InPhoneTop>
+      <StateRow name="Un thème sur deux lignes" detail="Deux lignes au plus, coupé par « … » au-delà.">
+        <PhoneHeader owner={SAMPLE_OWNER} theme={LONG_THEME} />
       </StateRow>
       <StateRow
-        name="Un toast sous la pill"
-        detail="Il se pose dessous et ne la recouvre jamais, quelle que soit sa hauteur."
+        name="En Dessin"
+        detail="Les pills Canvas et Compte s'effacent en fondu, la bande monte à leur place : seul le thème reste en haut. Sans thème, le haut est vide."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} isDrafting />
+      </StateRow>
+      <StateRow
+        name="Un toast sous la bande"
+        detail="Il se pose dessous et ne la recouvre jamais, quelle que soit sa hauteur ; en Dessin, sous la bande montée."
       >
         <InPhoneTop>
           <ThemePill theme={TWO_LINES_THEME} isDocked={false} />
