@@ -43,6 +43,9 @@ const TROLL = {
   placementId: SAMPLE_PLACEMENT_ID,
 };
 
+// Écart §5.4 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit pas.
+const NAMED_HERE = { isFromTwitch: false, isNamedHere: true };
+
 const MODERATING: ModerationControls = { isProtected: () => false, onModerate: noop };
 const PROTECTING: ModerationControls = { isProtected: () => true, onModerate: noop };
 const OWNING: ModerationControls = { isProtected: () => false, onModerate: noop, onSetModerator: noop };
@@ -131,6 +134,12 @@ const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
 const FOR_MODERATORS = (nowMs: number): readonly InspectionScene[] => [
   { name: "Le pixel d'un autre", inspection: inspectionOf(nowMs, TROLL), moderation: MODERATING },
   {
+    name: "Inspection d'un modérateur LivePlace : sans Bannir",
+    detail: "Nommé ici, il ne se bannit pas : le streamer lui retire d'abord son rôle.",
+    inspection: inspectionOf(nowMs, { ...TROLL, moderatorOrigin: NAMED_HERE }),
+    moderation: MODERATING,
+  },
+  {
     name: "Le pixel du streamer, ou le sien",
     inspection: inspectionOf(nowMs, { userId: "1", ...SAMPLE_OWNER, placementId: "pdemo0001" }),
     moderation: PROTECTING,
@@ -150,6 +159,12 @@ const FOR_OWNER = (nowMs: number): readonly InspectionScene[] => [
       ...TROLL,
       moderatorOrigin: { isFromTwitch: true, isNamedHere: false },
     }),
+    moderation: OWNING,
+  },
+  {
+    name: "Un modérateur nommé ici",
+    detail: "Retirer modérateur, et pas de Bannir.",
+    inspection: inspectionOf(nowMs, { ...TROLL, moderatorOrigin: NAMED_HERE }),
     moderation: OWNING,
   },
 ];
@@ -195,7 +210,7 @@ export const InspectionEntry = () => {
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock
         title="Pour qui modère"
-        note="Sous un filet : Retirer ses pixels et Bannir. Rien sur les pixels du streamer ni sur les siens."
+        note="Sous un filet : Retirer ses pixels et Bannir, sauf sur un modérateur nommé ici. Rien sur les pixels du streamer ni sur les siens."
         nowMs={nowMs}
         scenes={FOR_MODERATORS(nowMs)}
       />
@@ -265,6 +280,17 @@ const REPORT_STATES = (
       name: "Trois signalements",
       detail: "Une pose cachée du stream, une pose en attente du seuil, un dessin de plusieurs poses.",
       props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports } },
+    },
+    {
+      name: "Un modérateur LivePlace signalé : sans Bannir",
+      detail: "Nommé ici, il ne se bannit pas.",
+      props: {
+        ...REPORTS_BASE(nowMs),
+        list: {
+          status: "ready",
+          reports: reports.slice(1, 2).map((report) => ({ ...report, moderatorOrigin: NAMED_HERE })),
+        },
+      },
     },
     {
       name: "Rétablir attend sa réponse",

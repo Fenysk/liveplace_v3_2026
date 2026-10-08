@@ -22,6 +22,7 @@ import type {
   Moderation,
   ModerationSlice,
   Moderator,
+  ModeratorOrigin,
   ModeratorRole,
   OffStreamCell,
   Pixel,
@@ -199,6 +200,7 @@ const moderate = (action: string, target = "user-2") =>
 type SetupOptions = {
   session?: Session | null;
   isModerator?: boolean;
+  authorOrigin?: ModeratorOrigin; // ce que rend `getModeratorOrigin` (l'auteur inspecté est modérateur) ; absent : il ne l'est pas
   twitchSync?: TwitchSync; // l'état de la synchro Twitch lu dans `meta`
   version?: number;
   duringSnapshot?: () => void;
@@ -323,7 +325,7 @@ const setup = (options: SetupOptions = {}) => {
       return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: undefined };
     },
     async getModeratorOrigin() {
-      return roles.isModerator ? { isFromTwitch: true, isNamedHere: false } : null;
+      return options.authorOrigin ?? null;
     },
     async report(_asked: string, sent: Report) {
       reports.push(sent);
@@ -598,23 +600,30 @@ describe("createConnection (§6.1)", () => {
     expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
   });
 
-  // Dit au propriétaire, en inspectant, que l'auteur est modérateur et d'où il vient, et à lui seul (JOURNAL 2026-09-27)
-  it("tells the owner, on inspection, that the author is a moderator and where from, and only the owner", async () => {
-    const byOwner = setup({ session: owner, isModerator: true });
-    const byModerator = setup({ isModerator: true });
+  // Dit à qui modère, en inspectant, que l'auteur est modérateur et d'où il vient, au streamer (JOURNAL 2026-09-27) comme à un
+  // modérateur (Écart §4.3, JOURNAL 2026-10-08), et à personne d'autre
+  it("tells whoever moderates, on inspection, that the author is a moderator and where from, and no one else", async () => {
+    const namedHere = { isFromTwitch: false, isNamedHere: true };
+    const fromTwitch = { isFromTwitch: true, isNamedHere: false };
+    const byOwner = setup({ session: owner, authorOrigin: fromTwitch });
+    const byModerator = setup({ isModerator: true, authorOrigin: namedHere });
+    const byViewer = setup({ authorOrigin: namedHere });
 
-    for (const { connection } of [byOwner, byModerator]) {
+    for (const { connection } of [byOwner, byModerator, byViewer]) {
       await connection.receive(hello());
       await connection.receive(inspect(1, 2));
     }
 
     const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
-    const moderatorOrigin = { isFromTwitch: true, isNamedHere: false };
     expect(byOwner.sent.at(-1)).toEqual({
       ...inspected,
-      entry: { ...entry, canReport: true, moderatorOrigin },
+      entry: { ...entry, canReport: true, moderatorOrigin: fromTwitch },
     });
-    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
+    expect(byModerator.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...entry, canReport: true, moderatorOrigin: namedHere },
+    });
+    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
   });
 
   // Refuse la 11e inspection d'une même seconde sans fermer, en nommant la requête, puis accepte une seconde plus tard
@@ -898,6 +907,53 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await context.connection.receive(moderate("clearUser"));
     expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
     expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Un modérateur banni perd son rôle en direct et ne modère plus, jusqu'à son déban (Écart §10.3, JOURNAL 2026-10-08)
+  it("rereads, live, the role of a moderator who is banned then unbanned: he moderates nothing while banned", async () => {
+    const context = setup({ isModerator: true });
+    await context.connection.receive(hello());
+    expect(context.sent[0]).toMatchObject({ t: "welcome", you: { role: "moderator" } });
+
+    context.roles.isModerator = false; // ce que rend le noyau pour un banni, même resté dans mods
+    context.control({ t: "banned", userId: session.userId });
+    await flush();
+    expect(context.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "role", role: "viewer" }]);
+    await context.connection.receive(moderate("clearUser"));
+    await context.connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
+    expect(context.sent.slice(-2)).toEqual([
+      { t: "error", code: "forbidden" },
+      { t: "error", code: "forbidden" },
+    ]);
+    expect(context.moderations).toEqual([]);
+
+    context.roles.isModerator = true;
+    context.control({ t: "unbanned", userId: session.userId });
+    await flush();
+    expect(context.sent.slice(-3)).toEqual([
+      { t: "unbanned" },
+      { t: "role", role: "moderator" },
+      { t: "reportCount", count: 0 },
+    ]);
+    await context.connection.receive(moderate("clearUser"));
+    expect(context.moderations).toHaveLength(1);
+  });
+
+  // Un ban tombé pendant l'arrivée d'un modérateur lui ôte son rôle juste après le welcome (Écart §10.3, JOURNAL 2026-10-08)
+  it("takes the role of a moderator whose ban lands during his arrival, right after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ isModerator: true, duringSnapshot: () => during.run?.() });
+    during.run = () => {
+      context.roles.isModerator = false;
+      context.control({ t: "banned", userId: session.userId });
+    };
+
+    await context.connection.receive(hello());
+
+    const kinds = context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"));
+    expect(kinds.slice(0, 2)).toEqual(["welcome", "snapshot"]);
+    expect(kinds).toContain("banned");
+    expect(context.sent.at(-1)).toEqual({ t: "role", role: "viewer" });
   });
 
   // Garde un ban tombé pendant l'arrivée, et l'envoie après le welcome

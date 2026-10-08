@@ -13,6 +13,7 @@ import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile } from "../design/profile";
 import { TwitchGlyph } from "../design/twitch";
+import { canBan } from "../moderation/can-ban";
 import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { formatPlacedAgo } from "./placed-ago";
@@ -81,7 +82,8 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
   );
 };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant.
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant. Écart §5.4 (JOURNAL
+// 2026-10-08) : pas de Bannir sur un modérateur nommé ici.
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const { userId } = author;
   if (!userId || moderation.isProtected(userId)) return null;
@@ -90,7 +92,9 @@ const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
     <>
       <div className="lp-row lp-row--ruled">
         <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clear", moderated)} />
-        <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+        {canBan(moderated) && (
+          <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+        )}
       </div>
       {moderation.onSetModerator && <RoleRow author={moderated} onSetModerator={moderation.onSetModerator} />}
     </>

@@ -42,7 +42,8 @@ const bannedOf = (userId: string, isFromTwitch: boolean): BannedUser => ({
   hasAccount: true,
 });
 
-type Current = { moderators?: Moderator[]; bans?: BannedUser[] };
+// `unbannable` : ceux que le script refuse de bannir (les modérateurs nommés ici, Écart §5.4, JOURNAL 2026-10-08).
+type Current = { moderators?: Moderator[]; bans?: BannedUser[]; unbannable?: string[] };
 
 // Un noyau qui note ce qu'on lui demande. `slices` : ce que rend chaque appel à `moderate`, dans l'ordre.
 const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
@@ -60,6 +61,9 @@ const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
     },
     async moderate(_asked: string, moderation: Moderation) {
       moderations.push(moderation);
+      const { action } = moderation;
+      if (action.action === "ban" && current.unbannable?.includes(action.target))
+        return { ok: false as const, error: "forbidden" as const };
       return {
         ok: true as const,
         value: slices[moderations.length - 1] ?? { version: 1, cells: 0, isDone: true },
@@ -104,6 +108,16 @@ describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
       { ...base, action: { action: "clearUser", target: "troll" }, slice: "first" },
       { ...base, action: { action: "clearUser", target: "troll" }, slice: "next" },
     ]);
+  });
+
+  // Un ban Twitch que le noyau refuse (un modérateur nommé ici) est ignoré : aucun retrait ne le suit (Écart §5.4, JOURNAL 2026-10-08)
+  it("ignores a Twitch ban that the core refuses, a moderator named here: no clear follows", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+
+    const outcome = await applyTwitchCommand(deps, { kind: "ban", canvasId, userId: "mod-here" });
+
+    expect(outcome).toBe("done");
+    expect(moderations.map(({ action }) => action.action)).toEqual(["ban"]);
   });
 
   // Un déban Twitch ne fait qu'un unban Twitch : c'est le noyau qui le refuse s'il ne vient pas de Twitch
@@ -162,6 +176,19 @@ describe("a full Twitch list (JOURNAL 2026-09-27)", () => {
       "ban:added:first",
       "clearUser:added:first",
       "unban:lifted:first",
+    ]);
+  });
+
+  // Dans la liste, un ban refusé (un modérateur nommé ici) ne retient pas les suivants et ne retire rien ; la synchro suivante le retentera
+  it("keeps going past a ban the core refuses in the list, and clears nothing of the refused one", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+
+    await applyTwitchCommand(deps, { kind: "bans", canvasId, userIds: ["mod-here", "troll"] });
+
+    expect(moderations.map(({ action, slice }) => `${action.action}:${action.target}:${slice}`)).toEqual([
+      "ban:mod-here:first",
+      "ban:troll:first",
+      "clearUser:troll:first",
     ]);
   });
 });
@@ -245,6 +272,37 @@ describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
     expect(acknowledged).toEqual(["id-0", "id-1"]);
     expect(roles).toEqual([{ userId: "mod-2", source: "twitch", isModerator: true }]);
     expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
+  });
+
+  // Acquitte un ban que le noyau refuse sans le retenter ni le journaliser comme une panne (Écart §5.4, JOURNAL 2026-10-08)
+  it("acknowledges a ban the core refuses, without retrying it nor logging it as a failure", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [
+          { id: "id-0", command: { kind: "ban", canvasId, userId: "mod-here" } },
+          { id: "id-1", command: { kind: "ban", canvasId, userId: "troll" } },
+        ];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await consumeTwitchCommands(deps, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["id-0", "id-1"]);
+    expect(moderations.map(({ action }) => `${action.action}:${action.target}`)).toEqual([
+      "ban:mod-here",
+      "ban:troll",
+      "clearUser:troll",
+    ]);
+    expect(logged).not.toHaveBeenCalled();
     logged.mockRestore();
   });
 });

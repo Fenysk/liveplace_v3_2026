@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §4.3 et §5.4 : un modérateur nommé ici ne se bannit pas, un banni ne modère plus
+
+**Contexte.** Sur la bêta, un modérateur nommé sur LivePlace a pu être banni et restait modérateur : `moderate.lua` ne contrôlait que `mods`, et le gateway donnait le rôle sur ce seul ensemble. Il aurait pu retirer des pixels, bannir, se débannir.
+**Décision.** `moderate.lua` refuse un `ban` contre un membre de `mods:liveplace`, de qui qu'il vienne (page, Twitch, script), et toute action d'un auteur banni ; `moderators.lua` refuse de nommer ici un banni. `isModerator` rend `false` pour un banni, modérateur Twitch compris (son rôle Twitch reste, le déban le rend), et le gateway relit le rôle sur son `banned` et son `unbanned`. Pour cacher Bannir, `moderatorOrigin` part à tout modérateur dans `inspected` (au streamer seul jusqu'ici, JOURNAL 2026-09-27) et la frame `reports` en gagne un : champs en plus, `PROTOCOL_VERSION` reste 17. Au démarrage, le gateway retire des modérateurs nommés ici ceux qui sont déjà bannis (l'état laissé par le bug), sans leur rendre le rôle au déban.
+**Renoncement.** Pas de script à lancer à la main (un oubli au déploiement laisserait des modérateurs bannis) ; pas de rôle Twitch retiré à un banni (Twitch le rétablirait à chaque synchro) ; pas d'état « banni » dans `inspected` pour cacher Nommer modérateur : un banni n'a plus de pixel visible, et le serveur refuse.
+
 ## 2026-10-08 — Écart §8.1 et §9.3 : sur mobile, la pill Thème devient une bande, les pills du haut s'effacent en Dessin, le canvas se cadre dans la zone libre
 
 **Contexte.** Sur un iPhone (393 px), la pill Compte passait par-dessus la pill Canvas, la catégorie du live se coupait deux fois, et la pill Thème, centrée sur deux lignes, laissait le canvas collé dessous et un vide au-dessus de la barre du bas.

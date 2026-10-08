@@ -470,6 +470,20 @@ describe("isModerator (§6.1)", () => {
 
     expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
   });
+
+  // Ne voit plus un modérateur banni, même resté dans mods, et le revoit une fois débanni (Écart §10.3, JOURNAL 2026-10-08)
+  it("does not see a banned moderator, still in mods, and sees him again once unbanned", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const keys = buildCanvasKeys(canvasId);
+    await redis.sadd(keys.mods, "moderator-1");
+
+    await redis.sadd(keys.bans, "moderator-1");
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(false);
+
+    await redis.srem(keys.bans, "moderator-1");
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
+  });
 });
 
 describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {

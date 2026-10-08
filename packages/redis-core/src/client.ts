@@ -317,8 +317,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const gauge = scriptOf("gauge.lua");
   redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withPile("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
-  redis.defineCommand("moderate", { numberOfKeys: 19, lua: withPile("moderate.lua") });
-  redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 20, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderators", { numberOfKeys: 5, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
   redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
   redis.defineCommand("resize", { numberOfKeys: 3, lua: withPile("resize.lua") });
@@ -349,6 +349,19 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
       hasAccount,
     };
+  };
+
+  // Un seul MULTI : `mods` et ses deux origines se lisent du même instant. `null` : pas modérateur.
+  const getModeratorOriginOf = async (keys: CanvasKeys, userId: string): Promise<ModeratorOrigin | null> => {
+    const results = await redis
+      .multi()
+      .sismember(keys.mods, userId)
+      .sismember(keys.modsTwitch, userId)
+      .sismember(keys.modsLiveplace, userId)
+      .exec();
+    if (!results) throw new Error(`getModeratorOrigin ${keys.prefix} : transaction annulée`);
+    const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
+    return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
   };
 
   // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. §5.7 : dans le
@@ -389,8 +402,13 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
     getCanvas: (canvasId: string): Promise<CanvasMeta | null> => getCanvasMeta(redis, canvasId),
 
+    // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère pas, même modérateur Twitch ; un MULTI, comme getModeratorOrigin.
     async isModerator(canvasId: string, userId: string): Promise<boolean> {
-      return (await redis.sismember(buildCanvasKeys(canvasId).mods, userId)) === 1;
+      const keys = buildCanvasKeys(canvasId);
+      const results = await redis.multi().sismember(keys.mods, userId).sismember(keys.bans, userId).exec();
+      if (!results) throw new Error(`isModerator ${canvasId} : transaction annulée`);
+      const [isMember, isBannedUser] = results.map((entry) => unwrap(entry) === 1);
+      return isMember === true && isBannedUser !== true;
     },
 
     // Un seul MULTI : entre deux commandes, une pose donnerait un état d'avant et une version d'après (§6.1).
@@ -547,6 +565,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.recentlyCleared(target),
         keys.scoreboard,
         keys.scoreboardBanned,
+        keys.modsLiveplace,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -672,13 +691,22 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
             .filter((pixel) => pixel.placementId === placementId)
             .map(({ x, y, colorIndex }) => ({ x, y, colorIndex }));
           if (pixels.length === 0) return null;
-          const [profile, reportCount, isOffStream] = await Promise.all([
+          const [profile, reportCount, isOffStream, moderatorOrigin] = await Promise.all([
             getProfile(keys, authorId),
             redis.scard(keys.reports(placementKey)),
             redis.sismember(keys.offStream, placementKey),
+            getModeratorOriginOf(keys, authorId),
           ]);
           const reportedAt = Number(flat[index * 2 + 1]);
-          return { ...profile, placementId, reportCount, reportedAt, isOffStream: isOffStream === 1, pixels };
+          return {
+            ...profile,
+            ...(moderatorOrigin ? { moderatorOrigin } : {}), // Écart §4.3 (JOURNAL 2026-10-08) : Bannir se cache
+            placementId,
+            reportCount,
+            reportedAt,
+            isOffStream: isOffStream === 1,
+            pixels,
+          };
         }),
       );
       await settleReports(
@@ -785,6 +813,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.mods,
         keys.modsTwitch,
         keys.modsLiveplace,
+        keys.bans,
         keys.live,
         userId,
         source,
@@ -812,18 +841,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
     },
 
-    async getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null> {
-      const keys = buildCanvasKeys(canvasId);
-      const results = await redis
-        .multi()
-        .sismember(keys.mods, userId)
-        .sismember(keys.modsTwitch, userId)
-        .sismember(keys.modsLiveplace, userId)
-        .exec();
-      if (!results) throw new Error(`getModeratorOrigin ${canvasId} : transaction annulée`);
-      const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
-      return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
-    },
+    getModeratorOrigin: (canvasId: string, userId: string) =>
+      getModeratorOriginOf(buildCanvasKeys(canvasId), userId),
 
     async getTwitchLive(userId) {
       return (await getTwitchLiveState(redis, userId))?.twitchLive ?? null;

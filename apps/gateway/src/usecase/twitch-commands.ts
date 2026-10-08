@@ -54,7 +54,8 @@ type OwnedCommand<Kind extends CanvasTwitchCommand["kind"]> = Extract<CanvasTwit
   ownerId: string;
 };
 
-// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels.
+// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels. Écart §5.4 (JOURNAL 2026-10-08) :
+// un ban que le script refuse (modérateur nommé ici) est ignoré, sans retrait ; la synchro suivante le retentera.
 const applyBan = async (deps: TwitchCommandsDeps, command: OwnedCommand<"ban" | "unban">) => {
   const { canvasId, userId, ownerId } = command;
   const origin = { by: ownerId, nowMs: deps.now(), source: "twitch" } as const;

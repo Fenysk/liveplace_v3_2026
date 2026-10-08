@@ -287,10 +287,16 @@ export function createConnection(
     if (control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
   };
 
+  // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère plus, son déban lui rend son rôle ; la frame `banned` part ensuite.
+  const rereadRoleOnBan = (control: Exclude<ControlMessage, ScoreboardControl>): void => {
+    if (control.t === "banned" || control.t === "unbanned") onRoleControl(control.userId);
+  };
+
   // §10.2 et CDC 2026 §1 : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
     if (control.t === "scoreboard") return onScoreboardControl(control);
     tellStaleList(control);
+    rereadRoleOnBan(control);
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
     if (control.t === "gaugeLimits") return onGaugeLimitsControl(control);
@@ -579,14 +585,15 @@ export function createConnection(
     return deps.core.canReport(ready.canvasId, { authorId: userId, placementId }, session.userId);
   };
 
-  // Ce que ce rôle voit de l'auteur : sans identifiant hors modération. JOURNAL 2026-09-27 : le streamer apprend en
-  // plus s'il est modérateur, pour le nommer ou le retirer.
+  // Ce que ce rôle voit de l'auteur : sans identifiant hors modération. JOURNAL 2026-09-27 : qui modère apprend en plus s'il
+  // est modérateur, le streamer pour le nommer ou le retirer. Écart §4.3 (JOURNAL 2026-10-08) : tout modérateur, pour
+  // que Bannir se cache sur un modérateur nommé ici.
   const entryFor = async (inspected: InspectEntry, ready: ReadyState): Promise<InspectEntry> => {
     // Écart §15 (JOURNAL 2026-10-06) : sur une archive, ni identifiant, ni signalement, ni origine : personne n'y modère.
     if (ready.isArchived) return withoutUserId(inspected);
     const found = session ? { ...inspected, canReport: await canReport(inspected, ready) } : inspected;
     if (!canModerate(ready.role)) return withoutUserId(found);
-    if (ready.role !== "owner" || !found.userId) return found;
+    if (!found.userId) return found;
     const moderatorOrigin = await deps.core.getModeratorOrigin(ready.canvasId, found.userId);
     return moderatorOrigin ? { ...found, moderatorOrigin } : found;
   };

@@ -508,6 +508,136 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
   });
 });
 
+describe("a moderator named here is never banned, and a banned one moderates nothing (Écart §5.4, JOURNAL 2026-10-08)", () => {
+  const nameModerator = async (canvasId: string, userId: string, source: ModerationSource) => {
+    const result = await core.setModerator(canvasId, { userId, source, isModerator: true });
+    if (!result.ok) throw new Error(result.error);
+  };
+  const FORBIDDEN = { ok: false, error: "forbidden" } as const;
+
+  // Refuse le ban d'un modérateur nommé ici, par le streamer, par un autre modérateur, ou depuis Twitch, sans rien écrire
+  it("refuses to ban a moderator named here, by the owner, by another moderator and from Twitch, and writes nothing", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await nameModerator(canvasId, "mod-here", "liveplace");
+    await nameModerator(canvasId, "mod-other", "twitch");
+    const banBy = (by: string, source?: ModerationSource) =>
+      core.moderate(canvasId, {
+        by,
+        nowMs: later,
+        action: ban("mod-here"),
+        slice: "first",
+        ...(source ? { source } : {}),
+      });
+
+    expect(await banBy(OWNER)).toEqual(FORBIDDEN);
+    expect(await banBy("mod-other")).toEqual(FORBIDDEN);
+    expect(await banBy(OWNER, "twitch")).toEqual(FORBIDDEN);
+
+    expect(await core.isBanned(canvasId, "mod-here")).toBe(false);
+    expect(await redis.exists(keys.bans, keys.bansTwitch)).toBe(0);
+    expect(await redis.get(keys.version)).toBe("0");
+    expect(await redis.xlen(keys.events)).toBe(0);
+    expect(await core.isModerator(canvasId, "mod-here")).toBe(true);
+  });
+
+  // Refuse aussi le ban d'un modérateur nommé ici qui est en plus modérateur Twitch
+  it("refuses to ban a moderator named here who is also a Twitch moderator", async () => {
+    const { canvasId } = await readyCanvas();
+    await nameModerator(canvasId, "mod-both", "twitch");
+    await nameModerator(canvasId, "mod-both", "liveplace");
+
+    expect(
+      await core.moderate(canvasId, { by: OWNER, nowMs: later, action: ban("mod-both"), slice: "first" }),
+    ).toEqual(FORBIDDEN);
+    expect(await core.isBanned(canvasId, "mod-both")).toBe(false);
+  });
+
+  // Une fois son rôle retiré ici, il se bannit comme n'importe qui ; encore modérateur Twitch, il ne modère rien banni
+  it("bans him once his role here is removed, and, still a Twitch moderator, he moderates nothing while banned", async () => {
+    const { canvasId } = await readyCanvas();
+    await nameModerator(canvasId, "mod-both", "twitch");
+    await nameModerator(canvasId, "mod-both", "liveplace");
+    await core.setModerator(canvasId, { userId: "mod-both", source: "liveplace", isModerator: false });
+
+    await moderateAll(canvasId, OWNER, ban("mod-both"));
+
+    expect(await core.isBanned(canvasId, "mod-both")).toBe(true);
+    expect(await core.isModerator(canvasId, "mod-both")).toBe(false);
+  });
+
+  // Un modérateur Twitch banni reste listé, mais toutes ses actions sont refusées, se débannir compris ; son déban lui rend ses droits
+  it("keeps a banned Twitch moderator listed but refuses all his actions, his own unban included, until he is unbanned", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, "troll", [{ x: 0, y: 0, colorIndex: 3 }]);
+    await nameModerator(canvasId, "mod-twitch", "twitch");
+    await moderateAll(canvasId, OWNER, ban("mod-twitch"));
+    const versionBefore = await redis.get(keys.version);
+    const asBanned = (action: Moderation["action"]) =>
+      core.moderate(canvasId, { by: "mod-twitch", nowMs: later, action, slice: "first" });
+
+    const refused = [
+      await asBanned(clearUser("troll")),
+      await asBanned({ action: "clearPlacement", target: "troll", placementId: "ptest0001" }),
+      await asBanned({ action: "approvePlacement", target: "troll", placementId: "ptest0001" }),
+      await asBanned(ban("troll")),
+      await asBanned(unban("mod-twitch")),
+    ];
+
+    expect(refused).toEqual(Array(5).fill(FORBIDDEN));
+    expect(await redis.get(keys.version)).toBe(versionBefore);
+    expect(await colorAt(canvasId, 0, 0)).toBe(3);
+    expect(await core.isBanned(canvasId, "mod-twitch")).toBe(true);
+    expect(await core.listModerators(canvasId)).toMatchObject([
+      { userId: "mod-twitch", isFromTwitch: true, isNamedHere: false },
+    ]);
+
+    // Twitch le nomme encore à la synchro suivante : cela ne rouvre rien
+    const synced = await core.setModerator(canvasId, {
+      userId: "mod-twitch",
+      source: "twitch",
+      isModerator: true,
+    });
+    expect(synced).toEqual({ ok: true, value: undefined });
+    expect(await core.isModerator(canvasId, "mod-twitch")).toBe(false);
+    expect(await asBanned(clearUser("troll"))).toEqual(FORBIDDEN);
+
+    await moderateAll(canvasId, OWNER, unban("mod-twitch"));
+    expect(await core.isModerator(canvasId, "mod-twitch")).toBe(true);
+    await moderateAll(canvasId, "mod-twitch", clearUser("troll"));
+    expect(await colorAt(canvasId, 0, 0)).toBe(TRANSPARENT_COLOR_INDEX);
+  });
+
+  // Refuse de nommer ici un banni, laisse Twitch le nommer, et laisse le streamer retirer le rôle d'un banni
+  it("refuses to name a banned account as moderator here, lets Twitch name them, and lets the owner remove the role of a banned one", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await moderateAll(canvasId, OWNER, ban("troll"));
+
+    const named = await core.setModerator(canvasId, {
+      userId: "troll",
+      source: "liveplace",
+      isModerator: true,
+    });
+
+    expect(named).toEqual(FORBIDDEN);
+    expect(await redis.sismember(keys.modsLiveplace, "troll")).toBe(0);
+    expect(await redis.sismember(keys.mods, "troll")).toBe(0);
+    await nameModerator(canvasId, "troll", "twitch");
+    expect(await redis.sismember(keys.mods, "troll")).toBe(1);
+
+    // L'état laissé par l'ancien bug : nommé ici et banni
+    await redis.sadd(keys.modsLiveplace, "legacy");
+    await redis.sadd(keys.mods, "legacy");
+    await redis.sadd(keys.bans, "legacy");
+    const removed = await core.setModerator(canvasId, {
+      userId: "legacy",
+      source: "liveplace",
+      isModerator: false,
+    });
+    expect(removed).toEqual({ ok: true, value: undefined });
+    expect(await redis.sismember(keys.mods, "legacy")).toBe(0);
+  });
+});
+
 describe("the rights of moderate (§5.4)", () => {
   // Refuse un viewer, et toute action qui vise le propriétaire, sans rien écrire
   it("refuses a viewer, and any action aimed at the owner, and writes nothing", async () => {

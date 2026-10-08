@@ -148,7 +148,7 @@ const TwitchLiveSchema = z.object({ category: z.string() });
 
 const InspectEntrySchema = z.object({
   userId: UserIdSchema.optional(), // §4.3 : seulement pour qui modère
-  moderatorOrigin: ModeratorOriginSchema.optional(), // pour le seul streamer, quand l'auteur est modérateur
+  moderatorOrigin: ModeratorOriginSchema.optional(), // pour qui modère (Écart §4.3, JOURNAL 2026-10-08), quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
@@ -497,6 +497,7 @@ const ReportedPlacementSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   hasAccount: z.boolean(),
+  moderatorOrigin: ModeratorOriginSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit pas
   placementId: PlacementIdSchema,
   reportCount: z.number().int().positive(),
   reportedAt: TimestampSchema, // le premier signalement

@@ -11,6 +11,8 @@ local clearedPlacementsKey, clearedRangesKey, offStreamKey, reportedKey, approve
 local recentlyClearedKey = KEYS[17]
 -- §5.1 : le classement, d'où un banni sort, et où son score l'attend.
 local scoreboardKey, scoreboardBannedKey = KEYS[18], KEYS[19]
+-- Écart §5.4 (JOURNAL 2026-10-08) : les modérateurs nommés ici, que personne ne bannit.
+local modsLiveplaceKey = KEYS[20]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
 local nowMs, cellStride, sliceCells, eventsMaxlen = tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), ARGV[11]
@@ -33,6 +35,13 @@ local width, ownerId, height = tonumber(meta[2]), meta[3], tonumber(meta[4])
 
 -- 1. Les droits : le propriétaire ou un modérateur, et jamais contre le propriétaire. Le gateway vérifie aussi.
 if (by ~= ownerId and redis.call("SISMEMBER", modsKey, by) == 0) or target == ownerId then
+  return { "forbidden" }
+end
+-- Écart §5.4 (JOURNAL 2026-10-08) : un banni ne modère plus, ni ne se débannit ; un modérateur nommé ici ne se bannit pas.
+if by ~= ownerId and redis.call("SISMEMBER", bansKey, by) == 1 then
+  return { "forbidden" }
+end
+if action == "ban" and redis.call("SISMEMBER", modsLiveplaceKey, target) == 1 then
   return { "forbidden" }
 end
 

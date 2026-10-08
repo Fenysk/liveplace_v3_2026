@@ -1021,3 +1021,47 @@ describe("protocol 17: the Twitch live of an account", () => {
     );
   });
 });
+
+// Écart §4.3 (JOURNAL 2026-10-08) : l'origine d'un modérateur part à tout modérateur, dans l'inspected et les signalements.
+describe("the origin of a moderator, for whoever moderates", () => {
+  const origin = { isFromTwitch: false, isNamedHere: true };
+  const inspected = {
+    t: "inspected",
+    requestId: "inspect-1",
+    x: 1,
+    y: 2,
+    entry: { login: "user2", displayName: "User 2", colorIndex: 3, placedAt: 1, placementId: "puser2001" },
+  };
+  const reports = {
+    t: "reports",
+    requestId: "reports-1",
+    reports: [
+      {
+        userId: "user-2",
+        login: "user2",
+        displayName: "User 2",
+        hasAccount: true,
+        placementId: "puser2001",
+        reportCount: 2,
+        reportedAt: 1,
+        isOffStream: true,
+        pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+      },
+    ],
+  };
+  const reportsWith = (moderatorOrigin: object) => ({
+    ...reports,
+    reports: reports.reports.map((report) => ({ ...report, moderatorOrigin })),
+  });
+
+  // Garde l'origine de l'auteur inspecté et de l'auteur signalé, et accepte l'un et l'autre sans elle
+  it("keeps the origin of an inspected author and of a reported one, and accepts both without it", () => {
+    const inspectedModerator = { ...inspected, entry: { ...inspected.entry, moderatorOrigin: origin } };
+
+    expect(decodeServerFrame(inspectedModerator)).toEqual({ ok: true, value: inspectedModerator });
+    expect(decodeServerFrame(reportsWith(origin))).toEqual({ ok: true, value: reportsWith(origin) });
+    expect(decodeServerFrame(inspected)).toEqual({ ok: true, value: inspected });
+    expect(decodeServerFrame(reports)).toEqual({ ok: true, value: reports });
+    expect(decodeServerFrame(reportsWith({})).ok).toBe(false);
+  });
+});

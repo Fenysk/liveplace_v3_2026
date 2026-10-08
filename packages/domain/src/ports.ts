@@ -169,7 +169,7 @@ export interface CanvasCore {
     user: Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>,
   ): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
-  isModerator(canvasId: string, userId: string): Promise<boolean>;
+  isModerator(canvasId: string, userId: string): Promise<boolean>; // Écart §10.3 (JOURNAL 2026-10-08) : `false` pour un banni
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
   // §5.6 : lue sans être écrite, pour le `welcome`.
   getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]>;
@@ -224,7 +224,7 @@ export interface CanvasCore {
   listTwitchLives(userIds: readonly string[]): Promise<Map<string, TwitchLive>>;
   // Écart §15 (JOURNAL 2026-10-06) : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.
   copyTwitchUsers(fromCanvasId: string, toCanvasId: string, userIds: readonly string[]): Promise<void>;
-  // `null` : pas modérateur. Pour la pill Inspection du streamer (JOURNAL 2026-09-27).
+  // `null` : pas modérateur. Pour la pill Inspection de qui modère (JOURNAL 2026-09-27, Écart §4.3 JOURNAL 2026-10-08).
   getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
