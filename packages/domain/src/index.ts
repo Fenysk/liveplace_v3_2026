@@ -274,6 +274,19 @@ export function toActivityPointStarts(nowMs: Timestamp): ActivityPointStarts {
   return { minute: toMinuteStart(nowMs), hour: toHourStart(nowMs), day: toParisDayStart(nowMs) };
 }
 
+// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes, côté OBS ou côté Twitch, se comble dans l'historique.
+export const STREAM_GRACE_MS = 5 * MINUTE_MS;
+
+// Les minutes entières strictement entre la fin d'une coupure et sa reprise : celles de la fin et de la reprise sont déjà
+// comptées. Aucune pour une coupure de `STREAM_GRACE_MS` ou plus.
+export function toGapMinutes(endedAt: Timestamp, resumedAt: Timestamp): Timestamp[] {
+  const minutes: Timestamp[] = [];
+  if (resumedAt - endedAt >= STREAM_GRACE_MS) return minutes;
+  for (let at = toMinuteStart(endedAt) + MINUTE_MS; at < toMinuteStart(resumedAt); at += MINUTE_MS)
+    minutes.push(at);
+  return minutes;
+}
+
 // JOURNAL 2026-10-07 : l'audience compte les 30 derniers jours de Paris, aujourd'hui compris.
 export const AUDIENCE_DAYS = 30;
 

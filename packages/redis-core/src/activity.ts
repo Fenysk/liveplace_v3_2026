@@ -1,4 +1,4 @@
-// L'activité dans Redis (écart §5.1, JOURNAL 2026-10-06 et 2026-10-07) : des nombres sous `activity:`, aucun nom ni
+// L'activité dans Redis (écart §5.1, JOURNAL 2026-10-06, 2026-10-07 et 2026-10-08) : des nombres sous `activity:`, aucun nom ni
 // identifiant dans l'historique ; les distincts d'un jour, dans des HyperLogLog. Le gateway écrit chaque minute et élague ;
 // le web compte un nouveau compte, sans script. Chaque canvas a ses propres points, sous `activity:cv:<canvasId>:`.
 
@@ -19,6 +19,7 @@ import type {
   ActivityStore,
   CanvasActivityPoint,
   CanvasAudience,
+  CanvasSeen,
   SignupWrites,
 } from "@liveplace/domain/ports";
 import type { ChainableCommander, Redis, Result as RedisResult } from "ioredis";
@@ -27,6 +28,7 @@ import {
   ACTIVITY_CANVAS_MINUTES_RETENTION_MS,
   ACTIVITY_HOURS_RETENTION_MS,
   ACTIVITY_MINUTES_RETENTION_MS,
+  ACTIVITY_SEEN_RETENTION_MS,
   buildActivityKeys,
   CANVAS_PIXELS_TTL_SECONDS,
   SIGNUPS_TTL_SECONDS,
@@ -40,6 +42,7 @@ import { DAY_MINUTES, execAll, MONTH_HOURS, pointStarts, pruneHash } from "./pyr
 declare module "ioredis" {
   interface RedisCommander<Context> {
     activity(...args: (string | number)[]): RedisResult<null, Context>;
+    activityGap(...args: (string | number)[]): RedisResult<null, Context>;
   }
 }
 
@@ -47,13 +50,22 @@ type ActivityKeys = ReturnType<typeof buildActivityKeys>;
 
 const POINT_FIELD = /^\d+$/; // le début d'un point ; celui de ses nouveaux comptes a un suffixe
 
-// `stored` : `people,streamed,pixels,visits,phoneVisits,visitMinutes`, écrit par activity.lua ; un point d'avant l'audience
-// n'a que les trois premiers.
+// `stored` : `people,streamed,pixels,visits,phoneVisits,visitMinutes,live`, écrit par activity.lua ; un point d'avant l'audience
+// n'a que les trois premiers, un point d'avant le live (JOURNAL 2026-10-08) les six premiers : les autres valent 0.
 const toPoint = (at: Timestamp, stored: string, signups: string | null | undefined): ActivityPoint => {
-  const [people = 0, streamed = 0, pixels = 0, visits = 0, phoneVisits = 0, visitMinutes = 0] = stored
-    .split(",")
-    .map(Number);
-  return { at, people, streamed, pixels, signups: Number(signups ?? 0), visits, phoneVisits, visitMinutes };
+  const [people = 0, streamed = 0, pixels = 0, visits = 0, phoneVisits = 0, visitMinutes = 0, live = 0] =
+    stored.split(",").map(Number);
+  return {
+    at,
+    people,
+    streamed,
+    live,
+    pixels,
+    signups: Number(signups ?? 0),
+    visits,
+    phoneVisits,
+    visitMinutes,
+  };
 };
 
 // `stored` : `accounts,players,streamers` d'un jour, écrit à côté de son point ; sans lui, le jour est d'avant l'audience.
@@ -89,11 +101,13 @@ const toCanvasAudienceCounts = (
   signups: points.reduce((sum, point) => sum + point.signups, 0),
 });
 
-// Le point d'un canvas, lu comme celui du global : ses vues OBS prennent la place des canvas streamés.
+// Le point d'un canvas, lu comme celui du global : ses vues OBS prennent la place des canvas streamés, ses minutes en live
+// (une somme, pas un pic) celle des canvas en live.
 const toCanvasPoint = ({
   at,
   people,
   streamed,
+  live,
   pixels,
   signups,
   visits,
@@ -102,6 +116,7 @@ const toCanvasPoint = ({
   at,
   people,
   obsViews: streamed,
+  live,
   pixels,
   visits,
   visitMinutes,
@@ -122,15 +137,36 @@ const addSignupPoints = (
     .hincrby(hashes.hours, toSignupsField(hour), 1)
     .hincrby(hashes.days, toSignupsField(day), 1);
 
-// Les six nombres d'une minute, dans l'ordre d'activity.lua : les deux premiers sont des pics, les quatre autres des sommes.
-type MinuteCounts = readonly [number, number, number, number, number, number];
+// Les sept nombres d'une minute, dans l'ordre d'activity.lua : les deux premiers sont des pics, les quatre suivants des
+// sommes, le dernier (les canvas en live) un pic pour tout LivePlace et une somme de minutes pour un canvas.
+type MinuteCounts = readonly [number, number, number, number, number, number, number];
+type LiveTotal = "peak" | "sum";
 
 const addMinuteCounts = (
   transaction: ChainableCommander,
   hashes: PointHashes,
   { minute, hour, day }: ActivityPointStarts,
   counts: MinuteCounts,
-) => transaction.activity(hashes.minutes, hashes.hours, hashes.days, minute, hour, day, ...counts);
+  liveTotal: LiveTotal,
+) => transaction.activity(hashes.minutes, hashes.hours, hashes.days, minute, hour, day, ...counts, liveTotal);
+
+// Un canvas vu : ses deux heures en millisecondes, un champ vide pour ce qu'il n'a jamais été (keys.ts).
+const toSeenField = ({ obsSeenAt, liveSeenAt }: CanvasSeen): string =>
+  `${obsSeenAt ?? ""},${liveSeenAt ?? ""}`;
+
+const toSeenAt = (field: string | undefined): Timestamp | undefined => {
+  const seenAt = field ? Number(field) : Number.NaN;
+  return Number.isFinite(seenAt) ? seenAt : undefined;
+};
+
+const toSeen = (stored: string): CanvasSeen => {
+  const [obs, live] = stored.split(",");
+  const [obsSeenAt, liveSeenAt] = [toSeenAt(obs), toSeenAt(live)];
+  return {
+    ...(obsSeenAt === undefined ? {} : { obsSeenAt }),
+    ...(liveSeenAt === undefined ? {} : { liveSeenAt }),
+  };
+};
 
 // Un identifiant déjà compté ne change rien : verser deux fois la même minute est sans dégât.
 const addMembers = (transaction: ChainableCommander, key: string, members: ReadonlySet<string>) =>
@@ -160,6 +196,10 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
   redis.defineCommand("activity", {
     numberOfKeys: 3,
     lua: readFileSync(new URL("./activity.lua", import.meta.url), "utf8"),
+  });
+  redis.defineCommand("activityGap", {
+    numberOfKeys: 6,
+    lua: readFileSync(new URL("./activity-gap.lua", import.meta.url), "utf8"),
   });
 
   const getStoredPoints = async (hash: string, ats: Timestamp[]): Promise<StoredPoint[]> => {
@@ -233,36 +273,104 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     // Les distincts d'abord, qui se rejouent sans dégât : une minute qui échoue plus loin revient au tic suivant, et ses
     // sommes ne s'écrivent qu'une fois, celles des canvas avec les siennes.
     async storeActivityMinute(closed) {
-      const { at, people, streamed, pixels, visits, phoneVisits, visitMinutes, pixelsByCanvas, canvases } =
-        closed;
+      const {
+        at,
+        people,
+        streamed,
+        live,
+        pixels,
+        visits,
+        phoneVisits,
+        visitMinutes,
+        pixelsByCanvas,
+        canvases,
+      } = closed;
       await storeActiveDay(closed);
       await Promise.all(
         [...canvases].map(([canvasId, { playerIds }]) => storeCanvasPlayers(canvasId, at, playerIds)),
       );
       const starts = toActivityPointStarts(at);
       const transaction = redis.multi();
-      addMinuteCounts(transaction, keys, starts, [
-        people,
-        streamed,
-        pixels,
-        visits,
-        phoneVisits,
-        visitMinutes,
-      ]);
+      addMinuteCounts(
+        transaction,
+        keys,
+        starts,
+        [people, streamed, pixels, visits, phoneVisits, visitMinutes, live],
+        "peak",
+      );
       for (const [canvasId, counts] of canvases)
-        addMinuteCounts(transaction, keys.canvas(canvasId), starts, [
-          counts.people,
-          counts.obsViews,
-          counts.pixels,
-          counts.visits,
-          counts.phoneVisits,
-          counts.visitMinutes,
-        ]);
+        addMinuteCounts(
+          transaction,
+          keys.canvas(canvasId),
+          starts,
+          [
+            counts.people,
+            counts.obsViews,
+            counts.pixels,
+            counts.visits,
+            counts.phoneVisits,
+            counts.visitMinutes,
+            counts.live,
+          ],
+          "sum",
+        );
       if (pixelsByCanvas.size > 0)
         transaction
           .hset(keys.canvasPixels(starts.minute), Object.fromEntries(pixelsByCanvas))
           .expire(keys.canvasPixels(starts.minute), CANVAS_PIXELS_TTL_SECONDS);
       await execAll(transaction);
+    },
+
+    // Les points d'abord, atomiques : un canvas streamé au passage de minuit l'est aussi pour le nouveau jour, un HyperLogLog
+    // qui se rejoue sans dégât. Un live n'ajoute pas de streamer actif : sa vue OBS les a déjà.
+    async storeActivityGap({ canvasId, kind, minutes }) {
+      if (minutes.length === 0) return;
+      const { minutes: canvasMinutes, hours, days } = keys.canvas(canvasId);
+      const starts = minutes.map((minute) => toActivityPointStarts(minute));
+      await redis.activityGap(
+        keys.minutes,
+        keys.hours,
+        keys.days,
+        canvasMinutes,
+        hours,
+        days,
+        kind,
+        ...starts.flatMap(({ minute, hour, day }) => [minute, hour, day]),
+      );
+      if (kind === "live") return;
+      const lastMinuteOfDay = new Map(starts.map(({ minute, day }) => [day, minute]));
+      for (const at of lastMinuteOfDay.values())
+        await storeActiveDay({
+          at,
+          accountIds: new Set(),
+          playerIds: new Set(),
+          streamedCanvasIds: new Set([canvasId]),
+        });
+    },
+
+    async storeSeen(seen) {
+      if (seen.size === 0) return;
+      await redis.hset(
+        keys.seen,
+        Object.fromEntries([...seen].map(([canvasId, at]) => [canvasId, toSeenField(at)])),
+      );
+    },
+
+    async listSeen() {
+      const fields = await redis.hgetall(keys.seen);
+      return new Map(Object.entries(fields).map(([canvasId, stored]) => [canvasId, toSeen(stored)]));
+    },
+
+    // Les identifiants de canvas peuvent commencer par un chiffre : `pruneHash`, qui lit un début de point, n'est pas pour eux.
+    async pruneSeen(nowMs) {
+      const fields = await redis.hgetall(keys.seen);
+      const expired = Object.entries(fields)
+        .filter(([, stored]) => {
+          const { obsSeenAt = 0, liveSeenAt = 0 } = toSeen(stored);
+          return Math.max(obsSeenAt, liveSeenAt) < nowMs - ACTIVITY_SEEN_RETENTION_MS;
+        })
+        .map(([canvasId]) => canvasId);
+      if (expired.length > 0) await redis.hdel(keys.seen, ...expired);
     },
 
     async pruneActivity(nowMs, canvasIds = []) {

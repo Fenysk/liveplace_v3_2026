@@ -14,6 +14,8 @@ const audienceDay = { visits: 12, phoneVisits: 5, visitMinutes: 80, activePlayer
 const here: ActivityHere = {
   canvasId: "c1",
   owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+  isStreamed: true,
+  isLive: false,
   obsViews: 1,
   people: 4,
   guests: 2,
@@ -44,7 +46,7 @@ const noAudience = {
 
 const frame = (shown: ActivityHere | null): ActivityFrame => ({
   t: "activity",
-  now: { people: 6, guests: 3, streamed: 1, pixels: 87, signups: 2 },
+  now: { people: 6, guests: 3, streamed: 1, live: 0, pixels: 87, signups: 2 },
   audience: { today: noAudience, month: noAudience },
   canvases: [],
   ...(shown ? { here: shown } : {}),
@@ -54,6 +56,7 @@ const canvasPoint: CanvasActivityPoint = {
   at: lastMinute,
   people: 3,
   obsViews: 1,
+  live: 0,
   pixels: 40,
   visits: 2,
   visitMinutes: 7,
@@ -121,9 +124,32 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(table).not.toContain("Streamers actifs");
   });
 
+  // Écart §5.1 (JOURNAL 2026-10-08) : en tête, la pastille « En live » après la pastille OBS quand le canvas est en live, et la courbe de ses minutes en live
+  it("puts the live badge after the OBS badge at the top when the canvas is live, and draws its minutes in live", () => {
+    const live = render(ready("day", [{ ...canvasPoint, live: 1 }], { ...here, isLive: true }));
+    const notLive = render(ready("day", [canvasPoint]));
+    const streamedOnly = notLive.slice(0, notLive.indexOf("Maintenant"));
+
+    const top = live.slice(0, live.indexOf("Maintenant"));
+    expect(top.indexOf(">OBS<")).toBeGreaterThan(-1);
+    expect(top.indexOf(">OBS<")).toBeLessThan(top.indexOf(">En live<"));
+    expect(top).toContain("lp-badge--live");
+    expect(live).toContain("Temps en live (min)");
+    expect(streamedOnly).toContain(">OBS<");
+    expect(streamedOnly).not.toContain("En live");
+  });
+
   // Ne met pas de pastille OBS à un canvas non streamé, et dit que personne n'est là quand personne n'y est
   it("puts no OBS badge on a canvas that is not streamed, and says nobody is there when nobody is", () => {
-    const empty = { ...here, obsViews: 0, guests: 0, people: 0, accounts: [] };
+    const empty = {
+      ...here,
+      isStreamed: false,
+      isLive: false,
+      obsViews: 0,
+      guests: 0,
+      people: 0,
+      accounts: [],
+    };
 
     const markup = render(ready("day", [], empty));
 
@@ -132,12 +158,12 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(markup).not.toContain("+ 0 invité");
   });
 
-  // Montre six courbes sur 24 h, sept sur Tout avec les joueurs actifs, et dit quand le canvas n'a eu aucune activité
-  it("shows six curves over 24 h, seven over All with the active players, and says when the canvas had no activity", () => {
+  // Montre sept courbes sur 24 h, huit sur Tout avec les joueurs actifs, et dit quand le canvas n'a eu aucune activité
+  it("shows seven curves over 24 h, eight over All with the active players, and says when the canvas had no activity", () => {
     const charts = (markup: string) => markup.match(/<figure/g)?.length;
 
-    expect(charts(render(ready("day", [canvasPoint])))).toBe(6);
-    expect(charts(render(ready("all", [{ ...canvasPoint, activePlayers: 2 }])))).toBe(7);
+    expect(charts(render(ready("day", [canvasPoint])))).toBe(7);
+    expect(charts(render(ready("all", [{ ...canvasPoint, activePlayers: 2 }])))).toBe(8);
     const none = render(ready("day", []));
     expect(charts(none)).toBeUndefined();
     expect(none).toContain("Aucune activité sur ce canvas sur cette période.");

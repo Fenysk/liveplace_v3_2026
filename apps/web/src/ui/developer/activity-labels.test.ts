@@ -13,6 +13,9 @@ import {
   formatDuration,
   guestsNote,
   heatLabel,
+  liveCanvasesLabel,
+  liveMinutesLabel,
+  liveNote,
   obsViewsLabel,
   PERIOD_OPTIONS,
   peopleLabel,
@@ -25,6 +28,7 @@ import {
   toAudienceRows,
   toCanvasActivityCard,
   toCanvasAudienceRows,
+  toObsTitle,
   visitMinutesLabel,
   visitsLabel,
 } from "./activity-labels";
@@ -83,6 +87,8 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
     const canvas: ActivityCanvas = {
       canvasId: "c1",
       owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+      isStreamed: true,
+      isLive: false,
       obsViews: 2,
       people: 3,
       guests: 1,
@@ -103,16 +109,63 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
     expect(toCanvasActivityCard(canvas, now)).toEqual({
       owner: canvas.owner,
       obsTitle: "2 vues OBS ouvertes",
+      isLive: false,
       facts: ["3 personnes, dont 1 invité", "120 px/h", "1 nouveau compte"],
       accounts: [
         { user: canvas.accounts[0], mention: "Modérateur · depuis 12 min", devices: ["desktop", "phone"] },
       ],
       guestsLine: "+ 1 invité",
     });
-    expect(toCanvasActivityCard({ ...canvas, obsViews: 0, guests: 0 }, now)).toMatchObject({
+    expect(toCanvasActivityCard({ ...canvas, isStreamed: false, obsViews: 0, guests: 0 }, now)).toMatchObject(
+      {
+        obsTitle: null,
+        guestsLine: null,
+      },
+    );
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : la pastille OBS suit `isStreamed`, la pastille « En live » suit `isLive`
+  it("follows isStreamed for the OBS badge and isLive for the live badge", () => {
+    const canvas: ActivityCanvas = {
+      canvasId: "c1",
+      owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+      isStreamed: true,
+      isLive: true,
+      obsViews: 1,
+      people: 0,
+      guests: 0,
+      heat: 0,
+      signups: 0,
+      accounts: [],
+    };
+
+    expect(toCanvasActivityCard(canvas, now)).toMatchObject({ obsTitle: "1 vue OBS ouverte", isLive: true });
+    expect(toCanvasActivityCard({ ...canvas, isStreamed: false, isLive: false }, now)).toMatchObject({
       obsTitle: null,
-      guestsLine: null,
+      isLive: false,
     });
+    expect(toObsTitle({ isStreamed: true, obsViews: 3 })).toBe("3 vues OBS ouvertes");
+    expect(toObsTitle({ isStreamed: false, obsViews: 0 })).toBeNull();
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : « dont N en live » sous les canvas streamés, et l'infobulle des courbes accordée
+  it("tells how many streamed canvases are live, and agrees the live curves' tooltip", () => {
+    expect([liveNote(0), liveNote(1), liveNote(3)]).toEqual([
+      "dont 0 en live",
+      "dont 1 en live",
+      "dont 3 en live",
+    ]);
+    expect(liveNote(1500)).toBe(`dont ${(1500).toLocaleString("fr-FR")} en live`);
+    expect([liveCanvasesLabel(0), liveCanvasesLabel(1), liveCanvasesLabel(3)]).toEqual([
+      "0 canvas en live",
+      "1 canvas en live",
+      "3 canvas en live",
+    ]);
+    expect([liveMinutesLabel(0), liveMinutesLabel(1), liveMinutesLabel(3)]).toEqual([
+      "0 minute en live",
+      "1 minute en live",
+      "3 minutes en live",
+    ]);
   });
 
   // Dans l'infobulle des courbes, accorde chaque valeur en minuscules, comme les lignes des canvas

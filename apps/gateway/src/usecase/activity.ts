@@ -1,6 +1,8 @@
-// Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06 et 2026-10-07) : qui est connecté, où, depuis
-// quand, les pixels acceptés, et l'audience : visites, temps passé, comptes, joueurs et streamers. La liste des connexions
-// reste en mémoire ; Redis ne garde que des nombres. Chaque canvas a aussi ses nombres (`canvas-activity.ts`), pour `here`.
+// Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06, 2026-10-07 et 2026-10-08) : qui est connecté,
+// où, depuis quand, les pixels acceptés, et l'audience : visites, temps passé, comptes, joueurs et streamers. La liste des
+// connexions reste en mémoire ; Redis ne garde que des nombres. Chaque canvas a aussi ses nombres (`canvas-activity.ts`), pour
+// `here`. À l'instant, un canvas est streamé tant qu'une vue OBS est ouverte, en live tant que son streamer l'est : l'état réel.
+// Une coupure de moins de `STREAM_GRACE_MS` ne se comble que dans l'historique, jamais à l'instant.
 
 import {
   type ActivityPeriod,
@@ -10,7 +12,9 @@ import {
   MINUTE_MS,
   type Role,
   type Session,
+  STREAM_GRACE_MS,
   type Timestamp,
+  toGapMinutes,
   toHourStart,
   toMinuteStart,
 } from "@liveplace/domain";
@@ -18,6 +22,7 @@ import type {
   ActivityAudience,
   ActivityCanvas,
   ActivityFrame,
+  ActivityGap,
   ActivityHere,
   ActivityHistory,
   ActivityStore,
@@ -25,6 +30,7 @@ import type {
   CanvasCore,
   CanvasMinute,
   CanvasPixelsMinute,
+  CanvasSeen,
   ClientSocket,
   ConnectedAccount,
   DaySignups,
@@ -71,17 +77,19 @@ export interface Activity {
     canvasId: string,
   ): Promise<ActivityHistory | null>; // `null` : refusé
   tick(): Promise<void>; // toutes les 2 s : la minute écoulée part dans Redis, la frame aux sockets qui regardent
-  start(): Promise<void>; // au démarrage : la température d'avant, et l'élagage
+  start(): Promise<void>; // au démarrage : la température d'avant, les heures vues, et l'élagage
 }
 
 type OpenPage = ActivityPage & { connectedAt: Timestamp; isCounted: boolean };
 
-// La minute en cours : le pic des personnes et des canvas streamés, les pixels, et ceux de chaque canvas, les visites
-// dont celles au téléphone, le temps passé en minutes entières (posé à la fermeture), et les identifiants vus.
+// La minute en cours : le pic des personnes, des canvas streamés et des canvas en live (relus à chaque lecture des lives),
+// les pixels, et ceux de chaque canvas, les visites dont celles au téléphone, le temps passé en minutes entières (posé à la
+// fermeture), et les identifiants vus.
 type OpenMinute = {
   at: Timestamp;
   people: number;
   streamed: number;
+  live: number;
   pixels: number;
   visits: number;
   phoneVisits: number;
@@ -176,6 +184,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     at,
     people: accountPages.size + guestPages,
     streamed: obsPages.size,
+    live: 0,
     pixels: 0,
     visits: 0,
     phoneVisits: 0,
@@ -193,6 +202,16 @@ export function createActivity(deps: ActivityDeps): Activity {
   let isTicking = false;
   const owners = new Map<string, { user: ActivityUser; readAt: Timestamp }>();
   const canvasOwners = new Map<string, string>(); // `canvasId` → `ownerId`, qui ne change jamais
+  // Écart §5.1 (JOURNAL 2026-10-08) : par canvas, la dernière heure où une vue OBS comptée était ouverte, et où il a été vu en
+  // live. Elles ne servent qu'à combler une coupure de moins de `STREAM_GRACE_MS` : jamais à dire l'état de l'instant.
+  const obsSeenAt = new Map<string, Timestamp>();
+  const liveSeenAt = new Map<string, Timestamp>();
+  const liveCanvasIds = new Set<string>(); // les canvas streamés dont le streamer était en live à la dernière lecture
+  const unreadCanvasIds = new Set<string>(); // streamés depuis la dernière lecture des lives : la prochaine ne les attend pas
+  const unstoredSeenIds = new Set<string>(); // dont la dernière vue vient de se fermer : leurs heures partent au tic suivant
+  const pendingGaps: ActivityGap[] = []; // une coupure ne quitte la file qu'une fois écrite
+  let livesListedAt = 0;
+  let storedSeenMinute = toMinuteStart(deps.now());
 
   const isCounted = (userId: string | undefined): boolean => !(deps.isProduction && isDeveloper(userId));
 
@@ -217,11 +236,51 @@ export function createActivity(deps: ActivityDeps): Activity {
     accruedAt = at;
   };
 
-  const tallyEverywhere = (page: OpenPage, delta: number): void => {
-    if (page.mode === "obs") {
-      addTo(obsPages, page.canvasId, delta);
-      if (delta > 0) minute.streamedCanvasIds.add(page.canvasId);
-    } else {
+  // La coupure d'une vue OBS ou d'un live, de sa dernière heure vue à sa reprise : l'historique la comble si elle a duré moins
+  // de `STREAM_GRACE_MS`. Sans heure vue, ou pour un trou plus court qu'une minute, rien à combler.
+  const queueGap = (
+    kind: ActivityGap["kind"],
+    canvasId: string,
+    endedAt: Timestamp | undefined,
+    resumedAt: Timestamp,
+  ): void => {
+    if (endedAt === undefined) return;
+    const minutes = toGapMinutes(endedAt, resumedAt);
+    if (minutes.length > 0) pendingGaps.push({ canvasId, kind, minutes });
+  };
+
+  // La première vue OBS d'un canvas s'ouvre : il est streamé, et la lecture suivante dira s'il est en live.
+  const startStream = (canvasId: string, nowMs: Timestamp): void => {
+    queueGap("streamed", canvasId, obsSeenAt.get(canvasId), nowMs);
+    obsSeenAt.set(canvasId, nowMs);
+    unreadCanvasIds.add(canvasId);
+  };
+
+  // La dernière se ferme : le canvas n'est plus streamé, ni en live, sans attendre la lecture suivante. Ses heures vues
+  // partent au tic, à la seconde de la fermeture.
+  const endStream = (canvasId: string, nowMs: Timestamp): void => {
+    obsSeenAt.set(canvasId, nowMs);
+    if (liveCanvasIds.delete(canvasId)) liveSeenAt.set(canvasId, nowMs);
+    unreadCanvasIds.delete(canvasId);
+    unstoredSeenIds.add(canvasId);
+  };
+
+  // Une vue OBS comptée s'ouvre ou se ferme : la première rend le canvas streamé, la dernière ne le rend plus.
+  const tallyObs = ({ canvasId, ownerId }: OpenPage, delta: number, nowMs: Timestamp): void => {
+    const wasStreamed = obsPages.has(canvasId);
+    addTo(obsPages, canvasId, delta);
+    if (delta < 0) {
+      if (!obsPages.has(canvasId)) endStream(canvasId, nowMs);
+      return;
+    }
+    minute.streamedCanvasIds.add(canvasId);
+    canvasOwners.set(canvasId, ownerId);
+    if (!wasStreamed) startStream(canvasId, nowMs);
+  };
+
+  const tallyEverywhere = (page: OpenPage, delta: number, nowMs: Timestamp): void => {
+    if (page.mode === "obs") tallyObs(page, delta, nowMs);
+    else {
       uiPages += delta;
       if (page.session) addTo(accountPages, page.session.userId, delta);
       else guestPages += delta;
@@ -233,7 +292,7 @@ export function createActivity(deps: ActivityDeps): Activity {
   // Une page comptée, dans les chiffres de tout LivePlace comme dans ceux de son canvas.
   const tally = (page: OpenPage, delta: number, nowMs: Timestamp): void => {
     if (!page.isCounted) return;
-    tallyEverywhere(page, delta);
+    tallyEverywhere(page, delta, nowMs);
     if (delta > 0) canvasCounts.join(page, nowMs);
     else canvasCounts.leave(page, nowMs);
   };
@@ -304,6 +363,8 @@ export function createActivity(deps: ActivityDeps): Activity {
   ): Promise<Omit<ActivityCanvas, "signups">> => ({
     canvasId,
     owner: await getOwnerWithLive(ownerId, nowMs, lives),
+    isStreamed: obsViews > 0,
+    isLive: obsViews > 0 && liveCanvasIds.has(canvasId),
     obsViews,
     people: countedUserIds.size + guests,
     guests,
@@ -363,6 +424,78 @@ export function createActivity(deps: ActivityDeps): Activity {
     };
   };
 
+  // Un canvas streamé dont le streamer est en live : s'il l'est de nouveau moins de `STREAM_GRACE_MS` après sa dernière heure
+  // vue, l'historique comble le trou.
+  const setLive = (canvasId: string, nowMs: Timestamp): void => {
+    if (!liveCanvasIds.has(canvasId)) queueGap("live", canvasId, liveSeenAt.get(canvasId), nowMs);
+    liveCanvasIds.add(canvasId);
+    liveSeenAt.set(canvasId, nowMs);
+  };
+
+  // Chaque lecture dit quels canvas streamés sont en live, et les compte dans la minute en cours.
+  const applyLives = (
+    ownerByCanvasId: ReadonlyMap<string, string>,
+    lives: ReadonlyMap<string, TwitchLive>,
+    nowMs: Timestamp,
+  ): void => {
+    for (const [canvasId, ownerId] of ownerByCanvasId) {
+      unreadCanvasIds.delete(canvasId);
+      if (!obsPages.has(canvasId)) continue; // sa dernière vue s'est fermée pendant la lecture
+      if (lives.has(ownerId)) setLive(canvasId, nowMs);
+      else liveCanvasIds.delete(canvasId);
+    }
+    minute.live = Math.max(minute.live, liveCanvasIds.size);
+    for (const canvasId of liveCanvasIds) canvasCounts.markLive(canvasId);
+  };
+
+  // Une seule lecture groupée par tic, pour les streamers listés et pour ceux des canvas streamés : le gateway ne lit que Redis.
+  const listLives = async (
+    nowMs: Timestamp,
+    listedOwnerIds: Iterable<string>,
+  ): Promise<Map<string, TwitchLive>> => {
+    const streamedOwnerIds = new Map<string, string>(); // `canvasId` → `ownerId`
+    for (const canvasId of obsPages.keys()) {
+      const ownerId = canvasOwners.get(canvasId);
+      if (ownerId) streamedOwnerIds.set(canvasId, ownerId);
+    }
+    const lives = await deps.core.listTwitchLives([
+      ...new Set([...listedOwnerIds, ...streamedOwnerIds.values()]),
+    ]);
+    livesListedAt = nowMs;
+    applyLives(streamedOwnerIds, lives, nowMs);
+    return lives;
+  };
+
+  // Sans personne qui regarde : une fois par minute, et dès qu'un canvas devient streamé, pour dater son live au plus tôt.
+  const isLivesListDue = (nowMs: Timestamp): boolean =>
+    obsPages.size > 0 && (unreadCanvasIds.size > 0 || toMinuteStart(nowMs) > toMinuteStart(livesListedAt));
+
+  // Tant qu'une vue OBS est ouverte, le canvas est vu à chaque tic.
+  const touchOpenStreams = (nowMs: Timestamp): void => {
+    for (const canvasId of obsPages.keys()) obsSeenAt.set(canvasId, nowMs);
+  };
+
+  // Une heure vue depuis `STREAM_GRACE_MS` ne comble plus rien : elle sort de la mémoire.
+  const forgetExpiredSeen = (nowMs: Timestamp): void => {
+    for (const [canvasId, seenAt] of obsSeenAt)
+      if (!obsPages.has(canvasId) && nowMs - seenAt >= STREAM_GRACE_MS) obsSeenAt.delete(canvasId);
+    for (const [canvasId, seenAt] of liveSeenAt)
+      if (!liveCanvasIds.has(canvasId) && nowMs - seenAt >= STREAM_GRACE_MS) liveSeenAt.delete(canvasId);
+  };
+
+  const toSeen = (): Map<string, CanvasSeen> => {
+    const seen = new Map<string, CanvasSeen>();
+    for (const canvasId of new Set([...obsSeenAt.keys(), ...liveSeenAt.keys()])) {
+      const obs = obsSeenAt.get(canvasId);
+      const live = liveSeenAt.get(canvasId);
+      seen.set(canvasId, {
+        ...(obs === undefined ? {} : { obsSeenAt: obs }),
+        ...(live === undefined ? {} : { liveSeenAt: live }),
+      });
+    }
+    return seen;
+  };
+
   // Construites une fois par envoi, le même objet pour chaque socket qui regarde le même canvas, ou aucun.
   const buildFrames = async (
     nowMs: Timestamp,
@@ -382,7 +515,7 @@ export function createActivity(deps: ActivityDeps): Activity {
       addHotCanvases(canvases, heat),
     ]);
     // Le live de tous les streamers listés, en une seule lecture.
-    const lives = await deps.core.listTwitchLives([
+    const lives = await listLives(nowMs, [
       ...new Set([...canvases.values()].map((canvas) => canvas.ownerId)),
     ]);
     const shown = await Promise.all(
@@ -396,6 +529,7 @@ export function createActivity(deps: ActivityDeps): Activity {
         people: accountPages.size + guestPages,
         guests: guestPages,
         streamed: obsPages.size,
+        live: liveCanvasIds.size,
         pixels: recentPixels.sum(nowMs),
         signups: signups.total,
       },
@@ -425,12 +559,38 @@ export function createActivity(deps: ActivityDeps): Activity {
     prunedHourAt = hourAt;
   };
 
+  // Les coupures comblées partent après les minutes closes, qu'elles complètent, et dans l'ordre.
+  const storeGaps = async (): Promise<void> => {
+    for (let gap = pendingGaps[0]; gap; gap = pendingGaps[0]) {
+      await deps.store.storeActivityGap(gap);
+      pendingGaps.shift();
+    }
+  };
+
+  // Les heures vues partent à chaque minute, et au tic qui suit la fermeture d'une dernière vue ; l'élagage les suit.
+  const storeSeen = async (nowMs: Timestamp): Promise<void> => {
+    const minuteAt = toMinuteStart(nowMs);
+    if (minuteAt === storedSeenMinute && unstoredSeenIds.size === 0) return;
+    forgetExpiredSeen(nowMs);
+    const sent = [...unstoredSeenIds];
+    await deps.store.storeSeen(toSeen());
+    await deps.store.pruneSeen(nowMs);
+    for (const canvasId of sent) unstoredSeenIds.delete(canvasId);
+    storedSeenMinute = minuteAt;
+  };
+
   const run = async (): Promise<void> => {
     const nowMs = deps.now();
     rollMinute(nowMs);
     accrueVisitTime(nowMs);
+    touchOpenStreams(nowMs);
     await storeClosedMinutes(nowMs);
-    if (watchers.size === 0) return;
+    await storeGaps();
+    await storeSeen(nowMs);
+    if (watchers.size === 0) {
+      if (isLivesListDue(nowMs)) await listLives(nowMs, []);
+      return;
+    }
     const frames = await buildFrames(nowMs, new Set(watchers.values()));
     for (const [socket, canvasId] of watchers) {
       const frame = frames.get(canvasId);
@@ -504,8 +664,15 @@ export function createActivity(deps: ActivityDeps): Activity {
       const nowMs = deps.now();
       const at = toMinuteStart(nowMs);
       pastMinutes = await deps.store.listCanvasPixels(at - HEAT_PAST_MINUTES * MINUTE_MS, at);
+      // Les vues OBS qui reviennent après ce redémarrage comblent leur coupure depuis ces heures (Écart §5.1, JOURNAL 2026-10-08).
+      for (const [canvasId, seen] of await deps.store.listSeen()) {
+        if (seen.obsSeenAt !== undefined) obsSeenAt.set(canvasId, seen.obsSeenAt);
+        if (seen.liveSeenAt !== undefined) liveSeenAt.set(canvasId, seen.liveSeenAt);
+      }
       await deps.store.pruneActivity(nowMs);
+      await deps.store.pruneSeen(nowMs);
       prunedHourAt = toHourStart(nowMs);
+      storedSeenMinute = at;
     },
   };
 }

@@ -12,11 +12,13 @@ import type {
   ActiveIds,
   ActivityAudience,
   ActivityFrame,
+  ActivityGap,
   ActivityMinute,
   ActivityStore,
   CanvasActivityPoint,
   CanvasAudience,
   CanvasPixelsMinute,
+  CanvasSeen,
   ClientSocket,
   DaySignups,
   TwitchLive,
@@ -78,6 +80,9 @@ const setup = (options: SetupOptions = {}) => {
   const audienceReads: ActiveIds[] = []; // les identifiants que la minute en cours a donnés à chaque lecture
   const canvasAudienceReads: { canvasId: string; playerIds: Set<string> }[] = [];
   const canvasHistoryReads: { canvasId: string; period: ActivityPeriod }[] = [];
+  const gaps: ActivityGap[] = []; // les coupures comblées (Écart §5.1, JOURNAL 2026-10-08)
+  const savedSeen = new Map<string, CanvasSeen>(); // ce que `activity:seen` garde, relu par un nouveau gateway
+  const prunedSeenAt: number[] = [];
   const store: ActivityStore = {
     async storeActivityMinute(minute) {
       stored.push(minute);
@@ -93,6 +98,7 @@ const setup = (options: SetupOptions = {}) => {
               at: minuteAt,
               people: 1,
               streamed: 0,
+              live: 0,
               pixels: 2,
               signups: 0,
               visits: 0,
@@ -129,37 +135,19 @@ const setup = (options: SetupOptions = {}) => {
       userReads.push(userId);
       return { userId, login: `login-${userId}`, displayName: `Name ${userId}` };
     },
-  };
-  const activity = createActivity({
-    store,
-    core: {
-      getCanvas: async (canvasId) => metas.get(canvasId) ?? null,
-      listTwitchLives: async (userIds) => {
-        liveReads.push([...userIds]);
-        return new Map(
-          userIds.flatMap((userId) => {
-            const live = options.lives?.[userId];
-            return live ? [[userId, live] as const] : [];
-          }),
-        );
-      },
+    async storeActivityGap(gap) {
+      gaps.push(gap);
     },
-    now: () => clock.nowMs,
-    isProduction: options.isProduction ?? false,
-  });
-
-  const join = (canvasId: string, session: Session | null, overrides: Partial<ActivityPage> = {}) =>
-    activity.join({
-      canvasId,
-      ownerId: metas.get(canvasId)?.ownerId ?? "owner-a",
-      mode: "ui",
-      session,
-      role: session ? "viewer" : "guest",
-      device: "desktop",
-      isResumed: false,
-      ...overrides,
-    });
-
+    async storeSeen(seen) {
+      for (const [canvasId, at] of seen) savedSeen.set(canvasId, at);
+    },
+    async listSeen() {
+      return new Map(savedSeen);
+    },
+    async pruneSeen(nowMs) {
+      prunedSeenAt.push(nowMs);
+    },
+  };
   const openSocket = () => {
     const sent: ServerFrame[] = [];
     const socket: ClientSocket = {
@@ -172,19 +160,61 @@ const setup = (options: SetupOptions = {}) => {
     return { socket, sent };
   };
 
-  // Ce que reçoit le développeur au prochain tic : il regarde depuis une socket à lui, sur `canvasId` s'il en a un.
-  const watched = async (canvasId?: string): Promise<ActivityFrame> => {
-    const { socket, sent } = openSocket();
-    activity.watch(socket, developer, true, canvasId);
-    await activity.tick();
-    activity.watch(socket, developer, false);
-    const frame = sent.at(-1);
-    if (frame?.t !== "activity") throw new Error("aucune frame activity");
-    return frame;
+  // Un gateway sur le même noyau : `restart` en lève un neuf, qui relit `activity:seen` à son `start()`.
+  const build = () => {
+    const activity = createActivity({
+      store,
+      core: {
+        getCanvas: async (canvasId) => metas.get(canvasId) ?? null,
+        listTwitchLives: async (userIds) => {
+          liveReads.push([...userIds]);
+          return new Map(
+            userIds.flatMap((userId) => {
+              const live = options.lives?.[userId];
+              return live ? [[userId, live] as const] : [];
+            }),
+          );
+        },
+      },
+      now: () => clock.nowMs,
+      isProduction: options.isProduction ?? false,
+    });
+
+    const join = (canvasId: string, session: Session | null, overrides: Partial<ActivityPage> = {}) =>
+      activity.join({
+        canvasId,
+        ownerId: metas.get(canvasId)?.ownerId ?? "owner-a",
+        mode: "ui",
+        session,
+        role: session ? "viewer" : "guest",
+        device: "desktop",
+        isResumed: false,
+        ...overrides,
+      });
+
+    // Ce que reçoit le développeur au prochain tic : il regarde depuis une socket à lui, sur `canvasId` s'il en a un.
+    const watched = async (canvasId?: string): Promise<ActivityFrame> => {
+      const { socket, sent } = openSocket();
+      activity.watch(socket, developer, true, canvasId);
+      await activity.tick();
+      activity.watch(socket, developer, false);
+      const frame = sent.at(-1);
+      if (frame?.t !== "activity") throw new Error("aucune frame activity");
+      return frame;
+    };
+
+    // Un tic à l'heure `nowMs` : sans personne qui regarde, il lit les lives une fois par minute.
+    const tickAt = async (nowMs: number) => {
+      clock.nowMs = nowMs;
+      await activity.tick();
+    };
+
+    return { activity, join, watched, tickAt };
   };
 
   return {
-    activity,
+    ...build(),
+    restart: build,
     clock,
     stored,
     prunedAt,
@@ -195,9 +225,10 @@ const setup = (options: SetupOptions = {}) => {
     audienceReads,
     canvasAudienceReads,
     canvasHistoryReads,
-    join,
+    gaps,
+    savedSeen,
+    prunedSeenAt,
     openSocket,
-    watched,
   };
 };
 
@@ -323,7 +354,7 @@ describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () =>
 
     expect(await watched()).toEqual({
       t: "activity",
-      now: { people: 0, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+      now: { people: 0, guests: 0, streamed: 0, live: 0, pixels: 0, signups: 0 },
       audience: { today: onceVisited, month: onceVisited },
       canvases: [],
     });
@@ -366,7 +397,7 @@ describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () =>
     clock.nowMs += MINUTE_MS;
     await activity.tick();
 
-    const unvisited = { visits: 0, phoneVisits: 0, visitMinutes: 0 };
+    const unvisited = { live: 0, visits: 0, phoneVisits: 0, visitMinutes: 0 };
     expect(
       stored.map(
         ({ pixelsByCanvas, canvases, accountIds, playerIds, streamedCanvasIds, ...counts }) => counts,
@@ -437,7 +468,7 @@ describe("the developer in production (écart §10.3, JOURNAL 2026-10-06)", () =
     clock.nowMs = minuteAt + MINUTE_MS;
     await activity.tick();
 
-    expect(moment).toEqual({ people: 0, guests: 0, streamed: 0, pixels: 0, signups: 0 });
+    expect(moment).toEqual({ people: 0, guests: 0, streamed: 0, live: 0, pixels: 0, signups: 0 });
     expect(canvases).toMatchObject([
       { canvasId: "canvas-a", people: 0, obsViews: 0, heat: 0, accounts: [{ userId: DEVELOPER_USER_ID }] },
     ]);
@@ -663,7 +694,7 @@ describe("the canvas of the socket in the gateway (JOURNAL 2026-10-07)", () => {
     today: { visits: 10, phoneVisits: 4, visitMinutes: 50, activePlayers: 3, signups: 2 },
     month: { visits: 100, phoneVisits: 40, visitMinutes: 500, activePlayers: 20, signups: 9 },
   };
-  const nothing = { people: 0, obsViews: 0, pixels: 0, visits: 0, phoneVisits: 0, visitMinutes: 0 };
+  const nothing = { people: 0, obsViews: 0, live: 0, pixels: 0, visits: 0, phoneVisits: 0, visitMinutes: 0 };
   const nobody = new Set<string>();
 
   // Dit du canvas de la socket son streamer, ses vues OBS, ses personnes dont les invités, sa température et ses comptes connectés
@@ -897,7 +928,7 @@ describe("the canvas of the socket in the gateway (JOURNAL 2026-10-07)", () => {
   // Rend au développeur seul l'historique du canvas de sa socket, avec celui de tout LivePlace
   it("gives the history of the socket's canvas, with the whole one, to the developer only", async () => {
     const canvasPoints = [
-      { at: minuteAt, people: 1, obsViews: 0, pixels: 2, visits: 1, visitMinutes: 3, signups: 0 },
+      { at: minuteAt, people: 1, obsViews: 0, live: 0, pixels: 2, visits: 1, visitMinutes: 3, signups: 0 },
     ];
     const { activity, canvasHistoryReads } = setup({ canvasPoints });
 
@@ -978,5 +1009,355 @@ describe("the Twitch live of the owners in the activity (Écart §4, JOURNAL 202
     expect(listed.here?.owner).toMatchObject({ userId: "owner-a", twitchLive: art });
     expect(alone.here?.owner).toMatchObject({ userId: "owner-b", twitchLive: art });
     expect(liveReads).toEqual([["owner-a"], ["owner-a"], ["owner-b"]]);
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-08) : à l'instant, l'état réel ; une coupure de moins de 5 minutes se comble dans l'historique,
+// jamais à l'instant, et la fin d'un stream n'est jamais prolongée.
+describe("the live and the gaps of a stream in the gateway (écart §5.1, JOURNAL 2026-10-08)", () => {
+  const art: TwitchLive = { category: "Art" };
+  const obs = { mode: "obs" } as const;
+  const at = (minutes: number, seconds = 0) => minuteAt + minutes * MINUTE_MS + seconds * 1000;
+
+  // Dit l'état de l'instant, sans tolérance : une vue qui vient de se fermer n'est plus streamée, un live qui vient de tomber n'est plus en live
+  it("tells the state of the moment, without grace: a view just closed is no longer streamed, a live just dropped is no longer live", async () => {
+    const lives: Record<string, TwitchLive> = { "owner-a": art };
+    const { join, watched } = setup({ lives });
+    const page = join("canvas-a", null, obs);
+    join("canvas-a", viewer);
+
+    const streamed = await watched("canvas-a");
+    expect(streamed.now).toMatchObject({ streamed: 1, live: 1 });
+    expect(streamed.canvases[0]).toMatchObject({ isStreamed: true, isLive: true, obsViews: 1 });
+    expect(streamed.here).toMatchObject({ isStreamed: true, isLive: true });
+
+    delete lives["owner-a"];
+    const dropped = await watched("canvas-a");
+    expect(dropped.now).toMatchObject({ streamed: 1, live: 0 });
+    expect(dropped.canvases[0]).toMatchObject({ isStreamed: true, isLive: false });
+
+    lives["owner-a"] = art;
+    page.leave();
+    const closed = await watched("canvas-a");
+    expect(closed.now).toMatchObject({ streamed: 0, live: 0 });
+    expect(closed.canvases[0]).toMatchObject({ isStreamed: false, isLive: false, obsViews: 0 });
+    expect(closed.here).toMatchObject({ isStreamed: false, isLive: false });
+  });
+
+  // Ne dit pas en live un canvas dont le streamer l'est mais dont aucune vue OBS n'est ouverte, ni l'inverse
+  it("does not tell a canvas live whose owner is live without an OBS view open, nor the other way round", async () => {
+    const { join, watched } = setup({ lives: { "owner-a": art } });
+    join("canvas-a", viewer);
+    join("canvas-b", null, obs);
+
+    const { canvases, now: moment } = await watched();
+
+    expect(canvases.map(({ canvasId, isStreamed, isLive }) => [canvasId, isStreamed, isLive])).toEqual([
+      ["canvas-a", false, false],
+      ["canvas-b", true, false],
+    ]);
+    expect(moment).toMatchObject({ streamed: 1, live: 0 });
+  });
+
+  // Garde un canvas streamé tant qu'une de ses vues est ouverte, et ne comble rien quand une vue fermée revient
+  it("keeps a canvas streamed while one of its views is open, and fills nothing when a closed one comes back", async () => {
+    const { join, watched, gaps, clock, tickAt } = setup();
+    const first = join("canvas-a", null, obs);
+    join("canvas-a", null, obs);
+
+    clock.nowMs = at(0, 40);
+    first.leave();
+    expect((await watched()).canvases[0]).toMatchObject({ isStreamed: true, obsViews: 1 });
+    clock.nowMs = at(3, 0);
+    join("canvas-a", null, obs);
+    await tickAt(at(3, 2));
+    await tickAt(at(3, 4));
+
+    expect(gaps).toEqual([]);
+  });
+
+  // Comble dans l'historique les minutes d'une vue fermée puis rouverte en moins de 5 minutes, jamais à l'instant pendant la coupure
+  it("fills the minutes of a view closed then reopened in under 5 minutes into the history, never at the moment during the cut", async () => {
+    const { join, tickAt, watched, clock, gaps, stored } = setup();
+    const page = join("canvas-a", null, obs);
+    await tickAt(at(0, 40));
+    clock.nowMs = at(0, 45);
+    page.leave();
+
+    const during = await watched();
+    await tickAt(at(1, 5));
+    await tickAt(at(2, 5));
+    clock.nowMs = at(3, 10);
+    join("canvas-a", null, obs);
+    await tickAt(at(3, 12));
+    await tickAt(at(3, 14));
+
+    expect(during.now.streamed).toBe(0);
+    expect(during.canvases).toEqual([]);
+    expect(gaps).toEqual([{ canvasId: "canvas-a", kind: "streamed", minutes: [at(1), at(2)] }]);
+    expect(stored.map(({ at: minuteStart, streamed }) => [minuteStart, streamed])).toEqual([
+      [at(0), 1],
+      [at(1), 0],
+      [at(2), 0],
+    ]);
+  });
+
+  // Ne comble que sous 5 minutes : 4 min 45 s de coupure se comblent, 6 min 5 s non
+  it("fills a cut only under 5 minutes: 4 min 45 s are filled, 6 min 5 s are not", async () => {
+    const { join, tickAt, clock, gaps } = setup();
+    const short = join("canvas-a", null, obs);
+    const long = join("canvas-b", null, obs);
+    clock.nowMs = at(0, 45);
+    short.leave();
+    long.leave();
+
+    clock.nowMs = at(5, 30);
+    join("canvas-a", null, obs);
+    clock.nowMs = at(6, 50);
+    join("canvas-b", null, obs);
+    await tickAt(at(6, 52));
+    await tickAt(at(6, 54));
+
+    expect(gaps).toEqual([{ canvasId: "canvas-a", kind: "streamed", minutes: [at(1), at(2), at(3), at(4)] }]);
+  });
+
+  // Ne comble rien quand la vue revient dans la minute de sa fermeture ou la suivante
+  it("fills nothing when the view comes back within the minute of its close or the next one", async () => {
+    const { join, tickAt, clock, gaps } = setup();
+    const page = join("canvas-a", null, obs);
+    clock.nowMs = at(0, 45);
+    page.leave();
+    clock.nowMs = at(0, 55);
+    const again = join("canvas-a", null, obs);
+    clock.nowMs = at(0, 58);
+    again.leave();
+    clock.nowMs = at(1, 5);
+    join("canvas-a", null, obs);
+    await tickAt(at(1, 7));
+    await tickAt(at(1, 9));
+
+    expect(gaps).toEqual([]);
+  });
+
+  // N'ajoute rien après la fermeture d'une vue qui ne revient pas : la fin d'un stream n'est jamais prolongée
+  it("adds nothing after the close of a view that never comes back: the end of a stream is never extended", async () => {
+    const { join, tickAt, clock, gaps, stored } = setup({ lives: { "owner-a": art } });
+    const page = join("canvas-a", null, obs);
+    await tickAt(at(0, 20));
+    clock.nowMs = at(0, 45);
+    page.leave();
+
+    for (const minutes of [1, 2, 3, 4, 5, 6, 7]) await tickAt(at(minutes, 5));
+
+    expect(gaps).toEqual([]);
+    expect(stored.map(({ streamed, live }) => [streamed, live])).toEqual([
+      [1, 1],
+      ...Array.from({ length: 6 }, () => [0, 0]),
+    ]);
+    expect(stored.flatMap(({ streamedCanvasIds }) => [...streamedCanvasIds])).toEqual(["canvas-a"]);
+    expect(stored.flatMap(({ canvases }) => [...canvases.keys()])).toEqual(["canvas-a"]);
+  });
+
+  // Écrit à chaque minute le pic des canvas en live pour tout LivePlace, et 1 pour chacun de ces canvas, 0 pour un canvas streamé qui ne l'est pas
+  it("writes each minute the peak of the live canvases for the whole of LivePlace, 1 for each of them, 0 for a streamed canvas that is not", async () => {
+    const { join, tickAt, stored } = setup({ lives: { "owner-a": art, "owner-b": art } });
+    join("canvas-a", null, obs);
+    join("canvas-b", null, obs);
+    join("canvas-c", null, obs);
+
+    await tickAt(at(0, 20));
+    await tickAt(at(1, 5));
+
+    expect(stored[0]).toMatchObject({ streamed: 3, live: 2 });
+    expect(stored[0]?.canvases.get("canvas-a")?.live).toBe(1);
+    expect(stored[0]?.canvases.get("canvas-b")?.live).toBe(1);
+    expect(stored[0]?.canvases.get("canvas-c")?.live).toBe(0);
+  });
+
+  // Comble dans l'historique les minutes d'un live qui tombe 2 minutes, lu une fois par minute quand personne ne regarde
+  it("fills the minutes of a live that drops for 2 minutes, read once a minute when nobody watches", async () => {
+    const lives: Record<string, TwitchLive> = { "owner-a": art };
+    const { join, tickAt, liveReads, gaps, stored } = setup({ lives });
+    join("canvas-a", null, obs);
+
+    await tickAt(at(0, 20));
+    delete lives["owner-a"];
+    await tickAt(at(1, 5));
+    await tickAt(at(2, 5));
+    lives["owner-a"] = art;
+    await tickAt(at(3, 5));
+    await tickAt(at(3, 7));
+
+    expect(gaps).toEqual([{ canvasId: "canvas-a", kind: "live", minutes: [at(1), at(2)] }]);
+    expect(liveReads).toEqual([["owner-a"], ["owner-a"], ["owner-a"], ["owner-a"]]);
+    expect(stored.map(({ live, canvases }) => [live, canvases.get("canvas-a")?.live])).toEqual([
+      [1, 1],
+      [0, 0],
+      [0, 0],
+    ]);
+  });
+
+  // Ne comble pas un live qui ne revient qu'après 5 minutes
+  it("does not fill a live that only comes back after 5 minutes", async () => {
+    const lives: Record<string, TwitchLive> = { "owner-a": art };
+    const { join, tickAt, gaps } = setup({ lives });
+    join("canvas-a", null, obs);
+    await tickAt(at(0, 20));
+    delete lives["owner-a"];
+    for (const minutes of [1, 2, 3, 4, 5]) await tickAt(at(minutes, 5));
+    lives["owner-a"] = art;
+    await tickAt(at(6, 5));
+    await tickAt(at(6, 7));
+
+    expect(gaps).toEqual([]);
+  });
+
+  // Date la fin d'un live à la fermeture de la vue OBS, et comble le trou du live quand les deux reviennent
+  it("dates the end of a live at the close of the OBS view, and fills the hole of the live when both come back", async () => {
+    const { join, tickAt, clock, gaps } = setup({ lives: { "owner-a": art } });
+    const page = join("canvas-a", null, obs);
+    await tickAt(at(0, 20));
+    clock.nowMs = at(0, 50);
+    page.leave();
+    await tickAt(at(1, 5));
+
+    clock.nowMs = at(3, 20);
+    join("canvas-a", null, obs);
+    await tickAt(at(3, 22));
+    await tickAt(at(3, 24));
+
+    expect(gaps).toEqual([
+      { canvasId: "canvas-a", kind: "streamed", minutes: [at(1), at(2)] },
+      { canvasId: "canvas-a", kind: "live", minutes: [at(1), at(2)] },
+    ]);
+  });
+
+  // Garde un redémarrage du gateway : la vue OBS qui revient en moins de 5 minutes comble son trou depuis la dernière heure vue, le live aussi
+  it("keeps a gateway restart: the OBS view coming back in under 5 minutes fills its gap from the last time it was seen, the live too", async () => {
+    const { join, tickAt, restart, clock, gaps, savedSeen } = setup({ lives: { "owner-a": art } });
+    join("canvas-a", null, obs);
+    await tickAt(at(0, 20));
+    await tickAt(at(1, 5));
+    expect(savedSeen.get("canvas-a")).toEqual({ obsSeenAt: at(1, 5), liveSeenAt: at(0, 20) });
+
+    const next = restart();
+    clock.nowMs = at(3, 30);
+    await next.activity.start();
+    expect(gaps).toEqual([]);
+    clock.nowMs = at(3, 40);
+    next.join("canvas-a", null, obs);
+    await next.tickAt(at(3, 42));
+    await next.tickAt(at(3, 44));
+
+    expect(gaps).toEqual([
+      { canvasId: "canvas-a", kind: "streamed", minutes: [at(2)] },
+      { canvasId: "canvas-a", kind: "live", minutes: [at(1), at(2)] },
+    ]);
+  });
+
+  // Ne comble rien d'un redémarrage dont la vue OBS ne revient qu'après 5 minutes
+  it("fills nothing of a restart whose OBS view only comes back after 5 minutes", async () => {
+    const { join, tickAt, restart, clock, gaps, prunedSeenAt } = setup({ lives: { "owner-a": art } });
+    join("canvas-a", null, obs);
+    await tickAt(at(0, 20));
+    await tickAt(at(1, 5));
+
+    const next = restart();
+    clock.nowMs = at(8, 0);
+    await next.activity.start();
+    next.join("canvas-a", null, obs);
+    await next.tickAt(at(8, 2));
+    await next.tickAt(at(8, 4));
+
+    expect(gaps).toEqual([]);
+    expect(prunedSeenAt).toContain(at(8, 0));
+  });
+
+  // Garde quand chaque canvas a été vu : à la minute, et à la fermeture de sa dernière vue, avec la fin de son live
+  it("keeps when each canvas was last seen: every minute, and at the close of its last view with the end of its live", async () => {
+    const { join, tickAt, clock, savedSeen, prunedSeenAt } = setup({ lives: { "owner-a": art } });
+    const first = join("canvas-a", null, obs);
+    const second = join("canvas-a", null, obs);
+
+    await tickAt(at(0, 20));
+    expect(savedSeen.size).toBe(0);
+    await tickAt(at(1, 5));
+    expect(savedSeen.get("canvas-a")).toEqual({ obsSeenAt: at(1, 5), liveSeenAt: at(0, 20) });
+
+    clock.nowMs = at(1, 30);
+    first.leave();
+    await tickAt(at(1, 32));
+    expect(savedSeen.get("canvas-a")).toEqual({ obsSeenAt: at(1, 5), liveSeenAt: at(0, 20) });
+    clock.nowMs = at(1, 40);
+    second.leave();
+    await tickAt(at(1, 42));
+
+    expect(savedSeen.get("canvas-a")).toEqual({ obsSeenAt: at(1, 40), liveSeenAt: at(1, 40) });
+    expect(prunedSeenAt).toEqual([at(1, 5), at(1, 42)]);
+  });
+
+  // En production, laisse de côté la vue OBS du développeur : ni streamée, ni vue, ni lue, ni comblée
+  it("in production, leaves the developer's OBS view out: not streamed, not seen, not read, not filled", async () => {
+    const { join, tickAt, watched, clock, savedSeen, gaps, liveReads } = setup({
+      isProduction: true,
+      lives: { "owner-a": art },
+    });
+    const page = join("canvas-a", developer, { ...obs, role: "owner" });
+    await tickAt(at(1, 5));
+    clock.nowMs = at(1, 10);
+    page.leave();
+    clock.nowMs = at(3, 10);
+    join("canvas-a", developer, { ...obs, role: "owner" });
+    await tickAt(at(3, 12));
+    await tickAt(at(3, 14));
+
+    const { now: moment, canvases } = await watched();
+
+    expect(moment).toMatchObject({ streamed: 0, live: 0 });
+    expect(canvases[0]).toMatchObject({ isStreamed: false, isLive: false });
+    expect(savedSeen.size).toBe(0);
+    expect(gaps).toEqual([]);
+    expect(liveReads).toEqual([["owner-a"]]);
+  });
+
+  // Lit les lives en une lecture groupée par tic, des seuls streamers des canvas streamés, au moins une fois par minute et dès qu'un canvas devient streamé
+  it("reads the lives in one grouped read per tick, of the owners of the streamed canvases only, at least once a minute and as soon as a canvas becomes streamed", async () => {
+    const { join, tickAt, liveReads } = setup({ lives: { "owner-a": art } });
+    join("canvas-c", viewer);
+    await tickAt(at(0, 20));
+    expect(liveReads).toEqual([]);
+
+    join("canvas-a", null, obs);
+    join("canvas-b", null, obs);
+    await tickAt(at(0, 25));
+    await tickAt(at(0, 27));
+    join("canvas-c", null, obs);
+    await tickAt(at(0, 40));
+    await tickAt(at(0, 50));
+    await tickAt(at(1, 5));
+
+    expect(liveReads).toEqual([
+      ["owner-a", "owner-b"],
+      ["owner-a", "owner-b", "owner-c"],
+      ["owner-a", "owner-b", "owner-c"],
+    ]);
+  });
+
+  // Quand le développeur regarde, la même lecture sert aux canvas listés et aux canvas streamés, et dit lesquels sont en live
+  it("when the developer watches, serves the listed and the streamed canvases with the same read, and tells which are live", async () => {
+    const { join, watched, liveReads } = setup({ lives: { "owner-a": art, "owner-b": art } });
+    join("canvas-a", viewer);
+    join("canvas-b", null, obs);
+    join("canvas-c", null, obs);
+
+    const { canvases, now: moment } = await watched();
+
+    expect(liveReads).toEqual([["owner-a", "owner-b", "owner-c"]]);
+    expect(canvases.map(({ canvasId, isLive }) => [canvasId, isLive])).toEqual([
+      ["canvas-a", false],
+      ["canvas-b", true],
+      ["canvas-c", false],
+    ]);
+    expect(moment).toMatchObject({ streamed: 2, live: 1 });
   });
 });

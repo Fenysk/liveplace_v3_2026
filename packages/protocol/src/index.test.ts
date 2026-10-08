@@ -440,12 +440,14 @@ describe("activity frames", () => {
   };
   const activity = {
     t: "activity",
-    now: { people: 3, guests: 1, streamed: 1, pixels: 40, signups: 2 },
+    now: { people: 3, guests: 1, streamed: 1, live: 1, pixels: 40, signups: 2 },
     audience: { today: audienceDay, month: { ...audienceDay, visits: 300 } },
     canvases: [
       {
         canvasId: "c1",
         owner: { userId: "68710381", login: "fenysk", displayName: "Fenysk" },
+        isStreamed: true,
+        isLive: true,
         obsViews: 1,
         people: 3,
         guests: 1,
@@ -459,13 +461,14 @@ describe("activity frames", () => {
     at: 60_000,
     people: 3,
     streamed: 1,
+    live: 1,
     pixels: 40,
     signups: 0,
     visits: 2,
     phoneVisits: 1,
     visitMinutes: 7,
   };
-  const pointBefore = { at: 60_000, people: 3, streamed: 1, pixels: 40, signups: 0 };
+  const pointBefore = { at: 60_000, people: 3, streamed: 1, live: 0, pixels: 40, signups: 0 };
 
   // Passe au protocole 13, après le 12 du classement (le 14 des archives vient ensuite) : une page en 12 se recharge
   it("is protocol 13 or later, after the scoreboard's 12: a page in 12 reloads", () => {
@@ -566,10 +569,41 @@ describe("activity frames", () => {
       ),
     });
     const history = { t: "activityHistory", requestId: "r", points: [{ ...point, activeAccounts: 4 }] };
+    const { live, ...seenBefore } = pointBefore;
 
-    expect(before.safeParse(history).data?.points).toEqual([pointBefore]);
+    expect(before.safeParse(history).data?.points).toEqual([seenBefore]);
     expect(decodeServerFrame({ ...activity, later: true }).ok).toBe(true);
     expect(decodeServerFrame({ ...history, points: [{ ...point, later: true }] }).ok).toBe(true);
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : le protocole reste en 17, une page d'avant ignore le live, et un gateway d'avant ne passe pas
+  it("adds the live to the numbers of the moment, the canvases and the points, without changing the version", () => {
+    const beforeActivity = z.object({
+      t: z.literal("activity"),
+      now: z.object({ people: z.number(), streamed: z.number() }),
+      canvases: z.array(z.object({ canvasId: z.string(), obsViews: z.number() })),
+    });
+
+    expect(PROTOCOL_VERSION).toBe(17);
+    expect(decodeServerFrame(activity)).toEqual({ ok: true, value: activity });
+    expect(beforeActivity.safeParse(activity).data).toEqual({
+      t: "activity",
+      now: { people: 3, streamed: 1 },
+      canvases: [{ canvasId: "c1", obsViews: 1 }],
+    });
+    const { live, ...nowWithoutLive } = activity.now;
+    expect(decodeServerFrame({ ...activity, now: nowWithoutLive }).ok).toBe(false);
+    expect(decodeServerFrame({ ...activity, now: { ...activity.now, live: 1.5 } }).ok).toBe(false);
+    expect(decodeServerFrame({ ...activity, now: { ...activity.now, live: -1 } }).ok).toBe(false);
+    const withoutIsLive = activity.canvases.map(({ isLive, ...canvas }) => canvas);
+    const streamedAsNumber = activity.canvases.map((canvas) => ({ ...canvas, isStreamed: 1 }));
+    expect(decodeServerFrame({ ...activity, canvases: withoutIsLive }).ok).toBe(false);
+    expect(decodeServerFrame({ ...activity, canvases: streamedAsNumber }).ok).toBe(false);
+    const history = { t: "activityHistory", requestId: "r", points: [{ ...point, live: 0 }] };
+    expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
+    expect(decodeServerFrame({ ...history, points: [{ ...point, live: -1 }] }).ok).toBe(false);
+    const { live: pointLive, ...pointWithoutLive } = point;
+    expect(decodeServerFrame({ ...history, points: [pointWithoutLive] }).ok).toBe(false);
   });
 });
 
@@ -579,6 +613,8 @@ describe("the canvas of the socket in the activity frames", () => {
   const here = {
     canvasId: "c1",
     owner: { userId: "68710381", login: "fenysk", displayName: "Fenysk", avatarUrl: "https://avatar" },
+    isStreamed: true,
+    isLive: true,
     obsViews: 1,
     people: 3,
     guests: 1,
@@ -599,7 +635,7 @@ describe("the canvas of the socket in the activity frames", () => {
   const day = { visits: 0, phoneVisits: 0, visitMinutes: 0, activeAccounts: 0, activePlayers: 0 };
   const activity = {
     t: "activity",
-    now: { people: 3, guests: 1, streamed: 1, pixels: 40, signups: 2 },
+    now: { people: 3, guests: 1, streamed: 1, live: 1, pixels: 40, signups: 2 },
     audience: { today: { ...day, activeStreamers: 0 }, month: { ...day, activeStreamers: 0 } },
     canvases: [],
   };
@@ -607,6 +643,7 @@ describe("the canvas of the socket in the activity frames", () => {
     at: 60_000,
     people: 3,
     obsViews: 1,
+    live: 1,
     pixels: 40,
     visits: 2,
     visitMinutes: 7,
@@ -648,6 +685,10 @@ describe("the canvas of the socket in the activity frames", () => {
     expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, signups: -1 }] }).ok).toBe(false);
     const { visits, ...withoutVisits } = canvasPoint;
     expect(decodeServerFrame({ ...frame, canvasPoints: [withoutVisits] }).ok).toBe(false);
+    // Écart §5.1 (JOURNAL 2026-10-08) : les minutes en live, un nombre entier comme le reste
+    expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, live: 0.5 }] }).ok).toBe(false);
+    const { live, ...withoutLive } = canvasPoint;
+    expect(decodeServerFrame({ ...frame, canvasPoints: [withoutLive] }).ok).toBe(false);
   });
 
   // Lit une frame sans ces champs, d'un gateway d'avant : pas de canvas, pas de points
@@ -923,12 +964,14 @@ describe("protocol 17: the Twitch live of an account", () => {
     const user = { userId: "68710381", login: "fenysk", displayName: "Fenysk" };
     const activity = (owner: object, account: object) => ({
       t: "activity",
-      now: { people: 1, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+      now: { people: 1, guests: 0, streamed: 0, live: 0, pixels: 0, signups: 0 },
       audience: { today: day, month: day },
       canvases: [
         {
           canvasId: "c1",
           owner,
+          isStreamed: false,
+          isLive: false,
           obsViews: 0,
           people: 1,
           guests: 0,

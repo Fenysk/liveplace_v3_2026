@@ -1,9 +1,10 @@
-import { type CellKey, toCellKey } from "@liveplace/domain";
+import { type CellKey, STREAM_GRACE_MS, toCellKey } from "@liveplace/domain";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVE_TTL_SECONDS,
   ACTIVITY_CANVAS_MINUTES_RETENTION_MS,
   ACTIVITY_HOURS_RETENTION_MS,
+  ACTIVITY_SEEN_RETENTION_MS,
   buildActivityKeys,
   buildCanvasKeys,
   SCORE_MAX_PIXELS,
@@ -57,6 +58,7 @@ describe("buildActivityKeys", () => {
     keys.hours,
     keys.days,
     keys.canvasPixels(Date.UTC(2026, 9, 6, 12, 34)),
+    keys.seen,
     keys.signups("2026-10-06"),
     keys.activeAccounts("2026-10-06"),
     keys.activePlayers("2026-10-06"),
@@ -93,6 +95,13 @@ describe("buildActivityKeys", () => {
   // Isole les clés d'un test sous son propre préfixe
   it("isolates a test's keys under its own prefix", () => {
     expect(buildActivityKeys("activity:run-1-").minutes).toBe("activity:run-1-minute");
+    expect(buildActivityKeys("activity:run-1-").seen).toBe("activity:run-1-seen");
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : les heures vues streamé ou en live sont gardées 10 minutes, le double de la tolérance
+  it("keeps the times a canvas was seen streamed or live 10 minutes, twice the grace", () => {
+    expect(buildActivityKeys().seen).toBe("activity:seen");
+    expect(ACTIVITY_SEEN_RETENTION_MS).toBe(2 * STREAM_GRACE_MS);
   });
 
   // JOURNAL 2026-10-07 : l'historique d'un canvas vit sous `activity:cv:<canvasId>:`, jamais sous les clés du canvas

@@ -195,6 +195,14 @@ export const BadgeEntry = () => (
           <Badge label="Nommé ici" />
         </div>
       </StateRow>
+      <StateRow
+        name="En live"
+        detail="Aux teintes du live Twitch : un canvas streamé dont le streamer l'est."
+      >
+        <div className="lp-row">
+          <Badge label="En live" icon={TwitchGlyph} tone="live" />
+        </div>
+      </StateRow>
     </Block>
   </Entry>
 );
@@ -293,7 +301,7 @@ const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
 
 export const ActivityCardEntry = () => {
   const nowMs = useNowMs();
-  const [kalyss, guestsOnly, hotOnly] = sampleCanvases(nowMs);
+  const [kalyss, guestsOnly, hotOnly, streamedOnly] = sampleCanvases(nowMs);
   const here = sampleHere(nowMs);
   const accounts = toActivityAccounts(here.accounts, nowMs);
   return (
@@ -305,13 +313,21 @@ export const ActivityCardEntry = () => {
     >
       <Block title="Carte">
         {kalyss && (
-          <StateRow name="Streamé, déplié" detail="Rôles, depuis quand, PC ou téléphone, puis les invités.">
+          <StateRow
+            name="Streamé et en live, déplié"
+            detail="Les pastilles OBS et « En live » ; rôles, depuis quand, PC ou téléphone, puis les invités."
+          >
             <ActivityCardScene canvas={kalyss} nowMs={nowMs} isOpen />
           </StateRow>
         )}
         {kalyss && (
-          <StateRow name="Streamé, replié">
+          <StateRow name="Streamé et en live, replié">
             <ActivityCardScene canvas={kalyss} nowMs={nowMs} isOpen={false} />
+          </StateRow>
+        )}
+        {streamedOnly && (
+          <StateRow name="Streamé, pas en live" detail="La pastille OBS seule.">
+            <ActivityCardScene canvas={streamedOnly} nowMs={nowMs} isOpen={false} />
           </StateRow>
         )}
         {guestsOnly && (
@@ -327,16 +343,25 @@ export const ActivityCardEntry = () => {
       </Block>
       <Block
         title="Streamer"
-        note="Le streamer d'un canvas, et sa pastille OBS quand il est streamé : en tête de Ce canvas, et dans chaque carte."
+        note="Le streamer d'un canvas, sa pastille OBS quand il est streamé et « En live » quand son streamer l'est : en tête de Ce canvas, et dans chaque carte."
       >
-        <StateRow name="Streamé" detail="La pastille, ses vues OBS en infobulle.">
+        <StateRow name="Streamé" detail="La pastille OBS, ses vues OBS en infobulle.">
           <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here.obsViews)} />
+            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={false} />
+          </Pill>
+        </StateRow>
+        <StateRow name="Streamé et en live" detail="« En live » après la pastille OBS, aux teintes du live.">
+          <Pill>
+            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={here.isLive} />
           </Pill>
         </StateRow>
         <StateRow name="Pas streamé" detail="Aucune pastille.">
           <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(0)} />
+            <CanvasActivityOwner
+              owner={here.owner}
+              obsTitle={toObsTitle({ isStreamed: false, obsViews: 0 })}
+              isLive={false}
+            />
           </Pill>
         </StateRow>
       </Block>

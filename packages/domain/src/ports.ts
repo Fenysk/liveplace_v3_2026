@@ -256,12 +256,12 @@ export type ActiveIds = {
   streamedCanvasIds: ReadonlySet<string>; // les canvas où une vue OBS était ouverte
 };
 
-// Ce qu'un canvas a vécu dans une minute (JOURNAL 2026-10-07) : le pic de ses personnes et de ses vues OBS, ses pixels, ses
-// visites dont celles au téléphone, son temps passé, et les comptes qui y ont posé un pixel. Les nouveaux comptes viennent
-// du web, pas du gateway.
+// Ce qu'un canvas a vécu dans une minute (JOURNAL 2026-10-07) : le pic de ses personnes et de ses vues OBS, 1 s'il a été en
+// live, ses pixels, ses visites dont celles au téléphone, son temps passé, et les comptes qui y ont posé un pixel. Les
+// nouveaux comptes viennent du web, pas du gateway.
 export type CanvasMinute = Pick<
   CanvasActivityPoint,
-  "people" | "obsViews" | "pixels" | "visits" | "visitMinutes"
+  "people" | "obsViews" | "live" | "pixels" | "visits" | "visitMinutes"
 > & {
   phoneVisits: number;
   playerIds: ReadonlySet<string>;
@@ -281,6 +281,13 @@ export type ActivityMinute = Omit<
 
 // Les pixels d'une minute passée, canvas par canvas : la température survit à un redémarrage.
 export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
+
+// Écart §5.1 (JOURNAL 2026-10-08) : les minutes d'une coupure de moins de `STREAM_GRACE_MS` (`toGapMinutes`), à compter
+// comme streamées ou en live pour ce canvas : sa vue OBS, ou son live, est revenu.
+export type ActivityGap = { canvasId: string; kind: "streamed" | "live"; minutes: readonly Timestamp[] };
+
+// La dernière fois qu'une vue OBS de ce canvas était ouverte, et qu'il était en live : un redémarrage du gateway les relit.
+export type CanvasSeen = { obsSeenAt?: Timestamp; liveSeenAt?: Timestamp };
 
 // Un nouveau compte, à sa première connexion, le streamer depuis la page duquel il s'est connecté (§8.1), et le canvas actif
 // de ce streamer à cet instant : c'est dans ses points que le compte se compte (JOURNAL 2026-10-07).
@@ -319,6 +326,12 @@ export interface ActivityStore {
     openedPlayerIds: ReadonlySet<string>,
   ): Promise<CanvasAudience>;
   getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
+  // Écart §5.1 (JOURNAL 2026-10-08) : compte un canvas comme streamé ou en live dans les minutes d'une coupure, pour lui seul et
+  // pour tout LivePlace là où la minute existe. Atomique, et sans effet pour une minute déjà comptée : on le rejoue sans dégât.
+  storeActivityGap(gap: ActivityGap): Promise<void>;
+  storeSeen(seen: ReadonlyMap<string, CanvasSeen>): Promise<void>; // remplace les heures de ces canvas
+  listSeen(): Promise<Map<string, CanvasSeen>>; // au démarrage du gateway
+  pruneSeen(nowMs: Timestamp): Promise<void>; // ce qui a été vu il y a plus de 10 minutes
 }
 
 // Le web compte un nouveau compte au callback OAuth : des compteurs seulement, jamais un script (§2).

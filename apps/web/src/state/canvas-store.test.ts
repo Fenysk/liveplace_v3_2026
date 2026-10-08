@@ -885,7 +885,7 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
   };
   const activity: ServerFrame = {
     t: "activity",
-    now: { people: 1, guests: 0, streamed: 0, pixels: 0, signups: 0 },
+    now: { people: 1, guests: 0, streamed: 0, live: 0, pixels: 0, signups: 0 },
     audience: { today: noAudience, month: noAudience },
     canvases: [],
   };
@@ -919,6 +919,7 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
       at: 60_000,
       people: 2,
       streamed: 1,
+      live: 0,
       pixels: 30,
       signups: 0,
       visits: 0,
@@ -945,6 +946,7 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
       at: 60_000,
       people: 1,
       obsViews: 0,
+      live: 0,
       pixels: 4,
       visits: 1,
       visitMinutes: 2,

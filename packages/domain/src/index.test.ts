@@ -24,6 +24,7 @@ import {
   LINK_CODE_ALPHABET,
   LINK_CODE_LENGTH,
   MAX_ARCHIVES,
+  MINUTE_MS,
   OBS_BACKGROUND,
   OBS_BACKGROUNDS,
   OBS_DELAY_MS,
@@ -36,6 +37,7 @@ import {
   reportThreshold,
   roleFor,
   type Session,
+  STREAM_GRACE_MS,
   type StateOffset,
   THEME_MAX_LENGTH,
   TRANSPARENT_COLOR_INDEX,
@@ -43,6 +45,7 @@ import {
   toAudienceDays,
   toCell,
   toCellKey,
+  toGapMinutes,
   toParisDay,
   toSession,
   toSessionClaims,
@@ -499,5 +502,42 @@ describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
     expect(after.some(({ day }) => day === "2026-10-25")).toBe(true);
     expect(before.at(-1)?.day).toBe("2026-03-30");
     expect(before.some(({ day }) => day === "2026-03-29")).toBe(true);
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes se comble dans l'historique.
+describe("the gap of a stream (écart §5.1, JOURNAL 2026-10-08)", () => {
+  const at = (minutes: number, seconds = 0) => Date.UTC(2026, 9, 8, 12, minutes, seconds);
+
+  // La tolérance est de 5 minutes
+  it("lasts 5 minutes", () => {
+    expect(STREAM_GRACE_MS).toBe(5 * MINUTE_MS);
+  });
+
+  // Rend les minutes entières strictement entre la fin et la reprise, ni celle de la fin ni celle de la reprise
+  it("gives the whole minutes strictly between the end and the resumption, neither the end's nor the resumption's", () => {
+    expect(toGapMinutes(at(0, 30), at(3, 10))).toEqual([at(1), at(2)]);
+    expect(toGapMinutes(at(0, 59), at(4, 58))).toEqual([at(1), at(2), at(3)]);
+    expect(toGapMinutes(at(0, 0), at(4, 59))).toEqual([at(1), at(2), at(3)]);
+  });
+
+  // Ne rend rien pour une coupure qui tient dans la minute de la fin ou dans la suivante
+  it("gives nothing for a gap within the end's minute or the next one", () => {
+    expect(toGapMinutes(at(0, 10), at(0, 50))).toEqual([]);
+    expect(toGapMinutes(at(0, 50), at(1, 5))).toEqual([]);
+  });
+
+  // Ne rend rien pour une coupure de 5 minutes ou plus : elle ne se comble pas
+  it("gives nothing for a gap of 5 minutes or more", () => {
+    expect(toGapMinutes(at(0, 0), at(5, 0))).toEqual([]);
+    expect(toGapMinutes(at(0, 30), at(6, 0))).toEqual([]);
+  });
+
+  // Rend les minutes d'une coupure qui passe l'heure
+  it("gives the minutes of a gap across the hour", () => {
+    expect(toGapMinutes(Date.UTC(2026, 9, 8, 12, 58, 20), Date.UTC(2026, 9, 8, 13, 1, 5))).toEqual([
+      Date.UTC(2026, 9, 8, 12, 59),
+      Date.UTC(2026, 9, 8, 13, 0),
+    ]);
   });
 });

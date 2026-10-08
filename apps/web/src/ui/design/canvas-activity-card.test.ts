@@ -12,13 +12,33 @@ describe("the owner of a canvas in the developer's activity (Écart §4, JOURNAL
       createElement(CanvasActivityOwner, {
         owner: { ...owner, twitchLive: { category: "Art" } },
         obsTitle: null,
+        isLive: false,
       }),
     );
-    const notLive = renderToString(createElement(CanvasActivityOwner, { owner, obsTitle: null }));
+    const notLive = renderToString(
+      createElement(CanvasActivityOwner, { owner, obsTitle: null, isLive: false }),
+    );
 
     expect(live).toContain("lp-btn--live");
     expect(live).toContain('title="Kalyss est en live sur Twitch : Art"');
     expect(notLive).not.toContain("lp-btn--live");
     expect(notLive).not.toContain("twitch.tv");
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : la pastille « En live » vient après la pastille OBS, teintée du live ; sans live, elle n'existe pas
+  it("puts the live badge after the OBS badge, tinted as the live is, and none when the canvas is not live", () => {
+    const render = (obsTitle: string | null, isLive: boolean) =>
+      renderToString(createElement(CanvasActivityOwner, { owner, obsTitle, isLive }));
+
+    const both = render("1 vue OBS ouverte", true);
+    const streamed = render("1 vue OBS ouverte", false);
+    const neither = render(null, false);
+
+    expect(both.indexOf(">OBS<")).toBeGreaterThan(-1);
+    expect(both.indexOf(">OBS<")).toBeLessThan(both.indexOf(">En live<"));
+    expect(both).toContain("lp-badge--live");
+    expect(streamed).toContain(">OBS<");
+    expect(streamed).not.toContain("En live");
+    expect(neither).not.toContain("lp-badge");
   });
 });

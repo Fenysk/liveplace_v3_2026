@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §5.1 : une coupure de moins de 5 minutes se comble dans l'historique, sans jamais prolonger un stream
+
+**Contexte.** Le suivi d'activité croise la vue OBS et le live Twitch (cahier des charges dédié, §2) ; une coupure de quelques minutes, côté LivePlace (redéploiement, reconnexion d'OBS) ou côté Twitch (stream qui retombe), ne doit pas couper un stream en deux, mais la fin d'un stream ne doit pas s'allonger.
+**Décision.** À l'instant, l'état réel. Le gateway garde par canvas l'heure de la dernière vue OBS ouverte et celle du dernier live vu (lu par `listTwitchLives`, une lecture groupée par tic, seulement pour les canvas streamés), versées à la minute dans un HASH `activity:seen` relu au démarrage. Quand la vue ou le live revient moins de 5 minutes après, un script comble les minutes du trou dans les points (global et canvas). Les points gagnent `live` ; frames serveur : champs ajoutés, `PROTOCOL_VERSION` ne change pas.
+**Renoncement.** Pas de tolérance à l'instant (on ne sait pas encore si le stream reviendra) ; pas de tolérance réglable ; pas d'abonnement Twitch de plus.
+
 ## 2026-10-07 — Écart §4 et §10.1 : le live Twitch d'un compte, suivi par EventSub, protocole 17
 
 **Contexte.** Le logo Twitch d'un profil doit dire si la personne est en live, et dans quelle catégorie, au plus près du réel et sans charge ; le plan ne prévoit aucun statut de live.

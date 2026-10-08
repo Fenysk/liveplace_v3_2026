@@ -43,7 +43,7 @@ const toChart = ({ canvasPoints, period }: ShownHistory): ShownChart | null =>
 
 const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & { here: ActivityHere }) => (
   <>
-    <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here.obsViews)} />
+    <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here)} isLive={here.isLive} />
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Maintenant</h3>
       <NowBlock here={here} />

@@ -13,6 +13,7 @@ const point = (at: number): ActivityPoint => ({
   at,
   people: 1,
   streamed: 0,
+  live: 0,
   pixels: 2,
   signups: 0,
   visits: 0,
@@ -24,6 +25,7 @@ const canvasPoint = (at: number): CanvasActivityPoint => ({
   at,
   people: 1,
   obsViews: 0,
+  live: 0,
   pixels: 2,
   visits: 0,
   visitMinutes: 0,
@@ -41,7 +43,7 @@ const noAudience = {
 
 const frame: ActivityFrame = {
   t: "activity",
-  now: { people: 2, guests: 1, streamed: 0, pixels: 5, signups: 0 },
+  now: { people: 2, guests: 1, streamed: 0, live: 0, pixels: 5, signups: 0 },
   audience: { today: noAudience, month: noAudience },
   canvases: [],
 };

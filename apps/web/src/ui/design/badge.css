@@ -15,3 +15,9 @@
   width: 12px;
   height: 12px;
 }
+
+/* En live (Écart §5.1, JOURNAL 2026-10-08) : les teintes du bouton de la chaîne en live, AA sur son fond au clair comme au sombre */
+.lp-badge--live {
+  background: var(--twitch-live-bg);
+  color: var(--twitch-live-ink);
+}

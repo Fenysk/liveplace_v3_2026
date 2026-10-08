@@ -78,6 +78,10 @@ const activityStore: ActivityStore = {
   listCanvasHistory: async () => [],
   getCanvasAudience: async () => ({ today: noCanvasAudience, month: noCanvasAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
+  storeActivityGap: async () => undefined,
+  storeSeen: async () => undefined,
+  listSeen: async () => new Map(),
+  pruneSeen: async () => undefined,
 };
 // La capacité non plus : rien à relire, la machine est celle d'un test (écart §5.1, JOURNAL 2026-10-07).
 const capacityStore: CapacityStore = {
