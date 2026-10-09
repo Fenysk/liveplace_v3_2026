@@ -7,6 +7,15 @@ import { ObsSettings } from "./obs-settings";
 
 const doNothing = (): void => undefined;
 
+const BACKGROUND_NAMES: Record<ObsBackground, string> = {
+  transparent: "Transparent",
+  black: "Noir",
+  white: "Blanc",
+};
+
+// Le contenu de la légende : le titre du groupe, puis le nom du choix à sa droite
+const legendOf = (html: string): string => html.match(/<legend[^>]*>(.*?)<\/legend>/)?.[1] ?? "";
+
 const settingsHtml = (obsBackground: ObsBackground, isTouch = false): string =>
   renderToString(
     createElement(ObsSettings, {
@@ -31,7 +40,7 @@ describe("the background of the OBS view in the settings (CDC 2026 §1)", () => 
     expect(html).not.toContain('type="checkbox"');
   });
 
-  // Transparent, Noir, Blanc, dans cet ordre, chacun sous son nom ; le noir et le blanc par une classe de teinte
+  // Transparent, Noir, Blanc, dans cet ordre, sans nom dessous ; le noir et le blanc par une classe de teinte
   it("offers Transparent, Noir and Blanc in that order, black and white by a tone class, transparent by the checker", () => {
     const html = settingsHtml("transparent");
     const swatches = [...html.matchAll(/<button[^>]*class="(lp-swatch[^"]*)"[^>]*aria-label="([^"]*)"/g)].map(
@@ -47,19 +56,47 @@ describe("the background of the OBS view in the settings (CDC 2026 §1)", () => 
 
   // Un réglage : la valeur actuelle est toujours sélectionnée, jamais de choix vide
   it("always selects the current value, whichever it is, and only it", () => {
-    const labels: Record<ObsBackground, string> = {
-      transparent: "Transparent",
-      black: "Noir",
-      white: "Blanc",
-    };
-
     for (const background of OBS_BACKGROUNDS) {
       const pressed = [
         ...settingsHtml(background).matchAll(/aria-label="([^"]*)"[^>]*aria-pressed="true"/g),
       ].map(([, label]) => label);
 
-      expect(pressed).toEqual([labels[background]]);
+      expect(pressed).toEqual([BACKGROUND_NAMES[background]]);
     }
+  });
+
+  // JOURNAL 2026-10-10 : le nom du fond choisi est à droite du titre, comme « 10 s » à droite de « Délai », et caché aux lecteurs
+  it("names the chosen background on the right of the title, whichever it is, and hides that name from screen readers", () => {
+    for (const background of OBS_BACKGROUNDS) {
+      expect(legendOf(settingsHtml(background))).toMatch(
+        new RegExp(
+          `^Fond de la vue OBS<span class="lp-type-numeric" aria-hidden="true">${BACKGROUND_NAMES[background]}</span>$`,
+        ),
+      );
+    }
+  });
+
+  // La rangée du titre prend les classes de celle du Délai : les deux réglages voisins se ressemblent
+  it("lays the title row out with the classes of the row of « Délai » and its value", () => {
+    const html = settingsHtml("black");
+    const [, delayRow = ""] =
+      html.match(
+        /<div class="([^"]*)"><label[^>]*>Délai<\/label><span class="lp-type-numeric">10 s<\/span>/,
+      ) ?? [];
+    const [, legendClasses = ""] = html.match(/<legend class="([^"]*)">/) ?? [];
+
+    expect(delayRow).toBe("lp-slider-row lp-type-body");
+    for (const className of delayRow.split(" ")) expect(legendClasses.split(" ")).toContain(className);
+  });
+
+  // JOURNAL 2026-10-10 : les noms de largeurs différentes rendaient les écarts inégaux ; les pastilles sont seules dans leur rangée
+  it("puts no name under the swatches: the row holds the three buttons only, with no label around them", () => {
+    const html = settingsHtml("black");
+    const row = html.match(/<div class="lp-palette lp-palette--choice[^"]*">(.*?)<\/div>/)?.[1] ?? "";
+
+    expect(row.match(/<button[^>]*><\/button>/g)).toHaveLength(OBS_BACKGROUNDS.length);
+    expect(row.replace(/<button[^>]*><\/button>/g, "")).toBe("");
+    expect(html).not.toContain("lp-swatch-option");
   });
 
   // Sur un écran étroit ou tactile : les pastilles rondes de la taille d'un contrôle, comme dans la fenêtre du PNG

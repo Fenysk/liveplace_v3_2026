@@ -9,6 +9,7 @@ import { ArchiveBanner } from "./archive-banner";
 import { ArchiveNotFound } from "./archive-not-found";
 import { ArchivePage } from "./archive-page";
 import { DownloadWindow } from "./download-window";
+import type { PngBackground } from "./png-export";
 
 // La page d'archive n'a pas de routeur ici : `useNavigate` ne sert qu'une fois la page rendue dans le navigateur.
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
@@ -39,11 +40,11 @@ const serverHtml = {
         },
       }),
     ),
-  window: (isOpen: boolean) =>
+  window: (isOpen: boolean, background: PngBackground | null = null) =>
     renderToString(
       createElement(DownloadWindow, {
         isOpen,
-        background: null,
+        background,
         onBackground: doNothing,
         isCompact: false,
         onConfirm: doNothing,
@@ -110,6 +111,18 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
       "lp-swatch lp-swatch--png-black",
       "lp-swatch lp-swatch--png-white",
     ]);
+  });
+
+  // JOURNAL 2026-10-10 : aucun fond n'est choisi d'avance, donc rien à droite du titre ; le choisi s'y nomme, sans nom sous les pastilles
+  it("names no background next to the title of the PNG window until one is picked, and puts no name under the swatches", () => {
+    const legendOf = (html: string): string => html.match(/<legend[^>]*>(.*?)<\/legend>/)?.[1] ?? "";
+
+    expect(legendOf(serverHtml.window(true))).toBe("Fond de l&#x27;image");
+    expect(legendOf(serverHtml.window(true, "white"))).toBe(
+      'Fond de l&#x27;image<span class="lp-type-numeric" aria-hidden="true">Blanc</span>',
+    );
+    expect(serverHtml.window(true, "white")).not.toContain("lp-swatch-option");
+    expect(serverHtml.window(true, "white")).not.toMatch(INLINE_STYLE);
   });
 });
 
