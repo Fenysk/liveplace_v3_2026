@@ -15,6 +15,7 @@ import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
 import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
+import { Route as LoginManifestDotwebmanifestRouteImport } from './../routes/$login_.manifest[.]webmanifest'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
@@ -52,6 +53,12 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginManifestDotwebmanifestRoute =
+  LoginManifestDotwebmanifestRouteImport.update({
+    id: '/$login_/manifest.webmanifest',
+    path: '/$login/manifest.webmanifest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LoginObsRoute = LoginObsRouteImport.update({
   id: '/$login_/obs',
   path: '/$login/obs',
@@ -90,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -104,6 +112,7 @@ export interface FileRoutesByTo {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -119,6 +128,7 @@ export interface FileRoutesById {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/$login_/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login_/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -163,6 +175,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/$login_/manifest.webmanifest'
     | '/$login_/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -178,6 +191,7 @@ export interface RootRouteChildren {
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
+  LoginManifestDotwebmanifestRoute: typeof LoginManifestDotwebmanifestRoute
   LoginObsRoute: typeof LoginObsRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
@@ -227,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$login_/manifest.webmanifest': {
+      id: '/$login_/manifest.webmanifest'
+      path: '/$login/manifest.webmanifest'
+      fullPath: '/$login/manifest.webmanifest'
+      preLoaderRoute: typeof LoginManifestDotwebmanifestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$login_/obs': {
@@ -293,6 +314,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
+  LoginManifestDotwebmanifestRoute: LoginManifestDotwebmanifestRoute,
   LoginObsRoute: LoginObsRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,

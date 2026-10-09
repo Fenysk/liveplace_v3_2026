@@ -205,7 +205,7 @@ export const InspectionEntry = () => {
       components={["InspectionPill"]}
       file="ui/inspection/inspection-pill.tsx"
       note="Seulement pendant une inspection, en mode Vue."
-      where="Au centre à droite"
+      where="Au centre à droite · sur mobile, au-dessus de la barre du bas · en paysage, en bas à gauche"
     >
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock

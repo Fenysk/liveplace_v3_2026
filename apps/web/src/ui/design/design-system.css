@@ -4,7 +4,11 @@
 @import "./tokens.css";
 @import "./canvas.css";
 @import "./pill.css";
+@import "./canvas-zone.css";
+@import "./pill-landscape.css";
+@import "./pill-hinge.css";
 @import "./button.css";
+@import "./reveal.css";
 @import "./twitch.css";
 @import "./badge.css";
 @import "./profile.css";
@@ -21,6 +25,8 @@
 @import "./choice-list.css";
 @import "./canvas-card.css";
 @import "./toast.css";
+@import "./bubble.css";
+@import "./first-hint.css";
 @import "./theme-pill.css";
 @import "./scoreboard.css";
 @import "./stat-tile.css";

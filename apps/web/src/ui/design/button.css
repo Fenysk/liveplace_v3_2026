@@ -87,6 +87,25 @@
   padding: 0;
 }
 
+/* Un libellé qui change (use-label-morph.ts) : les chiffres gardent tous la même largeur, la largeur du bouton ne tremble
+   pas à chaque seconde d'un compte à rebours. Pendant le glissement, le texte plus large que le bouton est rogné. */
+.lp-btn--morph {
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-btn[data-morphing] {
+  overflow: hidden;
+}
+
+/* Le mot de devant d'un libellé (« Attendre » devant « 12 s ») cède quand la place manque. Mesuré sur la barre du bas d'un
+   téléphone : « Attendre 12 s » tient dès 325 px, « Attendre 1 min 05 » dès 356 px (à 352 px, le tube de la jauge passe de 3 px
+   sous Annuler) ; sous 360 px, le mot s'efface pour les deux (Écart §9.3, JOURNAL 2026-10-08). */
+@media (max-width: 359px) {
+  .lp-btn-lead {
+    display: none;
+  }
+}
+
 /* Le point rouge (.lp-avatar-dot, profile.css) se pose dans l'angle du bouton */
 .lp-btn--dot {
   position: relative;

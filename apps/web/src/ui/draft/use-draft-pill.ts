@@ -8,9 +8,8 @@ import { signInHref } from "../account/auth-links";
 import type { useSigningIn } from "../account/use-signing-in";
 import type { GaugeProps } from "../design/gauge";
 import { TOUCH_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import { msToNextSecond, waitSecondsOf } from "./draft-labels";
 import type { DraftPillActions, DraftPillState } from "./draft-pill";
-
-const TICK_MS = 1000;
 
 const formatCountdown = (ms: number): string => {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -23,14 +22,23 @@ export const submitDraft = (draftStore: DraftStore): void => {
     .catch((error: unknown) => console.error("draft-pill : envoi du brouillon interrompu", error));
 };
 
-// Un minuteur d'une seconde, jamais `requestAnimationFrame` : seul le texte de l'infobulle en dépend (§9.4).
-const useNowMs = (): number => {
-  const [nowMs, setNowMs] = useState(() => Date.now());
+// Une minuterie calée sur la seconde du compte à rebours, jamais `requestAnimationFrame` : le texte de l'infobulle et
+// celui d'Attendre en dépendent (§9.4, Écart §9.3, JOURNAL 2026-10-08). Elle repart quand la jauge change d'échéance.
+const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) => void): void => {
   useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), TICK_MS);
-    return () => clearInterval(timer);
-  }, []);
-  return nowMs;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timer = setTimeout(
+        () => {
+          setNowMs(Date.now());
+          schedule();
+        },
+        msToNextSecond(endsAt, Date.now()),
+      );
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [endsAt, setNowMs]);
 };
 
 // Le client prédit, le serveur tranche : la jauge affichée entre deux réponses (§9.4).
@@ -58,11 +66,18 @@ const toGaugeProps = (canvas: CanvasView, draft: DraftView, nowMs: number): Gaug
   };
 };
 
+// Plus aucune charge et rien à poser : de quoi dire « Attendre 12 s » (Écart §9.3, JOURNAL 2026-10-08).
+const toWaitSeconds = (gauge: GaugeProps | null, draftSize: number, nowMs: number): number | undefined =>
+  gauge?.refill && gauge.charges === 0 && draftSize === 0
+    ? waitSecondsOf(gauge.refill.endsAt - nowMs)
+    : undefined;
+
 const draftModeState = (
   canvas: CanvasView,
   draft: DraftView,
   gauge: GaugeProps,
   isTouchScreen: boolean,
+  waitSeconds: number | undefined,
 ): Extract<DraftPillState, { kind: "draft" }> => {
   const isEditable = draft.draft.size > 0 && !draft.isSending;
   return {
@@ -72,11 +87,13 @@ const draftModeState = (
     colorIndex: draft.colorIndex,
     recentColorIndexes: draft.recentColorIndexes,
     isSending: draft.isSending,
+    draftSize: draft.draft.size,
     canSubmit: isEditable,
     canDiscard: isEditable,
     isTouchScreen,
     isTouchTracing: draft.isTouchTracing,
     isPicking: draft.isPicking,
+    ...(waitSeconds === undefined ? {} : { waitSeconds }),
     ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
   };
 };
@@ -90,6 +107,7 @@ const toShownState = (
   gauge: GaugeProps | null,
   login: string,
   isTouchScreen: boolean,
+  waitSeconds: number | undefined,
 ): ShownDraftPillState => {
   if (canvas.status === "connecting" || canvas.status === "closed") return { kind: canvas.status };
   if (!canvas.userId) return { kind: "guest", signInHref: signInHref(login) };
@@ -98,13 +116,18 @@ const toShownState = (
   if (!gauge) return { kind: "connecting" };
   if (draft.mode === "view") {
     const canClaim = (canvas.gauge?.claimable ?? 0) > 0;
-    return { kind: "view", gauge, canClaim, ...(canvas.lastError ? { refusal: canvas.lastError } : {}) };
+    return {
+      kind: "view",
+      gauge,
+      canClaim,
+      ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
+    };
   }
-  return draftModeState(canvas, draft, gauge, isTouchScreen);
+  return draftModeState(canvas, draft, gauge, isTouchScreen, waitSeconds);
 };
 
 // Pendant une reprise, la pill garde son contenu, flouté, et rien n'y répond (CDC 2026, Connexion et reconnexion).
-const toDraftPillState = (...shown: Parameters<typeof toShownState>): DraftPillState => {
+export const toDraftPillState = (...shown: Parameters<typeof toShownState>): DraftPillState => {
   const state = toShownState(...shown);
   return shown[0].status === "reconnecting" ? { kind: "reconnecting", shown: state } : state;
 };
@@ -121,13 +144,15 @@ export function useDraftPillProps(
   const canvasView = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const draftView = useSyncExternalStore(draft.subscribe, draft.getView, draft.getView);
   const isTouchScreen = useMediaQuery(TOUCH_SCREEN_QUERY);
-  const nowMs = useNowMs();
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const gauge = toGaugeProps(canvasView, draftView, nowMs);
+  useCountdownTick(gauge?.refill?.endsAt, setNowMs);
+  const waitSeconds = toWaitSeconds(gauge, draftView.draft.size, nowMs);
   return {
     // Parti chez Twitch, la page perd sa connexion : la pill dit où elle va, jamais « Reconnexion ».
     state: isSigningIn
       ? { kind: "signingIn", signInHref: signInHref(login) }
-      : toDraftPillState(canvasView, draftView, gauge, login, isTouchScreen),
+      : toDraftPillState(canvasView, draftView, gauge, login, isTouchScreen, waitSeconds),
     actions: {
       onEnter: () => draft.enterDraftMode(),
       onClaim: () => canvas.claimGauge(),

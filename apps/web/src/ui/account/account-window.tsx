@@ -9,6 +9,7 @@ import { AppearancePicker } from "../design/appearance-controls";
 import { Button } from "../design/button";
 import { Profile, type ProfileUser } from "../design/profile";
 import { Window, WindowRow } from "../design/window";
+import { BubbleTarget } from "../help/bubble-target";
 
 export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "scoreboard" | "account";
 
@@ -23,6 +24,10 @@ const OBS_SECTION = { id: "obs", label: "Vue OBS", icon: MonitorPlay } as const;
 const MODERATION_SECTION = { id: "moderation", label: "Modération", icon: Shield } as const;
 const SCOREBOARD_SECTION = { id: "scoreboard", label: "Classement", icon: Trophy } as const;
 const ACCOUNT_SECTION = { id: "account", label: "Mon compte", icon: User } as const;
+
+// Écart §8.1 (JOURNAL 2026-10-09) : l'onglet Vue OBS est la cible de la bulle qui invite le streamer à l'ouvrir.
+export const wrapObsTab = (id: string, tab: ReactNode): ReactNode =>
+  id === OBS_SECTION.id ? <BubbleTarget name="obs-tab">{tab}</BubbleTarget> : tab;
 
 type AccountWindowProps = {
   isOpen: boolean;
@@ -66,7 +71,14 @@ export const AccountWindow = ({
   // Une section qui n'existe plus (le classement, en passant du mobile au PC) : la fenêtre montre la première.
   const shownId = sections.find(({ id }) => id === sectionId)?.id ?? sections[0]?.id;
   return (
-    <Window isOpen={isOpen} sections={sections} sectionId={sectionId} onSelect={onSelect} onClose={onClose}>
+    <Window
+      isOpen={isOpen}
+      sections={sections}
+      sectionId={sectionId}
+      onSelect={onSelect}
+      onClose={onClose}
+      wrapTab={wrapObsTab}
+    >
       {shownId === "canvas" && canvasTab}
       {shownId === "canvases" && canvasesTab}
       {shownId === "obs" && obsTab}

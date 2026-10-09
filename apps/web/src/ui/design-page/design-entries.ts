@@ -33,6 +33,7 @@ const ENTRIES_BY_SLUG = {
   "avatar-et-profil": { title: "Avatar et profil", chapterId: "components" },
   badge: { title: "Badge", chapterId: "components" },
   bouton: { title: "Bouton", chapterId: "components" },
+  bulle: { title: "Bulle", chapterId: "components" },
   "carte-d-activite": { title: "Carte d'activité", chapterId: "components" },
   champs: { title: "Champs", chapterId: "components" },
   chiffres: { title: "Chiffres", chapterId: "components" },

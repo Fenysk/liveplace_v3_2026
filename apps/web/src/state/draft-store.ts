@@ -35,7 +35,7 @@ export type DraftView = {
   colorIndex: number; // la couleur active, TRANSPARENT_COLOR_INDEX pour la gomme
   isSending: boolean; // la pill est verrouillée jusqu'au dernier ack ou à la coupure
   isTracing: boolean;
-  isTouchTracing: boolean; // le Toggle tracé : un doigt trace, deux doigts déplacent
+  isTouchTracing: boolean; // le Toggle tracé, en Dessin seulement : un doigt trace, deux doigts déplacent
   isPicking: boolean; // la pipette armée : le prochain clic prend une couleur (CDC 2026, `I`)
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
   recentColorIndexes: readonly number[]; // sur mobile, la rangée : cinq couleurs, jamais celle du bouton (design system)
@@ -93,6 +93,8 @@ export function createDraftStore(
     recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES,
   };
   let lastColorIndex = FIRST_COLOR_INDEX;
+  // Écart §9.3 (JOURNAL 2026-10-08) : gardé d'un Dessin au suivant, pas au rechargement ; la vue ne le porte qu'en Dessin.
+  let isTouchTracingRemembered = false;
   let loadedUserId: string | undefined;
   let hasShakenThisTrace = false;
   // CDC 2026, §8 Historique : en mémoire seulement, hors de la vue et de la sauvegarde.
@@ -245,7 +247,7 @@ export function createDraftStore(
       const { userId, isBanned, isArchived } = canvas.getView();
       if (isBanned || isArchived) return;
       // Un invité n'entre jamais en Dessin : la pill Dessin lui montre déjà l'invitation (CDC 2026).
-      if (userId && !view.isSending) publish({ mode: "draft" });
+      if (userId && !view.isSending) publish({ mode: "draft", isTouchTracing: isTouchTracingRemembered });
     },
     exitDraftMode() {
       if (!view.isSending) leaveDraftMode();
@@ -300,7 +302,9 @@ export function createDraftStore(
       if (view.isTracing) publish({ isTracing: false });
     },
     toggleTouchTracing() {
-      if (view.mode === "draft") publish({ isTouchTracing: !view.isTouchTracing });
+      if (view.mode !== "draft") return;
+      isTouchTracingRemembered = !view.isTouchTracing;
+      publish({ isTouchTracing: isTouchTracingRemembered });
     },
     undo: () => travel(undoDraftStep),
     redo: () => travel(redoDraftStep),

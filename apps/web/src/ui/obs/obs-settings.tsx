@@ -5,6 +5,7 @@ import { OBS_DELAY_STEPS_MS, type ObsBackground } from "@liveplace/domain";
 import { CopyButton } from "../design/copy-button";
 import { SwatchChoice, type SwatchOption } from "../design/palette";
 import { Slider, type SliderStep } from "../design/slider";
+import { BubbleTarget } from "../help/bubble-target";
 import { OBS_BACKGROUND_LABELS } from "./obs-background";
 import { obsDelayLabel } from "./obs-delay-label";
 
@@ -21,9 +22,23 @@ const DELAY_STEPS: readonly SliderStep[] = OBS_DELAY_STEPS_MS.map((value) => ({
   label: obsDelayLabel(value),
 }));
 
-type ObsSettingsProps = {
+type ObsAddressProps = {
   address: string; // sans le protocole : ce que le streamer lit
   url: string; // ce qu'il colle dans OBS
+  onCopy?: (() => void) | undefined; // l'adresse est copiée (Écart §8.1, JOURNAL 2026-10-09)
+};
+
+// L'adresse à coller dans OBS : le champ qui la copie est la cible de la dernière bulle de la chaîne OBS.
+export const ObsAddress = ({ address, url, onCopy }: ObsAddressProps) => (
+  <>
+    <span className="lp-type-body">Adresse à coller dans OBS</span>
+    <BubbleTarget name="obs-address">
+      <CopyButton value={address} copyText={url} onCopy={onCopy} />
+    </BubbleTarget>
+  </>
+);
+
+type ObsSettingsProps = ObsAddressProps & {
   obsDelayMs: number;
   onPickDelay: (obsDelayMs: number) => void;
   obsBackground: ObsBackground;
@@ -34,6 +49,7 @@ type ObsSettingsProps = {
 export const ObsSettings = ({
   address,
   url,
+  onCopy,
   obsDelayMs,
   onPickDelay,
   obsBackground,
@@ -42,8 +58,7 @@ export const ObsSettings = ({
 }: ObsSettingsProps) => (
   <>
     <div className="lp-setting">
-      <span className="lp-type-body">Adresse à coller dans OBS</span>
-      <CopyButton value={address} copyText={url} />
+      <ObsAddress address={address} url={url} onCopy={onCopy} />
       <p className="lp-type-caption lp-muted">
         Dans OBS Studio ou Streamlabs : Sources, +, Navigateur. Colle l'adresse, choisis une taille aux
         proportions de ton canvas (1080 × 1080 pour un carré, 1920 × 1080 pour un 16:9). C'est tout.

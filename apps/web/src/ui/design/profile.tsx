@@ -132,17 +132,36 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
 
 // Dans la pill Compte, sa propre photo n'est pas un profil : c'est le bouton Mon compte.
 // `hasDot` : quelque chose l'attend, un signalement pour qui modère (JOURNAL 2026-09-28) ; `title` le dit.
-type AvatarButtonProps = { user: AvatarProps; title: string; onPress: () => void; hasDot?: boolean };
+// `isLive` (Écart §8.1, JOURNAL 2026-10-08) : la pill Canvas repliée, où la photo déplie le profil ; en live, le rond
+// violet de Twitch remplace le rouge. `isExpanded` dit si le bouton déplie ce qu'il commande.
+type AvatarButtonProps = {
+  user: AvatarProps;
+  title: string;
+  onPress: () => void;
+  hasDot?: boolean;
+  isLive?: boolean;
+  isExpanded?: boolean;
+};
 
-export const AvatarButton = ({ user, title, onPress, hasDot = false }: AvatarButtonProps) => (
+export const AvatarButton = ({
+  user,
+  title,
+  onPress,
+  hasDot = false,
+  isLive = false,
+  isExpanded,
+}: AvatarButtonProps) => (
   <button
     type="button"
     className="lp-btn lp-avatar-btn"
     title={title}
     aria-label={title}
+    aria-expanded={isExpanded}
     onClick={blurAfterClick(onPress)}
   >
     <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
-    {hasDot && <span className="lp-avatar-dot" aria-hidden="true" />}
+    {(hasDot || isLive) && (
+      <span className={classNames("lp-avatar-dot", isLive && "lp-avatar-dot--live")} aria-hidden="true" />
+    )}
   </button>
 );

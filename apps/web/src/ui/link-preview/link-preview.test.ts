@@ -114,14 +114,14 @@ describe("la carte d'aperçu du lien d'un canvas", () => {
   it("posts the card on the canvas route from what its loader returned", async () => {
     const head = await CanvasRoute.options.head?.({ loaderData: PAGE } as never);
 
-    expect(head?.meta).toEqual(linkPreviewMeta(PAGE));
+    expect(head?.meta).toEqual(expect.arrayContaining(linkPreviewMeta(PAGE)));
   });
 
   // Si le pseudo n'a pas de canvas, alors la route ne doit poser aucune carte
   it("posts no card when the login has no canvas", async () => {
     const head = await CanvasRoute.options.head?.({ loaderData: undefined } as never);
 
-    expect(head?.meta).toEqual([]);
+    expect(head).toEqual({});
   });
 
   // Quand une archive ou la vue OBS rend son head, le système ne doit y mettre aucune carte

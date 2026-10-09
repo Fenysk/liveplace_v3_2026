@@ -10,7 +10,7 @@ describe("le sommaire de /design", () => {
     expect(slugs.filter((slug) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug))).toEqual([]);
   });
 
-  it("holds the five chapters and the 44 entries of the brief", () => {
+  it("holds the five chapters and the 45 entries of the brief", () => {
     expect(DESIGN_CHAPTERS.map(({ id }) => id)).toEqual([
       "foundations",
       "components",
@@ -18,7 +18,7 @@ describe("le sommaire de /design", () => {
       "window",
       "dialogs",
     ]);
-    expect(DESIGN_ENTRIES).toHaveLength(44);
+    expect(DESIGN_ENTRIES).toHaveLength(45);
   });
 
   it("never leaves a chapter empty", () => {

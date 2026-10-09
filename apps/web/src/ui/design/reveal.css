@@ -1,0 +1,40 @@
+/* Un contrôle d'une largeur de contrôle qui paraît et s'efface (reveal.tsx). Fermé, il ne prend plus de place, pas même
+   l'espace de la rangée (marge négative) : ses voisins glissent de la même durée que lui. */
+
+.lp-reveal {
+  display: flex;
+  flex: 0 0 0px;
+  overflow: hidden;
+  opacity: 0;
+  margin-inline-start: calc(-1 * var(--space-2));
+  transition:
+    flex var(--lp-dur) var(--lp-ease),
+    margin var(--lp-dur) var(--lp-ease),
+    opacity var(--lp-dur-fade) ease;
+}
+
+.lp-reveal.is-open {
+  flex-basis: var(--control-size);
+  opacity: 1;
+  margin-inline-start: 0;
+}
+
+/* Il garde sa largeur : c'est la boîte qui s'ouvre sur lui */
+.lp-reveal > .lp-btn {
+  flex: none;
+}
+
+/* Le rognage couperait l'anneau du clavier : il se dessine à l'intérieur du bouton */
+.lp-reveal .lp-btn:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Dans une rangée répartie à la main, un ressort avant chaque contrôle (pas `space-between`, qui compterait un contrôle
+   fermé) : ouvert, il prend sa part comme eux, avec son propre espace ; fermé, il ne pèse rien. */
+.lp-reveal--spread {
+  gap: var(--space-2);
+}
+
+.lp-reveal--spread.is-open {
+  flex: 1 0 calc(var(--control-size) + var(--space-2));
+}

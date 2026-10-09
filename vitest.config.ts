@@ -16,5 +16,7 @@ export default defineConfig({
   test: {
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "tools/**/*.test.ts"],
     environment: "node",
+    // Vitest vide les CSS importés : les jetons restent lisibles, le manifest y lit le fond du jeu (`?raw`).
+    css: { include: [/design\/tokens\.css/] },
   },
 });

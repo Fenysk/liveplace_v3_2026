@@ -2,6 +2,7 @@
 
 import type { ComponentType, MouseEvent } from "react";
 import { classNames } from "./class-names";
+import { useLabelMorph } from "./use-label-morph";
 
 // `twitch` : aux couleurs de Twitch, pour Se connecter seulement (SignInButton).
 export type ButtonVariant = "primary" | "danger" | "ghost" | "twitch";
@@ -26,6 +27,8 @@ export type ButtonProps = ButtonText &
     isExpanded?: boolean; // un contrôle qui replie ou déplie ce qu'il commande
     isDisabled?: boolean;
     hasDot?: boolean; // quelque chose attend : le point rouge de l'avatar (profile.css), dans l'angle du bouton
+    hasMorphingLabel?: boolean; // son libellé change : la largeur glisse, le texte passe en fondu (use-label-morph.ts)
+    labelLead?: string; // un mot devant le libellé (« Attendre » devant « 12 s »), qui cède quand la place manque (button.css)
   };
 
 // Rendre le focus après un clic de souris : sinon Espace et Entrée recliqueraient le bouton au lieu de tracer ou de valider.
@@ -35,18 +38,35 @@ export const blurAfterClick = (onPress: () => void) => (event: MouseEvent<HTMLBu
   onPress();
 };
 
+// Le mot de devant est masqué sur un écran étroit : le nom accessible garde le tout.
+const ButtonLabel = ({ label, lead }: { label: string; lead: string }) => (
+  <span>
+    {lead && <span className="lp-btn-lead">{lead}</span>}
+    {label}
+  </span>
+);
+
+const labelParts = ({ label, labelLead = "", title }: ButtonProps) => {
+  const whole = label === undefined ? undefined : `${labelLead}${label}`;
+  return { lead: labelLead, whole, accessibleName: label ? (labelLead ? whole : undefined) : title };
+};
+
 export const Button = (props: ButtonProps) => {
   const { label, title, icon: Icon, kbd, variant, isPressed, isExpanded, isDisabled, hasDot } = props;
+  const { lead, whole, accessibleName } = labelParts(props);
+  const hasMorphingLabel = props.hasMorphingLabel ?? false;
+  const morphingButton = useLabelMorph(whole, hasMorphingLabel);
   const className = classNames(
     "lp-btn lp-type-body",
     variant && `lp-btn--${variant}`,
     !label && "lp-btn--icon",
     hasDot && "lp-btn--dot",
+    hasMorphingLabel && "lp-btn--morph",
   );
   const content = (
     <>
       {Icon && <Icon aria-hidden="true" />}
-      {label && <span>{label}</span>}
+      {label && <ButtonLabel label={label} lead={lead} />}
       {kbd && (
         <span className="lp-kbd lp-type-kbd" aria-hidden="true">
           {kbd}
@@ -55,7 +75,6 @@ export const Button = (props: ButtonProps) => {
       {hasDot && <span className="lp-avatar-dot" aria-hidden="true" />}
     </>
   );
-  const accessibleName = label ? undefined : title;
 
   if (props.href !== undefined)
     return (
@@ -72,6 +91,7 @@ export const Button = (props: ButtonProps) => {
     );
   return (
     <button
+      ref={morphingButton}
       type="button"
       className={className}
       title={title}

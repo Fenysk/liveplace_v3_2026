@@ -1,0 +1,33 @@
+/* Les trois points du conseil de première visite (Écart §8.1, JOURNAL 2026-10-08), sous les deux lignes de sa bulle :
+   un point par geste distinct réussi. Un point se remplit en grandissant depuis son centre, une fois la bulle revenue. */
+
+.lp-hint-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+.lp-hint-dot {
+  position: relative;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--chip-hover);
+  overflow: hidden;
+}
+
+.lp-hint-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scale(0);
+  /* Après le fondu de la bulle : un geste la cache (data-panning), le point se remplit à son retour, sous les yeux */
+  transition: transform var(--lp-dur) var(--lp-ease) var(--lp-dur-fade);
+}
+
+.lp-hint-dot.is-filled::after {
+  transform: scale(1);
+}

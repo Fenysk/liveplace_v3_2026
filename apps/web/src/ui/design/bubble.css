@@ -1,0 +1,241 @@
+/* La bulle (Écart §8.1, JOURNAL 2026-10-08) : une surface de pill sans action. Le doigt la traverse : un pincement qui
+   commence dessous zoome quand même. Importée après pill.css, dont elle reprend la main sur le pointeur des pills posées. */
+
+.lp-bubble {
+  /* La flèche pointe la cible depuis le bas ; elle ne sort jamais de la partie droite du bord (le rayon de la pill) */
+  --lp-bubble-inset: calc(var(--control-size) / 2 + var(--space-2));
+  /* La place qu'a le contenu : une longueur absolue, que le texte respecte en passant à la ligne (comme --lp-theme-room) */
+  --lp-bubble-room: calc(100vw - 2 * var(--space-4));
+  /* Elle paraît et part en glissant d'un cran vers la cible, d'où qu'elle soit posée */
+  --lp-bubble-slide: translateY(var(--space-2));
+  width: max-content;
+  max-width: 100%;
+}
+
+/* Posée sur place (/design), elle reste dans le flux ; posée sur l'écran, `.lp-floating` la fixe (pill.css) */
+.lp-bubble:not(.lp-floating) {
+  position: relative;
+}
+
+/* La place de la flèche, du côté de la cible : sa hauteur, et un espace avant elle. Au-dessus de la cible (le défaut), la
+   flèche est sous la pill ; dessous, au-dessus d'elle ; à gauche ou à droite de la cible, de l'autre côté. */
+.lp-bubble--pointing {
+  --lp-bubble-gap: calc(var(--space-2) + var(--space-1));
+  padding-bottom: var(--lp-bubble-gap);
+}
+
+.lp-bubble--pointing[data-side="below"] {
+  --lp-bubble-slide: translateY(calc(-1 * var(--space-2)));
+  padding-top: var(--lp-bubble-gap);
+  padding-bottom: 0;
+}
+
+.lp-bubble--pointing[data-side="left"] {
+  --lp-bubble-slide: translateX(var(--space-2));
+  padding-right: var(--lp-bubble-gap);
+  padding-bottom: 0;
+}
+
+.lp-bubble--pointing[data-side="right"] {
+  --lp-bubble-slide: translateX(calc(-1 * var(--space-2)));
+  padding-left: var(--lp-bubble-gap);
+  padding-bottom: 0;
+}
+
+.lp-bubble > .lp-pill {
+  max-width: var(--lp-bubble-room);
+  pointer-events: none;
+  animation: lp-bubble-in var(--lp-dur) var(--lp-ease);
+}
+
+/* Un fondu : la bulle ne glisse que d'un cran en partant */
+.lp-bubble > .lp-pill.is-hidden {
+  transform: var(--lp-bubble-slide);
+}
+
+/* Le contenu garde sa taille, mais plafonnée à cette place : le texte passe à la ligne plutôt que d'être rogné */
+.lp-bubble .lp-pill-content {
+  max-width: var(--lp-bubble-room);
+}
+
+.lp-bubble-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+}
+
+.lp-bubble-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lp-bubble-line span {
+  text-wrap: balance;
+}
+
+.lp-bubble-line svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--muted);
+}
+
+/* Sans cible : au-dessus de la barre du bas, dont la hauteur est mesurée (pill.tsx), centrée */
+.lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+  left: 0;
+  right: 0;
+  width: auto;
+  display: flex;
+  justify-content: center;
+  bottom: calc(
+    var(--space-4) +
+    var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+    var(--space-2)
+  );
+}
+
+/* Avec une cible : placée par bubble.tsx. Tant qu'elle ne l'est pas, elle reste invisible */
+.lp-floating.lp-bubble--pointing {
+  --lp-bubble-room: calc(100vw - 2 * var(--space-2));
+  left: var(--lp-bubble-left, 0);
+  top: var(--lp-bubble-top, 0);
+}
+
+.lp-bubble--pointing:not([data-positioned]) {
+  visibility: hidden;
+}
+
+/* Dans une fenêtre ouverte (Écart §8.1, JOURNAL 2026-10-09) : dans la couche supérieure du navigateur (`popover`), au-dessus
+   de la fenêtre modale. Ses styles de base (cadre, fond, marge, remplissage, défilement) tombent ; sans `:where`, ils
+   écraseraient les rembourrages de la flèche, qui valent plus. */
+:where(.lp-bubble[popover]) {
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+}
+
+/* Sa cible a défilé hors du cadre de la fenêtre : elle s'efface avec elle, et revient avec elle */
+.lp-bubble[data-clipped] {
+  opacity: 0;
+}
+
+/* La cible d'une bulle (bubble-target.tsx) : un <span> autour de l'élément visé, sans effet sur la mise en page. Un tube de
+   jauge qui prend la place restante (barre du bas, sur mobile) la lui garde. */
+.lp-bubble-target {
+  display: flex;
+  min-width: 0;
+}
+
+.lp-bubble-target:has(> .lp-gauge--fill) {
+  flex: 1;
+}
+
+/* Le bouton visé remplit son <span>, qui s'étire où le bouton seul s'étirerait (la colonne latérale) : le +1 y prend la place
+   de Dessiner, aussi large (Écart §9.3, JOURNAL 2026-10-09). Sans place en plus, il garde sa taille. */
+.lp-bubble-target > .lp-btn {
+  flex: 1 1 auto;
+}
+
+/* La flèche : un triangle contre la pill, de sa couleur et de son contour (le filet du mode sombre). Au-dessus de la cible,
+   il est sous la pill et pointe vers le bas ; elle se tourne avec le côté. */
+.lp-bubble-arrow {
+  position: absolute;
+  bottom: var(--space-1);
+  left: clamp(var(--lp-bubble-inset), var(--lp-bubble-arrow-x, 50%), calc(100% - var(--lp-bubble-inset)));
+  width: calc(2 * var(--space-2));
+  height: var(--space-2);
+  transform: translateX(-50%);
+  background: var(--pill-border);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transition: opacity var(--lp-dur-fade) ease;
+  animation: lp-bubble-arrow-in var(--lp-dur-fade) ease;
+}
+
+.lp-bubble-arrow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--pill-surface) var(--pill-opacity), transparent);
+  clip-path: polygon(1px 0, calc(100% - 1px) 0, 50% calc(100% - 1.5px));
+}
+
+/* Dessous : la pointe vers le haut */
+.lp-bubble[data-side="below"] .lp-bubble-arrow {
+  top: var(--space-1);
+  bottom: auto;
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+.lp-bubble[data-side="below"] .lp-bubble-arrow::after {
+  clip-path: polygon(50% 1.5px, 1px 100%, calc(100% - 1px) 100%);
+}
+
+/* À gauche ou à droite : la flèche longe un bord vertical, et se place en y */
+.lp-bubble[data-side="left"] .lp-bubble-arrow,
+.lp-bubble[data-side="right"] .lp-bubble-arrow {
+  top: clamp(var(--lp-bubble-inset), var(--lp-bubble-arrow-y, 50%), calc(100% - var(--lp-bubble-inset)));
+  bottom: auto;
+  width: var(--space-2);
+  height: calc(2 * var(--space-2));
+  transform: translateY(-50%);
+}
+
+/* À gauche de la cible, la flèche est sur le bord droit et pointe vers la droite */
+.lp-bubble[data-side="left"] .lp-bubble-arrow {
+  right: var(--space-1);
+  left: auto;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.lp-bubble[data-side="left"] .lp-bubble-arrow::after {
+  clip-path: polygon(0 1px, calc(100% - 1.5px) 50%, 0 calc(100% - 1px));
+}
+
+/* À droite de la cible, sur le bord gauche, vers la gauche */
+.lp-bubble[data-side="right"] .lp-bubble-arrow {
+  left: var(--space-1);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
+.lp-bubble[data-side="right"] .lp-bubble-arrow::after {
+  clip-path: polygon(100% 1px, 1.5px 50%, 100% calc(100% - 1px));
+}
+
+.lp-bubble.is-hidden .lp-bubble-arrow {
+  opacity: 0;
+}
+
+@keyframes lp-bubble-in {
+  from {
+    opacity: 0;
+    transform: var(--lp-bubble-slide);
+  }
+}
+
+@keyframes lp-bubble-arrow-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Écran étroit : la barre du bas est pleine largeur, au-dessus de l'indicateur d'accueil (pill.css), et la pill Recentrer
+   se pose à droite au même niveau que la bulle : elle garde sa place (sa largeur, ses marges, un espace) */
+@media (max-width: 640px) {
+  .lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+    --lp-bubble-room: calc(100vw - var(--control-size) - 5 * var(--space-2));
+    left: var(--space-2);
+    right: calc(var(--control-size) + 4 * var(--space-2));
+    bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+      var(--space-2)
+    );
+  }
+}

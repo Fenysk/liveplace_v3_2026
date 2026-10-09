@@ -4,6 +4,7 @@ import { MapPin } from "lucide-react";
 import { Children, type ReactNode, useState } from "react";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
+import { classNames } from "../design/class-names";
 import { DESIGN_CHAPTERS, DESIGN_ENTRIES, type EntrySlug } from "./design-entries";
 
 type EntryProps = {
@@ -101,9 +102,41 @@ export const InLargeWindow = ({ children }: { children: ReactNode }) => (
 );
 
 // Un téléphone, moins ses marges. `isWindow` : le contenu d'une fenêtre, tel que `@media (max-width: 640px)` le met en page.
-export const InPhone = ({ isWindow = false, children }: { isWindow?: boolean; children: ReactNode }) => (
-  <div className={isWindow ? "lp-pill design-in-phone design-in-phone--window" : "design-in-phone"}>
+// `isNarrow` : un téléphone de 320 px, où `@media (max-width: 359px)` efface le mot de devant d'un libellé (button.css).
+export const InPhone = ({
+  isWindow = false,
+  isNarrow = false,
+  children,
+}: {
+  isWindow?: boolean;
+  isNarrow?: boolean;
+  children: ReactNode;
+}) => (
+  <div
+    className={classNames(
+      isWindow ? "lp-pill design-in-phone design-in-phone--window" : "design-in-phone",
+      isNarrow && "design-in-phone--narrow",
+    )}
+  >
     {children}
+  </div>
+);
+
+// Un téléphone en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08) : la colonne du bas, ou le panneau Dessin sur toute la hauteur.
+export const InLandscape = ({ isPanel = false, children }: { isPanel?: boolean; children: ReactNode }) => (
+  <div className={isPanel ? "design-in-landscape design-in-landscape--panel" : "design-in-landscape"}>
+    {children}
+  </div>
+);
+
+// Un écran à charnière : le canvas dans le premier écran, les commandes dans le second, jamais rien sur la charnière.
+type InHingeProps = { isStacked?: boolean; canvas: ReactNode; controls: ReactNode };
+
+export const InHinge = ({ isStacked = false, canvas, controls }: InHingeProps) => (
+  <div className={isStacked ? "design-hinge design-hinge--stacked" : "design-hinge"}>
+    <div className="design-hinge-screen">{canvas}</div>
+    <div className="design-hinge-fold" aria-hidden="true" />
+    <div className="design-hinge-screen">{controls}</div>
   </div>
 );
 

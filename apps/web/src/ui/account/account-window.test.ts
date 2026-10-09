@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { type BubbleTargets, BubbleTargetsContext } from "../help/bubble-target";
 import { AccountWindow, SETTINGS_SECTION } from "./account-window";
 
 const doNothing = (): void => undefined;
@@ -10,20 +11,20 @@ type WindowProps = Parameters<typeof AccountWindow>[0];
 const tab = (text: string) => createElement("p", null, text);
 
 // La fenêtre telle que la reçoit chaque rôle : le streamer a Canvas et Vue OBS, qui modère a Modération.
+const windowProps = (props: Partial<WindowProps> = {}): WindowProps => ({
+  isOpen: true,
+  sectionId: "account",
+  onSelect: doNothing,
+  onClose: doNothing,
+  user: { displayName: "Kalyss", login: "kalyss" },
+  signOutHref: "#",
+  appearanceChoice: "auto",
+  onPickAppearance: doNothing,
+  ...props,
+});
+
 const renderWindow = (props: Partial<WindowProps> = {}): string =>
-  renderToStaticMarkup(
-    createElement(AccountWindow, {
-      isOpen: true,
-      sectionId: "account",
-      onSelect: doNothing,
-      onClose: doNothing,
-      user: { displayName: "Kalyss", login: "kalyss" },
-      signOutHref: "#",
-      appearanceChoice: "auto",
-      onPickAppearance: doNothing,
-      ...props,
-    }),
-  );
+  renderToStaticMarkup(createElement(AccountWindow, windowProps(props)));
 
 const OWNER_TABS = {
   canvasTab: tab("contenu de la section Canvas"),
@@ -148,5 +149,42 @@ describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)"
 
     expect(markup).toMatch(/<h2[^>]*>Mon compte<\/h2>/);
     expect(markup).toContain("Se déconnecter");
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-09) : l'onglet Vue OBS est la cible de la bulle qui invite le streamer à l'ouvrir
+describe("l'onglet Vue OBS, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09)", () => {
+  const refs: BubbleTargets = {
+    trace: { current: null },
+    submit: { current: null },
+    gauge: { current: null },
+    claim: { current: null },
+    settings: { current: null },
+    reports: { current: null },
+    "obs-tab": { current: null },
+    "obs-address": { current: null },
+  };
+  const inGame = (props: Partial<WindowProps>): string =>
+    renderToStaticMarkup(
+      createElement(BubbleTargetsContext, { value: refs }, createElement(AccountWindow, windowProps(props))),
+    );
+  const targetsIn = (markup: string): string[] =>
+    [
+      ...markup.matchAll(/<span class="lp-bubble-target"><button[^>]*>(?:<svg.*?<\/svg>)([^<]+)<\/button>/g),
+    ].map(([, label]) => label ?? "");
+
+  // Dans la page de jeu : le seul onglet enveloppé est Vue OBS, les autres restent des boutons seuls
+  it("wraps the Vue OBS tab, and only it, in the game page", () => {
+    expect(targetsIn(inGame(OWNER_TABS))).toEqual(["Vue OBS"]);
+  });
+
+  // Qui n'est pas le streamer n'a pas cet onglet : rien à viser
+  it("has nothing to wrap for who is not the owner", () => {
+    expect(targetsIn(inGame({ moderationTab: tab("contenu de la section Modération") }))).toEqual([]);
+  });
+
+  // Hors de la page de jeu, l'onglet reste seul : aucun `<span>` de plus
+  it("leaves the tab alone outside the game page", () => {
+    expect(renderWindow(OWNER_TABS)).not.toContain("lp-bubble-target");
   });
 });

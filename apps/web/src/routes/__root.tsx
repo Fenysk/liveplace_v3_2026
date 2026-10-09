@@ -52,6 +52,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     links: [
       { rel: "stylesheet", href: designSystemCss },
       { rel: "stylesheet", href: betaBadgeCss },
+      // Écart §9.1 (JOURNAL 2026-10-08) : la même icône que l'application, dans l'onglet de toutes les pages.
+      { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { rel: "icon", type: "image/png", href: "/icon-192.png", sizes: "192x192" },
     ],
   }),
   shellComponent: RootDocument,

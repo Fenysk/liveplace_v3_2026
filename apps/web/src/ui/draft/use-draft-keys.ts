@@ -5,6 +5,7 @@ import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { CanvasScene } from "../canvas/canvas-scene";
 import { PALETTE_SELECTOR } from "../design/swatch-keys";
+import { isWindowOpen } from "../design/window-open";
 import {
   type DraftKeyCommand,
   isTypingElement,
@@ -26,9 +27,6 @@ const isTyping = (target: EventTarget | null): boolean =>
 // Le focus est dans la palette : ses touches sont à elle (draft-keys.ts, `keyAction`).
 const isInPalette = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest(PALETTE_SELECTOR) !== null;
-
-// La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
-const isWindowOpen = (): boolean => document.querySelector("dialog[open]") !== null;
 
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
   const { mode, isPicking } = draft.getView();
@@ -86,6 +84,7 @@ const pressCommand = (
 };
 
 const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
+  // La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
   if (isTyping(event.target) || isWindowOpen()) return;
   const action = keyAction(toKeyPress(event), keyModeOf(stores), isInPalette(event.target));
   if (action?.kind === "command") pressCommand(action.command, event, stores, space, scene);

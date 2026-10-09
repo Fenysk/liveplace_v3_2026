@@ -45,9 +45,24 @@ const liveView = (overrides: Partial<CanvasView> = {}): CanvasView =>
   });
 
 // `onPlace` : ce qui arrive pendant qu'un lot part, avant sa réponse.
-type Setup = { view?: CanvasView; results?: PlaceResult[]; saved?: string; onPlace?: () => void };
+// `entries` : le stockage d'un store précédent (la page rechargée) ; `isStorageRefused` : l'accès au stockage lève.
+type Setup = {
+  view?: CanvasView;
+  results?: PlaceResult[];
+  saved?: string;
+  onPlace?: () => void;
+  entries?: Map<string, string>;
+  isStorageRefused?: boolean;
+};
 
-const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) => {
+const setup = ({
+  view = liveView(),
+  results = [],
+  saved,
+  onPlace,
+  entries = new Map<string, string>(),
+  isStorageRefused = false,
+}: Setup = {}) => {
   let canvasView = view;
   const canvasListeners = new Set<() => void>();
   const sentBatches: Pixel[][] = [];
@@ -66,7 +81,6 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
       return results.shift() ?? accepted;
     },
   };
-  const entries = new Map<string, string>();
   if (saved) entries.set("liveplace:draft:canvas-1:user-1", saved);
   const storage: DraftStorage = {
     getItem: (key) => entries.get(key) ?? null,
@@ -82,7 +96,11 @@ const setup = ({ view = liveView(), results = [], saved, onPlace }: Setup = {}) 
       clock.current += ms;
     },
   };
-  const store = createDraftStore("canvas-1", canvas, () => storage, draftClock);
+  const getStorage = (): DraftStorage => {
+    if (isStorageRefused) throw new Error("stockage refusé");
+    return storage;
+  };
+  const store = createDraftStore("canvas-1", canvas, getStorage, draftClock);
   const setCanvasView = (next: CanvasView) => {
     canvasView = next;
     for (const listener of canvasListeners) listener();
@@ -321,6 +339,71 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
 
     store.exitDraftMode();
     expect(store.getView().isTouchTracing).toBe(false);
+  });
+
+  // Garde le Toggle tracé d'un Dessin au suivant, allumé comme éteint
+  it("keeps touch tracing from one draft mode to the next, on or off", () => {
+    const { store } = setup();
+    store.enterDraftMode();
+    store.toggleTouchTracing();
+
+    store.exitDraftMode();
+    store.enterDraftMode();
+    expect(store.getView().isTouchTracing).toBe(true);
+
+    store.toggleTouchTracing();
+    store.exitDraftMode();
+    store.enterDraftMode();
+    expect(store.getView().isTouchTracing).toBe(false);
+  });
+
+  // Un rechargement de la page remet le Toggle tracé à éteint : le choix ne vit que dans le store
+  it("starts a new store with touch tracing off, even when the previous one had it on", () => {
+    const first = setup();
+    first.store.enterDraftMode();
+    first.store.toggleTouchTracing();
+    expect(first.store.getView().isTouchTracing).toBe(true);
+
+    const reloaded = setup({ entries: first.entries });
+    reloaded.store.enterDraftMode();
+
+    expect(reloaded.store.getView().isTouchTracing).toBe(false);
+  });
+
+  // En Vue, un doigt déplace toujours : le Toggle tracé retenu ne compte qu'en Dessin
+  it("keeps touch tracing off in view mode even when it is on in draft mode", () => {
+    const { store } = setup();
+    expect(store.getView().isTouchTracing).toBe(false);
+
+    store.enterDraftMode();
+    store.toggleTouchTracing();
+    expect(store.getView().isTouchTracing).toBe(true);
+
+    store.exitDraftMode();
+    expect(store.getView().isTouchTracing).toBe(false);
+  });
+
+  // Le Toggle tracé est éteint à la première visite, et n'écrit rien dans le stockage du navigateur
+  it("starts with touch tracing off and writes nothing to browser storage", () => {
+    const { store, entries } = setup();
+    store.enterDraftMode();
+    expect(store.getView().isTouchTracing).toBe(false);
+
+    store.toggleTouchTracing();
+
+    expect(entries.size).toBe(0);
+  });
+
+  // Un stockage qui refuse l'accès ne gêne pas le Toggle tracé : le choix tient pour la page
+  it("keeps touch tracing for the page, without error, when storage refuses access", () => {
+    const { store } = setup({ isStorageRefused: true });
+    store.enterDraftMode();
+    expect(store.getView().isTouchTracing).toBe(false);
+
+    expect(() => store.toggleTouchTracing()).not.toThrow();
+    store.exitDraftMode();
+    store.enterDraftMode();
+    expect(store.getView().isTouchTracing).toBe(true);
   });
 
   // Ne trace rien hors d'un tracé

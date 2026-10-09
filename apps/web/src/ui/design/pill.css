@@ -59,11 +59,6 @@
   padding-top: var(--space-2);
 }
 
-/* La rangée d'outils de la feuille Dessin, sur mobile : répartie sur toute la largeur */
-.lp-sheet-tools {
-  justify-content: space-between;
-}
-
 .lp-sep {
   width: 1px;
   align-self: stretch;
@@ -200,9 +195,16 @@
   animation: lp-toast-in var(--lp-dur) var(--lp-ease);
 }
 
-/* Pendant un déplacement du viewport, les pills s'effacent en fondu (CDC 2026) */
-html[data-panning] .lp-floating {
-  opacity: 0;
+/* Au PC, pendant un déplacement du viewport, toutes les pills s'effacent en fondu (CDC 2026). Sur mobile (Écart §8.1, JOURNAL
+   2026-10-08), seules celles du haut : voir plus bas. */
+@media not ((max-width: 640px) or (pointer: coarse)) {
+  html[data-panning] .lp-floating {
+    opacity: 0;
+  }
+
+  html[data-panning] .lp-floating > .lp-pill {
+    pointer-events: none;
+  }
 }
 
 .lp-pill.is-hidden {
@@ -211,7 +213,6 @@ html[data-panning] .lp-floating {
   pointer-events: none;
 }
 
-html[data-panning] .lp-floating > .lp-pill,
 .lp-floating > .lp-pill.is-hidden {
   pointer-events: none;
 }
@@ -311,7 +312,8 @@ html[data-panning] .lp-floating > .lp-pill,
 
 /* Écran étroit ou tactile (Écart §8.1, JOURNAL 2026-10-08). La rangée du haut mesure un contrôle et ses deux marges, à 44 px
    ici comme dans tokens.css.
-   La pill Canvas ne dépasse jamais la place que la pill Compte lui laisse (sa largeur est publiée, pill.tsx), avec un espace.
+   La pill Canvas ne dépasse jamais la place que la pill Compte lui laisse (sa largeur est publiée, pill.tsx), avec un espace,
+   et prend toute la rangée tant que celle-ci n'est pas là : l'invité n'a pas de pill Compte, un viewer l'attend du gateway.
    La pill Thème devient une bande : sous la rangée, sur la même largeur qu'elle. */
 @media (max-width: 640px), (pointer: coarse) {
   .lp-floating[data-dock="tl"] {
@@ -319,9 +321,13 @@ html[data-panning] .lp-floating > .lp-pill,
       100vw -
       2 *
       var(--space-4) -
-      var(--lp-top-right, calc(2 * var(--control-size) + 3 * var(--space-2))) -
+      var(--lp-top-right, calc(var(--control-size) + 2 * var(--space-2))) -
       var(--space-2)
     );
+  }
+
+  html:not(:has(.lp-floating[data-dock="tr"] > .lp-pill:not(.is-hidden))) .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(100vw - 2 * var(--space-4));
   }
 
   .lp-floating[data-dock="tl"] .lp-pill-content {
@@ -366,6 +372,25 @@ html[data-panning] .lp-floating > .lp-pill,
   html[data-drafting] .lp-floating[data-dock="tc"] {
     transform: translateY(calc(-1 * (var(--control-size) + 3 * var(--space-2))));
   }
+
+  /* Pendant un geste de vue (déplacer, pincer), le haut s'efface de même : les pills Canvas et Compte, puis la bande Thème,
+     et la bulle qui en vise une (bubble.tsx). Il revient au dernier doigt levé, sans délai, par le fondu des pills (Écart
+     §8.1, JOURNAL 2026-10-09). Le bas reste, c'est là qu'est le pouce. Rien ne bouge de place (ni `top`, ni `display`) : le
+     cadrage du canvas (arrival-insets.ts) lit les pills là où elles sont en Vue. */
+  html[data-panning] .lp-bubble:is([data-aimed-dock="tl"], [data-aimed-dock="tr"], [data-aimed-dock="tc"]),
+  html[data-panning] .lp-floating:is([data-dock="tl"], [data-dock="tr"], [data-dock="tc"]) {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      visibility 0s linear var(--lp-dur-fade),
+      transform var(--lp-dur) var(--lp-ease);
+  }
+
+  /* Elles ne prennent déjà plus les touchers pendant le fondu, sans attendre `visibility` */
+  html[data-panning] .lp-floating:is([data-dock="tl"], [data-dock="tr"], [data-dock="tc"]) > .lp-pill {
+    pointer-events: none;
+  }
 }
 
 /* Écran étroit : pills du haut sous l'encoche, barre du bas pleine largeur au-dessus de l'indicateur d'accueil.
@@ -376,11 +401,15 @@ html[data-panning] .lp-floating > .lp-pill,
       100vw -
       2 *
       var(--space-2) -
-      var(--lp-top-right, calc(2 * var(--control-size) + 3 * var(--space-2))) -
+      var(--lp-top-right, calc(var(--control-size) + 2 * var(--space-2))) -
       var(--space-2)
     );
     top: max(var(--space-2), env(safe-area-inset-top));
     left: var(--space-2);
+  }
+
+  html:not(:has(.lp-floating[data-dock="tr"] > .lp-pill:not(.is-hidden))) .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(100vw - 2 * var(--space-2));
   }
 
   .lp-floating[data-dock="tr"] {

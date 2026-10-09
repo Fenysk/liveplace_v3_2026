@@ -1,0 +1,133 @@
+/* Les écrans à charnière (Écart §8.1 et §9.3, JOURNAL 2026-10-08) : Surface Duo ou Galaxy Z Fold à moitié plié, deux écrans
+   côte à côte ; Galaxy Z Flip en Flex mode, un en haut, un en bas. Une charnière n'a jamais de pill ni de bouton à cheval :
+   le canvas (avec les pills Canvas et Thème, et Recentrer) occupe le premier écran, les commandes (la pill Compte, la
+   colonne de la barre du bas, l'inspection, les fenêtres) le second : une disposition d'écran tactile large (pill-landscape.css),
+   que les segments bornent. Les deux se disent par `--lp-zone-w` et `--lp-zone-h` (le premier écran, lus aussi par
+   canvas-zone.css) et `--lp-seg2-start` et `--lp-seg2-top` (où commence le second).
+   Chargé après pill.css et pill-landscape.css : chaque règle y garde la même forme que la leur, préfixée de `html`.
+   Sans segments (la requête ne correspond pas), rien de ceci ne s'applique : un écran continu, comme Safari sur l'iPhone Duo. */
+
+/* Deux écrans côte à côte, charnière verticale : le canvas à gauche, les commandes à droite */
+@media (horizontal-viewport-segments: 2) and (pointer: coarse) {
+  :root {
+    --lp-zone-w: env(viewport-segment-width 0 0);
+    --lp-seg2-start: env(viewport-segment-left 1 0);
+    --lp-zone-left: 0px;
+    --lp-zone-right: 0px;
+    --lp-zone-bottom: var(--space-2);
+    /* La charnière dit la zone : le canvas n'a pas de zone au-dessus de la colonne (pill-landscape.css) */
+    --lp-zone-above-right: initial;
+    --lp-zone-above-bottom: initial;
+  }
+
+  html .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(var(--lp-zone-w) - 2 * var(--space-2));
+    top: max(var(--space-2), env(safe-area-inset-top));
+    left: var(--space-2);
+  }
+
+  html .lp-floating[data-dock="tr"] {
+    top: max(var(--space-2), env(safe-area-inset-top));
+    right: var(--space-2);
+  }
+
+  /* La bande Thème, sur la largeur du premier écran : jamais sous la charnière */
+  html .lp-floating[data-dock="tc"] {
+    top: calc(max(var(--space-2), env(safe-area-inset-top)) + var(--control-size) + 3 * var(--space-2));
+    left: var(--space-2);
+    right: auto;
+    width: calc(var(--lp-zone-w) - 2 * var(--space-2));
+  }
+
+  html .lp-floating[data-dock="br"],
+  html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] {
+    right: auto;
+    left: calc(var(--lp-zone-w) - var(--space-2) - var(--control-size) - 2 * var(--space-2));
+    bottom: var(--space-2);
+  }
+
+  /* Les fenêtres, au centre du second écran */
+  html .lp-window {
+    inset: 0 0 0 var(--lp-seg2-start);
+    max-width: calc(100% - var(--lp-seg2-start) - 2 * var(--space-4));
+  }
+}
+
+/* Deux écrans l'un sur l'autre, charnière horizontale, ou un pliable à moitié plié sans segment (Flip en Flex mode : la charnière
+   au milieu) : le canvas en haut, les commandes en bas. Le tout aussi haut que le premier écran, et le second à partir de la
+   charnière. */
+@media (vertical-viewport-segments: 2) and (pointer: coarse),
+  (device-posture: folded) and (orientation: portrait) and (pointer: coarse) {
+  :root {
+    --lp-zone-h: 50dvh;
+    --lp-seg2-top: 50dvh;
+    --lp-zone-left: 0px;
+    --lp-zone-right: 0px;
+    --lp-zone-bottom: var(--space-2);
+    --lp-zone-above-right: initial;
+    --lp-zone-above-bottom: initial;
+  }
+
+  /* Recentrer au bas de l'écran du haut, pas au-dessus de la barre du bas */
+  html .lp-floating[data-dock="br"],
+  html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] {
+    top: calc(var(--lp-zone-h) - var(--space-2) - var(--control-size) - 2 * var(--space-2));
+    bottom: auto;
+  }
+
+  /* Sur un écran large, la colonne est dans l'écran du bas : Recentrer garde le coin du haut */
+  @media (min-width: 560px) and (min-height: 560px) {
+    html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] {
+      right: max(var(--space-4), env(safe-area-inset-right));
+    }
+  }
+
+  /* L'inspection au-dessus de la barre du bas, dans l'écran du bas : pas au centre de l'écran, sur la charnière */
+  html .lp-floating[data-dock="cr"] {
+    top: auto;
+    transform: none;
+    bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+      var(--space-2)
+    );
+  }
+
+  /* Ni la barre du bas, ni l'inspection, ni la feuille Dessin ne montent au-delà de la charnière : elles défilent */
+  html .lp-floating[data-dock="bc"] .lp-pill-content {
+    max-height: calc(100dvh - var(--lp-seg2-top) - 2 * var(--space-2));
+    overflow-y: auto;
+  }
+
+  html .lp-floating[data-dock="cr"] .lp-pill-content {
+    max-height: calc(
+      100dvh -
+      var(--lp-seg2-top) -
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) -
+      3 *
+      var(--space-2)
+    );
+    overflow-y: auto;
+  }
+
+  /* Les fenêtres : la feuille du bas reste dans l'écran du bas, la fenêtre centrée aussi */
+  html .lp-window {
+    max-height: calc(100dvh - var(--lp-seg2-top) - var(--space-2));
+  }
+}
+
+/* Avec de vrais segments, la hauteur du premier écran et le début du second sont ceux de la charnière */
+@media (vertical-viewport-segments: 2) and (pointer: coarse) {
+  :root {
+    --lp-zone-h: env(viewport-segment-height 0 0);
+    --lp-seg2-top: env(viewport-segment-top 0 1);
+  }
+}
+
+/* La fenêtre centrée d'un écran large : au centre de l'écran du bas */
+@media (vertical-viewport-segments: 2) and (pointer: coarse) and (min-width: 641px),
+  (device-posture: folded) and (orientation: portrait) and (pointer: coarse) and (min-width: 641px) {
+  html .lp-window {
+    top: var(--lp-seg2-top);
+  }
+}

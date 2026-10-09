@@ -19,6 +19,7 @@ import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
+import { Reveal } from "../design/reveal";
 import { SaturationFigure } from "../design/saturation-figure";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
@@ -43,6 +44,7 @@ import {
 } from "../developer/activity-slots";
 import { formatRate, toGuardsRow, toRowState } from "../developer/capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
+import { ENTER_LABEL, submitLabel } from "../draft/draft-labels";
 import {
   NO_AUDIENCE,
   sampleCanvases,
@@ -183,6 +185,32 @@ export const ProfileEntry = () => (
         <AvatarButton user={SAMPLE_OWNER} title="Mon compte" onPress={noop} />
       </StateRow>
     </Block>
+    <Block
+      title="Profil replié"
+      note="La pill Canvas sur mobile, une fois repliée : la photo seule, en bouton qui déplie le profil."
+    >
+      <StateRow name="Hors live">
+        <Pill>
+          <AvatarButton
+            user={SAMPLE_OWNER}
+            title="Déplier le profil de Kalyss"
+            isExpanded={false}
+            onPress={noop}
+          />
+        </Pill>
+      </StateRow>
+      <StateRow name="En live" detail="Le rond violet de Twitch, comme celui du logo du bouton live.">
+        <Pill>
+          <AvatarButton
+            user={SAMPLE_OWNER}
+            title="Déplier le profil de Kalyss, en live sur Twitch"
+            isLive
+            isExpanded={false}
+            onPress={noop}
+          />
+        </Pill>
+      </StateRow>
+    </Block>
   </Entry>
 );
 
@@ -242,10 +270,50 @@ const ICON_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
   },
 ];
 
+// Les libellés du bouton Dessiner puis Valider de la pill Dessin, dans l'ordre où un joueur les voit.
+const MORPHING_LABELS = [ENTER_LABEL, submitLabel(3, undefined), submitLabel(0, 12), submitLabel(0, 65)];
+
+// Le libellé change : la largeur glisse de l'ancienne à la nouvelle, le texte passe en fondu quand ses mots changent,
+// les chiffres gardent leur largeur. Le contrôle qui paraît s'ouvre en largeur et en opacité.
+const MorphingScenes = () => (
+  <Block title="Qui bougent">
+    <StateRow
+      name="Un libellé qui change"
+      detail="Touche-le : sa largeur glisse, ses chiffres ne tremblent pas."
+    >
+      <WithValue initial={0}>
+        {(index, setIndex) => (
+          <Button
+            label={MORPHING_LABELS[index] ?? ""}
+            variant="primary"
+            hasMorphingLabel
+            onPress={() => setIndex((index + 1) % MORPHING_LABELS.length)}
+          />
+        )}
+      </WithValue>
+    </StateRow>
+    <StateRow
+      name="Un contrôle qui paraît"
+      detail="Touche Brouillon : la corbeille s'ouvre en largeur et en opacité."
+    >
+      <WithValue initial={false}>
+        {(isOpen, setIsOpen) => (
+          <Pill>
+            <Button label="Brouillon" isPressed={isOpen} onPress={() => setIsOpen(!isOpen)} />
+            <Reveal isOpen={isOpen}>
+              <Button icon={Trash} variant="ghost" title="Vider le brouillon" onPress={noop} />
+            </Reveal>
+          </Pill>
+        )}
+      </WithValue>
+    </StateRow>
+  </Block>
+);
+
 export const ButtonEntry = () => (
   <Entry
     slug="bouton"
-    components={["Button"]}
+    components={["Button", "Reveal"]}
     file="ui/design/button.tsx"
     note="Un texte pour une décision, une icône seule pour une action secondaire."
   >
@@ -263,6 +331,7 @@ export const ButtonEntry = () => (
         </StateRow>
       ))}
     </Block>
+    <MorphingScenes />
   </Entry>
 );
 
@@ -704,7 +773,10 @@ export const ChoicesEntry = () => {
         <StateRow name="Apparence, comme dans Mon compte">
           <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
-        <StateRow name="Apparence, comme dans la pill Compte">
+        <StateRow
+          name="Apparence, comme dans la pill Compte"
+          detail="Au PC seulement : sur mobile, elle vit dans Mon compte."
+        >
           <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
       </Block>

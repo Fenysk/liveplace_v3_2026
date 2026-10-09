@@ -8,6 +8,7 @@ import {
   DownloadWindowEntry,
   SwitchWindowEntry,
 } from "./archive-entries";
+import { BubbleEntry } from "./bubble-entries";
 import {
   CanvasSettingsEntry,
   CeilingWindowEntry,
@@ -72,6 +73,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "avatar-et-profil": ProfileEntry,
   badge: BadgeEntry,
   bouton: ButtonEntry,
+  bulle: BubbleEntry,
   "carte-d-activite": ActivityCardEntry,
   champs: FieldsEntry,
   chiffres: StatTilesEntry,

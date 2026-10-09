@@ -1,0 +1,46 @@
+/* La zone libre du canvas (Écart §9.3, JOURNAL 2026-10-08) : ce que les pills lui laissent à l'arrivée, à gauche, à droite et en
+   bas. Les pills du haut se mesurent (arrival-insets.ts) ; le reste se dit ici, une fois par disposition : la barre du bas, la
+   colonne d'un téléphone en paysage (pill-landscape.css), le premier écran d'un double écran (pill-hinge.css). La sonde est
+   invisible : la page lit sa boîte. Sans propriété, elle couvre tout l'écran. */
+.lp-canvas-zone {
+  position: fixed;
+  top: 0;
+  left: var(--lp-zone-left, 0px);
+  width: calc(var(--lp-zone-w, 100%) - var(--lp-zone-left, 0px) - var(--lp-zone-right, 0px));
+  height: calc(var(--lp-zone-h, 100%) - var(--lp-zone-bottom, 0px));
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* La zone au-dessus de la colonne (Écart §9.3, JOURNAL 2026-10-09) : l'autre que la colonne d'un écran tactile large laisse au
+   canvas en Vue (pill-landscape.css). Le cadrage d'arrivée compare les deux sondes et prend la plus grande ; en Dessin, le panneau
+   garde celle à côté de la colonne. Sans colonne large, les deux sondes sont la même. */
+.lp-canvas-zone--above {
+  width: calc(
+    var(--lp-zone-w, 100%) -
+    var(--lp-zone-left, 0px) -
+    var(--lp-zone-above-right, var(--lp-zone-right, 0px))
+  );
+  height: calc(var(--lp-zone-h, 100%) - var(--lp-zone-above-bottom, var(--lp-zone-bottom, 0px)));
+}
+
+/* Écran étroit : la barre du bas, pleine largeur, au-dessus de l'indicateur d'accueil (pill.css) */
+@media (max-width: 640px) {
+  :root {
+    --lp-zone-bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--control-size) +
+      2 *
+      var(--space-2)
+    );
+  }
+}
+
+/* Écran tactile large : la barre du bas flotte au centre, à un espace du bord ; une encoche sur le côté se contourne */
+@media (min-width: 641px) and (pointer: coarse) {
+  :root {
+    --lp-zone-bottom: calc(var(--space-4) + var(--control-size) + 2 * var(--space-2));
+    --lp-zone-left: env(safe-area-inset-left, 0px);
+    --lp-zone-right: env(safe-area-inset-right, 0px);
+  }
+}
