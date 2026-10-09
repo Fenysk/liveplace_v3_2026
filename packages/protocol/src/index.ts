@@ -43,9 +43,7 @@ export const PROTOCOL_VERSION = 19;
 // la seule forme que le client connaît : le worker/gateway traduit l'un
 // vers l'autre, sans jamais laisser `authorId` ni `moderation` franchir le fil.
 
-// §4.3 : `hide` et `unhide` ne changent que ce que montre le stream.
-export type EventKind = "place" | "clear" | "hide" | "unhide";
-
+// À la main : aucun schéma Zod ne le décode, il ne franchit jamais le fil.
 export type Event = {
   version: number;
   kind: EventKind;
@@ -58,32 +56,6 @@ export type Event = {
     target: string;
     placementId?: string; // `clearPlacement` et `approvePlacement` (JOURNAL 2026-09-28)
   };
-};
-
-// §9.5 : la case vue par le stream, quand une pose cachée est en jeu.
-export type StreamCell = {
-  colorIndex: number;
-  previousColorIndex: number;
-  placedAt: Timestamp;
-};
-
-export type EventCell = {
-  x: number;
-  y: number;
-  colorIndex: number; // la couleur désormais visible
-  previousColorIndex: number; // celle qui était visible avant
-  placedAt: Timestamp; // date de pose du pixel désormais visible
-  obs?: StreamCell | undefined; // absente : le stream voit la même chose que la page (Zod la type ainsi)
-};
-
-export type CellsFrame = {
-  toVersion: number; // version du canvas après la dernière case du lot
-  cells: BroadcastCell[]; // ordonnées par version croissante
-};
-
-export type BroadcastCell = EventCell & {
-  version: number; // la version de CETTE case
-  kind: EventKind; // le genre de CETTE case
 };
 
 // --- Fragments Zod partagés ---------------------------------------------
@@ -118,24 +90,41 @@ const GaugeSchema = z.object({
   claimable: z.number().int().nonnegative(), // JOURNAL 2026-09-30 : les récompenses à réclamer
 });
 
+// §4.3 : `hide` et `unhide` ne changent que ce que montre le stream.
+const EventKindSchema = z.enum(["place", "clear", "hide", "unhide"]);
+
+export type EventKind = z.infer<typeof EventKindSchema>;
+
+// §9.5 : la case vue par le stream, quand une pose cachée est en jeu.
 const StreamCellSchema = z.object({
-  colorIndex: ColorIndexSchema,
-  previousColorIndex: ColorIndexSchema,
-  placedAt: TimestampSchema,
+  colorIndex: ColorIndexSchema, // la couleur désormais visible
+  previousColorIndex: ColorIndexSchema, // celle qui était visible avant
+  placedAt: TimestampSchema, // date de pose du pixel désormais visible
 });
 
-const BroadcastCellSchema = StreamCellSchema.extend({
+export type StreamCell = z.infer<typeof StreamCellSchema>;
+
+const EventCellSchema = StreamCellSchema.extend({
   x: CoordinateSchema,
   y: CoordinateSchema,
-  obs: StreamCellSchema.optional(),
-  version: VersionSchema,
-  kind: z.enum(["place", "clear", "hide", "unhide"]),
+  obs: StreamCellSchema.optional(), // absente : le stream voit la même chose que la page
 });
 
-const CellsPayloadSchema = z.object({
-  toVersion: VersionSchema,
-  cells: z.array(BroadcastCellSchema),
+export type EventCell = z.infer<typeof EventCellSchema>;
+
+const BroadcastCellSchema = EventCellSchema.extend({
+  version: VersionSchema, // la version de CETTE case
+  kind: EventKindSchema, // le genre de CETTE case
 });
+
+export type BroadcastCell = z.infer<typeof BroadcastCellSchema>;
+
+const CellsPayloadSchema = z.object({
+  toVersion: VersionSchema, // version du canvas après la dernière case du lot
+  cells: z.array(BroadcastCellSchema), // ordonnées par version croissante
+});
+
+export type CellsFrame = z.infer<typeof CellsPayloadSchema>;
 
 const RejectedPixelSchema = z.object({
   index: z.number().int().nonnegative(),
