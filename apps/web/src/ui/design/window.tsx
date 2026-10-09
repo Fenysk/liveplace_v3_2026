@@ -11,6 +11,7 @@ import { classNames } from "./class-names";
 import { DESIGN_TEXTS } from "./design-texts";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
+import { ToastAnnouncement } from "./toast-announcement";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
 
@@ -23,6 +24,46 @@ export const useShownWhileClosing = <T,>(value: T | null): T | null => {
   return value ?? lastShown.current;
 };
 
+// Enveloppe un onglet : la cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09).
+type WrapTab<Id extends string> = (id: Id, tab: ReactNode) => ReactNode;
+
+type WindowNavProps<Id extends string> = {
+  sections: readonly WindowSection<Id>[];
+  currentId: Id | undefined;
+  onSelect: (id: Id) => void;
+  wrapTab?: WrapTab<Id> | undefined;
+};
+
+// La barre latérale, ou la rangée d'onglets sur mobile : un bouton par section.
+export const WindowNav = <Id extends string>({
+  sections,
+  currentId,
+  onSelect,
+  wrapTab,
+}: WindowNavProps<Id>) => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <nav className="lp-window-nav" aria-label={t.sections}>
+      <ul>
+        {sections.map(({ id, label, icon: Icon }) => {
+          const tab = (
+            <button
+              type="button"
+              className="lp-btn lp-type-body"
+              aria-current={id === currentId ? "page" : undefined}
+              onClick={blurAfterClick(() => onSelect(id))}
+            >
+              <Icon aria-hidden="true" />
+              {label}
+            </button>
+          );
+          return <li key={id}>{wrapTab ? wrapTab(id, tab) : tab}</li>;
+        })}
+      </ul>
+    </nav>
+  );
+};
+
 type WindowProps<Id extends string> = {
   isOpen: boolean;
   sections: readonly WindowSection<Id>[]; // selon le rôle, ouvertes directement sur la bonne
@@ -30,6 +71,7 @@ type WindowProps<Id extends string> = {
   onSelect: (id: Id) => void;
   onClose: () => void;
   isLarge?: boolean; // sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur (JOURNAL 2026-10-07) ; mobile : la feuille
+  wrapTab?: WrapTab<Id>;
   children: ReactNode; // le contenu de la section ouverte
 };
 
@@ -111,6 +153,8 @@ const WindowShell = ({
         <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
       </div>
       {children}
+      {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}
+      <ToastAnnouncement />
     </dialog>
   );
 };
@@ -136,31 +180,15 @@ export const Window = <Id extends string>({
   onSelect,
   onClose,
   isLarge = false,
+  wrapTab,
   children,
 }: WindowProps<Id>) => {
   // Un identifiant par fenêtre : une petite fenêtre peut exister à côté (JOURNAL 2026-09-25).
   const titleId = useId();
-  const t = useTexts(DESIGN_TEXTS);
   const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
   return (
     <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId} isLarge={isLarge}>
-      <nav className="lp-window-nav" aria-label={t.sections}>
-        <ul>
-          {sections.map(({ id, label, icon: Icon }) => (
-            <li key={id}>
-              <button
-                type="button"
-                className="lp-btn lp-type-body"
-                aria-current={id === current?.id ? "page" : undefined}
-                onClick={blurAfterClick(() => onSelect(id))}
-              >
-                <Icon aria-hidden="true" />
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <WindowNav sections={sections} currentId={current?.id} onSelect={onSelect} wrapTab={wrapTab} />
       <section className="lp-window-main">
         <WindowHead titleId={titleId} title={current?.label} onClose={onClose} />
         <div className="lp-window-body">{children}</div>

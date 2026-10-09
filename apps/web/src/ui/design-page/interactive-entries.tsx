@@ -14,6 +14,7 @@ import { ColorChip, CurrentColorButton, Palette, RecentSwatches } from "../desig
 import { Pill, PillSeparator, type PillState } from "../design/pill";
 import { Profile } from "../design/profile";
 import { Toast, ToastProvider, useToast } from "../design/toast";
+import { ToastAnnouncement, ToastAnnouncementContext, type ToastMessage } from "../design/toast-announcement";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { SmallWindow, Window, WindowRow } from "../design/window";
@@ -103,7 +104,11 @@ export const PaletteEntry = () => {
       note="Les couleurs arrivent par props : la palette de `domain`."
     >
       <Block title="États">
-        <StateRow name="À la souris" detail="La gomme en tête.">
+        <StateRow
+          name="À la souris"
+          detail="La gomme en tête. Au clavier : Tab arrive sur la couleur actuelle, les flèches la changent, Début et Fin vont aux bouts, Échap rend la main au canvas."
+          isDemo
+        >
           <Pill>
             <Palette palette={PALETTE} colorIndex={colorIndex} onPick={setColorIndex} />
           </Pill>
@@ -144,7 +149,7 @@ export const PaletteEntry = () => {
         </StateRow>
         <StateRow
           name="Les récentes"
-          detail="Toucher une récente l'échange avec la couleur actuelle, sur place."
+          detail="Toucher une récente l'échange avec la couleur actuelle, sur place. Au clavier, les touches 1 à 5 prennent la case de leur rang."
         >
           <RecentRowScene />
         </StateRow>
@@ -302,11 +307,20 @@ const GAME_TOASTS = [
   { name: "Ses viewers, avec un brouillon non vide", text: viewerToast(3) },
 ] as const;
 
+// Les deux régions d'un toast sont invisibles dans le jeu : ici elles se montrent, avec ce qu'elles diraient.
+const AnnouncementScene = ({ message }: { message: ToastMessage }) => (
+  <div className="design-announcement lp-type-body">
+    <ToastAnnouncementContext.Provider value={message}>
+      <ToastAnnouncement />
+    </ToastAnnouncementContext.Provider>
+  </div>
+);
+
 export const ToastEntry = () => (
   <Entry
     slug="toast"
-    components={["Toast", "ToastProvider"]}
-    file="ui/design/toast.tsx"
+    components={["Toast", "ToastProvider", "ToastAnnouncement"]}
+    file="ui/design/{toast,toast-announcement}.tsx"
     note="Une icône et une phrase, 3 s, un seul à la fois. Il entre et sort comme les pills."
   >
     <Block title="États">
@@ -323,6 +337,19 @@ export const ToastEntry = () => (
         <ToastProvider>
           <ToastButtons />
         </ToastProvider>
+      </StateRow>
+    </Block>
+    <Block
+      title="Lecteur d'écran"
+      note="Deux régions invisibles, toujours là, que chaque toast remplit : un succès se dit poliment, une erreur tout de suite. Chaque fenêtre a les siennes, la page étant inerte sous elle. L'image du toast n'est pas lue."
+    >
+      <StateRow name="Succès" detail="La région d'état.">
+        <AnnouncementScene message={{ id: 1, tone: "success", text: "Signalement envoyé" }} />
+      </StateRow>
+      <StateRow name="Erreur" detail="L'alerte.">
+        <AnnouncementScene
+          message={{ id: 2, tone: "error", text: "3 pixels refusés : ils restent dans le brouillon." }}
+        />
       </StateRow>
     </Block>
     <Block

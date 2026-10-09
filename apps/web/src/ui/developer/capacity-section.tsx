@@ -27,7 +27,7 @@ const LiveBlocks = ({ capacity, nowMs }: { capacity: CapacityFrame; nowMs: Times
   <>
     <SaturationFigure {...toSaturationView(capacity.saturation, capacity.resources)} />
     <div className="lp-capacity-links">
-      {toCapacityLinks(capacity.resources, nowMs).map(({ link, title, detail, rows }) => (
+      {toCapacityLinks(capacity.resources, nowMs, capacity.guards).map(({ link, title, detail, rows }) => (
         <CapacityLinkRows key={link} title={title} detail={detail}>
           {rows.map(({ id, name, note, state }) => (
             <CapacityRow key={id} name={name} note={note} state={state} />

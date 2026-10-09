@@ -33,6 +33,15 @@ export function fitViewport(screen: Size, canvas: Size, insets: Insets = NO_INSE
   };
 }
 
+// En Vue, la colonne d'un écran tactile large laisse au canvas deux zones, à côté d'elle ou au-dessus (Écart §9.3, JOURNAL
+// 2026-10-09) : il arrive où il est le plus grand, à sa forme et non à celle de l'écran ; à égalité, à côté. Avant le `welcome`, un carré.
+export type ArrivalZone = "side" | "above";
+
+export function pickArrivalZone(screen: Size, canvas: Size, side: Insets, above: Insets): ArrivalZone {
+  const shape = canvas.width > 0 && canvas.height > 0 ? canvas : { width: 1, height: 1 };
+  return fitViewport(screen, shape, above).scale > fitViewport(screen, shape, side).scale ? "above" : "side";
+}
+
 // Le seul chemin de l'écran vers une case. `null` : le point est dans le vide.
 export function viewportToCell(viewport: Viewport, point: ScreenPoint, canvas: Size): Cell | null {
   const x = Math.floor((point.x - viewport.offsetX) / viewport.scale);
@@ -54,6 +63,18 @@ export function zoomAt(viewport: Viewport, point: ScreenPoint, factor: number, l
     offsetX: point.x - (point.x - viewport.offsetX) * ratio,
     offsetY: point.y - (point.y - viewport.offsetY) * ratio,
   };
+}
+
+// Un zoom de plus pendant qu'un autre avance (Écart §9.3, JOURNAL 2026-10-09) : `factor` s'ajoute à l'échelle visée, `goalScale`,
+// et le point garde sa case sous lui comme dans la vue d'aujourd'hui.
+export function zoomTowards(
+  viewport: Viewport,
+  goalScale: number,
+  point: ScreenPoint,
+  factor: number,
+  limits: ZoomLimits,
+): Viewport {
+  return zoomAt(viewport, point, (goalScale * factor) / viewport.scale, limits);
 }
 
 export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {

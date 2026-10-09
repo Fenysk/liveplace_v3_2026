@@ -2,7 +2,6 @@
 // Inspection ouvre la fenêtre de modération, qui montre les pixels visés, puis le signalement part au serveur.
 // Les poses signalées restent « Signalé » pendant la session.
 
-import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
@@ -11,6 +10,7 @@ import { useTexts } from "../locale/use-locale";
 import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toPlacementRange } from "./cleared-pixels";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { ModerationStatus, ModerationWindowProps, ReportTarget } from "./moderation-window";
+import { usePixelListing } from "./pixel-listing";
 
 type SentReport = Exclude<ReportControl["status"], "available">;
 
@@ -23,10 +23,10 @@ export function useReport(canvas: CanvasStore): {
   const t = useTexts(MODERATION_TEXTS);
   const [sent, setSent] = useState<ReadonlyMap<string, SentReport>>(new Map());
   const [target, setTarget] = useState<ReportTarget | null>(null);
-  const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
+  const { pixels, list, drop } = usePixelListing();
   const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
   const [status, setStatus] = useState<ModerationStatus>("idle");
-  // La demande en cours : une réponse arrivée pour une demande abandonnée n'y touche plus.
+  // La demande en cours : la réponse d'un signalement d'une demande abandonnée n'y touche plus.
   const current = useRef<ReportTarget | null>(null);
 
   const mark = (placementId: string, next: SentReport | null) =>
@@ -40,19 +40,15 @@ export function useReport(canvas: CanvasStore): {
   const open = (next: ReportTarget): void => {
     current.current = next;
     setTarget(next);
-    setPixels(null);
     setScope(PLACEMENT_ONLY);
     setStatus("idle");
-    void canvas.listAuthorPixels(next.x, next.y, next.placementId).then((result) => {
-      if (current.current !== next) return;
-      setPixels(result.ok ? result.value : []);
-      if (!result.ok) setStatus("failed");
-    });
+    list(canvas.listAuthorPixels(next.x, next.y, next.placementId), () => setStatus("failed"));
   };
 
   const close = (): void => {
     current.current = null;
     setTarget(null);
+    drop();
   };
 
   // Cette pose seule, ou ses voisines : la plage de l'aperçu, calculée sur les mêmes pixels.

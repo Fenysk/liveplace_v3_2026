@@ -58,7 +58,8 @@
   height: 128px;
 }
 
-/* Le tube prend la place restante (barre du bas, sur mobile) */
+/* Le tube prend la place restante (barre du bas, sur mobile). Il cède avant que Valider, quand il compte ou attend
+   (Écart §9.3, JOURNAL 2026-10-08), ne le recouvre : 32 px au moins. */
 .lp-gauge--fill {
   flex: 1;
 }
@@ -66,7 +67,7 @@
 .lp-gauge--fill .lp-fluid {
   flex: 1;
   width: auto;
-  min-width: 64px;
+  min-width: 32px;
 }
 
 /* Le fluide se range du côté de la gravité : à gauche à l'horizontale, en bas à la verticale.

@@ -11,9 +11,10 @@ const COPIED_MS = 1500;
 type CopyButtonProps = {
   value: string; // ce qu'on lit
   copyText?: string; // ce qui part dans le presse-papiers : `value` par défaut
+  onCopy?: (() => void) | undefined; // le navigateur a bien pris la valeur (Écart §8.1, JOURNAL 2026-10-09)
 };
 
-export const CopyButton = ({ value, copyText = value }: CopyButtonProps) => {
+export const CopyButton = ({ value, copyText = value, onCopy }: CopyButtonProps) => {
   const t = useTexts(DESIGN_TEXTS);
   const [isCopied, setIsCopied] = useState(false);
   useEffect(() => {
@@ -23,7 +24,10 @@ export const CopyButton = ({ value, copyText = value }: CopyButtonProps) => {
   }, [isCopied]);
   const copy = (): void => {
     navigator.clipboard.writeText(copyText).then(
-      () => setIsCopied(true),
+      () => {
+        setIsCopied(true);
+        onCopy?.();
+      },
       (error: unknown) => console.warn("copy-button : le navigateur refuse le presse-papiers", error),
     );
   };

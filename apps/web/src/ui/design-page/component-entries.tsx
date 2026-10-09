@@ -1,6 +1,6 @@
 // Le chapitre Composants (1/2) : ce qui se montre sans état de jeu autour. Chacun dans chacun de ses états.
 
-import { toRatio } from "@liveplace/domain/capacity";
+import { type GuardTotals, toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
@@ -21,6 +21,7 @@ import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
+import { Reveal } from "../design/reveal";
 import { SaturationFigure } from "../design/saturation-figure";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
@@ -43,8 +44,10 @@ import {
   toActivitySlots,
   toCanvasSlots,
 } from "../developer/activity-slots";
-import { formatRate, toRowState } from "../developer/capacity-labels";
+import { formatRate, toGuardsRow, toRowState } from "../developer/capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
+import { submitLabel } from "../draft/draft-labels";
+import { DRAFT_TEXTS } from "../draft/draft-texts";
 import {
   NO_AUDIENCE,
   sampleCanvases,
@@ -185,6 +188,32 @@ export const ProfileEntry = () => (
         <AvatarButton user={SAMPLE_OWNER} title="Mon compte" onPress={noop} />
       </StateRow>
     </Block>
+    <Block
+      title="Profil replié"
+      note="La pill Canvas sur mobile, une fois repliée : la photo seule, en bouton qui déplie le profil."
+    >
+      <StateRow name="Hors live">
+        <Pill>
+          <AvatarButton
+            user={SAMPLE_OWNER}
+            title="Déplier le profil de Kalyss"
+            isExpanded={false}
+            onPress={noop}
+          />
+        </Pill>
+      </StateRow>
+      <StateRow name="En live" detail="Le rond violet de Twitch, comme celui du logo du bouton live.">
+        <Pill>
+          <AvatarButton
+            user={SAMPLE_OWNER}
+            title="Déplier le profil de Kalyss, en live sur Twitch"
+            isLive
+            isExpanded={false}
+            onPress={noop}
+          />
+        </Pill>
+      </StateRow>
+    </Block>
   </Entry>
 );
 
@@ -244,10 +273,55 @@ const ICON_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
   },
 ];
 
+// Les libellés du bouton Dessiner puis Valider de la pill Dessin, dans l'ordre où un joueur les voit.
+const MORPHING_LABELS = [
+  DRAFT_TEXTS.fr.draw,
+  submitLabel(3, undefined, "fr"),
+  submitLabel(0, 12, "fr"),
+  submitLabel(0, 65, "fr"),
+];
+
+// Le libellé change : la largeur glisse de l'ancienne à la nouvelle, le texte passe en fondu quand ses mots changent,
+// les chiffres gardent leur largeur. Le contrôle qui paraît s'ouvre en largeur et en opacité.
+const MorphingScenes = () => (
+  <Block title="Qui bougent">
+    <StateRow
+      name="Un libellé qui change"
+      detail="Touche-le : sa largeur glisse, ses chiffres ne tremblent pas."
+    >
+      <WithValue initial={0}>
+        {(index, setIndex) => (
+          <Button
+            label={MORPHING_LABELS[index] ?? ""}
+            variant="primary"
+            hasMorphingLabel
+            onPress={() => setIndex((index + 1) % MORPHING_LABELS.length)}
+          />
+        )}
+      </WithValue>
+    </StateRow>
+    <StateRow
+      name="Un contrôle qui paraît"
+      detail="Touche Brouillon : la corbeille s'ouvre en largeur et en opacité."
+    >
+      <WithValue initial={false}>
+        {(isOpen, setIsOpen) => (
+          <Pill>
+            <Button label="Brouillon" isPressed={isOpen} onPress={() => setIsOpen(!isOpen)} />
+            <Reveal isOpen={isOpen}>
+              <Button icon={Trash} variant="ghost" title="Vider le brouillon" onPress={noop} />
+            </Reveal>
+          </Pill>
+        )}
+      </WithValue>
+    </StateRow>
+  </Block>
+);
+
 export const ButtonEntry = () => (
   <Entry
     slug="bouton"
-    components={["Button"]}
+    components={["Button", "Reveal"]}
     file="ui/design/button.tsx"
     note="Un texte pour une décision, une icône seule pour une action secondaire."
   >
@@ -265,6 +339,7 @@ export const ButtonEntry = () => (
         </StateRow>
       ))}
     </Block>
+    <MorphingScenes />
   </Entry>
 );
 
@@ -471,6 +546,12 @@ const ratioRow = (name: string, value: number, ceiling: number, note?: string) =
   />
 );
 
+// La ligne des protections du gateway : les mêmes mots que le jeu, sans plafond ni barre ni taux.
+const guardsRow = (guards: GuardTotals) => {
+  const { name, note, state } = toGuardsRow(guards);
+  return <CapacityRow name={name} note={note} state={state} />;
+};
+
 export const StatTilesEntry = () => {
   const nowMs = useNowMs();
   const { audience } = sampleFrame(nowMs);
@@ -574,7 +655,7 @@ export const StatTilesEntry = () => {
       </Block>
       <Block
         title="Les ressources"
-        note="Des lignes simples sous un intitulé de maillon : le nom, la valeur sur son plafond, une fine barre, le taux. Sur mobile, le taux passe sous le nom."
+        note="Des lignes simples sous un intitulé de maillon : le nom, la valeur sur son plafond, une fine barre, le taux. Sur mobile, le taux passe sous le nom. Les protections du gateway n'ont ni plafond ni taux."
       >
         <StateRow name="Les trois teintes" detail="Un taux sous 50 %, de 50 à 80 %, à partir de 80 %.">
           <InWindow>
@@ -617,6 +698,37 @@ export const StatTilesEntry = () => {
             </div>
           </InWindow>
         </StateRow>
+        <StateRow
+          name="Sans plafond : les protections"
+          detail="Les poses refusées et les connexions fermées, sur 1 h puis 24 h : deux nombres, sans barre ni taux, hors de la saturation."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {ratioRow("Connexions en tout", 410, 1750)}
+                {guardsRow({
+                  hour: { refusedPlacements: 20, closedConnections: 1 },
+                  day: { refusedPlacements: 140, closedConnections: 3 },
+                })}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Les protections au repos"
+          detail="Rien de refusé ni de fermé : des zéros, la ligne reste."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {guardsRow({
+                  hour: { refusedPlacements: 0, closedConnections: 0 },
+                  day: { refusedPlacements: 0, closedConnections: 0 },
+                })}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
         <StateRow name="Sur mobile" detail="Le nom et la valeur en haut ; dessous, le taux et la barre.">
           <InPhone isWindow>
             <div className="lp-window-layout">
@@ -624,6 +736,10 @@ export const StatTilesEntry = () => {
                 {ratioRow("Connexions en tout", 410, 1750)}
                 {ratioRow("Connexions au plus gros canvas", 910, 1000)}
                 <CapacityRow name="Occupation" state={{ kind: "withoutNews" }} />
+                {guardsRow({
+                  hour: { refusedPlacements: 20, closedConnections: 1 },
+                  day: { refusedPlacements: 140, closedConnections: 3 },
+                })}
               </CapacityLinkRows>
             </div>
           </InPhone>
@@ -673,7 +789,10 @@ export const ChoicesEntry = () => {
         <StateRow name="Apparence, comme dans Mon compte">
           <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
-        <StateRow name="Apparence, comme dans la pill Compte">
+        <StateRow
+          name="Apparence, comme dans la pill Compte"
+          detail="Au PC seulement : sur mobile, elle vit dans Mon compte."
+        >
           <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
       </Block>

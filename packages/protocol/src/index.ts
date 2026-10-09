@@ -711,7 +711,14 @@ const CapacityResourceSchema = z.discriminatedUnion("state", [
   CapacityResourceBaseSchema.extend({ state: z.literal("unmeasured") }),
 ]);
 
+// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections du gateway, sur la dernière heure et sur 24 h.
+const GuardCountSchema = z.object({
+  refusedPlacements: z.number().int().nonnegative(),
+  closedConnections: z.number().int().nonnegative(),
+});
+
 // `resource` : celle qui porte la saturation, absente quand rien n'est mesuré. `isIncomplete` : une ressource est sans nouvelles.
+// `guards` : sans plafond ni taux, hors de la saturation ; absent, un gateway d'avant.
 const CapacityFrameSchema = z.object({
   t: z.literal("capacity"),
   saturation: z.object({
@@ -720,6 +727,7 @@ const CapacityFrameSchema = z.object({
     isIncomplete: z.boolean(),
   }),
   resources: z.array(CapacityResourceSchema),
+  guards: z.object({ hour: GuardCountSchema, day: GuardCountSchema }).optional(),
 });
 
 // Un point, à `at` son début : le pic de la saturation et de la ressource qui la portait, et le plus haut taux de chaque

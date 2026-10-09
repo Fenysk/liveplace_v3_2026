@@ -78,6 +78,24 @@
   text-align: right;
 }
 
+/* Sans plafond (les protections du gateway) : des nombres par période, la période en discret, qui tiennent la place de la valeur,
+   de la barre et du taux */
+.lp-capacity-counts {
+  grid-row: 1;
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: end;
+  column-gap: var(--space-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.lp-capacity-counts > :nth-child(odd) {
+  text-align: left;
+}
+
 /* La fine barre du taux : un `<meter>`, sans son apparence native. Sa teinte est celle de la ligne ; elle glisse vers sa
    nouvelle valeur comme le niveau de la jauge. */
 .lp-capacity-meter {
@@ -129,7 +147,8 @@
     text-align: left;
   }
 
-  .lp-capacity-missing {
+  .lp-capacity-missing,
+  .lp-capacity-counts {
     grid-area: value;
   }
 }

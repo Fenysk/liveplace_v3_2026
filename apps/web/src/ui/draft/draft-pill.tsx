@@ -1,6 +1,9 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
-// Vue : la jauge et Dessiner, ou le +1 quand une récompense attend (JOURNAL 2026-09-30). Dessin : la palette, puis la jauge, Vider, Annuler, Valider. Invité : l'invitation.
-// Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile).
+// Vue : la jauge et Dessiner, ou le +1 quand une récompense attend, qui s'étire comme lui (Écart §9.3, JOURNAL 2026-10-09).
+// Dessin : la palette, puis la jauge, Vider (seulement avec un brouillon), Annuler, Valider (sa taille, ou l'attente d'une charge).
+// Les boutons suivent le brouillon et la jauge, et leur largeur glisse (Écart §9.3, JOURNAL 2026-10-08). Invité : l'invitation.
+// Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile). En paysage sur un écran bas,
+// un panneau sur le côté : sans poignée, la palette complète dedans (Écart §8.1, JOURNAL 2026-10-08).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Trash } from "lucide-react";
@@ -11,8 +14,11 @@ import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
+import { Reveal } from "../design/reveal";
 import { SignInButton, SignInNote } from "../design/twitch";
-import { useTexts } from "../locale/use-locale";
+import { BubbleTarget } from "../help/bubble-target";
+import { useLocale, useTexts } from "../locale/use-locale";
+import { submitWords } from "./draft-labels";
 import { DRAFT_TEXTS, type DraftTexts, type RefusalCode } from "./draft-texts";
 
 export type DraftPillState =
@@ -30,6 +36,8 @@ export type DraftPillState =
       colorIndex: number;
       recentColorIndexes: readonly number[]; // sur mobile, la rangée : jamais la couleur du bouton
       isSending: boolean;
+      draftSize: number; // les pixels du brouillon : dans Valider, et Vider n'est là qu'avec eux
+      waitSeconds?: number; // plus aucune charge et rien à poser : Valider attend la prochaine
       canSubmit: boolean;
       canDiscard: boolean;
       isTouchScreen: boolean;
@@ -56,6 +64,7 @@ type DraftPillProps = {
   state: DraftPillState;
   actions: DraftPillActions;
   isCompact?: boolean; // écran étroit ou tactile : la barre du bas, et la feuille en Dessin
+  isSidePanel?: boolean; // paysage sur un écran bas : la barre est une colonne sur le côté, la feuille un panneau
   isDocked?: boolean;
 };
 
@@ -86,45 +95,59 @@ const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
   return <Button label={design.cancel} kbd={design.escapeKey} title={t.cancelTip} onPress={onExit} />;
 };
 
-const SubmitButton = ({ canSubmit, onSubmit }: { canSubmit: boolean; onSubmit: () => void }) => {
+// Dans l'attente, plus de raccourci : Entrée ne poserait rien.
+const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: () => void }) => {
   const t = useTexts(DRAFT_TEXTS);
+  const isWaiting = state.waitSeconds !== undefined;
+  const { lead, label } = submitWords(state.draftSize, state.waitSeconds, useLocale());
   return (
-    <Button
-      label={t.confirm}
-      kbd="⏎"
-      variant="primary"
-      title={t.confirmTip}
-      isDisabled={!canSubmit}
-      onPress={onSubmit}
-    />
+    <BubbleTarget name="submit">
+      <Button
+        label={label}
+        labelLead={lead}
+        {...(isWaiting ? {} : { kbd: "⏎" })}
+        variant="primary"
+        title={isWaiting ? t.waitTip : t.confirmTip}
+        isDisabled={!state.canSubmit}
+        hasMorphingLabel
+        onPress={onSubmit}
+      />
+    </BubbleTarget>
   );
 };
 
-const DiscardButton = ({ canDiscard, onDiscard }: { canDiscard: boolean; onDiscard: () => void }) => {
-  const t = useTexts(DRAFT_TEXTS);
-  return (
+// Vider n'est là qu'avec un brouillon : il paraît au premier pixel et s'efface avec le dernier.
+const DiscardButton = ({
+  state,
+  isSpread = false,
+  onDiscard,
+}: {
+  state: DraftModeState;
+  isSpread?: boolean;
+  onDiscard: () => void;
+}) => (
+  <Reveal isOpen={state.draftSize > 0} isSpread={isSpread}>
     <Button
       icon={Trash}
       variant="ghost"
-      title={t.clearDraftTip}
-      isDisabled={!canDiscard}
+      title={useTexts(DRAFT_TEXTS).clearDraftTip}
+      isDisabled={!state.canDiscard}
       onPress={onDiscard}
     />
-  );
-};
+  </Reveal>
+);
 
-const TraceButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
-  const t = useTexts(DRAFT_TEXTS);
-  return (
+const TraceButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => (
+  <BubbleTarget name="trace">
     <Button
       icon={Brush}
       variant="ghost"
-      title={t.traceTip}
+      title={useTexts(DRAFT_TEXTS).traceTip}
       isPressed={state.isTouchTracing}
       onPress={actions.onToggleTouchTracing}
     />
-  );
-};
+  </BubbleTarget>
+);
 
 const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
   const t = useTexts(DRAFT_TEXTS);
@@ -139,33 +162,41 @@ const PickerButton = ({ state, actions }: { state: DraftModeState; actions: Draf
   );
 };
 
+// La jauge, que la bulle de la jauge vide vise (Écart §8.1, JOURNAL 2026-10-08).
+const PillGauge = ({ gauge, isFill = false }: { gauge: GaugeProps; isFill?: boolean }) => (
+  <BubbleTarget name="gauge">
+    <Gauge {...gauge} isFill={isFill} />
+  </BubbleTarget>
+);
+
 // La feuille Dessin, sur mobile. Repliée ou dépliée, c'est son affaire : elle repart repliée à chaque entrée en Dessin.
-const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
+// Panneau : toujours dépliée, sans poignée ni couleurs récentes, la palette y défile sous les outils (pill-landscape.css).
+type DraftSheetProps = { state: DraftModeState; actions: DraftPillActions; isPanel: boolean };
+
+const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
   const t = useTexts(DRAFT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   const [isExpanded, setIsExpanded] = useState(false);
+  const isOpen = isPanel || isExpanded;
   const isEraser = state.colorIndex === TRANSPARENT_COLOR_INDEX;
   const toggle = () => setIsExpanded((expanded) => !expanded);
-  // Choisir une couleur replie la feuille (design system, Mobile).
-  const pickColor = (colorIndex: number) => {
-    actions.onPickColor(colorIndex);
-    setIsExpanded(false);
-  };
   return (
     <>
-      <Grabber
-        label={isExpanded ? t.collapseSheet : t.expandPalette}
-        onUp={() => setIsExpanded(true)}
-        onDown={() => setIsExpanded(false)}
-        onTap={toggle}
-      />
+      {!isPanel && (
+        <Grabber
+          label={isExpanded ? t.collapseSheet : t.expandPalette}
+          onUp={() => setIsExpanded(true)}
+          onDown={() => setIsExpanded(false)}
+          onTap={toggle}
+        />
+      )}
       <div className="lp-row">
-        <Gauge {...state.gauge} isFill />
+        <PillGauge gauge={state.gauge} isFill />
         <CancelButton onExit={actions.onExit} />
-        <SubmitButton canSubmit={state.canSubmit} onSubmit={actions.onSubmit} />
+        <SubmitButton state={state} onSubmit={actions.onSubmit} />
       </div>
       {/* La palette complète dépliée remplace toute la rangée : elle revient quand la palette se replie. */}
-      {!isExpanded && (
+      {!isOpen && (
         <div className="lp-row">
           {/* La couleur active ouvre la palette. Toucher une récente l'échange avec elle, sur place. */}
           <CurrentColorButton
@@ -179,7 +210,8 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
           />
         </div>
       )}
-      <div className="lp-row lp-sheet-tools">
+      {/* Les outils se répartissent sur toute la largeur par des ressorts : Vider y prend sa part en s'ouvrant (reveal.css). */}
+      <div className="lp-row">
         <Button
           icon={Eraser}
           variant="ghost"
@@ -187,15 +219,19 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
           isPressed={isEraser}
           onPress={actions.onToggleEraser}
         />
+        <span className="lp-spacer" />
         <PickerButton state={state} actions={actions} />
+        <span className="lp-spacer" />
         <TraceButton state={state} actions={actions} />
-        <DiscardButton canDiscard={state.canDiscard} onDiscard={actions.onDiscard} />
+        <DiscardButton state={state} isSpread onDiscard={actions.onDiscard} />
       </div>
-      {isExpanded && (
+      {/* Un clic, Entrée, Espace ou Échap replient la feuille (design system, Mobile) ; une flèche choisit sans la replier. Le panneau reste ouvert. */}
+      {isOpen && (
         <Palette
           palette={state.palette}
           colorIndex={state.colorIndex}
-          onPick={pickColor}
+          onPick={actions.onPickColor}
+          onDone={() => setIsExpanded(false)}
           isTouch
           hasEraser={false}
         />
@@ -220,22 +256,23 @@ const draftContent = (
   state: DraftModeState,
   actions: DraftPillActions,
   isCompact: boolean,
+  isSidePanel: boolean,
 ): DraftPillContent => ({
   layout: "stack",
   pillState: state.isSending ? { kind: "locked" } : undefined,
   content: isCompact ? (
-    <DraftSheet state={state} actions={actions} />
+    <DraftSheet state={state} actions={actions} isPanel={isSidePanel} />
   ) : (
     <>
       <Palette palette={state.palette} colorIndex={state.colorIndex} onPick={actions.onPickColor} />
       <div className="lp-row">
-        <Gauge {...state.gauge} />
+        <PillGauge gauge={state.gauge} />
         <span className="lp-spacer" />
         {state.isTouchScreen && <TraceButton state={state} actions={actions} />}
         <PickerButton state={state} actions={actions} />
-        <DiscardButton canDiscard={state.canDiscard} onDiscard={actions.onDiscard} />
+        <DiscardButton state={state} onDiscard={actions.onDiscard} />
         <CancelButton onExit={actions.onExit} />
-        <SubmitButton canSubmit={state.canSubmit} onSubmit={actions.onSubmit} />
+        <SubmitButton state={state} onSubmit={actions.onSubmit} />
       </div>
       <Refusal code={state.refusal} />
     </>
@@ -246,6 +283,7 @@ const contentOf = (
   state: DraftPillState,
   actions: DraftPillActions,
   isCompact: boolean,
+  isSidePanel: boolean,
   t: DraftTexts,
 ): DraftPillContent => {
   switch (state.kind) {
@@ -256,7 +294,7 @@ const contentOf = (
       };
     case "reconnecting":
       return {
-        ...contentOf(state.shown, actions, isCompact, t),
+        ...contentOf(state.shown, actions, isCompact, isSidePanel, t),
         pillState: { kind: "reconnecting", label: t.reconnecting },
       };
     case "closed":
@@ -281,9 +319,11 @@ const contentOf = (
       return {
         content: (
           <>
-            <Gauge {...state.gauge} isFill={isCompact} />
+            <PillGauge gauge={state.gauge} isFill={isCompact} />
             {state.canClaim ? (
-              <ClaimButton onClaim={actions.onClaim} />
+              <BubbleTarget name="claim">
+                <ClaimButton onClaim={actions.onClaim} />
+              </BubbleTarget>
             ) : (
               <EnterButton onEnter={actions.onEnter} />
             )}
@@ -292,13 +332,19 @@ const contentOf = (
         ),
       };
     case "draft":
-      return draftContent(state, actions, isCompact);
+      return draftContent(state, actions, isCompact, isSidePanel);
   }
 };
 
-export const DraftPill = ({ state, actions, isCompact = false, isDocked = true }: DraftPillProps) => {
+export const DraftPill = ({
+  state,
+  actions,
+  isCompact = false,
+  isSidePanel = false,
+  isDocked = true,
+}: DraftPillProps) => {
   const t = useTexts(DRAFT_TEXTS);
-  const { content, layout, pillState } = contentOf(state, actions, isCompact, t);
+  const { content, layout, pillState } = contentOf(state, actions, isCompact, isSidePanel, t);
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout={layout} state={pillState}>
       {content}

@@ -5,7 +5,7 @@ import type { RecoveryStore, RecoveryTarget } from "@liveplace/domain/ports";
 import { type CanvasSnapshot, RECOVERY_VERSION_JUMP } from "@liveplace/domain/snapshot";
 import type { Result } from "@liveplace/shared";
 
-export const RECOVERY_CHECK_MS = 5_000; // la fenêtre où une page dirait « introuvable » ne dépasse pas cet intervalle
+export const RECOVERY_CHECK_MS = 5_000; // une page n'attend plus ce tour (Écart §4.2, JOURNAL 2026-10-09)
 export const RECOVERY_RETRY_MS = 30_000; // un canvas qui n'a pas pu revenir : Convex a coupé, ou aucune sauvegarde lisible
 
 export type RecoveryCycleDeps = {

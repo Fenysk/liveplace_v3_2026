@@ -4,7 +4,16 @@ import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { CanvasScene } from "../canvas/canvas-scene";
-import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand, targetStep } from "./draft-keys";
+import { PALETTE_SELECTOR } from "../design/swatch-keys";
+import { isWindowOpen } from "../design/window-open";
+import {
+  type DraftKeyCommand,
+  isTypingElement,
+  type KeyAction,
+  type KeyMode,
+  keyAction,
+  toKeyPress,
+} from "./draft-keys";
 import { submitDraft } from "./use-draft-pill";
 
 type KeyStores = { canvas: CanvasStore; draft: DraftStore };
@@ -12,20 +21,12 @@ type KeyStores = { canvas: CanvasStore; draft: DraftStore };
 // L'Espace qui entre en Dessin ne trace qu'après avoir été relâchée : la case sous la souris n'est pas prise.
 type SpaceState = { isEntering: boolean };
 
-// Les raccourcis se taisent quand un champ de saisie a le focus (CDC 2026).
 const isTyping = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+  target instanceof HTMLElement && isTypingElement(target);
 
-// La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
-const isWindowOpen = (): boolean => document.querySelector("dialog[open]") !== null;
-
-const toKeyPress = (event: KeyboardEvent): KeyPress => ({
-  key: event.key,
-  code: event.code,
-  hasModifier: event.ctrlKey || event.metaKey || event.altKey,
-  isShifted: event.shiftKey,
-});
+// Le focus est dans la palette : ses touches sont à elle (draft-keys.ts, `keyAction`).
+const isInPalette = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && target.closest(PALETTE_SELECTOR) !== null;
 
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
   const { mode, isPicking } = draft.getView();
@@ -44,27 +45,51 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores, scen
     startTrace: () => draft.startTrace(),
     pickTarget: () => scene?.pickTarget(),
     discardTarget: () => scene?.discardTarget(),
+    undo: () => draft.undo(),
+    redo: () => draft.redo(),
     closeInspection: () => canvas.closeInspection(),
   };
   commands[command]();
 };
 
-const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
-  if (isTyping(event.target) || isWindowOpen()) return;
-  const press = toKeyPress(event);
-  const step = targetStep(press);
-  // Une flèche tenue répète : la case visée file, comme un curseur de texte (CDC 2026).
-  if (step) {
-    event.preventDefault();
-    scene?.moveTarget(step.dx, step.dy);
+type AimAction = Exclude<KeyAction, { kind: "command" }>;
+
+const runAim = (action: AimAction, event: KeyboardEvent, { draft }: KeyStores, scene?: CanvasScene): void => {
+  // Un chiffre tenu ne reprend pas la couleur en boucle : 1 alterne entre deux couleurs, une fois par appui.
+  if (action.kind === "pickRecentColor") {
+    if (!event.repeat) draft.selectRecentColor(action.slot);
     return;
   }
-  const command = keyCommand(press, keyModeOf(stores));
-  // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
-  if (command || event.code === "Space") event.preventDefault();
-  if (!command || event.repeat || (command === "startTrace" && space.isEntering)) return;
+  // Une flèche tenue répète : la case visée file, comme un curseur de texte (CDC 2026).
+  event.preventDefault();
+  scene?.moveTarget(action.step.dx, action.step.dy);
+};
+
+// Une commande tenue ne se répète pas, sauf Annuler et Rétablir : elles remontent les étapes comme dans un éditeur.
+const REPEATING_COMMANDS: readonly DraftKeyCommand[] = ["undo", "redo"];
+
+const pressCommand = (
+  command: DraftKeyCommand,
+  event: KeyboardEvent,
+  stores: KeyStores,
+  space: SpaceState,
+  scene?: CanvasScene,
+): void => {
+  // Espace ne fait jamais défiler la page, ni Ctrl+Z annuler dans le navigateur, et rien ne reclique un bouton (CDC 2026).
+  event.preventDefault();
+  const isRepeated = event.repeat && !REPEATING_COMMANDS.includes(command);
+  if (isRepeated || (command === "startTrace" && space.isEntering)) return;
   if (command === "enterDraftMode") space.isEntering = event.code === "Space";
   runCommand(command, stores, scene);
+};
+
+const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
+  // La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
+  if (isTyping(event.target) || isWindowOpen()) return;
+  const action = keyAction(toKeyPress(event), keyModeOf(stores), isInPalette(event.target));
+  if (action?.kind === "command") pressCommand(action.command, event, stores, space, scene);
+  else if (action) runAim(action, event, stores, scene);
+  else if (event.code === "Space") event.preventDefault();
 };
 
 const releaseSpace = (stores: KeyStores, space: SpaceState): void => {

@@ -71,6 +71,10 @@ const toFrame = (resources: Resource[], nowMs: number): CapacityFrame => {
     t: "capacity",
     saturation: { percent, ...(resource === undefined ? {} : { resource }), isIncomplete },
     resources,
+    guards: {
+      hour: { refusedPlacements: 20, closedConnections: 1 },
+      day: { refusedPlacements: 140, closedConnections: 3 },
+    },
   };
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGestureTracker, wheelFactor } from "./gestures";
+import { createGestureTracker, isWheelNotch, wheelFactor } from "./gestures";
 
 const mouse = (x: number, y: number, button = 0) => ({
   pointerId: 1,
@@ -169,5 +169,29 @@ describe("wheelFactor (CDC 2026, molette vers le curseur)", () => {
   // Le pincement du trackpad arrive en petits pas : il zoome plus fort par pas
   it("zooms more per step for a trackpad pinch", () => {
     expect(wheelFactor(-10, 0, true)).toBeGreaterThan(wheelFactor(-10, 0, false));
+  });
+});
+
+describe("isWheelNotch (Écart §9.3, JOURNAL 2026-10-09)", () => {
+  // Un cran de souris (100 ou 120 px, ou des lignes sous Firefox) s'anime, dans un sens comme dans l'autre
+  it("takes a mouse notch, in pixels or in lines, either way", () => {
+    expect(isWheelNotch(100, 0, false)).toBe(true);
+    expect(isWheelNotch(-120, 0, false)).toBe(true);
+    expect(isWheelNotch(3, 1, false)).toBe(true);
+    expect(isWheelNotch(1, 2, false)).toBe(true);
+  });
+
+  // Les petits pas d'un trackpad (deux doigts) arrivent à la chaîne : ils restent directs, sans retard
+  it("leaves the small steps of a trackpad direct", () => {
+    expect(isWheelNotch(4, 0, false)).toBe(false);
+    expect(isWheelNotch(-12, 0, false)).toBe(false);
+    expect(isWheelNotch(49, 0, false)).toBe(false);
+  });
+
+  // Le pincement du trackpad et Ctrl + molette (`ctrlKey`) restent directs, même par grands pas
+  it("leaves a trackpad pinch and Ctrl + wheel direct, even in big steps", () => {
+    expect(isWheelNotch(-10, 0, true)).toBe(false);
+    expect(isWheelNotch(100, 0, true)).toBe(false);
+    expect(isWheelNotch(3, 1, true)).toBe(false);
   });
 });

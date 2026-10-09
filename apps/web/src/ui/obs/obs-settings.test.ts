@@ -2,6 +2,7 @@ import { OBS_BACKGROUNDS, type ObsBackground } from "@liveplace/domain";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { type BubbleTargets, BubbleTargetsContext } from "../help/bubble-target";
 import { ObsSettings } from "./obs-settings";
 
 const doNothing = (): void => undefined;
@@ -70,5 +71,42 @@ describe("the background of the OBS view in the settings (CDC 2026 §1)", () => 
   // La CSP de production bloque l'attribut `style` du HTML du serveur : les pastilles ont leur teinte par une classe
   it("carries no inline style: the production CSP would block it", () => {
     for (const background of OBS_BACKGROUNDS) expect(settingsHtml(background)).not.toMatch(/\sstyle=/);
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-09) : le champ qui copie l'adresse est la cible de la dernière bulle de la chaîne OBS
+describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09)", () => {
+  const refs: BubbleTargets = {
+    trace: { current: null },
+    submit: { current: null },
+    gauge: { current: null },
+    claim: { current: null },
+    settings: { current: null },
+    reports: { current: null },
+    "obs-tab": { current: null },
+    "obs-address": { current: null },
+  };
+  const props = {
+    address: "liveplace.test/kalyss",
+    url: "https://liveplace.test/kalyss",
+    obsDelayMs: 10_000,
+    onPickDelay: doNothing,
+    obsBackground: "transparent",
+    onPickBackground: doNothing,
+  } as const;
+
+  // Dans la page de jeu : un `<span>` entoure le champ, et lui seul, que la bulle vise
+  it("wraps the copy field, and only it, in a span the bubble can aim at, in the game page", () => {
+    const html = renderToString(
+      createElement(BubbleTargetsContext, { value: refs }, createElement(ObsSettings, props)),
+    );
+
+    expect([...html.matchAll(/<span class="lp-bubble-target">/g)]).toHaveLength(1);
+    expect(html).toMatch(/<span class="lp-bubble-target"><button[^>]*class="lp-btn lp-copy lp-type-body"/);
+  });
+
+  // Hors de la page de jeu (/design), le champ reste seul
+  it("leaves the field alone outside the game page", () => {
+    expect(settingsHtml("transparent")).not.toContain("lp-bubble-target");
   });
 });

@@ -11,12 +11,14 @@ import {
   CONVEX_PLAN,
   CONVEX_USAGE_MS,
   GATEWAY_OUTBOUND_CEILING_BPS,
+  type GuardMinute,
   getCapacitySpec,
   INSTANT_WINDOW_MS,
   isWithoutNews,
   projectMonth,
   SNAPSHOT_DELAY_CEILING_MS,
   TOTAL_CONNECTIONS_CEILING,
+  toGuardTotals,
   toInstantResource,
   toMonthlyResource,
   toMonthStart,
@@ -412,5 +414,32 @@ describe("the saturation: the highest ratio and the resource that carries it (JO
       percent: 140,
       resource: "convexCalls",
     });
+  });
+});
+
+// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : les protections du gateway, des comptes par minute, sans plafond.
+describe("the totals of the guards (JOURNAL 2026-10-09)", () => {
+  const guard = (agoMinutes: number, refusedPlacements: number, closedConnections: number): GuardMinute => ({
+    at: now - agoMinutes * MINUTE_MS,
+    refusedPlacements,
+    closedConnections,
+  });
+
+  // Somme à part la dernière heure et les 24 dernières heures : une minute sortie de l'heure reste dans le jour
+  it("sums the last hour and the last 24 hours apart: a minute out of the hour stays in the day", () => {
+    const minutes = [guard(0, 3, 1), guard(59, 4, 0), guard(60, 10, 2), guard(600, 20, 5), guard(1439, 1, 1)];
+
+    expect(toGuardTotals(minutes, now)).toEqual({
+      hour: { refusedPlacements: 7, closedConnections: 1 },
+      day: { refusedPlacements: 38, closedConnections: 9 },
+    });
+  });
+
+  // Laisse de côté ce qui a plus de 24 heures, et vaut zéro sans aucune minute
+  it("leaves out what is older than 24 hours, and is zero without any minute", () => {
+    const zero = { refusedPlacements: 0, closedConnections: 0 };
+
+    expect(toGuardTotals([guard(1440, 9, 9), guard(3000, 9, 9)], now)).toEqual({ hour: zero, day: zero });
+    expect(toGuardTotals([], now)).toEqual({ hour: zero, day: zero });
   });
 });

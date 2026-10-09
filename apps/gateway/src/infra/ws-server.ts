@@ -25,6 +25,7 @@ export type GatewayServerDeps = {
   verifier: SessionVerifier;
   openConnection: (socket: ClientSocket, session: Session | null, device: Device) => ClientConnection;
   onBytesSent: (bytes: number) => void; // Écart §5.1 (JOURNAL 2026-10-07) : le débit sortant, compté à chaque envoi
+  onClosedBehind: () => void; // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : une connexion fermée en 1013, comptée une fois
 };
 
 // Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
@@ -43,6 +44,7 @@ const encode = (frame: ServerFrame): Buffer => {
 export const toClientSocket = (
   socket: Pick<WebSocket, "send" | "close" | "bufferedAmount">,
   onBytesSent: (bytes: number) => void,
+  onClosedBehind: () => void,
 ): ClientSocket => {
   let largestSent = 0;
   let isBehind = false;
@@ -53,6 +55,7 @@ export const toClientSocket = (
     if (socket.bufferedAmount > MAX_BUFFERED_BYTES + largestSent) {
       isBehind = true;
       socket.close(CLOSE_TRY_AGAIN_LATER);
+      onClosedBehind();
       return;
     }
     largestSent = Math.max(largestSent, payload.length);
@@ -84,7 +87,11 @@ export function startGatewayServer(deps: GatewayServerDeps) {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
   const serve = (socket: WebSocket, session: Session | null, device: Device): void => {
-    const connection = deps.openConnection(toClientSocket(socket, deps.onBytesSent), session, device);
+    const connection = deps.openConnection(
+      toClientSocket(socket, deps.onBytesSent, deps.onClosedBehind),
+      session,
+      device,
+    );
     // `hello` attendu dans les 5 s (§6.3) : le compte à rebours s'arrête à la première frame.
     const greeting = setTimeout(() => socket.close(CLOSE_POLICY), HELLO_TIMEOUT_MS);
 

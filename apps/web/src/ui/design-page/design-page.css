@@ -269,6 +269,175 @@
   width: 100%;
 }
 
+/* Un téléphone de 320 px : sa barre du bas fait 304 px, et `@media (max-width: 359px)` y efface le mot de devant d'un libellé */
+.design-in-phone--narrow {
+  width: 304px;
+}
+
+.design-in-phone--narrow .lp-btn-lead {
+  display: none;
+}
+
+/* Ce que `@media (orientation: landscape) and (max-height: 500px)` fait au vrai écran (pill-landscape.css) : la barre du bas
+   en colonne, contre le bord droit ; en Dessin, un panneau aussi haut qu'un téléphone en paysage (359 px sous ses marges),
+   la palette qui défile dedans */
+.design-in-landscape {
+  --control-size: var(--control-size-touch);
+  width: 320px;
+  max-width: 100%;
+}
+
+.design-in-landscape .lp-pill,
+.design-in-landscape .lp-pill-content {
+  width: 100%;
+  max-width: none;
+}
+
+.design-in-landscape .lp-pill-content {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.design-in-landscape .lp-kbd,
+.design-hinge .lp-kbd {
+  display: none;
+}
+
+.design-in-landscape--panel .lp-pill-content {
+  height: 359px;
+}
+
+.design-in-landscape .lp-palette--touch {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--space-1);
+  column-gap: var(--space-1);
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+/* Un écran à charnière : deux écrans de 353 px et la charnière entre eux, hachurée par les teintes des pills */
+.design-hinge {
+  --control-size: var(--control-size-touch);
+  width: 100%;
+  max-width: 740px;
+  display: flex;
+  background: var(--void);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--pill-border);
+  overflow: hidden;
+}
+
+.design-hinge-screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 200px;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.design-hinge-screen:last-child {
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.design-hinge-screen .lp-pill-content {
+  max-width: 100%;
+}
+
+.design-hinge-fold {
+  flex: none;
+  width: 34px;
+  background: repeating-linear-gradient(45deg, var(--chip) 0 4px, var(--chip-hover) 4px 8px);
+}
+
+.design-hinge--stacked {
+  width: 340px;
+  max-width: 100%;
+  flex-direction: column;
+}
+
+.design-hinge--stacked .design-hinge-fold {
+  width: auto;
+  height: 34px;
+}
+
+/* Une bulle au-dessus de ce qu'elle accompagne (la barre du bas, une rangée d'outils) : centrée, comme dans le jeu */
+.design-bubble-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.design-bubble-stack--aimed {
+  gap: 0;
+}
+
+/* Une bulle sur la barre d'un téléphone ou d'un PC : la largeur de la pill, la bulle collée au bord que sa cible approche */
+.design-bubble-stack--wide {
+  width: fit-content;
+  min-width: 359px;
+  max-width: 100%;
+}
+
+.design-bubble-stack--start {
+  align-items: flex-start;
+}
+
+.design-bubble-stack--end {
+  align-items: flex-end;
+}
+
+/* Une colonne et sa bulle côte à côte : la flèche vise la première des cibles */
+.design-bubble-row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.design-bubble-row--middle {
+  align-items: center;
+}
+
+.design-bubble-row--end {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+/* Recentrer à gauche de la colonne, au bas des deux, sur une seule ligne : la colonne rétrécit plutôt que de passer dessous */
+.design-bubble-row--bottom {
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+/* Les régions d'un toast pour un lecteur d'écran, rendues visibles pour se lire : leur rôle, puis ce qu'elles disent */
+.design-announcement {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.design-announcement .lp-visually-hidden {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+
+.design-announcement [role]::before {
+  content: attr(role) " : ";
+  color: var(--muted);
+}
+
 /* La place entre les pills Canvas et Compte : un thème trop long s'y coupe par « … » */
 .design-in-top-room {
   --lp-theme-room: 360px;
@@ -280,7 +449,7 @@
 
 /* Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous, le toast sous elle. Ce que
    `@media (max-width: 640px), (pointer: coarse)` fait au vrai écran (tokens.css, pill.css, theme-pill.css) : contrôles de
-   44 px, la pill Canvas bornée à la place que la pill Compte lui laisse (112 px et un espace, ici celle d'un invité), la
+   44 px, la pill Canvas bornée à la place que la pill Compte lui laisse (60 px et un espace, ici la photo d'un viewer), la
    bande sur toute la largeur, « Thème » devant le thème, qui prend la taille « title » et tient sur deux lignes au plus */
 .design-in-phone-top {
   --control-size: var(--control-size-touch);
@@ -306,8 +475,17 @@
 }
 
 .design-phone-row-start {
-  --lp-canvas-room: calc(var(--lp-phone-width) - 120px);
+  --lp-canvas-room: calc(var(--lp-phone-width) - 68px);
   min-width: 0;
+}
+
+/* Sans pill Compte (un invité), la rangée n'a que la pill Canvas, qui la prend toute (pill.css) */
+.design-phone-row > .lp-pill.is-hidden {
+  display: none;
+}
+
+.design-phone-row:has(> .lp-pill.is-hidden) .design-phone-row-start {
+  --lp-canvas-room: var(--lp-phone-width);
 }
 
 .design-phone-row-start .lp-pill-content {
@@ -360,6 +538,43 @@
   font-weight: var(--type-title-weight);
 }
 
+/* Le geste de vue sur mobile : le haut s'efface en fondu tant qu'on glisse, puis ne prend plus ni touchers ni lecteurs d'écran,
+   et revient au doigt levé (Écart §8.1, JOURNAL 2026-10-09) ; il garde sa place, comme les pills du jeu (pill.css). Un faux
+   canvas dessous. */
+.design-pan-demo {
+  width: 359px;
+  max-width: 100%;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.design-pan-top {
+  transition: opacity var(--lp-dur-fade) ease;
+}
+
+.design-pan-top[data-panning] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    visibility 0s linear var(--lp-dur-fade);
+}
+
+.design-pan-canvas {
+  display: grid;
+  place-items: center;
+  height: 140px;
+  border-radius: var(--radius-sm);
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 32px 32px;
+  color: var(--muted);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
 /* Ce que `@media (max-width: 640px)` fait au vrai écran (tokens.css, window.css) */
 .design-in-phone--window.lp-pill {
   --control-size: var(--control-size-touch);
@@ -376,6 +591,25 @@
 
 .design-in-phone--window .lp-window-row--profile > :not(:first-child) {
   margin-left: auto;
+}
+
+/* La barre latérale de la fenêtre (PC), et sa rangée d'onglets sur la feuille (window.css, max-width: 640px) */
+.design-nav-column.lp-pill {
+  width: 208px;
+}
+
+.design-nav-row .lp-window-nav {
+  width: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.design-nav-row .lp-window-nav ul {
+  flex-direction: row;
+}
+
+.design-nav-row .lp-window-nav .lp-btn {
+  width: auto;
 }
 
 /* Le message seul occupe tout l'écran dans le jeu : ici, sa taille à lui */

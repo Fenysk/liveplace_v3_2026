@@ -186,7 +186,7 @@ export const DeveloperEntry = () => {
       </Block>
       <Block
         title="Capacité"
-        note="Chaque ressource face à son plafond : la saturation en tête, puis les ressources rangées par maillon, puis l'historique. Vert sous 50 %, orange de 50 à 80 %, rouge à partir de 80 %."
+        note="Chaque ressource face à son plafond : la saturation en tête, puis les ressources rangées par maillon, puis l'historique. Vert sous 50 %, orange de 50 à 80 %, rouge à partir de 80 %. Au pied du gateway, une ligne Protections : ce qu'il a refusé ou fermé, sans plafond ni part dans la saturation."
       >
         <StateRow
           name="La section Capacité, hors de la fenêtre : à surveiller"

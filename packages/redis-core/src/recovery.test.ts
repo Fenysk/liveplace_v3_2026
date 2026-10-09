@@ -429,6 +429,18 @@ describe("the marks the web writes while a page renders (JOURNAL 2026-10-08)", (
     expect(await redis.hget(live.keys.meta, "ready")).toBe("1");
   });
 
+  // Le canvas neuf d'un archivage (version posée, pas encore prêt) vit pour le web : le marquer n'y touche pas
+  it("takes the new canvas of an archive for live, and marking it leaves it alone", async () => {
+    const canvasId = `${runId}-preparing-2`;
+    await archiveWrites.prepareCanvas(canvasId, meta);
+
+    expect(await marks.isCanvasLive(canvasId)).toBe(true);
+    await marks.markRecovering(canvasId);
+
+    expect(await core.isRecovering(canvasId)).toBe(false);
+    expect(await redis.hexists(buildCanvasKeys(canvasId).meta, "ready")).toBe(0);
+  });
+
   // Une connexion qui crée le canvas pendant la marque ne le sert jamais à moitié : `ready` ne repasse pas à 1
   it("keeps a canvas created while it is marked from becoming ready on its own", async () => {
     const canvasId = `${runId}-lost-3`;

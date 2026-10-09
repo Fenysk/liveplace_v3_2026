@@ -36,15 +36,16 @@ const getGameCanvasPage = createServerFn({ method: "GET" })
       { verifier: context.deps.verifier, cookieHeader: getRequestHeader("cookie") },
       context.deps.tracker, // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, lu à Redis, jamais à Twitch
     );
-    if (page)
-      await markRecoveringIfLost(
-        { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
-        page.canvasId,
-      );
-    return page;
+    if (!page) return null;
+    await markRecoveringIfLost(
+      { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
+      page.canvasId,
+    );
+    // `publicUrl` : l'adresse que la carte d'aperçu du lien (`head`) donne à la page, que seul le serveur connaît.
+    return { ...page, publicUrl: context.deps.publicUrl };
   });
 
-const toPage = (page: ResolvedCanvas | null): ResolvedCanvas => {
+const toPage = <Page extends ResolvedCanvas>(page: Page | null): Page => {
   if (!page) throw notFound();
   return page;
 };

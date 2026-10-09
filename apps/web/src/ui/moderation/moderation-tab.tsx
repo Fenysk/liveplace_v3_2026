@@ -11,12 +11,13 @@ import type { CanvasStore, StaleList } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
 import { useToast } from "../design/toast";
 import { useTexts } from "../locale/use-locale";
-import { type BannedList, BannedUsers, type BanPreview } from "./banned-users";
+import { type BannedList, BannedUsers } from "./banned-users";
 import { moderateInOrder } from "./moderate-in-order";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
 import { oneAtATime } from "./one-at-a-time";
 import { type PendingReport, pendingReportKey, toPendingReports } from "./pending-reports";
+import { usePixelListing } from "./pixel-listing";
 import { ReportedPlacements, type ReportList } from "./reported-placements";
 import { TwitchSyncBlock, type TwitchSyncView } from "./twitch-sync";
 import type { ModerationControls } from "./use-moderation";
@@ -142,7 +143,8 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
 const useModerationTabProps = (canvas: CanvasStore) => {
   const { width, height, palette } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const [list, setList] = useState<BannedList>({ status: "loading" });
-  const [preview, setPreview] = useState<BanPreview | null>(null);
+  const [previewedUserId, setPreviewedUserId] = useState<string | null>(null);
+  const listing = usePixelListing();
   const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
   const toast = useToast();
   const t = useTexts(MODERATION_TEXTS);
@@ -158,15 +160,12 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   useRelistOnReports(canvas, relist);
   useRelistOnStale(canvas, "bans", relist);
 
+  // L'œil ouvre l'aperçu de ce compte, ou le referme ; un autre œil ouvert entre-temps remplace le chargement.
   const onPreview = (userId: string) => {
-    if (preview?.userId === userId) return setPreview(null);
-    setPreview({ userId, pixels: null });
-    void canvas.listPixels(userId).then((result) => {
-      // Un autre œil ouvert entre-temps garde le sien.
-      setPreview((shown) =>
-        shown?.userId === userId ? { userId, pixels: result.ok ? result.value : [] } : shown,
-      );
-    });
+    const next = previewedUserId === userId ? null : userId;
+    setPreviewedUserId(next);
+    if (next) listing.list(canvas.listPixels(next));
+    else listing.drop();
   };
 
   const onUnban = (userId: string) => {
@@ -180,10 +179,11 @@ const useModerationTabProps = (canvas: CanvasStore) => {
           ? { status: "ready", users: shown.users.filter((user) => user.userId !== userId) }
           : shown,
       );
-      setPreview((shown) => (shown?.userId === userId ? null : shown));
+      setPreviewedUserId((shown) => (shown === userId ? null : shown));
     });
   };
 
+  const preview = previewedUserId ? { userId: previewedUserId, pixels: listing.pixels } : null;
   return { list, preview, unbanningUserId, canvas: { width, height, palette }, onPreview, onUnban };
 };
 

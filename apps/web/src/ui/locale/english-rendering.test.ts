@@ -5,6 +5,7 @@ import { PALETTE } from "@liveplace/domain";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { HELP_BUBBLES } from "../../state/help-bubbles";
 import { toScoreboardRows } from "../../state/scoreboard";
 import { AccountPill } from "../account/account-pill";
 import { AccountWindow } from "../account/account-window";
@@ -12,18 +13,22 @@ import { ArchiveBanner } from "../archive/archive-banner";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { ArchivesSection } from "../archive/canvas-cards";
 import { DownloadWindow } from "../archive/download-window";
+import { CanvasPill } from "../canvas/canvas-pill";
 import { CanvasRecovering } from "../canvas/canvas-recovering";
 import { CanvasSettings, ResizeWindow } from "../canvas/canvas-settings";
 import { ViewportPill } from "../canvas/viewport-pill";
 import { ClaimButton } from "../design/gauge";
 import { Palette } from "../design/palette";
-import { Profile } from "../design/profile";
+import { Profile, type ProfileUser } from "../design/profile";
 import { ThemePill } from "../design/theme-pill";
 import { SignInNote } from "../design/twitch";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
+import { HelpBubbleLine } from "../help/help-bubbles";
+import { FirstHint } from "../hint/first-hint";
 import { InspectionPill } from "../inspection/inspection-pill";
 import { BannedWindow } from "../moderation/banned-window";
 import { PLACEMENT_ONLY } from "../moderation/cleared-pixels";
+import { ConnectionLost } from "../moderation/connection-lost";
 import { ModerationWindow } from "../moderation/moderation-window";
 import { ObsSettings } from "../obs/obs-settings";
 import { ScoreboardList } from "../scoreboard/scoreboard-list";
@@ -172,6 +177,7 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
       colorIndex: 5,
       recentColorIndexes: [],
       isSending: false,
+      draftSize: 3,
       canSubmit: true,
       canDiscard: true,
       isTouchScreen: true,
@@ -180,7 +186,7 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
     });
 
     expect(markup).toContain(">Cancel</span>");
-    expect(markup).toContain(">Confirm</span>");
+    expect(markup).toContain(">Confirm · 3</span>");
     expect(markup).toContain('title="Place the draft"');
     expect(markup).toContain('title="Clear the draft"');
     expect(markup).toContain('title="Leave Draw mode (your draft is kept)"');
@@ -510,5 +516,89 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(markup).toContain("OBS view background");
     expect(markup).toContain('aria-label="Transparent"');
     expect(markup).toContain('aria-label="Black"');
+  });
+});
+
+describe("what arrived with the mobile interface, in English (Écart §14, JOURNAL 2026-10-07)", () => {
+  const owner: ProfileUser = { displayName: "Kalyss", login: "kalyss" };
+
+  // La pill Canvas repliée sur mobile : le bouton qui la déplie, et le live dans son nom
+  it("says the folded Canvas pill in English, with the live", () => {
+    const fold = { isFolded: true, onUnfold: doNothing };
+    const folded = (profile: ProfileUser) =>
+      inEnglish(createElement(CanvasPill, { owner: profile, isCompact: true, isDocked: false, fold }));
+
+    expect(folded(owner)).toContain('aria-label="Expand Kalyss&#x27;s profile"');
+    expect(folded({ ...owner, twitchLive: { category: "Art" } })).toContain(
+      'aria-label="Expand Kalyss&#x27;s profile, live on Twitch"',
+    );
+  });
+
+  // Le conseil de première visite : ses deux gestes et ses points, dits à voix haute
+  it("says the first-visit hint in English", () => {
+    const markup = inEnglish(createElement(FirstHint, { doneCount: 2, isVisible: true, isDocked: false }));
+
+    expect(markup).toContain("Pinch to zoom");
+    expect(markup).toContain("Tap a pixel to see who placed it");
+    expect(markup).toContain('aria-label="2 of 3"');
+  });
+
+  // Chaque bulle d'aide a sa phrase anglaise : aucun mot français ne reste
+  it("says every help bubble in English", () => {
+    const lines = HELP_BUBBLES.map((bubble) =>
+      inEnglish(
+        createElement(HelpBubbleLine, {
+          bubble,
+          isTouchScreen: true,
+          refill: { refillMs: 10_000, refillCharges: 1 },
+        }),
+      ),
+    ).join("");
+
+    expect(lines).toContain("A pixel was reported");
+    expect(lines).toContain("Your gauge refills on its own: one pixel every 10 s");
+    expect(lines).toContain("Tap the canvas to prepare your drawing, then Confirm to send it");
+    expect(lines).toContain("Turn on Trace to draw by dragging");
+    expect(lines).not.toMatch(/Ajoute|Copie|Active|récompense|jauge/);
+  });
+
+  // L'attente d'une charge, quand il n'y a plus rien à poser
+  it("says Wait with the countdown when the gauge is empty and the draft too", () => {
+    const markup = draftPill({
+      kind: "draft",
+      gauge: GAUGE,
+      palette: PALETTE,
+      colorIndex: 5,
+      recentColorIndexes: [],
+      isSending: false,
+      draftSize: 0,
+      waitSeconds: 12,
+      canSubmit: false,
+      canDiscard: false,
+      isTouchScreen: false,
+      isTouchTracing: false,
+      isPicking: false,
+    });
+
+    expect(markup).toContain("Wait ");
+    expect(markup).toContain('title="Wait for the next charge"');
+    expect(markup).toContain("12 s");
+  });
+
+  // L'échec des listes de modération : une alerte toujours là, en anglais seulement une fois l'échec arrivé
+  it("says the moderation failure in English in an alert that exists before its text", () => {
+    expect(inEnglish(createElement(ConnectionLost, { isFailed: false }))).toContain('role="alert"');
+    expect(inEnglish(createElement(ConnectionLost, { isFailed: false }))).not.toContain("connection");
+    expect(inEnglish(createElement(ConnectionLost, { isFailed: true }))).toContain(
+      "The connection dropped. Try again in a moment: the page reconnects by itself.",
+    );
+  });
+
+  // La palette au clavier : son groupe et ses cases se nomment en anglais
+  it("names the palette radio group in English", () => {
+    const markup = inEnglish(createElement(Palette, { palette: PALETTE, colorIndex: 1, onPick: doNothing }));
+
+    expect(markup).toContain('role="radiogroup"');
+    expect(markup).toContain('aria-label="All colors"');
   });
 });

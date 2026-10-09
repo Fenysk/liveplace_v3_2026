@@ -34,6 +34,8 @@ const MIDDLE_BUTTON = 1;
 // Ctrl + molette de souris prend le même chemin, et c'est voulu : un zoom rapide (CDC 2026).
 const WHEEL_SPEED = 0.0015;
 const TRACKPAD_PINCH_SPEED = 0.01;
+// Un cran de souris pèse 100 px (120 sous Windows à 125 %), un pas de trackpad quelques pixels.
+const WHEEL_NOTCH_MIN_PIXELS = 50;
 const LINE_HEIGHT = 16;
 const PAGE_HEIGHT = 800;
 
@@ -141,8 +143,18 @@ export function createGestureTracker(
   };
 }
 
+// Écart §8.1 (JOURNAL 2026-10-08) : déplacer, pincer et zoomer replient la pill Canvas ; viser et tracer non.
+export const movesViewport = ({ kind }: Gesture): boolean =>
+  kind === "pan" || kind === "pinch" || kind === "zoom";
+
 // `mode` est le `deltaMode` du navigateur : 0 en pixels, 1 en lignes (Firefox), 2 en pages.
 export function wheelFactor(amount: number, mode: number, isTrackpadPinch: boolean): number {
   const pixels = amount * ([1, LINE_HEIGHT, PAGE_HEIGHT][mode] ?? 1);
   return Math.exp(-pixels * (isTrackpadPinch ? TRACKPAD_PINCH_SPEED : WHEEL_SPEED));
+}
+
+// Un cran de molette de souris, par opposition au pas d'un trackpad ou d'un Ctrl + molette (Écart §9.3, JOURNAL 2026-10-09) :
+// le cran arrive d'un coup, en lignes ou d'au moins `WHEEL_NOTCH_MIN_PIXELS`, et la scène l'anime ; les pas, déjà continus, restent directs.
+export function isWheelNotch(amount: number, mode: number, isTrackpadPinch: boolean): boolean {
+  return !isTrackpadPinch && (mode !== 0 || Math.abs(amount) >= WHEEL_NOTCH_MIN_PIXELS);
 }

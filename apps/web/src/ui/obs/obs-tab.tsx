@@ -12,7 +12,7 @@ import { obsDelayLabel } from "./obs-delay-label";
 import { ObsSettings } from "./obs-settings";
 import { OBS_TEXTS } from "./obs-texts";
 
-type ObsTabProps = { canvas: CanvasStore; login: string };
+type ObsTabProps = { canvas: CanvasStore; login: string; onCopy: () => void };
 
 // Le fond, comme le délai : la valeur demandée tant que la frame `obsBackground` ne l'a pas confirmée (JOURNAL 2026-09-29).
 const useObsBackground = (canvas: CanvasStore) => {
@@ -36,7 +36,7 @@ const useObsBackground = (canvas: CanvasStore) => {
   };
 };
 
-export const ObsTab = ({ canvas, login }: ObsTabProps) => {
+export const ObsTab = ({ canvas, login, onCopy }: ObsTabProps) => {
   const getConfirmed = () => canvas.getView().params?.obsDelayMs ?? OBS_DELAY_MS;
   const confirmed = useSyncExternalStore(canvas.subscribe, getConfirmed, getConfirmed);
   const [requested, setRequested] = useState<number | null>(null);
@@ -57,6 +57,7 @@ export const ObsTab = ({ canvas, login }: ObsTabProps) => {
     <ObsSettings
       address={url.replace(/^https?:\/\//, "")}
       url={url}
+      onCopy={onCopy}
       obsDelayMs={requested ?? confirmed}
       onPickDelay={(obsDelayMs) => {
         setRequested(obsDelayMs);

@@ -50,6 +50,7 @@ const ArchiveAccount = ({
       <AccountPill
         {...account}
         isCompact={isCompact}
+        hasBottomBar={false}
         onOpenAccount={() => setIsOpen(true)}
         onSignIn={signingIn.onSignIn}
       />

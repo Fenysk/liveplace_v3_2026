@@ -34,6 +34,13 @@ export const CANVAS_TEXTS = defineTexts({
     en: "With the keyboard: the arrow keys aim at a cell, Shift goes ten times farther. D, Enter or Space to draw. In Draw mode: Space adds the aimed cell, Backspace removes it, E picks the eraser, I the eyedropper, Enter confirms, Esc cancels.",
   },
 
+  // La pill Canvas repliée sur mobile (Écart §8.1, JOURNAL 2026-10-08) : la photo seule, en bouton qui la déplie.
+  unfoldProfile: localized({
+    fr: ({ name, isLive }: { name: string; isLive: boolean }) =>
+      `Déplier le profil de ${name}${isLive ? ", en live sur Twitch" : ""}`,
+    en: ({ name, isLive }) => `Expand ${name}'s profile${isLive ? ", live on Twitch" : ""}`,
+  }),
+
   // La pill Pratique.
   recenter: { fr: "Recentrer la vue", en: "Recenter the view" },
   zoomIn: { fr: "Zoomer", en: "Zoom in" },

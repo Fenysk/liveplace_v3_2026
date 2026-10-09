@@ -65,6 +65,40 @@ describe("la pill Canvas sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
   });
 });
 
+describe("la pill Canvas sans pill Compte sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
+  // Tant qu'aucune pill Compte n'est visible (l'invité n'en a pas, un viewer l'attend du gateway), rien n'est réservé
+  const alone =
+    'html:not(:has(.lp-floating[data-dock="tr"] > .lp-pill:not(.is-hidden))) .lp-floating[data-dock="tl"]';
+
+  it("gives the Canvas pill the whole row while no Account pill is visible, with the same side margins as the docks", () => {
+    expect(ruleOf(compact, alone).replace(/\s+/g, " ")).toContain(
+      "--lp-canvas-room: calc(100vw - 2 * var(--space-4));",
+    );
+    expect(ruleOf(narrow, alone).replace(/\s+/g, " ")).toContain(
+      "--lp-canvas-room: calc(100vw - 2 * var(--space-2));",
+    );
+    expect(ruleOf(compact, alone)).not.toContain("--lp-top-right");
+    expect(ruleOf(narrow, alone)).not.toContain("--lp-top-right");
+  });
+
+  // Avant sa première mesure, la pill Compte vaut une photo : un contrôle et ses deux marges, comme pour un viewer
+  it("reserves one control and its margins for an Account pill not yet measured", () => {
+    for (const block of [compact, narrow]) {
+      expect(ruleOf(block, '.lp-floating[data-dock="tl"]').replace(/\s+/g, " ")).toContain(
+        "var(--lp-top-right, calc(var(--control-size) + 2 * var(--space-2)))",
+      );
+    }
+  });
+
+  // Au PC, rien ne change : la place rendue à la pill Canvas ne vaut que sur les écrans étroits ou tactiles
+  it("changes nothing on a PC: the whole-row rule is only inside the narrow or touch screens' blocks", () => {
+    const outside = pillCss.replace(compact, "").replace(narrow, "");
+
+    expect(outside).not.toContain("--lp-canvas-room");
+    expect(pillCss).toContain(alone);
+  });
+});
+
 describe("la bande Thème sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
   // Même largeur que la rangée du haut : de la marge d'un côté à la marge de l'autre, comme les docks du haut
   it("spans the top row: from one margin to the other, as the top docks do", () => {
@@ -145,5 +179,118 @@ describe("la route du jeu et le mode Dessin (Écart §8.1, JOURNAL 2026-10-08)",
 
     expect(route).toContain("useDraftingAttribute(stores.draft)");
     expect(DRAFTING_ATTRIBUTE).toBe("data-drafting");
+  });
+});
+
+describe("le haut pendant un geste de vue sur mobile (Écart §8.1, JOURNAL 2026-10-09)", () => {
+  const panning = "html[data-panning]";
+  const TOP_DOCKS = '[data-dock="tl"], [data-dock="tr"], [data-dock="tc"]';
+  // Tout ce qui n'est pas le haut : la barre du bas, Recentrer, l'inspection, le classement et le toast
+  const OTHER_DOCKS = ["bc", "br", "cr", "cl", "toast"];
+
+  // Pendant le geste, les pills Canvas et Compte et la bande s'effacent, puis quittent le clavier
+  it("fades the Canvas and Account pills and the band out while the view moves, then out of the keyboard's reach", () => {
+    const faded = ruleOf(compact, `${panning} .lp-floating:is(${TOP_DOCKS})`).replace(/\s+/g, " ");
+
+    expect(faded).toContain("opacity: 0;");
+    expect(faded).toContain("visibility: hidden;");
+    // La visibilité ne part qu'une fois le fondu fini : sans ce délai, il n'y aurait pas de fondu
+    expect(faded).toContain("visibility 0s linear var(--lp-dur-fade)");
+    expect(faded).toContain("opacity var(--lp-dur-fade) ease");
+  });
+
+  // Les durées passent par les jetons, que `prefers-reduced-motion` met à 0 : sans mouvement, le haut part et revient d'un coup
+  it("takes its durations from the tokens alone, which reduced motion sets to 0: no animated fade", () => {
+    const faded = ruleOf(compact, `${panning} .lp-floating:is(${TOP_DOCKS})`);
+
+    expect(faded).not.toMatch(/\d(ms|s)\b(?!\s*linear)/);
+    expect(read("tokens.css")).toMatch(
+      /prefers-reduced-motion: reduce\) \{\s*:root \{[^}]*--lp-dur-fade: 0s;/,
+    );
+  });
+
+  // Une bulle qui vise une pill du haut part et revient avec elle : seule, sa flèche pointerait sur du vide
+  it("takes a bubble aimed at a top pill away with the pills, and back with them", () => {
+    const aimed = ["tl", "tr", "tc"].map((dock) => `[data-aimed-dock="${dock}"]`).join(", ");
+
+    expect(compact.replace(/\s+/g, " ")).toContain(
+      `${panning} .lp-bubble:is(${aimed}), ${panning} .lp-floating:is(${TOP_DOCKS}) {`,
+    );
+  });
+
+  // Pendant le fondu, elles ne prennent déjà plus les touchers
+  it("takes the touches off the pills at once, without waiting for the fade to end", () => {
+    expect(ruleOf(compact, `${panning} .lp-floating:is(${TOP_DOCKS}) > .lp-pill`)).toContain(
+      "pointer-events: none;",
+    );
+  });
+
+  // Rien ne bouge de place : le cadrage du canvas lit les pills là où elles sont en Vue
+  it("moves nothing: no top, no display, no transform, so the canvas framing stays where it is", () => {
+    const faded = ruleOf(compact, `${panning} .lp-floating:is(${TOP_DOCKS})`).replace(
+      /transition:[^;]*;/,
+      "",
+    );
+
+    for (const property of [
+      "top:",
+      "left:",
+      "right:",
+      "bottom:",
+      "display:",
+      "transform:",
+      "height:",
+      "width:",
+    ]) {
+      expect(faded).not.toContain(property);
+    }
+  });
+
+  // Le pouce est en bas : la barre du bas, Recentrer, l'inspection et le toast ne s'effacent jamais
+  it("leaves the bottom bar, Recenter, the inspection sheet and the toast alone", () => {
+    // Le sélecteur de chaque règle du geste, de `html[data-panning]` à son accolade
+    const rules = compact
+      .split(panning)
+      .slice(1)
+      .map((rest) => rest.slice(0, rest.indexOf("{")));
+
+    expect(rules.length).toBeGreaterThan(0);
+    for (const dock of OTHER_DOCKS) {
+      expect(rules.filter((rule) => rule.includes(`data-dock="${dock}"`))).toEqual([]);
+    }
+  });
+
+  // Au PC, rien ne change : toutes les pills s'effacent au geste, comme avant, et la règle du haut seul n'y est pas
+  it("changes nothing on a PC: every pill still fades with the gesture, and the top-only rule is not there", () => {
+    const outside = pillCss.replace(compact, "").replace(narrow, "");
+    const pc = mediaBlockOf(outside, "@media not ((max-width: 640px) or (pointer: coarse)) {");
+
+    expect(ruleOf(pc, `${panning} .lp-floating`)).toContain("opacity: 0;");
+    expect(ruleOf(pc, `${panning} .lp-floating > .lp-pill`)).toContain("pointer-events: none;");
+    expect(outside).not.toContain(`${panning} .lp-floating:is(`);
+    expect(compact).not.toContain(`${panning} .lp-floating {`);
+  });
+
+  // Aucun intermédiaire entre le geste et le CSS : sur mobile aussi, la règle lit l'attribut que la scène pose et lève,
+  // trois fois (la bulle visée, les pills, leurs touchers), et le PC garde ses deux
+  it("reads the gesture attribute itself on mobile, with no hold in between", () => {
+    expect(compact.split(panning)).toHaveLength(4);
+    expect(pillCss.split(panning)).toHaveLength(6);
+    expect(pillCss).not.toContain("data-pan-hold");
+  });
+
+  // Le retour est la sortie de la règle : le fondu normal des pills, sans délai, et la visibilité revient d'un coup
+  it("brings the top back at once with the normal fade: no delay on the way back, visibility not transitioned", () => {
+    // La règle de base, au début d'une ligne (les règles du geste la contiennent aussi), et celle de la bande
+    const back = [ruleOf(pillCss, "\n.lp-floating"), ruleOf(compact, '.lp-floating[data-dock="tc"]')].map(
+      (rule) => rule.replace(/\s+/g, " "),
+    );
+
+    for (const rule of back) {
+      expect(rule).toContain("opacity var(--lp-dur-fade) ease");
+      expect(rule).not.toContain("visibility");
+      expect(rule).not.toMatch(/delay|\d(ms|s)\b/);
+    }
+    expect(ruleOf(compact, `${panning} .lp-floating:is(${TOP_DOCKS})`)).not.toContain("transition-delay");
   });
 });

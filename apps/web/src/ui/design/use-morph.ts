@@ -3,6 +3,7 @@
 // nouvelle, sur la courbe du design system, et le nouveau contenu apparaît en fondu.
 
 import { useEffect, useRef } from "react";
+import { MORPHING_SELECTOR } from "./morphing";
 import { motionEasing, motionMs } from "./motion";
 
 type BoxSize = { width: number; height: number };
@@ -30,6 +31,8 @@ export function useMorph<Pill extends HTMLElement, Content extends HTMLElement>(
       const from = lastSize;
       lastSize = nextSize;
       if (from.width === nextSize.width && from.height === nextSize.height) return;
+      // Un élément dont la taille glisse fait déjà suivre la pill : la rejouer à chaque image la ferait clignoter.
+      if (contentElement.querySelector(MORPHING_SELECTOR)) return;
       const duration = motionMs(pillElement, "--lp-dur");
       if (duration === 0) return;
       pillElement.animate([toKeyframe(from), toKeyframe(nextSize)], {

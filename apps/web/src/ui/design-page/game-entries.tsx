@@ -1,10 +1,10 @@
 // Le chapitre L'écran de jeu : les pills, les vraies, avec des props d'exemple, chacune dans chacun de ses états.
 
 import { PALETTE } from "@liveplace/domain";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { ArchiveNotFound } from "../archive/archive-not-found";
-import { CanvasPill } from "../canvas/canvas-pill";
+import { CanvasPill, type CanvasPillFold } from "../canvas/canvas-pill";
 import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
@@ -17,31 +17,56 @@ import { Toast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
+import { BubbleTargetsContext, useBubbleTargets } from "../help/bubble-target";
 import { noop, SAMPLE_LIVE_OWNER, SAMPLE_OWNER } from "./design-fixtures";
-import { Block, Entry, InNotice, InPhone, InPhoneTop, InTopRoom, StateRow, useNowMs } from "./entry-layout";
+import {
+  Block,
+  Entry,
+  InHinge,
+  InLandscape,
+  InNotice,
+  InPhone,
+  InPhoneTop,
+  InTopRoom,
+  StateRow,
+  useNowMs,
+} from "./entry-layout";
+import { PanFadeDemo } from "./pan-fade-demo";
 
 const REFILL_MS = 10_000;
 
+export const SIGNED_IN = { kind: "signedIn", user: SAMPLE_OWNER } as const;
+
 type PhoneHeaderProps = {
   owner: ProfileUser;
+  identity?: AccountPillProps["identity"];
   theme?: string | undefined;
   isNarrow?: boolean;
   isDrafting?: boolean;
+  fold?: CanvasPillFold;
 };
 
 // Le haut d'un téléphone en Vue : la rangée des pills Canvas et Compte, la bande Thème dessous. En Dessin (Écart §8.1, JOURNAL
-// 2026-10-08), les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut.
-const PhoneHeader = ({ owner, theme, isNarrow = false, isDrafting = false }: PhoneHeaderProps) => {
+// 2026-10-08), les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut. Un invité n'a pas de pill
+// Compte (Écart §8.1, JOURNAL 2026-10-08) : la pill Canvas prend la rangée.
+const PhoneHeader = ({
+  owner,
+  identity = SIGNED_IN,
+  theme,
+  isNarrow = false,
+  isDrafting = false,
+  fold,
+}: PhoneHeaderProps) => {
   const appearanceChoice = useAppearanceChoice();
   return (
     <InPhoneTop isNarrow={isNarrow}>
       {!isDrafting && (
         <div className="design-phone-row">
           <div className="design-phone-row-start">
-            <CanvasPill owner={owner} isCompact isDocked={false} />
+            <CanvasPill owner={owner} isCompact isDocked={false} {...(fold ? { fold } : {})} />
           </div>
           <AccountPill
-            identity={{ kind: "guest" }}
+            identity={identity}
             signInHref="#"
             appearanceChoice={appearanceChoice}
             onPickAppearance={pickAppearance}
@@ -56,11 +81,29 @@ const PhoneHeader = ({ owner, theme, isNarrow = false, isDrafting = false }: Pho
   );
 };
 
+// Écart §8.1 (JOURNAL 2026-10-08, 2026-10-09) : déplacer, zoomer, recentrer ou ouvrir une case replie la pill Canvas, la toucher la déplie.
+const FoldDemo = () => {
+  const [isFolded, setIsFolded] = useState(false);
+  return (
+    <>
+      <PhoneHeader
+        owner={SAMPLE_LIVE_OWNER}
+        theme={SHORT_THEME}
+        fold={{ isFolded, onUnfold: () => setIsFolded(false) }}
+      />
+      <Button label="Déplacer le canvas" onPress={() => setIsFolded(true)} />
+    </>
+  );
+};
+
+const FOLDED: CanvasPillFold = { isFolded: true, onUnfold: noop };
+
 export const CanvasPillEntry = () => (
   <Entry
     slug="pill-canvas"
     components={["CanvasPill"]}
     file="ui/canvas/canvas-pill.tsx"
+    note="Sur mobile, elle se replie sur la photo quand on déplace, zoome, recentre ou ouvre une case sur le canvas, et la toucher la déplie. Un simple appui ou un trait en Dessin ne la replie pas. Rien n'est retenu : chaque visite commence dépliée."
     where="En haut à gauche"
   >
     <Block title="États">
@@ -83,6 +126,33 @@ export const CanvasPillEntry = () => (
         detail="La catégorie disparaît, le logo et le rond restent ; le nom ne se coupe qu'en dernier."
       >
         <PhoneHeader owner={SAMPLE_LIVE_OWNER} isNarrow />
+      </StateRow>
+      <StateRow
+        name="En live, invité"
+        detail="Pas de pill Compte : la pill Canvas prend toute la rangée, la catégorie avec."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} identity={{ kind: "guest" }} />
+      </StateRow>
+    </Block>
+    <Block title="Repliée sur mobile">
+      <StateRow
+        name="Repliée"
+        detail="La photo seule, en bouton : la pill Compte et la bande Thème ne bougent pas, le canvas non plus."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} fold={FOLDED} />
+      </StateRow>
+      <StateRow
+        name="Repliée, en live"
+        detail="Le rond violet de Twitch reste sur la photo ; le bouton le dit aussi à voix haute."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} theme={SHORT_THEME} fold={FOLDED} />
+      </StateRow>
+      <StateRow
+        name="Se replie sur le canvas, se déplie au toucher"
+        detail="Déplacer, zoomer, recentrer ou ouvrir une case la replie ; toucher la photo la déplie."
+        isDemo
+      >
+        <FoldDemo />
       </StateRow>
     </Block>
   </Entry>
@@ -152,6 +222,15 @@ export const ThemePillEntry = () => (
         <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} isDrafting />
       </StateRow>
       <StateRow
+        name="Pendant un déplacement du canvas"
+        detail="Les pills Canvas et Compte et la bande s'effacent en fondu tant que la vue bouge, et reviennent dès que le doigt se lève, par le même fondu, avec la bulle d'aide qui vise l'une d'elles. La barre du bas reste."
+        isDemo
+      >
+        <PanFadeDemo>
+          <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} />
+        </PanFadeDemo>
+      </StateRow>
+      <StateRow
         name="Un toast sous la bande"
         detail="Il se pose dessous et ne la recouvre jamais, quelle que soit sa hauteur ; en Dessin, sous la bande montée."
       >
@@ -173,9 +252,9 @@ type AccountScene = {
   hasSettings?: boolean;
   hasModeration?: boolean;
   isDeveloper?: boolean; // écart §10.3 (JOURNAL 2026-10-06) : le bouton Développeur
+  isInRow?: boolean; // la rangée d'un téléphone, pour dire la place qu'une pill absente laisse à la pill Canvas
+  hasBottomBar?: boolean; // faux : la page d'une archive, sans barre du bas
 };
-
-const SIGNED_IN = { kind: "signedIn", user: SAMPLE_OWNER } as const;
 
 const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] }[] = [
   {
@@ -235,7 +314,22 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
   {
     title: "Sur mobile",
     scenes: [
-      { name: "Invité", identity: { kind: "guest" }, isCompact: true },
+      {
+        name: "Invité",
+        detail:
+          "Aucune pill : la barre du bas dit déjà « Se connecter pour dessiner », et l'apparence est dans Mon compte.",
+        identity: { kind: "guest" },
+        isCompact: true,
+        isInRow: true,
+      },
+      {
+        name: "Invité, sur la page d'une archive",
+        detail: "Sans barre du bas, Se connecter reste dans la pill, avec son libellé.",
+        identity: { kind: "guest" },
+        isCompact: true,
+        hasBottomBar: false,
+      },
+      { name: "Connecté", detail: "Sa photo seule.", identity: SIGNED_IN, isCompact: true },
       { name: "Le streamer sur son canvas", identity: SIGNED_IN, isCompact: true, hasSettings: true },
       {
         name: "Qui modère, des signalements attendent",
@@ -244,57 +338,69 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
         pendingReports: 2,
         hasModeration: true,
       },
+      {
+        name: "Le développeur",
+        identity: SIGNED_IN,
+        isCompact: true,
+        hasSettings: true,
+        isDeveloper: true,
+      },
     ],
   },
 ];
 
-export const AccountPillEntry = () => {
+const AccountSceneView = ({ scene }: { scene: AccountScene }) => {
   const appearanceChoice = useAppearanceChoice();
+  const {
+    identity,
+    isCompact,
+    pendingReports,
+    hasSettings,
+    hasModeration,
+    isDeveloper,
+    isInRow,
+    hasBottomBar,
+  } = scene;
+  if (isInRow) return <PhoneHeader owner={SAMPLE_OWNER} identity={identity} />;
   return (
-    <Entry
-      slug="pill-compte"
-      components={["AccountPill"]}
-      file="ui/account/account-pill.tsx"
-      note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo."
-      where="En haut à droite"
-    >
-      {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
-        <Block key={title} title={title}>
-          {scenes.map(
-            ({
-              name,
-              detail,
-              identity,
-              isCompact,
-              pendingReports,
-              hasSettings,
-              hasModeration,
-              isDeveloper,
-            }) => (
-              <StateRow key={name} name={name} detail={detail}>
-                <AccountPill
-                  identity={identity}
-                  signInHref="#"
-                  appearanceChoice={appearanceChoice}
-                  onPickAppearance={pickAppearance}
-                  onOpenAccount={noop}
-                  onOpenSettings={hasSettings ? noop : undefined}
-                  onOpenModeration={hasModeration ? noop : undefined}
-                  onOpenDeveloper={isDeveloper ? noop : undefined}
-                  pendingReports={pendingReports ?? 0}
-                  isCompact={isCompact ?? false}
-                  isDocked={false}
-                />
-              </StateRow>
-            ),
-          )}
-        </Block>
-      ))}
-    </Entry>
+    <AccountPill
+      identity={identity}
+      signInHref="#"
+      appearanceChoice={appearanceChoice}
+      onPickAppearance={pickAppearance}
+      onOpenAccount={noop}
+      onOpenSettings={hasSettings ? noop : undefined}
+      onOpenModeration={hasModeration ? noop : undefined}
+      onOpenDeveloper={isDeveloper ? noop : undefined}
+      pendingReports={pendingReports ?? 0}
+      isCompact={isCompact ?? false}
+      hasBottomBar={hasBottomBar ?? true}
+      isDocked={false}
+    />
   );
 };
 
-const DRAFT_ACTIONS: DraftPillActions = {
+export const AccountPillEntry = () => (
+  <Entry
+    slug="pill-compte"
+    components={["AccountPill"]}
+    file="ui/account/account-pill.tsx"
+    note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
+    where="En haut à droite"
+  >
+    {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
+      <Block key={title} title={title}>
+        {scenes.map((scene) => (
+          <StateRow key={scene.name} name={scene.name} detail={scene.detail}>
+            <AccountSceneView scene={scene} />
+          </StateRow>
+        ))}
+      </Block>
+    ))}
+  </Entry>
+);
+
+export const DRAFT_ACTIONS: DraftPillActions = {
   onEnter: noop,
   onClaim: noop,
   onExit: noop,
@@ -308,7 +414,7 @@ const DRAFT_ACTIONS: DraftPillActions = {
   onSignIn: noop,
 };
 
-const gaugeAt = (nowMs: number, charges: number, draft = 0): GaugeProps => ({
+export const gaugeAt = (nowMs: number, charges: number, draft = 0): GaugeProps => ({
   charges,
   max: 10,
   draft,
@@ -316,7 +422,10 @@ const gaugeAt = (nowMs: number, charges: number, draft = 0): GaugeProps => ({
   label: `${charges} / 10 charges`,
 });
 
-const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { kind: "draft" }>> = {}) =>
+export const draftState = (
+  nowMs: number,
+  overrides: Partial<Extract<DraftPillState, { kind: "draft" }>> = {},
+) =>
   ({
     kind: "draft",
     gauge: gaugeAt(nowMs, 8, 3),
@@ -324,6 +433,7 @@ const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { 
     colorIndex: 5,
     recentColorIndexes: [1, 28, 19, 9, 42],
     isSending: false,
+    draftSize: 3,
     canSubmit: true,
     canDiscard: true,
     isTouchScreen: false,
@@ -332,9 +442,9 @@ const draftState = (nowMs: number, overrides: Partial<Extract<DraftPillState, { 
     ...overrides,
   }) satisfies DraftPillState;
 
-type DraftScene = { name: string; detail?: string; state: DraftPillState };
+type DraftScene = { name: string; detail?: string; isNarrow?: boolean; state: DraftPillState };
 
-// Les 18 états de la pill Dessin, par bloc : la connexion, l'invité et le banni, la vue, le dessin, puis le mobile.
+// Les 23 états de la pill Dessin, par bloc : la connexion, l'invité et le banni, la vue, le dessin, puis le mobile.
 type DraftBlock = { title: string; isCompact?: boolean; scenes: readonly DraftScene[] };
 
 const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
@@ -365,7 +475,15 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
   {
     title: "Vue",
     scenes: [
-      { name: "Jauge pleine", state: { kind: "view", gauge: gaugeAt(nowMs, 10), canClaim: false } },
+      {
+        name: "Jauge pleine",
+        state: { kind: "view", gauge: gaugeAt(nowMs, 10), canClaim: false },
+      },
+      {
+        name: "Jauge vide",
+        detail: "Dessiner reste là : le mode Dessin reste accessible.",
+        state: { kind: "view", gauge: gaugeAt(nowMs, 0), canClaim: false },
+      },
       {
         name: "Une récompense attend",
         detail: "Le +1 prend la place de Dessiner.",
@@ -374,17 +492,43 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
       {
         name: "Après un refus",
         detail: "La raison, à côté de Dessiner.",
-        state: { kind: "view", gauge: gaugeAt(nowMs, 2), canClaim: false, refusal: "rate_limited" },
+        state: {
+          kind: "view",
+          gauge: gaugeAt(nowMs, 2),
+          canClaim: false,
+          refusal: "rate_limited",
+        },
       },
     ],
   },
   {
     title: "Dessin",
     scenes: [
-      { name: "Un brouillon de 3", detail: "La jauge dit ce qui restera.", state: draftState(nowMs) },
+      {
+        name: "Un brouillon de 3",
+        detail: "La jauge dit ce qui restera, Valider la taille du brouillon.",
+        state: draftState(nowMs),
+      },
       {
         name: "Brouillon vide",
-        state: draftState(nowMs, { gauge: gaugeAt(nowMs, 8), canSubmit: false, canDiscard: false }),
+        detail: "Vider n'est pas là : il paraît au premier pixel.",
+        state: draftState(nowMs, {
+          gauge: gaugeAt(nowMs, 8),
+          draftSize: 0,
+          canSubmit: false,
+          canDiscard: false,
+        }),
+      },
+      {
+        name: "Plus aucune charge",
+        detail: "Valider attend la prochaine, en direct.",
+        state: draftState(nowMs, {
+          gauge: gaugeAt(nowMs, 0),
+          draftSize: 0,
+          waitSeconds: REFILL_MS / 2 / 1000,
+          canSubmit: false,
+          canDiscard: false,
+        }),
       },
       {
         name: "Pendant l'envoi",
@@ -394,7 +538,7 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
       { name: "Pipette armée (I)", state: draftState(nowMs, { isPicking: true }) },
       {
         name: "Écran tactile",
-        detail: "Tracé armé.",
+        detail: "Tracé armé, gardé d'un Dessin au suivant jusqu'au rechargement.",
         state: draftState(nowMs, { isTouchScreen: true, isTouchTracing: true }),
       },
     ],
@@ -414,10 +558,150 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         state: { kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: true },
       },
       { name: "Dessin", detail: "La feuille, palette repliée.", state: draftState(nowMs) },
+      {
+        name: "Dessin, brouillon vide",
+        detail: "Vider n'est pas là : les outils se répartissent sans lui.",
+        state: draftState(nowMs, {
+          gauge: gaugeAt(nowMs, 8),
+          draftSize: 0,
+          canSubmit: false,
+          canDiscard: false,
+        }),
+      },
+      {
+        name: "Dessin, plus aucune charge",
+        detail: "Valider attend la prochaine.",
+        state: draftState(nowMs, {
+          gauge: gaugeAt(nowMs, 0),
+          draftSize: 0,
+          waitSeconds: REFILL_MS / 2 / 1000,
+          canSubmit: false,
+          canDiscard: false,
+        }),
+      },
+      {
+        name: "Dessin, plus aucune charge, 320 px",
+        detail: "Sous 360 px, « Attendre » s'efface : « 5 s » seul.",
+        isNarrow: true,
+        state: draftState(nowMs, {
+          gauge: gaugeAt(nowMs, 0),
+          draftSize: 0,
+          waitSeconds: REFILL_MS / 2 / 1000,
+          canSubmit: false,
+          canDiscard: false,
+        }),
+      },
       { name: "Invité", detail: "L'invitation au centre.", state: { kind: "guest", signInHref: "#" } },
     ],
   },
 ];
+
+// Comme dans le jeu, où le +1 est enveloppé dans la cible d'une bulle : son `<span>` ne doit pas le rétrécir (Écart §9.3, JOURNAL 2026-10-09).
+const WithBubbleTargets = ({ children }: { children: ReactNode }) => {
+  const targets = useBubbleTargets();
+  return <BubbleTargetsContext value={targets}>{children}</BubbleTargetsContext>;
+};
+
+// Un téléphone en paysage, puis les écrans à charnière (Écart §8.1 et §9.3, JOURNAL 2026-10-08).
+const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
+  <>
+    <Block
+      title="En colonne sur le côté"
+      note="Sur un écran bas (un téléphone en paysage) ou un écran tactile large dont les deux côtés font au moins 560 px (un pliable déplié, une tablette) : la barre du bas passe en colonne contre le bord droit. En Vue, le canvas prend la plus grande zone qu'elle lui laisse, à côté d'elle ou au-dessus ; en Dessin, le panneau garde la droite."
+    >
+      <StateRow name="Vue" detail="La jauge et Dessiner, l'un sous l'autre.">
+        <InLandscape>
+          <DraftPill
+            state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+            actions={DRAFT_ACTIONS}
+            isCompact
+            isSidePanel
+            isDocked={false}
+          />
+        </InLandscape>
+      </StateRow>
+      <StateRow
+        name="Vue, une récompense attend"
+        detail="Le +1 prend la place de Dessiner : aussi large que la colonne, comme lui."
+      >
+        <InLandscape>
+          <WithBubbleTargets>
+            <DraftPill
+              state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: true }}
+              actions={DRAFT_ACTIONS}
+              isCompact
+              isSidePanel
+              isDocked={false}
+            />
+          </WithBubbleTargets>
+        </InLandscape>
+      </StateRow>
+      <StateRow name="Invité" detail="L'invitation, dans la colonne.">
+        <InLandscape>
+          <DraftPill
+            state={{ kind: "guest", signInHref: "#" }}
+            actions={DRAFT_ACTIONS}
+            isCompact
+            isSidePanel
+            isDocked={false}
+          />
+        </InLandscape>
+      </StateRow>
+      <StateRow
+        name="Dessin"
+        detail="Un panneau sur toute la hauteur : la palette complète défile sous les outils."
+      >
+        <InLandscape isPanel>
+          <DraftPill
+            state={draftState(nowMs)}
+            actions={DRAFT_ACTIONS}
+            isCompact
+            isSidePanel
+            isDocked={false}
+          />
+        </InLandscape>
+      </StateRow>
+    </Block>
+    <Block
+      title="Écrans à charnière"
+      note="Jamais une pill ni un bouton sur la charnière : le canvas dans le premier écran, les commandes dans le second. Sur deux grands écrans, la colonne est celle du second ; en Flex mode, la barre du bas."
+    >
+      <StateRow name="Côte à côte" detail="Surface Duo déployé : la colonne dans le second écran.">
+        <InHinge
+          canvas={<CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />}
+          controls={
+            <InLandscape>
+              <DraftPill
+                state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+                actions={DRAFT_ACTIONS}
+                isCompact
+                isSidePanel
+                isDocked={false}
+              />
+            </InLandscape>
+          }
+        />
+      </StateRow>
+      <StateRow
+        name="L'un sur l'autre"
+        detail="Galaxy Z Flip en Flex mode : le canvas en haut, la barre du bas en bas."
+      >
+        <InHinge
+          isStacked
+          canvas={<CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />}
+          controls={
+            <DraftPill
+              state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+              actions={DRAFT_ACTIONS}
+              isCompact
+              isDocked={false}
+            />
+          }
+        />
+      </StateRow>
+    </Block>
+  </>
+);
 
 export const DraftPillEntry = () => {
   const nowMs = useNowMs();
@@ -427,15 +711,15 @@ export const DraftPillEntry = () => {
       components={["DraftPill"]}
       file="ui/draft/draft-pill.tsx"
       note="La pill du joueur : regarder, réclamer, dessiner, envoyer. La même que dans le jeu, avec des props d'exemple."
-      where="En bas au centre · sur mobile, la barre du bas"
+      where="En bas au centre · sur mobile, la barre du bas · en paysage ou sur un écran large (pliable déplié, tablette), une colonne en bas à droite"
     >
       {draftBlocks(nowMs).map(({ title, isCompact = false, scenes }) => (
         <Block key={title} title={title}>
-          {scenes.map(({ name, detail, state }) => (
+          {scenes.map(({ name, detail, isNarrow = false, state }) => (
             <StateRow key={name} name={name} detail={detail}>
               {isCompact ? (
                 // Sur mobile, la barre du bas prend toute la largeur : ici, celle d'un téléphone.
-                <InPhone>
+                <InPhone isNarrow={isNarrow}>
                   <DraftPill state={state} actions={DRAFT_ACTIONS} isCompact isDocked={false} />
                 </InPhone>
               ) : (
@@ -445,6 +729,7 @@ export const DraftPillEntry = () => {
           ))}
         </Block>
       ))}
+      <LandscapeBlocks nowMs={nowMs} />
     </Entry>
   );
 };
@@ -454,41 +739,83 @@ const VIEWPORT_STATES: readonly { name: string; framing: Framing }[] = [
   { name: "Zoomé de près", framing: { zoomPercent: 1250, isArrival: false } },
 ];
 
-export const ViewportPillEntry = () => (
-  <Entry
-    slug="pratique"
-    components={["ViewportPill"]}
-    file="ui/canvas/viewport-pill.tsx"
-    where="En bas à droite · sur mobile, Recentrer seul, quand la vue a bougé"
-  >
-    <Block title="États">
-      {VIEWPORT_STATES.map(({ name, framing }) => (
-        <StateRow key={name} name={name}>
-          <ViewportPill
-            framing={framing}
-            onZoomIn={noop}
-            onZoomOut={noop}
-            onRecenter={noop}
-            isCompact={false}
-            isDocked={false}
-          />
-        </StateRow>
-      ))}
-    </Block>
-    <Block title="Sur mobile">
-      <StateRow name="La vue a bougé">
-        <ViewportPill
-          framing={{ zoomPercent: 180, isArrival: false }}
-          onZoomIn={noop}
-          onZoomOut={noop}
-          onRecenter={noop}
-          isCompact
-          isDocked={false}
-        />
-      </StateRow>
-    </Block>
-  </Entry>
+const RecenterPill = () => (
+  <ViewportPill
+    framing={{ zoomPercent: 180, isArrival: false }}
+    onZoomIn={noop}
+    onZoomOut={noop}
+    onRecenter={noop}
+    isCompact
+    isDocked={false}
+  />
 );
+
+// Recentrer et la colonne : le canvas arrive dans la plus grande zone qu'elle lui laisse (Écart §9.3, JOURNAL 2026-10-09).
+const WithColumn = ({ nowMs, isAbove }: { nowMs: number; isAbove: boolean }) => (
+  <div
+    className={
+      isAbove ? "design-bubble-stack design-bubble-stack--end" : "design-bubble-row design-bubble-row--bottom"
+    }
+  >
+    <RecenterPill />
+    <InLandscape>
+      <DraftPill
+        state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+        actions={DRAFT_ACTIONS}
+        isCompact
+        isSidePanel
+        isDocked={false}
+      />
+    </InLandscape>
+  </div>
+);
+
+export const ViewportPillEntry = () => {
+  const nowMs = useNowMs();
+  return (
+    <Entry
+      slug="pratique"
+      components={["ViewportPill"]}
+      file="ui/canvas/viewport-pill.tsx"
+      note="En Vue, toucher une case de moins de 20 px au doigt ou de 10 px à la souris zoome en douceur sous le doigt, jusqu'à 28 px ou 16 px (un peu moins sur un écran bas), au lieu d'ouvrir l'inspection. Entrer en Dessin ou en sortir ne bouge pas la vue."
+      where="En bas à droite · sur mobile, Recentrer seul, quand la vue a bougé · en paysage, contre la colonne du bas · sur un écran tactile large en portrait, au-dessus de la colonne"
+    >
+      <Block title="États">
+        {VIEWPORT_STATES.map(({ name, framing }) => (
+          <StateRow key={name} name={name}>
+            <ViewportPill
+              framing={framing}
+              onZoomIn={noop}
+              onZoomOut={noop}
+              onRecenter={noop}
+              isCompact={false}
+              isDocked={false}
+            />
+          </StateRow>
+        ))}
+      </Block>
+      <Block title="Sur mobile">
+        <StateRow name="La vue a bougé">
+          <RecenterPill />
+        </StateRow>
+      </Block>
+      <Block
+        title="Avec la colonne du bas"
+        note="Sur un écran tactile large, le canvas arrive dans la plus grande des deux zones que la colonne lui laisse, mesurées à sa forme : à côté d'elle, ou au-dessus d'elle. Recentrer se pose au coin de cette zone."
+      >
+        <StateRow name="À côté de la colonne" detail="Un téléphone en paysage, une tablette en paysage.">
+          <WithColumn nowMs={nowMs} isAbove={false} />
+        </StateRow>
+        <StateRow
+          name="Au-dessus de la colonne"
+          detail="Un pliable déplié ou une tablette en portrait : le canvas garde toute la largeur."
+        >
+          <WithColumn nowMs={nowMs} isAbove />
+        </StateRow>
+      </Block>
+    </Entry>
+  );
+};
 
 export const NoticeEntry = () => (
   <Entry

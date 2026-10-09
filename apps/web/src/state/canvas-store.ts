@@ -50,6 +50,9 @@ export type CanvasStoreOptions = {
   mode: CanvasMode;
   now: () => Timestamp; // l'âge d'un lot au moment de le renvoyer
   reload: () => void; // §4.5 : une reprise refusée pour la version du protocole
+  // Écart §4.2 (JOURNAL 2026-10-09) : le web dit si rien ne ramènera un canvas que le gateway ne trouve pas. Absent, le
+  // store croit le gateway ; sinon la page attend cette réponse avant de dire « introuvable » (vue OBS exceptée).
+  isMissingConfirmed?: (canvasId: string) => Promise<boolean>;
 };
 
 // Ce qui arrive du serveur, dans l'ordre : la vue OBS en tient son propre affichage (§9.5).
@@ -242,6 +245,7 @@ export function createCanvasStore(
   // n'est pas une coupure : rien ne reprendra, et rien ne l'annonce.
   let isClosedByPage = false;
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
+  let missingAsk = 0; // la dernière demande au web : une réponse plus ancienne, ou d'avant un `welcome`, ne compte plus
 
   const emit = (arrival: Arrival): void => {
     for (const listener of arrivalListeners) listener(arrival);
@@ -371,6 +375,7 @@ export function createCanvasStore(
 
   const welcome = (frame: WelcomeFrame): void => {
     heldRecent = frame.recent ?? null;
+    missingAsk += 1;
     // Le canvas existe : un `welcome` démentit `canvas_not_found` et `canvas_recovering`, les autres refus restent.
     const isDisproved = view.lastError === "canvas_not_found" || view.lastError === "canvas_recovering";
     publish({ ...welcomeView(frame), ...(isDisproved ? { lastError: null } : {}) });
@@ -386,6 +391,21 @@ export function createCanvasStore(
     hasWelcomed = true;
   };
 
+  // Écart §4.2 (JOURNAL 2026-10-09) : le gateway ne trouve pas un canvas que Convex connaît, souvent parce que Redis vient de
+  // le perdre et que personne ne l'a encore marqué. La page ne dit rien tant que le web n'a pas répondu, puis « introuvable »
+  // seulement si rien ne le ramènera ; une panne du web, ou un canvas qui vit, est une attente.
+  const askIfMissing = (ask: (canvasId: string) => Promise<boolean>): void => {
+    if (view.lastError === "canvas_not_found") return; // déjà confirmé : Convex n'est pas relu à chaque reprise
+    missingAsk += 1;
+    const asked = missingAsk;
+    void ask(canvasId)
+      .catch(() => false)
+      .then((isMissing) => {
+        if (asked !== missingAsk || isClosedByPage) return;
+        publish({ lastError: isMissing ? "canvas_not_found" : "canvas_recovering" });
+      });
+  };
+
   // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
   const refuse = (code: ErrorCode): void => {
     // §4.5 : le code a changé pendant la coupure, la page va le chercher.
@@ -395,6 +415,10 @@ export function createCanvasStore(
     }
     settleAllPending({ ok: false, error: code });
     failAllRequests(code);
+    if (code === "canvas_not_found" && options.mode === "ui" && options.isMissingConfirmed) {
+      askIfMissing(options.isMissingConfirmed);
+      return;
+    }
     publish({ lastError: code });
     // Au tout premier `hello`, la page est déjà la dernière : reprendre ne ferait que reboucler.
     if (code !== "protocol_version") return;

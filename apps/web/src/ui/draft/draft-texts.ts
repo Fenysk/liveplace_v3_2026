@@ -26,6 +26,9 @@ export const DRAFT_TEXTS = defineTexts({
   },
   confirm: { fr: "Valider", en: "Confirm" },
   confirmTip: { fr: "Poser le brouillon", en: "Place the draft" },
+  // Plus aucune charge et rien à poser : le bouton compte jusqu'à la prochaine (Écart §9.3, JOURNAL 2026-10-08).
+  waitLead: { fr: "Attendre ", en: "Wait " },
+  waitTip: { fr: "Attendre la prochaine charge", en: "Wait for the next charge" },
   clearDraftTip: { fr: "Vider le brouillon", en: "Clear the draft" },
   traceTip: {
     fr: "Tracé : un doigt dessine, deux doigts déplacent",

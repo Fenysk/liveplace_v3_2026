@@ -7,13 +7,28 @@ import { CopyButton } from "../design/copy-button";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { SwatchChoice, type SwatchOption } from "../design/palette";
 import { Slider, type SliderStep } from "../design/slider";
+import { BubbleTarget } from "../help/bubble-target";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { obsDelayLabel } from "./obs-delay-label";
 import { OBS_TEXTS } from "./obs-texts";
 
-type ObsSettingsProps = {
+type ObsAddressProps = {
   address: string; // sans le protocole : ce que le streamer lit
   url: string; // ce qu'il colle dans OBS
+  onCopy?: (() => void) | undefined; // l'adresse est copiée (Écart §8.1, JOURNAL 2026-10-09)
+};
+
+// L'adresse à coller dans OBS : le champ qui la copie est la cible de la dernière bulle de la chaîne OBS.
+export const ObsAddress = ({ address, url, onCopy }: ObsAddressProps) => (
+  <>
+    <span className="lp-type-body">{useTexts(OBS_TEXTS).address}</span>
+    <BubbleTarget name="obs-address">
+      <CopyButton value={address} copyText={url} onCopy={onCopy} />
+    </BubbleTarget>
+  </>
+);
+
+type ObsSettingsProps = ObsAddressProps & {
   obsDelayMs: number;
   onPickDelay: (obsDelayMs: number) => void;
   obsBackground: ObsBackground;
@@ -24,6 +39,7 @@ type ObsSettingsProps = {
 export const ObsSettings = ({
   address,
   url,
+  onCopy,
   obsDelayMs,
   onPickDelay,
   obsBackground,
@@ -47,8 +63,7 @@ export const ObsSettings = ({
   return (
     <>
       <div className="lp-setting">
-        <span className="lp-type-body">{t.address}</span>
-        <CopyButton value={address} copyText={url} />
+        <ObsAddress address={address} url={url} onCopy={onCopy} />
         <p className="lp-type-caption lp-muted">{t.howTo}</p>
       </div>
       <div className="lp-setting">

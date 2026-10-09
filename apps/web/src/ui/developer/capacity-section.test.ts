@@ -83,6 +83,32 @@ describe("the capacity section (écart §4.3, JOURNAL 2026-10-07)", () => {
     expect(markup).toContain("projection fin");
   });
 
+  // Montre la ligne Protections au pied du groupe Gateway, ses deux nombres sur 1 h et 24 h, sans barre ni taux (JOURNAL 2026-10-09)
+  it("shows the Protections row at the foot of the Gateway group, its two numbers over 1 h and 24 h, with no bar and no ratio", () => {
+    const guards = {
+      hour: { refusedPlacements: 20, closedConnections: 1 },
+      day: { refusedPlacements: 140, closedConnections: 3 },
+    };
+
+    const markup = render({ capacity: { ...frame, guards }, period: "day", history: loading });
+
+    const order = [
+      ">Gateway<",
+      ">Protections<",
+      "poses refusées · connexions fermées",
+      ">1 h<",
+      "20 · 1",
+      ">24 h<",
+      "140 · 3",
+      ">Web<",
+    ];
+    const positions = order.map((text) => markup.indexOf(text));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((left, right) => left - right)).toEqual(positions);
+    expect(markup.match(/<meter /g)).toHaveLength(2);
+    expect(render({ capacity: frame, period: "day", history: loading })).not.toContain("Protections");
+  });
+
   // Dit « sans nouvelles » et « non mesuré » à la place de la valeur, sans barre
   it("says without news and not measured in place of the value, with no bar", () => {
     const markup = render({ capacity: frame, period: "day", history: loading });

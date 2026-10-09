@@ -149,7 +149,7 @@ const MEASURE_SETS: readonly { title: string; kind: SpecimenKind; usages: Usages
 
 const MOTION_USAGES: Usages = {
   lpEase: "La seule courbe : douce, sans rebond.",
-  lpDur: "Morphing, feuilles, fenêtre, niveau de la jauge.",
+  lpDur: "Morphing, feuilles, fenêtre, niveau de la jauge, zooms de la vue.",
   lpDurFade: "Apparitions, fondu des pills.",
   lpDurFast: "Survols, fondu du contenu.",
 };

@@ -121,6 +121,11 @@ button.lp-profile-main:hover .lp-profile-name {
   animation: lp-dot-in var(--lp-dur) var(--lp-ease);
 }
 
+/* En live (pill Canvas repliée) : le violet de Twitch, comme le rond du logo du bouton live (twitch.css) */
+.lp-avatar-dot--live {
+  background: var(--twitch);
+}
+
 @keyframes lp-dot-in {
   from {
     transform: scale(0);

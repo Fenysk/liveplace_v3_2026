@@ -296,6 +296,29 @@ export function toStockResource(
   };
 }
 
+// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections du gateway, compté par minute. Sans plafond ni
+// taux : ce n'est pas une ressource, la saturation l'ignore.
+export type GuardCount = { refusedPlacements: number; closedConnections: number };
+export type GuardMinute = { at: Timestamp } & GuardCount;
+export type GuardTotals = { hour: GuardCount; day: GuardCount };
+
+export const GUARD_DAY_MS = 24 * HOUR_MS;
+
+const sumGuards = (minutes: readonly GuardMinute[], nowMs: Timestamp, windowMs: number): GuardCount => {
+  const total: GuardCount = { refusedPlacements: 0, closedConnections: 0 };
+  for (const { at, refusedPlacements, closedConnections } of minutes) {
+    if (at <= nowMs - windowMs) continue;
+    total.refusedPlacements += refusedPlacements;
+    total.closedConnections += closedConnections;
+  }
+  return total;
+};
+
+// Les minutes dont le début tombe dans la fenêtre qui finit à `nowMs` : la dernière heure et les 24 dernières, minute en cours comprise.
+export function toGuardTotals(minutes: readonly GuardMinute[], nowMs: Timestamp): GuardTotals {
+  return { hour: sumGuards(minutes, nowMs, HOUR_MS), day: sumGuards(minutes, nowMs, GUARD_DAY_MS) };
+}
+
 // Un plafond atteint pèse 100 % pendant l'heure qui suit (§2) : la saturation vaut au moins 100 %.
 export type Saturation = {
   percent: number;

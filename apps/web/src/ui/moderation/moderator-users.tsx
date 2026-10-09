@@ -6,6 +6,7 @@ import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { WindowRow } from "../design/window";
 import { useTexts } from "../locale/use-locale";
+import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
 
@@ -25,7 +26,7 @@ const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) 
   const t = useTexts(MODERATION_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{t.connectionLost}</span>;
+  if (list.status === "failed") return null; // `ConnectionLost`, juste après
   if (list.users.length === 0) return <span className="lp-type-caption lp-muted">{t.noModerators}</span>;
   return list.users.map((user) => (
     <WindowRow
@@ -50,6 +51,7 @@ export const ModeratorUsers = (props: ModeratorUsersProps) => {
     <>
       <span className="lp-type-body">{t.moderators}</span>
       <ModeratorRows {...props} />
+      <ConnectionLost isFailed={props.list.status === "failed"} />
     </>
   );
 };

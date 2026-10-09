@@ -11,6 +11,7 @@ import { PixelPreview } from "../design/pixel-preview";
 import { formatPlacedAgo } from "../inspection/placed-ago";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "./can-ban";
+import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
@@ -82,7 +83,7 @@ const ReportRows = ({ list, ...rowProps }: ReportedPlacementsProps) => {
   const t = useTexts(MODERATION_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{t.connectionLost}</span>;
+  if (list.status === "failed") return null; // `ConnectionLost`, juste après
   if (list.reports.length === 0) return <span className="lp-type-caption lp-muted">{t.noReports}</span>;
   return list.reports.map((report) => (
     <ReportRow key={pendingReportKey(report)} report={report} {...rowProps} />
@@ -95,6 +96,7 @@ export const ReportedPlacements = (props: ReportedPlacementsProps) => {
     <>
       <span className="lp-type-body">{t.reports}</span>
       <ReportRows {...props} />
+      <ConnectionLost isFailed={props.list.status === "failed"} />
     </>
   );
 };

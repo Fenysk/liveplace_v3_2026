@@ -5,10 +5,26 @@ import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
-import { measureArrivalInsets } from "./arrival-insets";
+import { easingCurve, motionEasing, motionMs } from "../design/motion";
+import { COARSE_POINTER_QUERY, SIDE_COLUMN_QUERY } from "../design/use-media-query";
+import {
+  measureArrivalInsets,
+  measureDraftInsets,
+  observeZone,
+  ZONE_ABOVE_ATTRIBUTE,
+} from "./arrival-insets";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
-import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
+import { freeArea, type PointerGrain, tapZoomTarget, zoomFrame } from "./draft-zoom";
+import {
+  createGestureTracker,
+  type Gesture,
+  isWheelNotch,
+  movesViewport,
+  type PointerInput,
+  wheelFactor,
+} from "./gestures";
+import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
 import { renderScene } from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
@@ -28,6 +44,7 @@ import {
   zoomAt,
   zoomLimits,
   zoomPercent,
+  zoomTowards,
 } from "./viewport";
 
 export type CanvasScene = {
@@ -44,11 +61,15 @@ export type CanvasScene = {
 // `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
 // et fait dériver son motif (`checkerTiles`).
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
+// `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
+// `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
 type SceneOptions = {
   initialViewport: Viewport | null;
   isFramedInFreeArea: boolean;
+  onNavigate?: ((kind: NavigationKind) => void) | undefined;
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
+  onGesture(): void;
   checker: HTMLElement;
   checkerTiles: HTMLElement;
 };
@@ -93,6 +114,7 @@ export function createCanvasScene(
   if (!context) throw new Error("canvas-scene : contexte 2d indisponible");
   const image = createCanvasImage();
   const tracker = createGestureTracker({ isTouchTracing: () => draftStore.getView().isTouchTracing });
+  const navigation = createNavigationWatch((kind) => options.onNavigate?.(kind));
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
   const root = document.documentElement;
@@ -102,7 +124,12 @@ export function createCanvasScene(
   // jamais recadré quand elles changent.
   let insets: Insets = NO_INSETS;
   let isAtArrival = false;
-  const measureInsets = (): Insets => (options.isFramedInFreeArea ? measureArrivalInsets(root) : NO_INSETS);
+  const measureInsets = (): Insets => {
+    if (!options.isFramedInFreeArea) return NO_INSETS;
+    const { insets: measured, zone } = measureArrivalInsets(root, screen, canvasSize());
+    root.toggleAttribute(ZONE_ABOVE_ATTRIBUTE, zone === "above");
+    return measured;
+  };
   let targetCell: Cell | null = null;
   let lastTracedCell: Cell | null = null;
   let isImageStale = true;
@@ -194,14 +221,68 @@ export function createCanvasScene(
   const pressedPointers = new Set<number>();
   const liftPointer = (pointerId: number) => {
     pressedPointers.delete(pointerId);
-    if (pressedPointers.size === 0) setPanning(false);
+    if (pressedPointers.size > 0) return;
+    setPanning(false);
+    navigation.end();
   };
 
-  const moveViewport = (next: Viewport) => {
+  const commitViewport = (next: Viewport) => {
     viewport = next;
     isAtArrival = false;
     options.onViewportMove(next);
     requestRender();
+  };
+
+  // Les zooms animés (un toucher sur une case trop petite, + et −, Recentrer, un cran de molette) avancent
+  // image par image sur l'état de la vue, jamais par un transform CSS qui décalerait la visée des cases. Tout geste de
+  // l'utilisateur sur la vue l'interrompt là où il est : seul `moveViewport` y mène. `zoomGoal` : la vue où il va, pour qu'un
+  // zoom de plus parte de son but et que les clics rapprochés s'additionnent.
+  let zoomRequest = 0;
+  let zoomGoal: Viewport | null = null;
+  const stopZoom = () => {
+    cancelAnimationFrame(zoomRequest);
+    zoomRequest = 0;
+    zoomGoal = null;
+  };
+
+  const moveViewport = (next: Viewport) => {
+    stopZoom();
+    commitViewport(next);
+  };
+
+  // Le pointeur principal décide de la taille de case qui reste facile à viser.
+  const pointerGrain = (): PointerGrain =>
+    window.matchMedia(COARSE_POINTER_QUERY).matches ? "coarse" : "fine";
+
+  const animateZoom = (from: Viewport, to: Viewport, startedAt: number, onDone?: () => void) => {
+    const duration = motionMs(root, "--lp-dur");
+    const finish = () => {
+      zoomGoal = null;
+      onDone?.();
+    };
+    // Mouvement réduit : la durée vaut 0, la vue saute à son but.
+    if (duration === 0) {
+      commitViewport(to);
+      return finish();
+    }
+    zoomGoal = to;
+    const ease = easingCurve(motionEasing(root));
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      zoomRequest = progress < 1 ? requestAnimationFrame(step) : 0;
+      commitViewport(zoomFrame(from, to, ease(progress)));
+      if (progress >= 1) finish();
+    };
+    zoomRequest = requestAnimationFrame(step);
+  };
+
+  // Une image d'attente, puis le zoom part de la vue d'alors : l'événement qui le décide n'a pas encore été peint.
+  const startZoom = (to: Viewport, onDone?: () => void) => {
+    stopZoom();
+    zoomRequest = requestAnimationFrame((startedAt) => {
+      zoomRequest = 0;
+      if (viewport) animateZoom(viewport, to, startedAt, onDone);
+    });
   };
 
   // Le cadrage d'arrivée, avec les marges d'aujourd'hui : l'arrivée elle-même, Recentrer, une nouvelle taille de canvas.
@@ -213,6 +294,8 @@ export function createCanvasScene(
   // Les pills se mesurent après le premier cadrage (le thème arrive, l'encoche change) : si la vue n'a pas bougé depuis
   // l'arrivée, elle suit la nouvelle zone libre ; sinon, seul le pourcentage du zoom se relit.
   const refreshInsets = () => {
+    // Écart §9.3 (JOURNAL 2026-10-09) : pas en Dessin, où la bande Thème, plus étroite, passe sur deux lignes et recadrerait la vue.
+    if (screen.width === 0 || draftStore.getView().mode === "draft") return;
     const next = measureInsets();
     if (isSameInsets(next, insets)) return;
     insets = next;
@@ -235,8 +318,18 @@ export function createCanvasScene(
 
   const cellAt = (current: Viewport, point: ScreenPoint) => viewportToCell(current, point, canvasSize());
 
-  // La barre du bas se mesure (pill.tsx) : la case visée au clavier reste au-dessus.
+  // La barre du bas se mesure (pill.tsx) : la case visée au clavier reste au-dessus. En colonne sur le côté, la zone libre la borne.
   const keyInsets = (): Insets => {
+    if (window.matchMedia(SIDE_COLUMN_QUERY).matches) {
+      // En Dessin le panneau tient la droite : la zone d'arrivée, peut-être au-dessus de la colonne, n'est plus la zone libre.
+      const free = draftStore.getView().mode === "draft" ? measureDraftInsets(root, screen) : insets;
+      return {
+        top: KEY_MARGIN,
+        right: KEY_MARGIN + free.right,
+        bottom: KEY_MARGIN + free.bottom,
+        left: KEY_MARGIN + free.left,
+      };
+    }
     const bottomBar = Number.parseFloat(getComputedStyle(root).getPropertyValue(BOTTOM_BAR_HEIGHT)) || 0;
     return { top: KEY_MARGIN, right: KEY_MARGIN, bottom: KEY_MARGIN + bottomBar, left: KEY_MARGIN };
   };
@@ -251,14 +344,22 @@ export function createCanvasScene(
   };
 
   // Un clic immobile ou un tap (A5 du plan du J10) : en Dessin, la case entre dans le brouillon ou en sort ;
-  // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026).
+  // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026). Écart §9.3 (JOURNAL 2026-10-09) : une case
+  // trop petite pour viser ne s'inspecte pas, la vue zoome sous le doigt ; un zoom, pour le conseil et la pill Canvas.
   const tap = (current: Viewport, point: ScreenPoint) => {
     const cell = cellAt(current, point);
     setTargetCell(cell);
     if (draftStore.getView().mode === "draft") {
       if (cell) draftStore.toggleCell(cell.x, cell.y);
-    } else if (cell) store.inspect(cell.x, cell.y);
-    else store.closeInspection();
+    } else if (cell) {
+      const limits = zoomLimits(screen, canvasSize(), insets);
+      const target = tapZoomTarget(current, point, pointerGrain(), freeArea(screen, insets), limits);
+      options.onGesture();
+      if (target) {
+        options.onNavigate?.("zoom");
+        startZoom(target);
+      } else store.inspect(cell.x, cell.y);
+    } else store.closeInspection();
   };
 
   const applyTrace = (current: Viewport, gesture: Gesture) => {
@@ -271,18 +372,27 @@ export function createCanvasScene(
     else if (draftStore.getView().isTracing) traceTo(cell);
   };
 
-  const apply = (gesture: Gesture) => {
+  // Un zoom d'un seul coup (un bouton, un cran de molette) s'anime au lieu de sauter, vers un but qui s'ajoute à celui d'avant.
+  const zoomView = (current: Viewport, point: ScreenPoint, factor: number, isSmooth: boolean) => {
+    const limits = zoomLimits(screen, canvasSize(), insets);
+    if (!isSmooth) return moveViewport(zoomAt(current, point, factor, limits));
+    const goalScale = (zoomGoal ?? current).scale;
+    const goal = zoomTowards(current, goalScale, point, factor, limits);
+    if (goal.scale !== goalScale) startZoom(goal);
+  };
+
+  const apply = (gesture: Gesture, isSmooth = false) => {
     // Avant le `welcome`, le canvas n'a pas de taille : rien à déplacer.
     if (!viewport || store.getView().width === 0) return;
+    if (movesViewport(gesture)) options.onGesture();
+    navigation.watch(gesture);
     switch (gesture.kind) {
       case "pan":
         setPanning(true);
         moveViewport(panBy(viewport, gesture.dx, gesture.dy));
         break;
       case "zoom":
-        moveViewport(
-          zoomAt(viewport, gesture.point, gesture.factor, zoomLimits(screen, canvasSize(), insets)),
-        );
+        zoomView(viewport, gesture.point, gesture.factor, isSmooth);
         break;
       case "pinch": {
         setPanning(true);
@@ -326,19 +436,30 @@ export function createCanvasScene(
   // Les pills publient leur taille sur <html> (pill.tsx) : un thème qui paraît ou change de hauteur change la zone libre.
   const insetsObserver = new MutationObserver(refreshInsets);
   insetsObserver.observe(root, { attributes: true, attributeFilter: ["style"] });
+  // Une charnière ou une posture change la zone sans changer l'écran : la boîte de la zone le dit. Un autre écran ne recadre
+  // jamais la vue (l'observateur ci-dessus relit les marges seul).
+  const refreshZone = () => {
+    if (surface.clientWidth === screen.width && surface.clientHeight === screen.height) refreshInsets();
+  };
+  const unobserveZone = options.isFramedInFreeArea ? observeZone(root, refreshZone) : () => undefined;
 
-  // §5.3 : une nouvelle taille ramène la vue à l'arrivée.
+  // §5.3 : une nouvelle taille ramène la vue à l'arrivée. Écart §9.3 (JOURNAL 2026-10-09) : sa forme dit aussi la zone d'arrivée.
   let knownSize: Size | null = null;
   const unsubscribe = store.subscribe(() => {
     const { width, height } = store.getView();
+    const isFirstSize = knownSize === null && width > 0;
     const isResized = knownSize !== null && (width !== knownSize.width || height !== knownSize.height);
     if (width > 0) knownSize = { width, height };
-    if (isResized && viewport && width > 0) frameArrival({ width, height });
+    if (isResized && viewport && width > 0) {
+      insets = measureInsets();
+      frameArrival({ width, height });
+    } else if (isFirstSize) refreshInsets();
     isImageStale = true;
     requestRender();
   });
 
   let wasTracing = false;
+  // Écart §9.3 (JOURNAL 2026-10-09) : entrer en Dessin, comme en sortir, ne touche pas à la vue.
   const unsubscribeDraft = draftStore.subscribe(() => {
     const { isTracing, mode } = draftStore.getView();
     if (isTracing !== wasTracing) {
@@ -358,6 +479,7 @@ export function createCanvasScene(
     (event) => {
       // Le glissement continue même quand la souris sort de la fenêtre.
       surface.setPointerCapture(event.pointerId);
+      stopZoom();
       pressedPointers.add(event.pointerId);
       apply(tracker.press(toPointerInput(event)));
     },
@@ -401,20 +523,25 @@ export function createCanvasScene(
     (event) => {
       event.preventDefault();
       const factor = wheelFactor(event.deltaY, event.deltaMode, event.ctrlKey);
-      apply({ kind: "zoom", point: { x: event.clientX, y: event.clientY }, factor });
+      const isNotch = isWheelNotch(event.deltaY, event.deltaMode, event.ctrlKey);
+      apply({ kind: "zoom", point: { x: event.clientX, y: event.clientY }, factor }, isNotch);
     },
     { passive: false, signal },
   );
 
   return {
     zoomBy(factor) {
-      apply({ kind: "zoom", point: { x: screen.width / 2, y: screen.height / 2 }, factor });
+      apply({ kind: "zoom", point: { x: screen.width / 2, y: screen.height / 2 }, factor }, true);
     },
-    // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui.
+    // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui, en douceur ; la vue n'est à l'arrivée qu'une fois arrivée.
+    // Écart §8.1 (JOURNAL 2026-10-09) : comme un déplacement, il replie la pill Canvas.
     recenter() {
       if (!viewport || store.getView().width === 0) return;
+      options.onGesture();
       insets = measureInsets();
-      frameArrival(canvasSize());
+      startZoom(fitViewport(screen, canvasSize(), insets), () => {
+        isAtArrival = true;
+      });
     },
     // Au clavier (CDC 2026, raccourcis) : pendant un tracé, chaque case visée entre au brouillon, sans trou.
     moveTarget(dx, dy) {
@@ -436,11 +563,14 @@ export function createCanvasScene(
     },
     dispose() {
       cancelAnimationFrame(frameRequest);
+      stopZoom();
       resizeObserver.disconnect();
       checkerDrift?.cancel();
       appearanceObserver.disconnect();
       insetsObserver.disconnect();
+      unobserveZone();
       setPanning(false);
+      root.removeAttribute(ZONE_ABOVE_ATTRIBUTE);
       unsubscribe();
       unsubscribeDraft();
       listening.abort();

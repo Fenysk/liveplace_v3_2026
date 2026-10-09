@@ -1,0 +1,293 @@
+/* Les écrans tactiles larges, et les téléphones en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08). Chargé après pill.css :
+   chaque règle y garde la même forme que la sienne, préfixée de `html` pour passer devant. */
+
+/* Une encoche ou une Dynamic Island sur le côté (iPhone Duo, iPhone en paysage) : les pills du haut et des côtés s'en écartent.
+   À 0, sans encoche latérale : rien ne bouge. */
+@media (min-width: 641px) and (pointer: coarse) {
+  html .lp-floating[data-dock="tl"] {
+    left: max(var(--space-4), env(safe-area-inset-left));
+  }
+
+  html .lp-floating:is([data-dock="tr"], [data-dock="br"], [data-dock="cr"]) {
+    right: max(var(--space-4), env(safe-area-inset-right));
+  }
+
+  html .lp-floating[data-dock="tc"] {
+    left: max(var(--space-4), env(safe-area-inset-left));
+    right: max(var(--space-4), env(safe-area-inset-right));
+  }
+
+  html .lp-floating[data-dock="toast"] {
+    left: max(var(--space-4), env(safe-area-inset-left));
+  }
+
+  html .lp-window {
+    width: min(
+      760px,
+      calc(100% - 2 * max(var(--space-4), env(safe-area-inset-left), env(safe-area-inset-right)))
+    );
+  }
+}
+
+/* Un téléphone en paysage : écran bas, étroit ou tactile. La rangée du haut garde ses trois pills (Canvas, Thème, Compte) comme
+   au PC, l'inspection monte à gauche. Les mêmes requêtes que les deux premières de `SIDE_COLUMN_QUERY` (use-media-query.ts). */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 640px),
+  (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  html .lp-floating[data-dock="tl"] {
+    --lp-canvas-room: calc(
+      100vw -
+      var(--lp-land-left) -
+      var(--lp-land-right) -
+      var(--lp-top-right, calc(var(--control-size) + 2 * var(--space-2))) -
+      var(--space-2)
+    );
+    top: var(--lp-land-top);
+    left: var(--lp-land-left);
+  }
+
+  html .lp-floating[data-dock="tr"] {
+    top: var(--lp-land-top);
+    right: var(--lp-land-right);
+  }
+
+  /* La pill Thème reprend sa place du PC, entre les deux : dans la rangée, pas dans une bande dessous */
+  html .lp-floating[data-dock="tc"] {
+    --lp-theme-side: calc(
+      max(var(--lp-land-left), var(--lp-land-right)) +
+      var(--space-2) +
+      max(var(--lp-top-left, 260px), var(--lp-top-right, 260px))
+    );
+    --lp-theme-room: calc(100vw - 2 * var(--lp-theme-side));
+    top: var(--lp-land-top);
+    left: 0;
+    right: 0;
+  }
+
+  html .lp-floating[data-dock="tc"] > .lp-pill {
+    width: max-content;
+  }
+
+  html .lp-floating[data-dock="tc"] .lp-pill-content {
+    width: max-content;
+    max-width: var(--lp-theme-room, none);
+  }
+
+  /* En Dessin, les pills Canvas et Compte s'effacent (pill.css) et le panneau prend la droite : le thème se centre dans
+     ce qui reste du côté du canvas */
+  html[data-drafting] .lp-floating[data-dock="tc"] {
+    --lp-theme-room: calc(100vw - var(--lp-zone-left) - var(--lp-zone-right) - 2 * var(--space-2));
+    transform: translateX(calc((var(--lp-zone-left) - var(--lp-zone-right)) / 2));
+  }
+
+  /* Sur son canvas, le streamer n'a pas de pill Canvas : le thème prend sa place, à gauche, jusqu'à la pill Compte */
+  html:not(:has(.lp-floating[data-dock="tl"])) .lp-floating[data-dock="tc"] {
+    --lp-theme-room: calc(
+      100vw -
+      var(--lp-land-left) -
+      var(--lp-land-right) -
+      var(--lp-top-right, 260px) -
+      2 *
+      var(--space-2)
+    );
+    justify-content: flex-start;
+    left: var(--lp-land-left);
+  }
+
+  html[data-drafting]:not(:has(.lp-floating[data-dock="tl"])) .lp-floating[data-dock="tc"] {
+    --lp-theme-room: calc(100vw - var(--lp-zone-left) - var(--lp-zone-right) - 2 * var(--space-2));
+    transform: none;
+  }
+
+  /* L'invité n'a pas de pill Compte sur mobile (account-pill.tsx) : à droite il n'y a rien à éviter, comme à gauche sans pill Canvas */
+  html:not(:has(.lp-floating[data-dock="tr"] > .lp-pill:not(.is-hidden))) .lp-floating[data-dock="tc"] {
+    --lp-theme-side: calc(
+      max(var(--lp-land-left), var(--lp-land-right)) +
+      var(--space-2) +
+      var(--lp-top-left, 260px)
+    );
+  }
+
+  /* L'inspection, à gauche : toute la hauteur sous la rangée du haut, elle défile au-delà */
+  html .lp-floating[data-dock="cr"] {
+    top: auto;
+    left: var(--lp-land-left);
+    right: auto;
+    bottom: var(--lp-land-bottom);
+    transform: none;
+  }
+
+  html .lp-floating[data-dock="cr"] .lp-pill,
+  html .lp-floating[data-dock="cr"] .lp-pill-content {
+    width: max-content;
+    max-width: min(
+      var(--lp-side-width),
+      calc(100vw - var(--lp-land-left) - var(--lp-zone-right) - var(--space-2))
+    );
+  }
+
+  html .lp-floating[data-dock="cr"] .lp-pill-content {
+    max-height: calc(
+      100dvh -
+      var(--lp-land-top) -
+      var(--lp-land-row) -
+      var(--space-2) -
+      var(--lp-land-bottom)
+    );
+    overflow-y: auto;
+  }
+
+  /* Le toast, en haut, au centre de ce que la colonne laisse au canvas, sous la rangée */
+  html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="toast"] {
+    top: calc(var(--lp-land-top) + var(--lp-land-row) + var(--space-2));
+    bottom: auto;
+    left: calc((var(--lp-zone-left) + 100% - var(--lp-zone-right)) / 2);
+    transform: translateX(-50%);
+    max-width: calc(100% - var(--lp-zone-left) - var(--lp-zone-right) - 2 * var(--space-2));
+  }
+
+  html .lp-window {
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+}
+
+/* La barre du bas en colonne contre le bord droit : un téléphone en paysage, et un écran tactile large (pliable déplié,
+   tablette), ses deux côtés d'au moins 560 px (JOURNAL 2026-10-08). Un téléphone ne les atteint jamais (440 px au plus), le plus
+   étroit des pliables dépliés mesuré fait 626 px. En Vue, la jauge et Dessiner l'un sous l'autre ; en Dessin, un panneau sur
+   toute la hauteur, la palette dedans. Le canvas prend ce qui reste, sous la rangée du haut et à gauche. Recentrer se pose
+   contre la colonne. Les marges suivent l'encoche latérale. Les trois requêtes de `SIDE_COLUMN_QUERY` (use-media-query.ts). */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 640px),
+  (orientation: landscape) and (max-height: 500px) and (pointer: coarse),
+  (pointer: coarse) and (min-width: 560px) and (min-height: 560px) {
+  :root {
+    --lp-land-left: max(var(--space-2), env(safe-area-inset-left));
+    --lp-land-right: max(var(--space-2), env(safe-area-inset-right));
+    --lp-land-top: max(var(--space-2), env(safe-area-inset-top));
+    --lp-land-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+    /* La rangée du haut : un contrôle et ses deux marges. La colonne : la largeur d'une feuille Dessin sur mobile, six pastilles */
+    --lp-land-row: calc(var(--control-size) + 2 * var(--space-2));
+    --lp-side-width: 320px;
+    /* Le canvas : à gauche de la colonne, sous la rangée du haut (arrival-insets.ts) */
+    --lp-zone-left: env(safe-area-inset-left, 0px);
+    --lp-zone-right: calc(var(--lp-land-right) + var(--lp-side-width) + var(--space-2));
+    --lp-zone-bottom: var(--lp-land-bottom);
+    /* Ce que la colonne laisse au canvas maintenant : la zone à côté d'elle, ou, en Vue sur un écran large, celle au-dessus */
+    --lp-free-right: var(--lp-zone-right);
+    --lp-free-bottom: var(--lp-zone-bottom);
+  }
+
+  /* La barre du bas : une colonne contre le bord droit, sur la hauteur de son contenu */
+  html .lp-floating[data-dock="bc"] {
+    top: auto;
+    left: auto;
+    right: var(--lp-land-right);
+    bottom: var(--lp-land-bottom);
+    width: var(--lp-side-width);
+    transform: none;
+  }
+
+  html .lp-floating[data-dock="bc"] .lp-pill,
+  html .lp-floating[data-dock="bc"] .lp-pill-content {
+    width: 100%;
+    max-width: none;
+  }
+
+  html .lp-floating[data-dock="bc"] .lp-pill-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* La palette complète prend la place qui reste sous les outils, et défile au-delà. Une marge à son tour : l'anneau de la
+     couleur choisie dépasse de quatre pixels, que le défilement rognerait sinon. */
+  html .lp-floating[data-dock="bc"] .lp-palette--touch {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: var(--space-1);
+    column-gap: var(--space-1);
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  /* Recentrer se pose contre la colonne, au bas du canvas. Sans colonne (la page d'une archive n'a pas de barre du bas),
+     il garde sa place. */
+  html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] {
+    right: calc(var(--lp-land-right) + var(--lp-side-width) + var(--space-2));
+    bottom: var(--lp-land-bottom);
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      right var(--lp-dur) var(--lp-ease),
+      bottom var(--lp-dur) var(--lp-ease);
+  }
+
+  /* En Dessin, le contenu prend toute la hauteur : la pill grandit vers le haut, par le morphing (use-morph.ts) */
+  html[data-drafting] .lp-floating[data-dock="bc"] .lp-pill-content {
+    height: calc(100dvh - var(--lp-land-top) - var(--lp-land-bottom));
+  }
+
+  /* Une bulle posée à gauche du panneau (bubble.tsx) passe sur la rangée du haut, où est la bande Thème : elle s'efface en fondu le temps de la bulle */
+  html:has(.lp-bubble[data-side="left"]:not(.is-hidden)) .lp-floating[data-dock="tc"] {
+    opacity: 0;
+  }
+
+  /* Le conseil de première visite, sans cible : au bas de la zone du canvas, à gauche de Recentrer. La hauteur de la colonne
+     ne dit pas où poser une bulle ; la zone d'un double écran est celle de son premier écran (canvas-zone.css). */
+  html .lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+    --lp-bubble-room: calc(
+      var(--lp-zone-w, 100vw) -
+      var(--lp-zone-left) -
+      var(--lp-zone-right) -
+      var(--control-size) -
+      4 *
+      var(--space-2)
+    );
+    left: calc(var(--lp-zone-left) + var(--space-2));
+    right: calc(
+      100vw -
+      var(--lp-zone-w, 100vw) +
+      var(--lp-zone-right) +
+      var(--control-size) +
+      3 *
+      var(--space-2)
+    );
+    bottom: calc(100dvh - var(--lp-zone-h, 100dvh) + var(--lp-zone-bottom));
+  }
+}
+
+/* Un écran tactile large : la bande Thème, montée en Dessin à la place des pills du haut, s'arrête avant le panneau. Sur le plus
+   étroit (iPhone Duo en portrait), le toast se pose au centre de ce que la colonne laisse au canvas. */
+@media (pointer: coarse) and (min-width: 560px) and (min-height: 560px) {
+  /* En Vue, la colonne laisse aussi au canvas la zone au-dessus d'elle (Écart §9.3, JOURNAL 2026-10-09), sur une colonne de hauteur
+     fixe (la jauge, Dessiner, leurs marges et un espace) : la feuille Dessin, qui la grandit, ne déplace pas le canvas. Le cadrage
+     prend la plus grande des deux zones (arrival-insets.ts) et le dit par `data-zone-above`. */
+  :root {
+    --lp-zone-above-right: env(safe-area-inset-right, 0px);
+    --lp-zone-above-bottom: calc(var(--lp-land-bottom) + 2 * var(--control-size) + 4 * var(--space-2));
+  }
+
+  html[data-zone-above]:not([data-drafting]) {
+    --lp-free-right: var(--lp-zone-above-right);
+    --lp-free-bottom: var(--lp-zone-above-bottom);
+  }
+
+  /* Recentrer au coin de la zone, contre le bord droit : au-dessus de la colonne */
+  html[data-zone-above]:not([data-drafting]):has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] {
+    right: var(--lp-land-right);
+    bottom: var(--lp-free-bottom);
+  }
+
+  html[data-drafting] .lp-floating[data-dock="tc"] {
+    right: max(var(--space-4), var(--lp-zone-right));
+  }
+
+  @media (max-width: 640px) {
+    html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="toast"] {
+      left: calc((var(--lp-zone-left) + 100% - var(--lp-free-right)) / 2);
+      max-width: calc(100% - var(--lp-zone-left) - var(--lp-free-right) - 2 * var(--space-2));
+      transition:
+        opacity var(--lp-dur-fade) ease,
+        top var(--lp-dur) var(--lp-ease),
+        left var(--lp-dur) var(--lp-ease);
+    }
+  }
+}
