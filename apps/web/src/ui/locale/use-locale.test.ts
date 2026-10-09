@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DESIGN_TEXTS } from "../design/design-texts";
-import { LocaleButton, LocalePicker } from "../design/locale-controls";
+import { LocalePicker } from "../design/locale-controls";
 import { LOCALE_COOKIE, type Locale, resolveLocale } from "./locale";
 import { FixedLocale, LocaleProvider, useLocale, useTexts, writeLocaleCookie } from "./use-locale";
 
@@ -38,18 +38,17 @@ describe("la langue de la page (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("le bouton et le choix de la langue (Écart §14, JOURNAL 2026-10-07)", () => {
-  // Le bouton montre la langue courante, et son titre dit la bascule vers l'autre, dans la langue courante
-  it("shows the current language on the button, its title saying the switch to the other", () => {
-    const french = inLocale("fr", createElement(LocaleButton));
-    const english = inLocale("en", createElement(LocaleButton));
+describe("le choix de la langue (Écart §14, JOURNAL 2026-10-07)", () => {
+  // Sous une langue imposée (la fenêtre Développeur), le choix reste dans cette langue, quelle que soit celle de la page
+  it("keeps the picker in a fixed language, whatever the language of the page", () => {
+    const html = inLocale("en", createElement(FixedLocale, { locale: "fr" }, createElement(LocalePicker)));
 
-    expect(french).toContain(">FR</span>");
-    expect(french).toContain('title="Passer en anglais"');
-    expect(french).toContain('aria-label="Passer en anglais"');
-    expect(english).toContain(">EN</span>");
-    expect(english).toContain('title="Switch to French"');
-    expect(english).toContain('aria-label="Switch to French"');
+    expect(html).toContain('aria-label="Langue"');
+    expect(html).not.toContain('aria-label="Language"');
+    expect(html).toContain("Français");
+    expect(html).toContain("English");
+    expect(html).toMatch(/checked=""[^>]*value="fr"/);
+    expect(html).not.toMatch(/checked=""[^>]*value="en"/);
   });
 
   // Le choix propose chaque langue écrite dans sa propre langue, la courante cochée

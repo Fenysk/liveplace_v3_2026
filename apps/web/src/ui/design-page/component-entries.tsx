@@ -16,7 +16,7 @@ import { Checkbox } from "../design/checkbox";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
 import { DESIGN_TEXTS } from "../design/design-texts";
-import { LocaleButton, LocalePicker } from "../design/locale-controls";
+import { LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
@@ -638,16 +638,9 @@ export const ChoicesEntry = () => {
   return (
     <Entry
       slug="choix"
-      components={[
-        "ChoiceList",
-        "AppearancePicker",
-        "AppearanceButton",
-        "LocalePicker",
-        "LocaleButton",
-        "SwatchChoice",
-      ]}
+      components={["ChoiceList", "AppearancePicker", "AppearanceButton", "LocalePicker", "SwatchChoice"]}
       file="ui/design/{choice-list,appearance-controls,locale-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; celui de langue bascule entre le français et l'anglais."
+      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; la langue se choisit dans Mon compte."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -685,11 +678,8 @@ export const ChoicesEntry = () => {
         </StateRow>
       </Block>
       <Block title="Langue">
-        <StateRow name="Langue, comme dans Mon compte">
+        <StateRow name="Langue, comme dans Mon compte" detail="Elle ne se choisit qu'ici.">
           <LocalePicker />
-        </StateRow>
-        <StateRow name="Langue, comme dans la pill Compte">
-          <LocaleButton />
         </StateRow>
       </Block>
       <Block title="Choix de couleur">

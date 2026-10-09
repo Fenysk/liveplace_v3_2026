@@ -20,17 +20,16 @@ const render = (props: Partial<AccountPillProps> = {}): string =>
 const positionOf = (markup: string, title: string): number => markup.indexOf(`title="${title}"`);
 
 describe("pill Compte", () => {
-  // Quand le streamer est sur son canvas, la pill Compte montre Réglages, puis sa photo, puis l'apparence et la langue
-  it("porte Réglages avant la photo, et l'apparence et la langue après, pour le streamer sur son canvas", () => {
+  // Quand le streamer est sur son canvas, la pill Compte montre Réglages, puis sa photo, puis l'apparence
+  it("porte Réglages avant la photo, et l'apparence après, sans bouton de langue, pour le streamer sur son canvas", () => {
     const markup = render({ onOpenSettings: doNothing });
     const settings = positionOf(markup, "Réglages");
     const appearance = positionOf(markup, "Apparence : Auto");
     const account = positionOf(markup, "Mon compte");
-    const locale = positionOf(markup, "Passer en anglais");
     expect(settings).toBeGreaterThanOrEqual(0);
     expect(account).toBeGreaterThan(settings);
     expect(appearance).toBeGreaterThan(account);
-    expect(locale).toBeGreaterThan(appearance);
+    expect(markup).not.toContain("Passer en anglais");
   });
 
   // Si ce n'est pas le streamer sur son canvas, alors la pill Compte n'a pas de Réglages
@@ -103,15 +102,7 @@ describe("pill Compte", () => {
 
 // L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (Écart §14, JOURNAL 2026-10-07).
 const SIGN_IN = "Se connecter avec Twitch";
-const ALL_TITLES = [
-  "Développeur",
-  "Réglages",
-  "Modération",
-  "Apparence : Auto",
-  "Passer en anglais",
-  "Mon compte",
-  SIGN_IN,
-];
+const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence : Auto", "Mon compte", SIGN_IN];
 
 const orderOf = (markup: string): string[] =>
   ALL_TITLES.map((title) => ({ title, at: positionOf(markup, title) }))
@@ -120,72 +111,62 @@ const orderOf = (markup: string): string[] =>
     .map(({ title }) => title);
 
 describe("la disposition de la pill Compte (Écart §14, JOURNAL 2026-10-07)", () => {
-  // Avec Développeur, Réglages ou Modération à gauche de la photo, l'apparence et la langue passent à droite de la photo
-  it("puts the appearance and the language right of the photo when icons stand left of it", () => {
+  // Avec Développeur, Réglages ou Modération à gauche de la photo, l'apparence passe à droite de la photo
+  it("puts the appearance right of the photo when icons stand left of it", () => {
     expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenSettings: doNothing }))).toEqual([
       "Développeur",
       "Réglages",
       "Mon compte",
       "Apparence : Auto",
-      "Passer en anglais",
     ]);
     expect(orderOf(render({ onOpenSettings: doNothing }))).toEqual([
       "Réglages",
       "Mon compte",
       "Apparence : Auto",
-      "Passer en anglais",
     ]);
     expect(orderOf(render({ onOpenDeveloper: doNothing }))).toEqual([
       "Développeur",
       "Mon compte",
       "Apparence : Auto",
-      "Passer en anglais",
     ]);
     expect(orderOf(render({ onOpenModeration: doNothing }))).toEqual([
       "Modération",
       "Mon compte",
       "Apparence : Auto",
-      "Passer en anglais",
     ]);
     expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenModeration: doNothing }))).toEqual([
       "Développeur",
       "Modération",
       "Mon compte",
       "Apparence : Auto",
-      "Passer en anglais",
     ]);
   });
 
-  // Un joueur connecté sans ces icônes : l'apparence, la langue, puis la photo
-  it("puts the appearance, the language, then the photo for a signed-in player without those icons", () => {
-    expect(orderOf(render())).toEqual(["Apparence : Auto", "Passer en anglais", "Mon compte"]);
+  // Un joueur connecté sans ces icônes : l'apparence, puis la photo
+  it("puts the appearance, then the photo for a signed-in player without those icons", () => {
+    expect(orderOf(render())).toEqual(["Apparence : Auto", "Mon compte"]);
   });
 
-  // Un invité : l'apparence, la langue, puis Se connecter, sur PC comme sur mobile
-  it("puts the appearance, the language, then Se connecter for a guest, on desktop and on mobile", () => {
+  // Un invité : l'apparence, puis Se connecter, sur PC comme sur mobile
+  it("puts the appearance, then Se connecter for a guest, on desktop and on mobile", () => {
     const guest = { identity: { kind: "guest" } } as const;
 
-    expect(orderOf(render(guest))).toEqual(["Apparence : Auto", "Passer en anglais", SIGN_IN]);
-    expect(orderOf(render({ ...guest, isCompact: true }))).toEqual([
-      "Apparence : Auto",
-      "Passer en anglais",
-      SIGN_IN,
-    ]);
+    expect(orderOf(render(guest))).toEqual(["Apparence : Auto", SIGN_IN]);
+    expect(orderOf(render({ ...guest, isCompact: true }))).toEqual(["Apparence : Auto", SIGN_IN]);
   });
 
-  // Tant que le gateway n'a pas répondu : l'apparence et la langue seules
-  it("shows the appearance and the language alone while the identity is unknown", () => {
-    expect(orderOf(render({ identity: { kind: "unknown" } }))).toEqual([
-      "Apparence : Auto",
-      "Passer en anglais",
-    ]);
+  // Tant que le gateway n'a pas répondu : l'apparence seule
+  it("shows the appearance alone while the identity is unknown", () => {
+    expect(orderOf(render({ identity: { kind: "unknown" } }))).toEqual(["Apparence : Auto"]);
   });
 
-  // Le bouton de langue montre la langue courante, et son titre dit l'action
-  it("shows the current language on the button, its title saying the action", () => {
+  // La langue se choisit dans Mon compte : aucun bouton de langue dans la pill, quel que soit le compte
+  it("has no language button, whoever the account is", () => {
     const markup = render();
 
-    expect(markup).toContain(">FR</span>");
-    expect(markup).toContain('aria-label="Passer en anglais"');
+    expect(markup).not.toContain(">FR</span>");
+    expect(markup).not.toContain('aria-label="Passer en anglais"');
+    expect(render({ identity: { kind: "guest" } })).not.toContain("Passer en anglais");
+    expect(render({ onOpenSettings: doNothing, onOpenDeveloper: doNothing })).not.toContain(">FR</span>");
   });
 });

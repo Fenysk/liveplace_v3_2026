@@ -255,7 +255,7 @@ export const AccountPillEntry = () => {
       slug="pill-compte"
       components={["AccountPill"]}
       file="ui/account/account-pill.tsx"
-      note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence et la langue passent à droite de la photo."
+      note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo."
       where="En haut à droite"
     >
       {ACCOUNT_BLOCKS.map(({ title, scenes }) => (

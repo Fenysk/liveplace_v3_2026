@@ -13,11 +13,6 @@ export const DESIGN_TEXTS = defineTexts({
   sections: { fr: "Sections", en: "Sections" },
 
   language: { fr: "Langue", en: "Language" },
-  // Le titre du bouton de langue dit l'action : passer dans l'autre langue, nommée dans la langue de la page.
-  switchTo: {
-    fr: { fr: "Passer en français", en: "Passer en anglais" },
-    en: { fr: "Switch to French", en: "Switch to English" },
-  },
   appearance: { fr: "Apparence", en: "Appearance" },
   appearanceAuto: { fr: "Auto", en: "Auto" },
   appearanceLight: { fr: "Clair", en: "Light" },

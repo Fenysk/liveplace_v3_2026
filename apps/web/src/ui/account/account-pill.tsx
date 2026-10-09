@@ -1,13 +1,12 @@
 // La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas) ou
-// Modération (qui modère sans être le streamer), l'apparence et la langue, puis sa photo (Mon compte) ou Se connecter.
-// Avec Développeur, Réglages ou Modération, l'apparence et la langue passent à droite de la photo (Écart §14,
-// JOURNAL 2026-10-07). Sur son canvas, c'est la seule pill du streamer.
+// Modération (qui modère sans être le streamer), l'apparence, puis sa photo (Mon compte) ou Se connecter. Avec
+// Développeur, Réglages ou Modération, l'apparence passe à droite de la photo (Écart §14, JOURNAL 2026-10-07). La langue
+// se choisit dans Mon compte, pas ici. Sur son canvas, c'est la seule pill du streamer.
 
 import { Activity, Settings, Shield } from "lucide-react";
 import type { AppearanceChoice } from "../design/appearance";
 import { AppearanceButton } from "../design/appearance-controls";
 import { Button } from "../design/button";
-import { LocaleButton } from "../design/locale-controls";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
 import { SignInButton } from "../design/twitch";
@@ -54,12 +53,7 @@ export const AccountPill = ({
   isDocked = true,
   isVisible = true,
 }: AccountPillProps) => {
-  const preferences = (
-    <>
-      <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />
-      <LocaleButton />
-    </>
-  );
+  const appearance = <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />;
   const t = useTexts(ACCOUNT_TEXTS);
   const moderation = useTexts(MODERATION_TEXTS);
   const titleWithReports = (title: string, reports: number): string =>
@@ -85,7 +79,7 @@ export const AccountPill = ({
           onPress={onOpenModeration}
         />
       )}
-      {!hasLeftIcons && preferences}
+      {!hasLeftIcons && appearance}
       {identity.kind === "guest" &&
         // Sur mobile, l'icône seule : la place manque en haut de l'écran.
         (isCompact ? (
@@ -101,7 +95,7 @@ export const AccountPill = ({
           onPress={onOpenAccount}
         />
       )}
-      {hasLeftIcons && preferences}
+      {hasLeftIcons && appearance}
     </Pill>
   );
 };

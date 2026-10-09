@@ -66,15 +66,15 @@ const accountPill = (props: Partial<Parameters<typeof AccountPill>[0]> = {}): st
   );
 
 describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
-  // La pill Compte : ses titres, le point des signalements dit en anglais, et le bouton de langue pour revenir
+  // La pill Compte : ses titres, le point des signalements dit en anglais, et pas de bouton de langue (elle est dans Mon compte)
   it("says the account pill in English, with the pending reports", () => {
     const markup = accountPill({ onOpenSettings: doNothing, pendingReports: 2 });
 
     expect(markup).toContain('title="Settings"');
     expect(markup).toContain('title="My account · 2 reports pending"');
     expect(markup).toContain('title="Appearance: Auto"');
-    expect(markup).toContain('title="Switch to French"');
-    expect(markup).toContain(">EN</span>");
+    expect(markup).not.toContain('title="Switch to French"');
+    expect(markup).not.toContain(">EN</span>");
     expect(accountPill({ identity: { kind: "guest" } })).toContain(">Sign in</span>");
     expect(accountPill({ identity: { kind: "guest" } })).toContain('title="Sign in with Twitch"');
   });
