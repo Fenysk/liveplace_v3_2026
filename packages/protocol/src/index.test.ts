@@ -901,6 +901,24 @@ describe("capacity frames", () => {
     expect(decodeServerFrame({ ...frame, resources: [{ ...delay, unit: "minutes" }] }).ok).toBe(false);
   });
 
+  // Les protections du gateway (JOURNAL 2026-10-09) : deux nombres entiers sur l'heure et sur le jour, facultatifs comme un champ d'un gateway d'avant
+  it("carries the guards over the hour and the day as whole numbers, and still accepts a frame without them", () => {
+    const guards = {
+      hour: { refusedPlacements: 20, closedConnections: 1 },
+      day: { refusedPlacements: 140, closedConnections: 3 },
+    };
+
+    expect(decodeServerFrame({ ...capacity, guards })).toEqual({ ok: true, value: { ...capacity, guards } });
+    expect(decodeServerFrame(capacity).ok).toBe(true);
+    for (const wrong of [
+      { ...guards, hour: { ...guards.hour, refusedPlacements: -1 } },
+      { ...guards, day: { ...guards.day, closedConnections: 1.5 } },
+      { ...guards, day: { refusedPlacements: 4 } },
+      { hour: guards.hour },
+    ])
+      expect(decodeServerFrame({ ...capacity, guards: wrong }).ok).toBe(false);
+  });
+
   // Une ressource mesurée a sa valeur, son plafond et son taux ; un état inconnu est refusé
   it("gives a measured resource its value, ceiling and ratio, and refuses an unknown state", () => {
     const { value, ...withoutValue } = measured;

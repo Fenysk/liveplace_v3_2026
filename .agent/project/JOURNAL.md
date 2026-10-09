@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-09 — Écart §4.3 et §5.1 : la section Capacité compte ce que bloquent les protections du gateway, sans plafond et hors de la saturation
+
+**Contexte.** Le gateway refuse une pose au-delà de dix par seconde et par connexion (`rate_limited`) et ferme en `1013` une connexion qui ne suit pas ; rien ne dit si cela arrive en production.
+**Décision.** Le gateway compte les deux en mémoire, par minute (jamais une écriture Redis par refus), et écrit au plus une fois par minute celles où l'une a joué, `HASH capacity:guard` (début de minute → `poses refusées,connexions fermées`, `HSET`, élagué à 7 jours avec les minutes de la capacité), relu au démarrage sur 24 h. La frame `capacity` gagne `guards` (facultatif), les deux nombres sur la dernière heure et sur 24 h, sommés depuis la mémoire : une ligne « Protections » au maillon Gateway, sans plafond ni taux. Ce n'est pas une ressource : `CAPACITY_RESOURCE_IDS`, la saturation et l'historique ne bougent pas. `PROTOCOL_VERSION` reste 19, comme pour `canvasPoints` : une page d'avant ignore le champ (`z.object`), une page neuve devant un gateway d'avant n'a pas la ligne.
+**Renoncement.** Pas de courbe des protections ; la minute en cours d'un gateway qui s'arrête est perdue ; le débit refusé d'`inspect` n'est pas compté, seul celui des poses.
+
 ## 2026-10-09 — Écart §9.3 : la palette du Dessin est un groupe radio qui garde ses touches, et 1 à 5 reprennent les récentes
 
 **Contexte.** La palette n'avait ni arrêt de Tab unique ni flèches (audit d'accessibilité), et l'écouteur de `window` agissait même avec le focus sur une pastille : Entrée validait le brouillon, Échap sortait du Dessin, les flèches visaient une case.

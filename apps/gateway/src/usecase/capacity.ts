@@ -1,7 +1,8 @@
 // La capacité vue du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-07) : toutes les 10 s, chaque ressource mesurée (Redis, la
 // machine, lui-même, ce que le web dépose), son pic des 5 dernières minutes face à son plafond, et la saturation qui en
 // sort. Chaque minute, les pics partent sous `capacity:`. La frame part toutes les 2 s au développeur qui regarde, sans
-// rien lire : tout vient de la mémoire. Rien par pose, au-delà d'un compteur.
+// rien lire : tout vient de la mémoire. Rien par pose, au-delà d'un compteur. Ce que bloquent les protections (Écart §4.3
+// et §5.1, JOURNAL 2026-10-09) se compte à part, sans plafond : la frame le porte, la saturation l'ignore.
 
 import {
   type ActivityPeriod,
@@ -42,6 +43,7 @@ import type {
 } from "@liveplace/domain/ports";
 import type { Broadcast } from "./broadcast";
 import type { DelayTally } from "./delay-tally";
+import { createGuardTally } from "./guard-tally";
 
 // §3 du cahier des charges : la frame part toutes les 2 s, tant que le développeur regarde.
 export const CAPACITY_TICK_MS = 2000;
@@ -58,6 +60,9 @@ export type CapacityDeps = {
 
 export interface Capacity {
   countBytes(bytes: number): void; // à chaque envoi de frame ou de snapshot : rien de lourd
+  // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections, un compteur de plus chacun, jamais une écriture.
+  countRefusedPlacement(): void; // une pose refusée pour le débit
+  countClosedConnection(): void; // une connexion fermée en 1013
   // Ignoré hors du développeur. Cesser de regarder ne demande aucun droit : la fermeture d'une page y passe aussi.
   watch(socket: ClientSocket, session: Session | null, isWatching: boolean): void;
   listHistory(session: Session | null, period: ActivityPeriod): Promise<CapacityHistory | null>; // `null` : refusé
@@ -107,6 +112,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
   let open: CapacityMinute = { at: toMinuteStart(deps.now()), percent: 0, linkRatios: {} };
   const closedMinutes: CapacityMinute[] = [];
   let prunedHourAt = toHourStart(deps.now());
+  const guards = createGuardTally(deps.now);
 
   // Un échantillon de plus, au millième : ceux de plus de 5 minutes s'en vont, et une mesure inutilisable n'en est pas une.
   const record = (id: CapacityResourceId, at: Timestamp, value: number): void => {
@@ -249,6 +255,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
       t: "capacity",
       saturation: { percent, ...(resource === undefined ? {} : { resource }), isIncomplete },
       resources,
+      guards: guards.getTotals(nowMs),
     };
   };
 
@@ -289,6 +296,18 @@ export function createCapacity(deps: CapacityDeps): Capacity {
     }
   };
 
+  // Les minutes de protections fermées s'écrivent d'un coup, une fois ; refusées par Redis, elles attendent l'échantillon suivant.
+  const storeGuardMinutes = async (nowMs: Timestamp): Promise<void> => {
+    try {
+      const unstored = guards.listUnstored(nowMs);
+      if (unstored.length === 0) return;
+      await deps.store.storeGuardMinutes(unstored);
+      guards.markStored(unstored);
+    } catch (error) {
+      console.error("gateway: capacité, protections non écrites", error);
+    }
+  };
+
   // Un échantillon à la fois : deux lectures d'une même minute en doubleraient les écritures.
   const sample = async (): Promise<void> => {
     if (isSampling) return;
@@ -307,6 +326,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
       sampleGateway(nowMs);
       foldIntoMinute(toSaturation(buildResources(nowMs), reachedAt, nowMs));
       await storeClosedMinutes(nowMs);
+      await storeGuardMinutes(nowMs);
     } finally {
       isSampling = false;
     }
@@ -316,6 +336,9 @@ export function createCapacity(deps: CapacityDeps): Capacity {
     countBytes(bytes) {
       sentBytes += bytes;
     },
+
+    countRefusedPlacement: guards.countRefusedPlacement,
+    countClosedConnection: guards.countClosedConnection,
 
     watch(socket, session, isWatching) {
       if (!isWatching) watchers.delete(socket);
@@ -344,6 +367,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
       }
       await deps.store.pruneCapacity(nowMs);
       prunedHourAt = toHourStart(nowMs);
+      guards.restore(await deps.store.listGuardMinutes(nowMs), nowMs);
       await sample();
     },
   };

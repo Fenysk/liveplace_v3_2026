@@ -1,14 +1,16 @@
 // Les ressources de la section Capacité (Écart §4.3, JOURNAL 2026-10-07), en lignes simples comme celles des autres sections
 // de la fenêtre (le motif de `WindowRow`), rangées par maillon : le nom et une légende à gauche, la valeur et son plafond, une
-// fine barre du taux, puis le taux en couleur. Sans nouvelles ou non mesurée, la ligne le dit à la place de la valeur.
+// fine barre du taux, puis le taux en couleur. Sans nouvelles ou non mesurée, la ligne le dit à la place de la valeur. Sans
+// plafond (les protections du gateway, JOURNAL 2026-10-09), des nombres par période, sans barre ni taux.
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { type CapacityTone, TONE_CLASSES } from "./capacity-tone";
 import { classNames } from "./class-names";
 
 // La barre est un `<meter>` natif : sa largeur n'est jamais un `style` que la CSP de production bloquerait dans le HTML du serveur.
 export type CapacityRowState =
   | { kind: "measured"; value: string; percent: number; rate: string; tone: Exclude<CapacityTone, "neutral"> }
+  | { kind: "counts"; lines: { period: string; value: string }[] }
   | { kind: "withoutNews" }
   | { kind: "unmeasured" };
 
@@ -20,18 +22,9 @@ type CapacityRowProps = {
 
 const MISSING_TEXTS = { withoutNews: "sans nouvelles", unmeasured: "non mesuré" } as const;
 
-export const CapacityRow = ({ name, note, state }: CapacityRowProps) => (
-  <li
-    className={classNames(
-      "lp-window-row lp-capacity-row lp-type-body",
-      state.kind === "measured" && `is-${state.tone}`,
-    )}
-  >
-    <span className="lp-capacity-name">
-      <span>{name}</span>
-      {note && <span className="lp-type-caption lp-muted">{note}</span>}
-    </span>
-    {state.kind === "measured" ? (
+const RowFigures = ({ state }: { state: CapacityRowState }) => {
+  if (state.kind === "measured")
+    return (
       <>
         <span className="lp-capacity-value">{state.value}</span>
         <meter
@@ -45,16 +38,39 @@ export const CapacityRow = ({ name, note, state }: CapacityRowProps) => (
           {state.rate}
         </span>
       </>
-    ) : (
-      <span
-        className={classNames(
-          "lp-capacity-missing",
-          state.kind === "withoutNews" ? "lp-warning" : "lp-muted",
-        )}
-      >
-        {MISSING_TEXTS[state.kind]}
+    );
+  if (state.kind === "counts")
+    return (
+      <span className="lp-capacity-counts">
+        {state.lines.map(({ period, value }) => (
+          <Fragment key={period}>
+            <span className="lp-muted">{period}</span>
+            <span>{value}</span>
+          </Fragment>
+        ))}
       </span>
+    );
+  return (
+    <span
+      className={classNames("lp-capacity-missing", state.kind === "withoutNews" ? "lp-warning" : "lp-muted")}
+    >
+      {MISSING_TEXTS[state.kind]}
+    </span>
+  );
+};
+
+export const CapacityRow = ({ name, note, state }: CapacityRowProps) => (
+  <li
+    className={classNames(
+      "lp-window-row lp-capacity-row lp-type-body",
+      state.kind === "measured" && `is-${state.tone}`,
     )}
+  >
+    <span className="lp-capacity-name">
+      <span>{name}</span>
+      {note && <span className="lp-type-caption lp-muted">{note}</span>}
+    </span>
+    <RowFigures state={state} />
   </li>
 );
 

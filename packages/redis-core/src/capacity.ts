@@ -244,6 +244,31 @@ export function createCapacityStore(redis: Redis, keys: CapacityKeys = buildCapa
     async pruneCapacity(nowMs) {
       await pruneHash(redis, keys.minutes, CAPACITY_MINUTES_RETENTION_MS, nowMs);
       await pruneHash(redis, keys.hours, CAPACITY_HOURS_RETENTION_MS, nowMs);
+      await pruneHash(redis, keys.guards, CAPACITY_MINUTES_RETENTION_MS, nowMs);
+    },
+
+    // Un seul `HSET` pour toutes les minutes : une minute déjà écrite est remplacée, jamais doublée (Écart §4.3, JOURNAL 2026-10-09).
+    async storeGuardMinutes(minutes) {
+      if (minutes.length === 0) return;
+      await redis.hset(
+        keys.guards,
+        Object.fromEntries(
+          minutes.map(({ at, refusedPlacements, closedConnections }) => [
+            at,
+            `${refusedPlacements},${closedConnections}`,
+          ]),
+        ),
+      );
+    },
+
+    // Les 1 440 dernières minutes écoulées ; la minute en cours n'est écrite que quand elle se ferme.
+    async listGuardMinutes(nowMs) {
+      const ats = pointStarts(toActivityPointStarts(nowMs).minute - MINUTE_MS, MINUTE_MS, DAY_MINUTES);
+      const values = await redis.hmget(keys.guards, ...ats.map(String));
+      return ats.flatMap((at, index) => {
+        const counts = toPair(values[index] ?? null);
+        return counts ? [{ at, refusedPlacements: counts[0], closedConnections: counts[1] }] : [];
+      });
     },
 
     // La minute en cours n'est pas encore écrite ; l'heure et le jour en cours le sont, en partie.

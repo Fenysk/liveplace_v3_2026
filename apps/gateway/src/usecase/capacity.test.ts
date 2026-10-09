@@ -1,5 +1,5 @@
 import { DEVELOPER_USER_ID, HOUR_MS, MINUTE_MS, type Session, type Timestamp } from "@liveplace/domain";
-import type { CapacityResourceId } from "@liveplace/domain/capacity";
+import { CAPACITY_RESOURCE_IDS, type CapacityResourceId, type GuardMinute } from "@liveplace/domain/capacity";
 import type {
   CapacityFrame,
   CapacityMinute,
@@ -56,7 +56,10 @@ const setup = (options: { isProduction?: boolean } = {}) => {
     snapshot: null as SnapshotMeasure | null, // ce que le worker a déposé : le retard de la sauvegarde
     convex: { status: "unconfigured" } as ConvexDeposit | null,
     isRefusingMinutes: false,
+    isRefusingGuards: false,
     reachedBefore: new Map<CapacityResourceId, Timestamp>(),
+    guardsBefore: [] as GuardMinute[], // les minutes de protections que Redis a gardées
+    storedGuards: [] as GuardMinute[][], // un élément par écriture
     storedMinutes: [] as CapacityMinute[],
     storedReached: [] as [CapacityResourceId, Timestamp][],
     prunedAt: [] as Timestamp[],
@@ -100,6 +103,13 @@ const setup = (options: { isProduction?: boolean } = {}) => {
     },
     async pruneCapacity(nowMs) {
       state.prunedAt.push(nowMs);
+    },
+    async storeGuardMinutes(minutes) {
+      if (state.isRefusingGuards) throw new Error("Redis refuse");
+      state.storedGuards.push([...minutes]);
+    },
+    async listGuardMinutes() {
+      return state.guardsBefore;
     },
     async listCapacityHistory(period) {
       state.historyPeriods.push(period);
@@ -776,5 +786,90 @@ describe("the history of the capacity (JOURNAL 2026-10-07)", () => {
     await sampleAfter(HOUR_MS);
 
     expect(state.prunedAt).toEqual([start, clock.nowMs]);
+  });
+});
+
+describe("the guards of the gateway (JOURNAL 2026-10-09)", () => {
+  // Porte dans la frame les poses refusées et les connexions fermées de la dernière heure et du dernier jour, comptées en mémoire et écrites nulle part
+  it("carries in the frame the refused placements and the closed connections of the last hour and day, counted in memory and written nowhere", async () => {
+    const { capacity, state, sampleAfter, frame } = setup();
+    await sampleAfter(0);
+    const reads = state.reads;
+
+    for (let count = 0; count < 20; count += 1) capacity.countRefusedPlacement();
+    capacity.countClosedConnection();
+
+    const counted = { refusedPlacements: 20, closedConnections: 1 };
+    expect(frame().guards).toEqual({ hour: counted, day: counted });
+    expect(state.reads).toBe(reads);
+    expect(state.storedGuards).toEqual([]);
+  });
+
+  // Écrit une minute de protections une fois, quand elle se ferme, et aucune minute où rien n'a joué
+  it("writes a minute of guards once, when it closes, and none where nothing happened", async () => {
+    const { capacity, state, sampleAfter } = setup();
+    await sampleAfter(0);
+    for (let count = 0; count < 3; count += 1) capacity.countRefusedPlacement();
+    await sampleAfter();
+    expect(state.storedGuards).toEqual([]); // la minute n'est pas finie
+
+    await sampleAfter(MINUTE_MS);
+    expect(state.storedGuards).toEqual([[{ at: start, refusedPlacements: 3, closedConnections: 0 }]]);
+
+    await sampleAfter(MINUTE_MS);
+    await sampleAfter(MINUTE_MS);
+    expect(state.storedGuards).toHaveLength(1);
+  });
+
+  // Garde une minute que Redis refuse, la réécrit à l'échantillon suivant, et ne retient pas les minutes de la capacité
+  it("keeps a minute of guards that Redis refuses, writes it again at the next sample, and does not hold back the capacity minutes", async () => {
+    const { capacity, state, sampleAfter } = setup();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await sampleAfter(0);
+    capacity.countClosedConnection();
+    state.isRefusingGuards = true;
+
+    await sampleAfter(MINUTE_MS);
+
+    expect(state.storedGuards).toEqual([]);
+    expect(state.storedMinutes).toHaveLength(1);
+    expect(logged).toHaveBeenCalledWith("gateway: capacité, protections non écrites", expect.any(Error));
+
+    state.isRefusingGuards = false;
+    await sampleAfter();
+
+    expect(state.storedGuards).toEqual([[{ at: start, refusedPlacements: 0, closedConnections: 1 }]]);
+  });
+
+  // Reprend au démarrage les minutes que Redis a gardées, et ne les réécrit pas
+  it("takes back at the start the minutes Redis kept, and does not write them again", async () => {
+    const { capacity, state, sampleAfter, frame } = setup();
+    state.guardsBefore = [
+      { at: start - 30 * MINUTE_MS, refusedPlacements: 2, closedConnections: 1 },
+      { at: start - 10 * HOUR_MS, refusedPlacements: 5, closedConnections: 0 },
+    ];
+
+    await capacity.start();
+
+    expect(frame().guards).toEqual({
+      hour: { refusedPlacements: 2, closedConnections: 1 },
+      day: { refusedPlacements: 7, closedConnections: 1 },
+    });
+    await sampleAfter(MINUTE_MS);
+    expect(state.storedGuards).toEqual([]);
+  });
+
+  // Ne pèse rien dans la saturation et n'est pas une ressource : la liste des ressources et la saturation ne bougent pas
+  it("weighs nothing in the saturation and is not a resource: the resources and the saturation do not move", async () => {
+    const { capacity, sampleAfter, frame } = setup();
+    await sampleAfter(0);
+    const before = frame().saturation;
+
+    for (let count = 0; count < 100_000; count += 1) capacity.countRefusedPlacement();
+    for (let count = 0; count < 1000; count += 1) capacity.countClosedConnection();
+
+    const after = frame();
+    expect(after.saturation).toEqual(before);
+    expect(after.resources.map(({ id }) => id)).toEqual([...CAPACITY_RESOURCE_IDS]);
   });
 });

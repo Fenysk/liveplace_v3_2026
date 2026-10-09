@@ -37,7 +37,13 @@ describe("toClientSocket (JOURNAL 2026-10-07)", () => {
   // Compte les octets de chaque envoi : une frame partagée compte pour chaque socket, un snapshot aussi
   it("counts the bytes of each send: a shared frame counts for each socket, and a snapshot too", () => {
     const counted: number[] = [];
-    const sockets = [silent, silent].map((socket) => toClientSocket(socket, (bytes) => counted.push(bytes)));
+    const sockets = [silent, silent].map((socket) =>
+      toClientSocket(
+        socket,
+        (bytes) => counted.push(bytes),
+        () => undefined,
+      ),
+    );
     const frame = { t: "pong" } as const; // `{"t":"pong"}` : 12 octets
 
     for (const socket of sockets) socket.sendFrame(frame);
@@ -51,6 +57,7 @@ describe("toClientSocket (JOURNAL 2026-10-07)", () => {
     const sent: unknown[][] = [];
     const socket = toClientSocket(
       { bufferedAmount: 0, send: (...args: unknown[]) => sent.push(args), close: () => undefined },
+      () => undefined,
       () => undefined,
     );
 
@@ -139,7 +146,11 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
     const pair = await openPair(false);
     try {
       const sent: number[] = [];
-      const client = toClientSocket(pair.server, (bytes) => sent.push(bytes));
+      const client = toClientSocket(
+        pair.server,
+        (bytes) => sent.push(bytes),
+        () => undefined,
+      );
       const snapshot = biggestSnapshot();
       for (let sends = 0; sends < 4096 && pair.server.readyState === WebSocket.OPEN; sends += 1)
         client.sendSnapshot(snapshot);
@@ -178,7 +189,11 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
       pair.client.on("close", (code) => {
         closedWith = code;
       });
-      const client = toClientSocket(pair.server, () => undefined);
+      const client = toClientSocket(
+        pair.server,
+        () => undefined,
+        () => undefined,
+      );
 
       client.sendFrame(cellsFrame(12_000));
       client.sendSnapshot(biggestSnapshot());
@@ -195,7 +210,11 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
   // Laisse finir l'arrivée d'une page qui la vide encore : une frame de plus de 1 Mio, le plus gros snapshot, puis la diffusion
   it("lets a page finish its arrival while it still empties it: a frame over 1 MiB, the biggest snapshot, then the broadcast", () => {
     const { socket, closes } = fillingSocket();
-    const client = toClientSocket(socket, () => undefined);
+    const client = toClientSocket(
+      socket,
+      () => undefined,
+      () => undefined,
+    );
     const arrival = cellsFrame(12_000);
 
     client.sendFrame(arrival);
@@ -210,7 +229,11 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
   it("closes as soon as the broadcast alone piles up more than 1 MiB behind the biggest frame, then sends nothing more", () => {
     const { socket, closes } = fillingSocket();
     const sent: number[] = [];
-    const client = toClientSocket(socket, (bytes) => sent.push(bytes));
+    const client = toClientSocket(
+      socket,
+      (bytes) => sent.push(bytes),
+      () => undefined,
+    );
     const snapshot = biggestSnapshot();
     const broadcast = cellsFrame(10);
 
@@ -227,6 +250,39 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
     client.sendSnapshot(snapshot);
     expect(socket.bufferedAmount).toBe(closedAt);
     expect(closes).toEqual([1013]);
+  });
+
+  // Compte une fois chaque connexion qu'il ferme en 1013 pour la capacité, et aucune qui suit (JOURNAL 2026-10-09)
+  it("counts once each connection it closes in 1013 for the capacity, and none that keeps up", () => {
+    const { socket, closes } = fillingSocket();
+    let closedBehind = 0;
+    const behind = toClientSocket(
+      socket,
+      () => undefined,
+      () => {
+        closedBehind += 1;
+      },
+    );
+    const broadcast = cellsFrame(10);
+
+    behind.sendSnapshot(biggestSnapshot());
+    for (let sends = 0; sends < 10_000 && closes.length === 0; sends += 1) behind.sendFrame(broadcast);
+    behind.sendFrame(broadcast);
+    behind.sendFrame(broadcast);
+
+    expect(closes).toEqual([1013]);
+    expect(closedBehind).toBe(1);
+
+    const keepingUp = toClientSocket(
+      { bufferedAmount: 0, send: () => undefined, close: () => undefined },
+      () => undefined,
+      () => {
+        closedBehind += 1;
+      },
+    );
+    for (let version = 1; version <= 100; version += 1) keepingUp.sendFrame(broadcast);
+    keepingUp.close(1000);
+    expect(closedBehind).toBe(1);
   });
 });
 

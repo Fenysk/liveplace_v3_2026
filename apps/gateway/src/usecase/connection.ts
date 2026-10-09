@@ -148,7 +148,8 @@ export type ConnectionDeps = {
   core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe" | "copyTwitchUsers">;
   broadcast: Broadcast;
   activity: Omit<Activity, "tick" | "start">; // écart §4.3 (JOURNAL 2026-10-06) : le gateway décide, et ne dit rien aux autres
-  capacity: Pick<Capacity, "watch" | "listHistory">; // écart §4.3 (JOURNAL 2026-10-07) : de même
+  // écart §4.3 (JOURNAL 2026-10-07) : de même ; Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : il compte aussi les poses refusées
+  capacity: Pick<Capacity, "watch" | "listHistory" | "countRefusedPlacement">;
   now: () => Timestamp;
 };
 
@@ -562,8 +563,10 @@ export function createConnection(
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
     // §6.3 : au-delà, la frame est refusée avant Redis, nommée par son `requestId`, et la connexion reste ouverte.
-    if (!isPlaceAllowed(deps.now()))
+    if (!isPlaceAllowed(deps.now())) {
+      deps.capacity.countRefusedPlacement();
       return socket.sendFrame({ t: "error", code: "rate_limited", requestId: frame.requestId });
+    }
     // Un invité reste connecté : il regarde, il ne pose pas (§10.2).
     if (!session)
       return socket.sendFrame({ t: "error", code: "unauthenticated", requestId: frame.requestId });

@@ -2,7 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { CapacityResourceId, Saturation } from "./capacity";
+import type { CapacityResourceId, GuardMinute, Saturation } from "./capacity";
 import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
   ActivityPeriod,
@@ -411,6 +411,9 @@ export interface CapacityStore {
   storeCapacityMinute(minute: CapacityMinute): Promise<void>;
   pruneCapacity(nowMs: Timestamp): Promise<void>; // les minutes de plus de 7 jours, les heures de plus de 366
   listCapacityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<CapacityPoint[]>; // un point absent le reste
+  // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : les minutes où une protection a joué. `HSET` : la même minute réécrite se remplace.
+  storeGuardMinutes(minutes: readonly GuardMinute[]): Promise<void>;
+  listGuardMinutes(nowMs: Timestamp): Promise<GuardMinute[]>; // les dernières 24 h, au démarrage ; une minute sans protection est absente
 }
 
 // Ce que le web écrit pour la capacité : des nombres seulement, jamais un script (§2).

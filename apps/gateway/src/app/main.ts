@@ -95,6 +95,7 @@ const server = startGatewayServer({
   openConnection: (socket, session, device) =>
     createConnection({ core, broadcast, activity, capacity, now: Date.now }, socket, session, device),
   onBytesSent: capacity.countBytes,
+  onClosedBehind: capacity.countClosedConnection,
 });
 
 const shutDown = (): void => {

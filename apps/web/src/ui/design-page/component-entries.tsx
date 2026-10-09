@@ -1,6 +1,6 @@
 // Le chapitre Composants (1/2) : ce qui se montre sans état de jeu autour. Chacun dans chacun de ses états.
 
-import { toRatio } from "@liveplace/domain/capacity";
+import { type GuardTotals, toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
@@ -41,7 +41,7 @@ import {
   toActivitySlots,
   toCanvasSlots,
 } from "../developer/activity-slots";
-import { formatRate, toRowState } from "../developer/capacity-labels";
+import { formatRate, toGuardsRow, toRowState } from "../developer/capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
 import {
   NO_AUDIENCE,
@@ -461,6 +461,12 @@ const ratioRow = (name: string, value: number, ceiling: number, note?: string) =
   />
 );
 
+// La ligne des protections du gateway : les mêmes mots que le jeu, sans plafond ni barre ni taux.
+const guardsRow = (guards: GuardTotals) => {
+  const { name, note, state } = toGuardsRow(guards);
+  return <CapacityRow name={name} note={note} state={state} />;
+};
+
 export const StatTilesEntry = () => {
   const nowMs = useNowMs();
   const { audience } = sampleFrame(nowMs);
@@ -564,7 +570,7 @@ export const StatTilesEntry = () => {
       </Block>
       <Block
         title="Les ressources"
-        note="Des lignes simples sous un intitulé de maillon : le nom, la valeur sur son plafond, une fine barre, le taux. Sur mobile, le taux passe sous le nom."
+        note="Des lignes simples sous un intitulé de maillon : le nom, la valeur sur son plafond, une fine barre, le taux. Sur mobile, le taux passe sous le nom. Les protections du gateway n'ont ni plafond ni taux."
       >
         <StateRow name="Les trois teintes" detail="Un taux sous 50 %, de 50 à 80 %, à partir de 80 %.">
           <InWindow>
@@ -607,6 +613,37 @@ export const StatTilesEntry = () => {
             </div>
           </InWindow>
         </StateRow>
+        <StateRow
+          name="Sans plafond : les protections"
+          detail="Les poses refusées et les connexions fermées, sur 1 h puis 24 h : deux nombres, sans barre ni taux, hors de la saturation."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {ratioRow("Connexions en tout", 410, 1750)}
+                {guardsRow({
+                  hour: { refusedPlacements: 20, closedConnections: 1 },
+                  day: { refusedPlacements: 140, closedConnections: 3 },
+                })}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Les protections au repos"
+          detail="Rien de refusé ni de fermé : des zéros, la ligne reste."
+        >
+          <InWindow>
+            <div className="lp-window-layout">
+              <CapacityLinkRows title="Gateway">
+                {guardsRow({
+                  hour: { refusedPlacements: 0, closedConnections: 0 },
+                  day: { refusedPlacements: 0, closedConnections: 0 },
+                })}
+              </CapacityLinkRows>
+            </div>
+          </InWindow>
+        </StateRow>
         <StateRow name="Sur mobile" detail="Le nom et la valeur en haut ; dessous, le taux et la barre.">
           <InPhone isWindow>
             <div className="lp-window-layout">
@@ -614,6 +651,10 @@ export const StatTilesEntry = () => {
                 {ratioRow("Connexions en tout", 410, 1750)}
                 {ratioRow("Connexions au plus gros canvas", 910, 1000)}
                 <CapacityRow name="Occupation" state={{ kind: "withoutNews" }} />
+                {guardsRow({
+                  hour: { refusedPlacements: 20, closedConnections: 1 },
+                  day: { refusedPlacements: 140, closedConnections: 3 },
+                })}
               </CapacityLinkRows>
             </div>
           </InPhone>

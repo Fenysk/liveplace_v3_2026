@@ -150,6 +150,9 @@ export function buildCapacityKeys(prefix = "capacity:") {
     minutes: `${prefix}minute`, // élagué au-delà de 7 jours
     hours: `${prefix}hour`, // élagué au-delà de 366 jours
     days: `${prefix}day`, // le début du jour de Paris, sans limite
+    // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : `HASH` début de minute → `refusedPlacements,closedConnections`, seulement les
+    // minutes où une protection du gateway a joué ; élagué avec les minutes de la capacité.
+    guards: `${prefix}guard`,
     // Déposé par le web : `STRING` `at,utilization`, son occupation à l'instant de sa mesure.
     web: `${prefix}web`,
     // Déposé par le web : `HASH` nom du déploiement → `at,calls,databaseIoGb,egressGb,computeGbHours[,filesBytes]`, l'usage du

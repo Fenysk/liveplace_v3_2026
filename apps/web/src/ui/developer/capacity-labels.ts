@@ -6,6 +6,7 @@ import {
   type CapacityLink,
   type CapacityResourceId,
   CONVEX_PLAN,
+  type GuardCount,
   getCapacitySpec,
   toSaturationColor,
 } from "@liveplace/domain/capacity";
@@ -169,7 +170,7 @@ export function toRowNote(resource: FrameResource, nowMs: number): string | unde
 }
 
 export type CapacityRowView = {
-  id: CapacityResourceId;
+  id: CapacityResourceId | "guards";
   name: string;
   note: string | undefined;
   state: CapacityRowState;
@@ -182,6 +183,23 @@ export type CapacityLinkView = {
   rows: CapacityRowView[];
 };
 
+// Les protections du gateway (Écart §4.3 et §5.1, JOURNAL 2026-10-09) : sans plafond, deux nombres par période, dans l'ordre de la légende.
+const toGuardsText = ({ refusedPlacements, closedConnections }: GuardCount): string =>
+  `${formatCount(refusedPlacements)} · ${formatCount(closedConnections)}`;
+
+export const toGuardsRow = ({ hour, day }: NonNullable<CapacityFrame["guards"]>): CapacityRowView => ({
+  id: "guards",
+  name: "Protections",
+  note: "poses refusées · connexions fermées",
+  state: {
+    kind: "counts",
+    lines: [
+      { period: withUnit("1", "h"), value: toGuardsText(hour) },
+      { period: withUnit("24", "h"), value: toGuardsText(day) },
+    ],
+  },
+});
+
 const toPlanName = (): string => `plan ${CONVEX_PLAN.charAt(0).toUpperCase()}${CONVEX_PLAN.slice(1)}`;
 
 // Les déploiements que compte Convex, par ordre alphabétique, puis son plan.
@@ -190,17 +208,22 @@ const toConvexDetail = (resources: readonly FrameResource[]): string => {
   return [...(deployments.length > 0 ? [deployments.join(", ")] : []), toPlanName()].join(" · ");
 };
 
-// Un groupe par maillon qui a des ressources, dans l'ordre de la chaîne.
-export function toCapacityLinks(resources: readonly FrameResource[], nowMs: number): CapacityLinkView[] {
+// Un groupe par maillon qui a des ressources, dans l'ordre de la chaîne ; les protections ferment celui du gateway, quand la frame les porte.
+export function toCapacityLinks(
+  resources: readonly FrameResource[],
+  nowMs: number,
+  guards?: CapacityFrame["guards"],
+): CapacityLinkView[] {
   return CAPACITY_LINKS.flatMap((link) => {
     const own = resources.filter((resource) => resource.link === link);
     if (own.length === 0) return [];
-    const rows = own.map((resource) => ({
+    const rows: CapacityRowView[] = own.map((resource) => ({
       id: resource.id,
       name: RESOURCE_NAMES[resource.id].name,
       note: toRowNote(resource, nowMs),
       state: toRowState(resource),
     }));
+    if (link === "gateway" && guards) rows.push(toGuardsRow(guards));
     return [
       { link, title: LINK_LABELS[link], ...(link === "convex" ? { detail: toConvexDetail(own) } : {}), rows },
     ];

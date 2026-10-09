@@ -164,6 +164,66 @@ describe("the capacity history in Redis (écart §5.1, JOURNAL 2026-10-07)", () 
   });
 });
 
+describe("the guards of the gateway in Redis (JOURNAL 2026-10-09)", () => {
+  const guard = (at: number, refusedPlacements: number, closedConnections: number) => ({
+    at,
+    refusedPlacements,
+    closedConnections,
+  });
+
+  // Garde une minute de protections à son début, et une seconde écriture de la même minute la remplace sans la doubler
+  it("keeps a minute of guards at its start, and a second write of the same minute replaces it instead of doubling it", async () => {
+    const { store, keys } = stores();
+
+    await store.storeGuardMinutes([guard(minuteAt - 5 * MINUTE_MS, 3, 0)]);
+    await store.storeGuardMinutes([
+      guard(minuteAt - 5 * MINUTE_MS, 3, 1),
+      guard(minuteAt - MINUTE_MS, 12, 0),
+    ]);
+
+    expect(await redis.hgetall(keys.guards)).toEqual({
+      [minuteAt - 5 * MINUTE_MS]: "3,1",
+      [minuteAt - MINUTE_MS]: "12,0",
+    });
+  });
+
+  // Rend les 1 440 dernières minutes, du plus ancien au plus récent, sans les minutes où rien n'a joué ni celles de plus d'un jour
+  it("lists the last 1,440 minutes, oldest first, without the minutes where nothing happened nor those over a day old", async () => {
+    const { store } = stores();
+    const minutes = [
+      guard(minuteAt - DAY_MS - MINUTE_MS, 9, 9),
+      guard(minuteAt - 600 * MINUTE_MS, 5, 0),
+      guard(minuteAt - 30 * MINUTE_MS, 2, 1),
+      guard(minuteAt - MINUTE_MS, 0, 3),
+    ];
+
+    await store.storeGuardMinutes(minutes);
+
+    expect(await store.listGuardMinutes(now)).toEqual(minutes.slice(1));
+  });
+
+  // N'écrit rien pour aucune minute, et ne lit rien d'une clé absente
+  it("writes nothing for no minute, and lists nothing from an absent key", async () => {
+    const { store, keys } = stores();
+
+    await store.storeGuardMinutes([]);
+
+    expect(await redis.exists(keys.guards)).toBe(0);
+    expect(await store.listGuardMinutes(now)).toEqual([]);
+  });
+
+  // Élague les minutes de protections de plus de 7 jours avec celles de la capacité
+  it("prunes the minutes of guards older than 7 days with the capacity minutes", async () => {
+    const { store, keys } = stores();
+    const past = toActivityPointStarts(now - CAPACITY_MINUTES_RETENTION_MS - 2 * MINUTE_MS).minute;
+
+    await store.storeGuardMinutes([guard(past, 4, 0), guard(minuteAt - 5 * MINUTE_MS, 1, 1)]);
+    await store.pruneCapacity(now);
+
+    expect((await redis.hkeys(keys.guards)).map(Number)).toEqual([minuteAt - 5 * MINUTE_MS]);
+  });
+});
+
 describe("what the web deposits (écart §2 et §9, JOURNAL 2026-10-07)", () => {
   // Garde l'occupation du web avec l'instant de sa mesure, et dit qu'il n'a rien déposé quand c'est le cas
   it("keeps the utilization of the web with the instant of its measure, and says it deposited nothing when it did not", async () => {

@@ -100,6 +100,8 @@ const capacityStore: CapacityStore = {
   storeCapacityMinute: async () => undefined,
   pruneCapacity: async () => undefined,
   listCapacityHistory: async () => [],
+  storeGuardMinutes: async () => undefined,
+  listGuardMinutes: async () => [],
 };
 const quietHost: HostProbe = {
   getMemory: () => ({ usedBytes: 1, totalBytes: 2 }),
@@ -2056,6 +2058,29 @@ describe("the capacity in the connection (écart §4.2, JOURNAL 2026-10-07)", ()
     capacity.tick();
 
     expect(sent).toHaveLength(count);
+  });
+
+  // Compte pour la capacité chaque pose refusée pour le débit, et aucune inspection refusée
+  it("counts for the capacity each placement refused for its rate, and no refused inspection", async () => {
+    const { capacity, connection, sent, clock } = setup({ session: developer });
+    await connection.receive(hello());
+    await connection.receive(watch);
+    const guards = () => {
+      capacity.tick();
+      const last = sent.at(-1);
+      if (!last || !("t" in last) || last.t !== "capacity") throw new Error("aucune frame de capacité");
+      return last.guards;
+    };
+    for (let count = 0; count < 12; count += 1) await connection.receive(inspect(1, 2));
+    expect(guards()?.hour.refusedPlacements).toBe(0);
+
+    clock.nowMs += 1000;
+    for (let count = 0; count < 13; count += 1) await connection.receive(place(`place-${count}`));
+
+    expect(guards()).toEqual({
+      hour: { refusedPlacements: 3, closedConnections: 0 },
+      day: { refusedPlacements: 3, closedConnections: 0 },
+    });
   });
 });
 

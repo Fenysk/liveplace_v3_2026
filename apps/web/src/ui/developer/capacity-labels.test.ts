@@ -317,6 +317,37 @@ describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
     expect(view("snapshotDelay", 60)).toBe("Convex, sauvegarde · à surveiller");
   });
 
+  // La ligne Protections (JOURNAL 2026-10-09) ferme le groupe Gateway : les poses refusées et les connexions fermées, sur 1 h puis 24 h
+  it("closes the Gateway group with the Protections row: refused placements and closed connections over 1 h then 24 h", () => {
+    const guards = {
+      hour: { refusedPlacements: 20, closedConnections: 1 },
+      day: { refusedPlacements: 140, closedConnections: 0 },
+    };
+
+    const gateway = toCapacityLinks(resources, nowMs, guards)[1];
+
+    expect(gateway?.rows.map(({ name }) => name)).toEqual(["Retard de diffusion", "Protections"]);
+    expect(gateway?.rows.at(-1)).toEqual({
+      id: "guards",
+      name: "Protections",
+      note: "poses refusées · connexions fermées",
+      state: {
+        kind: "counts",
+        lines: [
+          { period: "1 h", value: "20 · 1" },
+          { period: "24 h", value: "140 · 0" },
+        ],
+      },
+    });
+  });
+
+  // Sans protections dans la frame (un gateway d'avant), pas de ligne : rien n'est inventé
+  it("shows no Protections row when the frame carries no guards: nothing is made up", () => {
+    const gateway = toCapacityLinks(resources, nowMs)[1];
+
+    expect(gateway?.rows.map(({ name }) => name)).toEqual(["Retard de diffusion"]);
+  });
+
   // Le retard de diffusion dit au-delà de quoi il compte, et pour combien de poses
   it("tells the broadcast lateness beyond what it counts, and for how many poses", () => {
     const [delay] = toCapacityLinks(resources, nowMs)[1]?.rows ?? [];
