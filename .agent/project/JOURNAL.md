@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-10 — Écart §15 (amende celui du 06/10 sur le choix de couleur) : les pastilles n'ont plus de nom dessous, le fond choisi se nomme à droite du titre comme le Délai
+
+**Contexte.** Le choix de couleur (« Fond de la vue OBS », « Fond de l'image ») montrait chaque pastille sous son nom. Chaque colonne prenant la largeur de son texte (« Transparent », « Noir », « Blanc »), les écarts entre pastilles étaient inégaux.
+**Décision.** Les pastilles restent les mêmes, en une rangée, sans nom dessous. Le nom de la choisie s'affiche à droite du titre du groupe, comme « 10 s » à droite de « Délai » (mêmes classes `lp-slider-row`, `lp-type-body`, `lp-type-numeric`) ; rien n'est choisi d'avance dans la fenêtre Télécharger, donc rien à droite. Ce nom est `aria-hidden` : `aria-pressed` dit déjà l'état, et la légende reste le seul nom du groupe.
+**Renoncement.** Un nom sous chaque pastille ou des colonnes de largeur fixe pour égaliser les écarts : la valeur à droite du titre est la décision d'Alexis.
+
 ## 2026-10-09 — Écart §9.3 (retire ceux du 08/10 et du 09/10 sur le zoom d'entrée en Dessin) : entrer en Dessin ne touche plus à la vue
 
 **Contexte.** Après son test sur la bêta, Alexis : « Quand j'entre en mode Dessin, je ne veux pas influencer le zoom. Rétrograde cela sans changer le reste. » L'entrée (bouton, `D`, Entrée, Espace) zoomait en douceur sous 20 px la case au doigt (10 px à la souris), centrait le brouillon repris, et, sur un écran tactile large où le canvas arrive au-dessus de la colonne, ramenait à gauche du panneau ce que la Vue montrait en son centre. Mesuré avant : 6,75 → 26,8 px sur un téléphone en portrait, 13,8 → 28 px sur un iPad.

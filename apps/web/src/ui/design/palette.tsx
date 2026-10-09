@@ -146,8 +146,9 @@ export const CurrentColorButton = ({ color, onPress }: CurrentColorButtonProps) 
   </button>
 );
 
-// Un choix de couleur au clavier de la palette (Écart §15, JOURNAL 2026-10-06) : les mêmes pastilles, chacune sous son nom.
-// Sans `tone`, la pastille est le damier du pixel transparent. Aucune n'est choisie d'avance : `value` à `null`.
+// Un choix de couleur au clavier de la palette (Écart §15, JOURNAL 2026-10-06) : les mêmes pastilles en une rangée, sans nom
+// dessous ; la choisie se nomme à droite du titre, comme le Délai (JOURNAL 2026-10-10). Aucune n'est choisie d'avance : `value`
+// à `null`, rien à droite. Sans `tone`, la pastille est le damier du pixel transparent.
 // Une teinte est une classe de palette.css, jamais un `style` (swatch-tones.ts).
 export type SwatchOption<Value extends string> = { value: Value; label: string; tone?: SwatchTone };
 
@@ -165,13 +166,23 @@ export const SwatchChoice = <Value extends string>({
   value,
   onSelect,
   isTouch = false,
-}: SwatchChoiceProps<Value>) => (
-  <fieldset className="lp-choices">
-    <legend className="lp-type-body">{label}</legend>
-    <div className={classNames("lp-palette lp-palette--choice", isTouch && "lp-palette--touch")}>
-      {options.map(({ value: optionValue, label: optionLabel, tone }) => (
-        <label key={optionValue} className="lp-swatch-option">
+}: SwatchChoiceProps<Value>) => {
+  const chosen = options.find((option) => option.value === value);
+  // Le nom du choix redouble `aria-pressed` : masqué, le nom du groupe reste le titre seul.
+  return (
+    <fieldset className="lp-choices">
+      <legend className="lp-slider-row lp-swatch-legend lp-type-body">
+        {label}
+        {chosen && (
+          <span className="lp-type-numeric" aria-hidden="true">
+            {chosen.label}
+          </span>
+        )}
+      </legend>
+      <div className={classNames("lp-palette lp-palette--choice", isTouch && "lp-palette--touch")}>
+        {options.map(({ value: optionValue, label: optionLabel, tone }) => (
           <button
+            key={optionValue}
             type="button"
             className={classNames("lp-swatch", tone ? `lp-swatch--${tone}` : "is-transparent")}
             title={optionLabel}
@@ -179,14 +190,11 @@ export const SwatchChoice = <Value extends string>({
             aria-pressed={optionValue === value}
             onClick={blurAfterClick(() => onSelect(optionValue))}
           />
-          <span className="lp-type-body" aria-hidden="true">
-            {optionLabel}
-          </span>
-        </label>
-      ))}
-    </div>
-  </fieldset>
-);
+        ))}
+      </div>
+    </fieldset>
+  );
+};
 
 // Sur mobile, la rangée des couleurs récentes, à côté de la couleur actuelle : toucher une case l'échange avec elle.
 // JOURNAL 2026-10-09 : au clavier, les touches 1 à 5 prennent la case de leur rang, y compris quand la rangée n'est pas montrée.

@@ -2,7 +2,7 @@ import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Palette, RecentSwatches } from "./palette";
+import { Palette, RecentSwatches, SwatchChoice, type SwatchOption } from "./palette";
 
 // La palette au clavier (JOURNAL 2026-10-09) : un groupe radio, un seul arrêt de Tab, chaque couleur sous son nom.
 
@@ -102,5 +102,61 @@ describe("les couleurs récentes (JOURNAL 2026-10-09)", () => {
     expect(swatches[0]).toContain(`title="${PALETTE[5]} (1)"`);
     expect(swatches[4]).toContain(`title="${PALETTE[42]} (5)"`);
     expect(swatches[0]).toContain(`aria-label="Couleur ${PALETTE[5]}"`);
+  });
+});
+
+describe("le choix de couleur (JOURNAL 2026-10-10)", () => {
+  type Background = "transparent" | "black" | "white";
+  const options: readonly SwatchOption<Background>[] = [
+    { value: "transparent", label: "Transparent" },
+    { value: "black", label: "Noir", tone: "png-black" },
+    { value: "white", label: "Blanc", tone: "png-white" },
+  ];
+  const choiceMarkup = (value: Background | null): string =>
+    renderToStaticMarkup(
+      createElement(SwatchChoice<Background>, { label: "Fond", options, value, onSelect: noop }),
+    );
+  const legendOf = (markup: string): string => markup.match(/<legend[^>]*>(.*?)<\/legend>/)?.[1] ?? "";
+
+  // Le nom du choix est à droite du titre, comme la valeur du Délai ; caché, il laisse au groupe le titre pour seul nom
+  it("names the chosen swatch on the right of the title, with the typography of the delay, hidden from screen readers", () => {
+    expect(legendOf(choiceMarkup("black"))).toBe(
+      'Fond<span class="lp-type-numeric" aria-hidden="true">Noir</span>',
+    );
+    expect(legendOf(choiceMarkup("transparent"))).toBe(
+      'Fond<span class="lp-type-numeric" aria-hidden="true">Transparent</span>',
+    );
+  });
+
+  // Aucune pastille n'est choisie d'avance : rien à droite du titre, aucune pastille appuyée
+  it("says nothing next to the title while no swatch is chosen, and presses none", () => {
+    const markup = choiceMarkup(null);
+
+    expect(legendOf(markup)).toBe("Fond");
+    expect(markup).not.toContain('aria-pressed="true"');
+  });
+
+  // Les pastilles sont seules dans leur rangée : pas de nom dessous, donc pas de largeur qui varie d'une colonne à l'autre
+  it("puts no name under the swatches: the row holds the buttons only, with no label around them", () => {
+    const markup = choiceMarkup("white");
+    const row = markup.match(/<div class="lp-palette lp-palette--choice">(.*?)<\/div>/)?.[1] ?? "";
+
+    expect(row.match(/<button[^>]*><\/button>/g)).toHaveLength(options.length);
+    expect(row.replace(/<button[^>]*><\/button>/g, "")).toBe("");
+    expect(markup).not.toContain("<label");
+  });
+
+  // Le fieldset et sa légende restent le nom du groupe ; chaque pastille garde son nom, son infobulle et son état
+  it("keeps the group named by its legend, and for each swatch its name, tooltip and pressed state", () => {
+    const markup = choiceMarkup("black");
+    const buttons = markup.match(/<button[^>]*>/g) ?? [];
+
+    expect(markup).toMatch(/^<fieldset [^>]*><legend /);
+    expect(buttons).toHaveLength(options.length);
+    options.forEach(({ value, label }, place) => {
+      expect(buttons[place]).toContain(`title="${label}"`);
+      expect(buttons[place]).toContain(`aria-label="${label}"`);
+      expect(buttons[place]).toContain(`aria-pressed="${value === "black"}"`);
+    });
   });
 });

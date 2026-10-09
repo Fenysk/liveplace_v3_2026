@@ -87,8 +87,8 @@
   border-radius: var(--radius-pill);
 }
 
-/* Un choix de couleur (Écart §15, JOURNAL 2026-10-06) : les pastilles de la palette en une rangée, chacune sous son
-   nom. Posé après la variante au doigt : il en garde les pastilles rondes, et refait les colonnes. */
+/* Un choix de couleur (Écart §15, JOURNAL 2026-10-06) : les pastilles de la palette en une rangée, sans nom dessous
+   (JOURNAL 2026-10-10). Posé après la variante au doigt : il en garde les pastilles rondes, et refait les colonnes. */
 .lp-palette--choice {
   grid-template-columns: none;
   grid-auto-flow: column;
@@ -97,11 +97,9 @@
   gap: var(--space-4);
 }
 
-.lp-swatch-option {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
+/* Le nom du choix à droite du titre, sur la rangée du Délai (slider.css) : une légende ne prend que sa largeur de texte */
+.lp-swatch-legend {
+  width: 100%;
 }
 
 /* Les couleurs récentes, plus discrètes que les contrôles : de la taille de la pastille de la couleur actuelle */
