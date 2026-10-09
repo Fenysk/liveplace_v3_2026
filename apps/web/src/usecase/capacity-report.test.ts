@@ -15,6 +15,7 @@ const setup = (sources: ConvexUsageSource[] = []) => {
   const stored = {
     utilizations: [] as WebMeasure[],
     usages: [] as [string, ConvexUsage][],
+    unread: [] as string[],
     unconfiguredCount: 0,
     isRefusing: false,
   };
@@ -26,6 +27,10 @@ const setup = (sources: ConvexUsageSource[] = []) => {
     async storeConvexUsage(deployment, convexUsage) {
       if (stored.isRefusing) throw new Error("Redis refuse");
       stored.usages.push([deployment, convexUsage]);
+    },
+    async storeConvexUnread(deployment) {
+      if (stored.isRefusing) throw new Error("Redis refuse");
+      stored.unread.push(deployment);
     },
     async storeConvexUnconfigured() {
       stored.unconfiguredCount += 1;
@@ -131,6 +136,30 @@ describe("the capacity report of the web (JOURNAL 2026-10-07)", () => {
     ]);
   });
 
+  // Chaque déploiement dépose son propre stock : le gateway en fait la somme, le web ne somme rien
+  it("deposits the stock of each deployment as its own, leaving the sum to the gateway", async () => {
+    const { report, stored } = setup([
+      source(
+        "valiant-panther-436",
+        async () => ({ ok: true, value: usage(100) }),
+        async () => ({ ok: true, value: 408_123 }),
+      ),
+      source(
+        "watchful-spider-409",
+        async () => ({ ok: true, value: usage(7) }),
+        async () => ({ ok: true, value: 38_389 }),
+      ),
+    ]);
+
+    await report.start();
+
+    expect(stored.usages).toEqual([
+      ["valiant-panther-436", { at: start, ...usage(100), filesBytes: 408_123 }],
+      ["watchful-spider-409", { at: start, ...usage(7), filesBytes: 38_389 }],
+    ]);
+    expect(stored.unread).toEqual([]);
+  });
+
   // Un stock qu'on ne peut pas lire n'empêche pas l'usage du mois : il se journalise par le nom du déploiement, sans clé
   it("deposits the usage of the month without the stock when it cannot be read, and logs the reason by the name", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -148,6 +177,7 @@ describe("the capacity report of the web (JOURNAL 2026-10-07)", () => {
     await report.start();
 
     expect(stored.usages).toEqual([["watchful-spider-409", { at: start, ...usage(100) }]]);
+    expect(stored.unread).toEqual([]); // l'usage du mois est lu : le gateway voit seul que le stock manque
     expect(logged).toHaveBeenCalledWith(
       "web: capacité, stockage des fichiers de Convex non lu pour watchful-spider-409 : HTTP 401",
     );
@@ -193,6 +223,23 @@ describe("the capacity report of the web (JOURNAL 2026-10-07)", () => {
     expect(logged).toHaveBeenCalledWith(
       "web: capacité, usage de Convex non lu pour watchful-spider-409 : HTTP 401",
     );
+  });
+
+  // Marque « jamais lu » un déploiement qu'il ne peut pas lire du tout : sans cette trace, le gateway sommerait les seuls autres
+  it("marks a deployment it cannot read at all as never read, so the gateway never sums the others alone", async () => {
+    const { report, stored } = setup([
+      source("valiant-panther-436", async () => ({ ok: false, error: "HTTP 401" })),
+      source(
+        "watchful-spider-409",
+        async () => ({ ok: true, value: usage(7) }),
+        async () => ({ ok: true, value: 38_389 }),
+      ),
+    ]);
+
+    await report.start();
+
+    expect(stored.unread).toEqual(["valiant-panther-436"]);
+    expect(stored.usages).toEqual([["watchful-spider-409", { at: start, ...usage(7), filesBytes: 38_389 }]]);
   });
 
   // Ne plante jamais quand Redis refuse un dépôt : la minuterie continue, l'erreur est journalisée

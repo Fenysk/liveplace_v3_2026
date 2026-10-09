@@ -216,6 +216,54 @@ describe("what the web deposits (écart §2 et §9, JOURNAL 2026-10-07)", () => 
     });
   });
 
+  // Un déploiement jamais lu se dépose « vieux de toujours » (instant 0) : le gateway le voit et ne somme pas les autres seuls
+  it("keeps a deployment never read as an old deposit, so the gateway sees it and never sums the others alone", async () => {
+    const { store, writes } = stores();
+
+    await writes.storeConvexUsage("dev-deployment", usage({ calls: 4, filesBytes: 1000 }));
+    await writes.storeConvexUnread("prod-deployment");
+
+    expect(await store.getConvexDeposit()).toEqual({
+      status: "configured",
+      deployments: new Map([
+        ["dev-deployment", usage({ calls: 4, filesBytes: 1000 })],
+        ["prod-deployment", usage({ at: 0 })],
+      ]),
+    });
+  });
+
+  // « Jamais lu » ne remplace pas une lecture déjà là, qui vieillit seule ; une lecture remplace « jamais lu »
+  it("never replaces a reading by never read, and a reading replaces never read", async () => {
+    const { store, writes } = stores();
+    await writes.storeConvexUsage("known", usage({ calls: 4 }));
+
+    await writes.storeConvexUnread("known");
+    await writes.storeConvexUnread("unknown");
+    await writes.storeConvexUsage("unknown", usage({ calls: 9, filesBytes: 5 }));
+
+    expect(await store.getConvexDeposit()).toEqual({
+      status: "configured",
+      deployments: new Map([
+        ["known", usage({ calls: 4 })],
+        ["unknown", usage({ calls: 9, filesBytes: 5 })],
+      ]),
+    });
+  });
+
+  // Le premier « jamais lu » efface « non configuré » : la variable vient d'être posée, et un déploiement qui ne répond pas est une panne
+  it("makes the first never read clear unconfigured: the variable was just set, and a deployment that does not answer is a failure", async () => {
+    const { store, writes, keys } = stores();
+    await writes.storeConvexUnconfigured();
+
+    await writes.storeConvexUnread("prod-deployment");
+
+    expect(await redis.exists(keys.convexUnconfigured)).toBe(0);
+    expect(await store.getConvexDeposit()).toEqual({
+      status: "configured",
+      deployments: new Map([["prod-deployment", usage({ at: 0 })]]),
+    });
+  });
+
   // Dit « non configuré » en retirant les déploiements d'avant, et la première lecture d'un déploiement le rend configuré
   it("says unconfigured by dropping the deployments from before, and the first reading of a deployment makes it configured", async () => {
     const { store, writes, keys } = stores();

@@ -25,15 +25,18 @@ export function createCapacityReport(deps: CapacityReportDeps): CapacityReport {
     await deps.writes.storeWebUtilization({ at: deps.now(), utilization: deps.getUtilizationPercent() });
   };
 
-  // Un déploiement qui échoue ne retient pas les autres : sa lecture vieillit, et le gateway dira « sans nouvelles ». Son stock de
+  // Un déploiement qui échoue ne retient pas les autres : sa lecture vieillit, et le gateway dira « sans nouvelles » ; jamais lu, il
+  // se dépose « jamais lu », car le gateway ne connaît que les déploiements déposés et sommerait les seuls autres. Son stock de
   // fichiers se lit à part : s'il manque, l'usage du mois se dépose sans lui et seule sa ligne vieillit.
   const reportConvexUsage = async (): Promise<void> => {
     if (deps.sources.length === 0) return deps.writes.storeConvexUnconfigured();
     await Promise.all(
       deps.sources.map(async (source) => {
         const [usage, files] = await Promise.all([source.getUsage(), source.getFilesBytes()]);
-        if (!usage.ok)
-          return console.error(`web: capacité, usage de Convex non lu pour ${source.name} : ${usage.error}`);
+        if (!usage.ok) {
+          console.error(`web: capacité, usage de Convex non lu pour ${source.name} : ${usage.error}`);
+          return deps.writes.storeConvexUnread(source.name);
+        }
         if (!files.ok)
           console.error(
             `web: capacité, stockage des fichiers de Convex non lu pour ${source.name} : ${files.error}`,

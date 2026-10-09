@@ -386,11 +386,12 @@ export interface ConvexUsageSource {
   name: string;
   getUsage(): Promise<Result<Omit<ConvexUsage, "at" | "filesBytes">>>;
   // Le stock de fichiers du déploiement, en octets, par un compteur que Convex tient lui-même (usage.ts) : l'API de
-  // déploiement ne le donne pas. Un échec ne retient pas le reste de l'usage.
+  // déploiement ne le donne pas. Un échec ne retient pas le reste de l'usage ; un compteur pas encore recompté en est un.
   getFilesBytes(): Promise<Result<number>>;
 }
 
-// Ce que le web a déposé pour Convex : rien (`null`), qu'aucun déploiement n'est configuré, ou l'usage de chacun par son nom.
+// Ce que le web a déposé pour Convex : rien (`null`), qu'aucun déploiement n'est configuré, ou l'usage de chacun par son nom ;
+// un déploiement que le web n'a jamais pu lire y figure à l'instant 0.
 export type ConvexDeposit =
   | { status: "unconfigured" }
   | { status: "configured"; deployments: ReadonlyMap<string, ConvexUsage> };
@@ -416,6 +417,9 @@ export interface CapacityStore {
 export interface CapacityWrites {
   storeWebUtilization(measure: WebMeasure): Promise<void>;
   storeConvexUsage(deployment: string, usage: ConvexUsage): Promise<void>; // `deployment` : son nom, jamais une clé
+  // Un déploiement configuré que le web n'a pas pu lire : déposé « vieux de toujours » (instant 0), sans écraser une lecture
+  // déjà là. Le gateway le voit, et ne somme pas les seuls autres (Écart §8.1, JOURNAL 2026-10-08).
+  storeConvexUnread(deployment: string): Promise<void>;
   storeConvexUnconfigured(): Promise<void>;
 }
 

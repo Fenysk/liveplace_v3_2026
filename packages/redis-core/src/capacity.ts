@@ -121,6 +121,9 @@ const toConvexUsage = (stored: string): ConvexUsage | null => {
   };
 };
 
+// Un déploiement jamais lu : l'instant 0 et des zéros, dans la forme d'une lecture.
+const NEVER_READ = "0,0,0,0,0";
+
 export function createCapacityWrites(redis: Redis, keys: CapacityKeys = buildCapacityKeys()): CapacityWrites {
   return {
     async storeWebUtilization({ at, utilization }) {
@@ -138,6 +141,11 @@ export function createCapacityWrites(redis: Redis, keys: CapacityKeys = buildCap
         ...(filesBytes === undefined ? [] : [filesBytes]),
       ].join(",");
       await execAll(redis.multi().hset(keys.convex, deployment, stored).del(keys.convexUnconfigured));
+    },
+
+    // `HSETNX` : une lecture déjà là reste et vieillit seule. Instant 0 : le gateway le voit et tient tout Convex sans nouvelles.
+    async storeConvexUnread(deployment) {
+      await execAll(redis.multi().hsetnx(keys.convex, deployment, NEVER_READ).del(keys.convexUnconfigured));
     },
 
     // Les déploiements d'avant partent avec la variable qui les nommait.

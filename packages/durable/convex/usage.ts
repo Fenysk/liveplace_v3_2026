@@ -4,7 +4,14 @@
 import { v } from "convex/values";
 import { requireServiceKey } from "../src/service-key";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+  mutation,
+  type QueryCtx,
+  query,
+} from "./_generated/server";
 
 export const FILES_KEY = "files"; // tous les fichiers du déploiement
 export const chunksKey = (scope: string): string => `chunks:${scope}`; // l'historique d'un scope
@@ -66,15 +73,20 @@ export const chunkBytes = query({
   },
 });
 
+const getUsageRow = (ctx: Pick<QueryCtx, "db">, key: string) =>
+  ctx.db
+    .query("storageUsage")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .first();
+
 // Interne : appelée avec la clé de déploiement (la Capacité de la fenêtre Développeur), jamais avec celle du service.
+// `isReady` : avant le premier recompte (`ensure`), le compteur est vide ou partiel : son chiffre n'est pas un stock (Écart §8.1,
+// JOURNAL 2026-10-08). Un champ de plus : le web d'avant ne lit que `bytes`.
 export const files = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const usage = await ctx.db
-      .query("storageUsage")
-      .withIndex("by_key", (q) => q.eq("key", FILES_KEY))
-      .first();
-    return { bytes: usage?.bytes ?? 0, count: usage?.count ?? 0 };
+    const [usage, ready] = await Promise.all([getUsageRow(ctx, FILES_KEY), getUsageRow(ctx, READY_KEY)]);
+    return { bytes: usage?.bytes ?? 0, count: usage?.count ?? 0, isReady: ready !== null };
   },
 });
 

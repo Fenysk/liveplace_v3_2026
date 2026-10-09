@@ -2,7 +2,7 @@
 // `GET /api/v1/get_current_usage`, `Authorization: Convex <clé>`. L'API est en bêta : une forme inconnue est un échec dit en
 // quelques mots, jamais un plantage. La clé et l'adresse ne sont ni gardées ni journalisées, pas même dans le message d'une erreur.
 // Le stock de fichiers (JOURNAL 2026-10-08) n'y figure pas : le compteur que tient Convex (`usage:files`, une fonction interne)
-// se lit par `POST /api/query`, avec la même clé, comme le fait `ConvexHttpClient.setAdminAuth`.
+// se lit par `POST /api/query`, avec la même clé, comme le fait `ConvexHttpClient.setAdminAuth`. Il n'est un stock qu'une fois recompté.
 
 import type { ConvexDeployment, ConvexUsageSource } from "@liveplace/domain/ports";
 import type { Result } from "@liveplace/shared";
@@ -32,10 +32,14 @@ const UsageResponseSchema = z.object({
   }),
 });
 
-// Ce que rend `usage:files` : `{ status: "success", value: { bytes, count } }`.
+// Ce que rend `usage:files` : `{ status: "success", value: { bytes, count, isReady } }`. `isReady` est exigé : une fonction qui ne
+// dit pas si son compteur est complet (celle d'avant) ne prouve rien, et un compteur pas encore recompté vaut zéro, pas un stock.
 const FilesResponseSchema = z
-  .object({ status: z.literal("success"), value: z.object({ bytes: z.number().nonnegative() }) })
-  .transform(({ value }) => value.bytes);
+  .object({
+    status: z.literal("success"),
+    value: z.object({ bytes: z.number().nonnegative(), isReady: z.boolean() }),
+  })
+  .transform(({ value }) => value);
 
 // Un appel au déploiement avec sa clé : un échec se dit en quelques mots, sans la clé ni l'adresse.
 async function call<Output>(
@@ -82,8 +86,8 @@ export function createConvexUsageSource(deployment: ConvexDeployment): ConvexUsa
       };
     },
 
-    getFilesBytes: () =>
-      call(
+    async getFilesBytes() {
+      const result = await call(
         deployment,
         QUERY_PATH,
         {
@@ -92,6 +96,11 @@ export function createConvexUsageSource(deployment: ConvexDeployment): ConvexUsa
           body: JSON.stringify({ path: FILES_FUNCTION, args: {}, format: "json" }),
         },
         FilesResponseSchema,
-      ),
+      );
+      if (!result.ok) return result;
+      return result.value.isReady
+        ? { ok: true, value: result.value.bytes }
+        : { ok: false, error: "compteur pas encore recompté" };
+    },
   };
 }

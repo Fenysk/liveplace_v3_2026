@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-08 — Écart §8.1 (amende celui du 08/10 sur les deux lignes de Capacité) : un compteur de fichiers pas recompté n'est pas un stock, un déploiement jamais lu se dépose « jamais lu »
+
+**Contexte.** « Stockage des fichiers » a affiché 37,3 Ko, le dev seul, quand prod et dev pesaient 436 Ko. Deux chaînons de l'écart précédent le produisent : `usage:files` rend 0 tant que `usage:ensure` n'a pas posé `ready` (le web lit au démarrage, avant le worker) et le web dépose ce 0 ; et un déploiement dont l'usage échoue n'était pas déposé du tout, donc le gateway, qui ne connaît que les déposés, sommait les seuls autres.
+**Décision.** `usage:files` ajoute `isReady` (un champ de plus : le web d'avant ne lit que `bytes`) ; le web l'exige, et un compteur pas prêt n'a pas de stock. Un déploiement illisible se dépose à l'instant 0 (`storeConvexUnread`, `HSETNX` : une lecture déjà là reste) : tout Convex est alors sans nouvelles. Mise en ligne : Convex d'abord, puis le web.
+**Renoncement.** Pas de relecture plus rapide après un démarrage neuf : jusqu'à 15 minutes sans nouvelles, une seule fois par déploiement Convex.
+
 ## 2026-10-08 — Écart §7.2 (amende celui du 08/10 sur la récupération) : le premier chunk d'après une récupération note les versions perdues avant elle
 
 **Contexte.** Panne simulée en bêta : un canvas dessiné jusqu'à la version 275, un seul chunk rangé (1 à 3), la sauvegarde à 275, `FLUSHALL`, reprise à 1 000 275. Les versions 4 à 275 n'ont jamais été archivées et le chunk suivant ne le disait pas : le saut de la reprise n'est pas un trou, mais ce qui le précédait en était un, et un trou se note, jamais un silence.

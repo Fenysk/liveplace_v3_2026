@@ -153,8 +153,8 @@ describe("createConvexUsageSource (JOURNAL 2026-10-07)", () => {
 
 // Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers, lu par `POST /api/query` sur la fonction interne `usage:files`.
 describe("the file stock of a deployment (JOURNAL 2026-10-08)", () => {
-  const filesReply = (bytes: number) =>
-    `{"status":"success","value":{"bytes":${bytes},"count":12},"logLines":[]}`;
+  const filesReply = (bytes: number, isReady = true) =>
+    `{"status":"success","value":{"bytes":${bytes},"count":12,"isReady":${isReady}},"logLines":[]}`;
 
   // Appelle la fonction interne par l'API de requête, avec la même clé, dans un délai borné
   it("calls the internal function through the query API with the same key, within a bounded time", async () => {
@@ -188,7 +188,8 @@ describe("the file stock of a deployment (JOURNAL 2026-10-08)", () => {
   it("says a failure in a few words for an error reply, another body or a negative number", async () => {
     const bodies = [
       '{"status":"error","errorMessage":"Could not find public function for usage:files"}',
-      '{"status":"success","value":{"bytes":-1}}',
+      '{"status":"success","value":{"bytes":-1,"isReady":true}}',
+      '{"status":"success","value":{"bytes":1000,"count":12}}', // la fonction d'avant : elle ne dit pas si son compteur est complet
       '{"status":"success","value":{}}',
       '{"status":"success"}',
       "[]",
@@ -201,6 +202,18 @@ describe("the file stock of a deployment (JOURNAL 2026-10-08)", () => {
       expect(await createConvexUsageSource(deployment).getFilesBytes(), body).toEqual({
         ok: false,
         error: "forme de réponse inconnue",
+      });
+    }
+  });
+
+  // Un compteur pas encore recompté (déploiement neuf, avant le premier démarrage du worker) n'a pas de stock : son zéro n'est pas une mesure
+  it("has no stock for a counter not yet recounted: its figure is no measure, zero or not", async () => {
+    for (const bytes of [0, 5000]) {
+      stubConvex(() => new Response(filesReply(bytes, false)));
+
+      expect(await createConvexUsageSource(deployment).getFilesBytes(), String(bytes)).toEqual({
+        ok: false,
+        error: "compteur pas encore recompté",
       });
     }
   });

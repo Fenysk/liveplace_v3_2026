@@ -570,6 +570,27 @@ describe("the file stock of Convex (JOURNAL 2026-10-08)", () => {
     expect(resourceOf("convexCalls").state).toBe("measured");
   });
 
+  // Un déploiement jamais lu (instant 0, comme le web le dépose) rend le stock sans nouvelles : jamais la somme des seuls autres
+  it("has no news of the stock nor of the month while a deployment was never read, never the sum of the others alone", async () => {
+    const { state, sampleAfter, resourceOf, frame } = setup({ isProduction: true });
+    state.convex = configured(
+      ["watchful-spider-409", convexUsage({ calls: 5, filesBytes: 38_389 })],
+      ["valiant-panther-436", convexUsage({ at: 0 })],
+    );
+
+    await sampleAfter(0);
+
+    expect(resourceOf("convexFiles")).toEqual({
+      state: "withoutNews",
+      link: "convex",
+      id: "convexFiles",
+      unit: "bytes",
+      deployments: ["valiant-panther-436", "watchful-spider-409"],
+    });
+    expect(resourceOf("convexCalls").state).toBe("withoutNews");
+    expect(frame().saturation.isIncomplete).toBe(true);
+  });
+
   // Atteint son plafond quand le stock vaut le quota : 100 % pendant une heure
   it("reaches its ceiling when the stock is the quota: 100 % for an hour", async () => {
     const { state, clock, sampleAfter, frame } = setup();
