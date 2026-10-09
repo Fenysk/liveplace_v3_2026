@@ -129,11 +129,6 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
   const [isExpanded, setIsExpanded] = useState(false);
   const isEraser = state.colorIndex === TRANSPARENT_COLOR_INDEX;
   const toggle = () => setIsExpanded((expanded) => !expanded);
-  // Choisir une couleur replie la feuille (design system, Mobile).
-  const pickColor = (colorIndex: number) => {
-    actions.onPickColor(colorIndex);
-    setIsExpanded(false);
-  };
   return (
     <>
       <Grabber
@@ -174,11 +169,13 @@ const DraftSheet = ({ state, actions }: { state: DraftModeState; actions: DraftP
         <TraceButton state={state} actions={actions} />
         <DiscardButton canDiscard={state.canDiscard} onDiscard={actions.onDiscard} />
       </div>
+      {/* Un clic, Entrée, Espace ou Échap replient la feuille (design system, Mobile) ; une flèche choisit sans la replier. */}
       {isExpanded && (
         <Palette
           palette={state.palette}
           colorIndex={state.colorIndex}
-          onPick={pickColor}
+          onPick={actions.onPickColor}
+          onDone={() => setIsExpanded(false)}
           isTouch
           hasEraser={false}
         />

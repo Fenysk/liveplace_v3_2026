@@ -2,6 +2,7 @@
 // `inspecting` : le mode Vue, pendant qu'une case est inspectée. `picking` : le Dessin, pipette armée.
 
 import type { DraftMode } from "../../state/draft-store";
+import { isSwatchKey } from "../design/swatch-keys";
 
 export type KeyPress = { key: string; code: string; hasModifier: boolean; isShifted: boolean };
 export type KeyMode = DraftMode | "inspecting" | "picking";
@@ -65,3 +66,39 @@ export function targetStep(press: KeyPress): TargetStep | null {
   const length = press.isShifted ? LONG_STEP : 1;
   return { dx: arrow.dx * length, dy: arrow.dy * length };
 }
+
+// JOURNAL 2026-10-09 : les touches 1 à 5 par `code`, pour que l'AZERTY marche sans Maj. Le pavé numérique doit taper son
+// chiffre : verrouillage éteint, 1 est Fin, 3 Page suivante, et ce ne sont pas des couleurs.
+const RECENT_SLOT_CODE = /^(Digit|Numpad)([1-5])$/;
+
+// La place de la récente que la touche prend, dans l'ordre où la rangée les montre.
+export function recentColorSlot(press: KeyPress): number | null {
+  const [, source, digit] = RECENT_SLOT_CODE.exec(press.code) ?? [];
+  if (press.hasModifier || !digit || (source === "Numpad" && press.key !== digit)) return null;
+  return Number(digit) - 1;
+}
+
+export type KeyAction =
+  | { kind: "moveTarget"; step: TargetStep }
+  | { kind: "pickRecentColor"; slot: number }
+  | { kind: "command"; command: DraftKeyCommand };
+
+const isDrawing = (mode: KeyMode): boolean => mode === "draft" || mode === "picking";
+
+// Ce que fait une touche, selon le mode. `isInPalette` : le focus est dans la palette, qui garde alors ses touches
+// (flèches, Début, Fin, Entrée, Espace, Échap) ; E, I, Retour arrière et les chiffres continuent.
+export function keyAction(press: KeyPress, mode: KeyMode, isInPalette: boolean): KeyAction | null {
+  if (isInPalette && isSwatchKey(press)) return null;
+  const step = targetStep(press);
+  if (step) return { kind: "moveTarget", step };
+  const slot = recentColorSlot(press);
+  if (slot !== null && isDrawing(mode)) return { kind: "pickRecentColor", slot };
+  const command = keyCommand(press, mode);
+  return command ? { kind: "command", command } : null;
+}
+
+const TYPING_TAGS: readonly string[] = ["INPUT", "TEXTAREA", "SELECT"];
+
+// Les raccourcis se taisent quand un champ de saisie a le focus (CDC 2026).
+export const isTypingElement = (element: { tagName: string; isContentEditable: boolean }): boolean =>
+  element.isContentEditable || TYPING_TAGS.includes(element.tagName);

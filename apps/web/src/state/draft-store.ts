@@ -40,6 +40,7 @@ export type DraftStore = {
   exitDraftMode(): void; // le brouillon est gardé
   discardDraft(): void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
+  selectRecentColor(slot: number): void; // les touches 1 à 5 : la récente de cette place, comme un clic sur elle
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
   togglePicker(): void; // `I` : la pipette, pour un seul clic
   toggleCell(x: number, y: number): void;
@@ -202,6 +203,10 @@ export function createDraftStore(
       if (isEditable()) setDraft(EMPTY_DRAFT);
     },
     selectColor,
+    selectRecentColor(slot) {
+      const colorIndex = view.recentColorIndexes[slot];
+      if (colorIndex !== undefined && isEditable()) selectColor(colorIndex);
+    },
     toggleEraser() {
       if (view.colorIndex === TRANSPARENT_COLOR_INDEX)
         publish({ colorIndex: lastColorIndex, isPicking: false });

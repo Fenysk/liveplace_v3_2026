@@ -102,7 +102,11 @@ export const PaletteEntry = () => {
       note="Les couleurs arrivent par props : la palette de `domain`."
     >
       <Block title="États">
-        <StateRow name="À la souris" detail="La gomme en tête.">
+        <StateRow
+          name="À la souris"
+          detail="La gomme en tête. Au clavier : Tab arrive sur la couleur actuelle, les flèches la changent, Début et Fin vont aux bouts, Échap rend la main au canvas."
+          isDemo
+        >
           <Pill>
             <Palette palette={PALETTE} colorIndex={colorIndex} onPick={setColorIndex} />
           </Pill>
@@ -143,7 +147,7 @@ export const PaletteEntry = () => {
         </StateRow>
         <StateRow
           name="Les récentes"
-          detail="Toucher une récente l'échange avec la couleur actuelle, sur place."
+          detail="Toucher une récente l'échange avec la couleur actuelle, sur place. Au clavier, les touches 1 à 5 prennent la case de leur rang."
         >
           <RecentRowScene />
         </StateRow>

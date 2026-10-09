@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-09 — Écart §9.3 : la palette du Dessin est un groupe radio qui garde ses touches, et 1 à 5 reprennent les récentes
+
+**Contexte.** La palette n'avait ni arrêt de Tab unique ni flèches (audit d'accessibilité), et l'écouteur de `window` agissait même avec le focus sur une pastille : Entrée validait le brouillon, Échap sortait du Dessin, les flèches visaient une case.
+**Décision.** `Palette` est un `radiogroup` à tabindex itinérant : les flèches mènent le focus et choisissent (bouclage, Début, Fin). Tant que le focus y est (`data-palette`), `keyAction` lui laisse flèches, Début, Fin, Entrée, Espace et Échap : Entrée et Espace choisissent, Échap renonce, et les trois rendent le focus au canvas sans quitter le Dessin. E, I et Retour arrière continuent. `Digit1` à `Digit5` et `Numpad1` à `Numpad5`, lus par `code`, appellent `selectRecentColor` : un clic sur la récente de ce rang, sans effet en Vue ni pendant l'envoi.
+**Renoncement.** Aucun nom de couleur inventé (`Couleur #hex` reste) ; pas de rangée de récentes sur PC, où 1 à 5 marchent sans indice visible ; la rangée repliée de la feuille mobile garde ses six arrêts de Tab.
+
 ## 2026-10-09 — Écart §6.3 : une connexion qui ne suit pas se ferme en `1013` à 1 Mio de plus que la plus grosse frame qu'on lui a envoyée
 
 **Contexte.** Le snapshot pèse 64 Kio au plus (256×256, un octet par case), mais le `recent` du `welcome` d'une vue OBS et le resync d'une page revenue peuvent peser des Mio (2000 événements × jusqu'à 64 cases × 117 octets) : « plus de 1 Mo en file » fermerait une page saine pendant qu'elle vide son arrivée, et elle reprendrait le même arrivage en boucle.

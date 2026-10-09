@@ -35,7 +35,8 @@
   outline-offset: 3px;
 }
 
-.lp-swatch[aria-pressed="true"] {
+.lp-swatch[aria-pressed="true"],
+.lp-swatch[aria-checked="true"] {
   box-shadow:
     0 0 0 2px var(--pill-surface),
     0 0 0 4px var(--ink);

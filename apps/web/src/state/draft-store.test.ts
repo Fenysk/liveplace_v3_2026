@@ -623,3 +623,91 @@ describe("createDraftStore — an archive (Écart §15, JOURNAL 2026-10-06)", ()
     expect(store.getView().mode).toBe("draft");
   });
 });
+
+describe("createDraftStore — the recent color keys (JOURNAL 2026-10-09)", () => {
+  // La touche 1 prend la dernière autre couleur utilisée, et la presser encore revient à la précédente
+  it("takes the last other color with the first slot, and takes the previous one back when pressed again", () => {
+    const { store } = setup();
+    store.enterDraftMode();
+    store.selectColor(12);
+    const { recentColorIndexes } = store.getView();
+    const previous = recentColorIndexes[0];
+
+    store.selectRecentColor(0);
+    expect(store.getView()).toMatchObject({ colorIndex: previous });
+
+    store.selectRecentColor(0);
+    expect(store.getView().colorIndex).toBe(12);
+    expect(store.getView().recentColorIndexes).toEqual(recentColorIndexes);
+  });
+
+  // Chaque place prend sa récente et l'échange avec la couleur actuelle, sur place, comme un clic sur elle
+  it("swaps the recent color of each slot with the current color in place, as a click on it does", () => {
+    for (const slot of [0, 1, 2, 3, 4]) {
+      const { store } = setup();
+      store.enterDraftMode();
+      const { colorIndex, recentColorIndexes } = store.getView();
+
+      store.selectRecentColor(slot);
+
+      expect(store.getView()).toMatchObject({
+        colorIndex: recentColorIndexes[slot],
+        recentColorIndexes: recentColorIndexes.map((index, place) => (place === slot ? colorIndex : index)),
+      });
+    }
+  });
+
+  // Sort de la gomme et désarme la pipette, comme un clic sur une couleur
+  it("leaves the eraser and disarms the picker, as a click on a color does", () => {
+    const { store } = setup();
+    store.enterDraftMode();
+    store.selectColor(12);
+    store.toggleEraser();
+
+    store.selectRecentColor(1);
+    expect(store.getView().colorIndex).not.toBe(0);
+
+    store.togglePicker();
+    expect(store.getView().isPicking).toBe(true);
+    store.selectRecentColor(2);
+    expect(store.getView().isPicking).toBe(false);
+  });
+
+  // Ne fait rien en Vue
+  it("does nothing in view mode", () => {
+    const { store } = setup();
+    const before = store.getView();
+
+    store.selectRecentColor(0);
+
+    expect(store.getView()).toBe(before);
+  });
+
+  // Ne fait rien pendant l'envoi, la pill est verrouillée
+  it("does nothing while sending, the pill being locked", async () => {
+    const { store } = setup();
+    store.enterDraftMode();
+    store.toggleCell(0, 0);
+    const before = store.getView();
+
+    const sending = store.submit();
+    store.selectRecentColor(0);
+    expect(store.getView()).toMatchObject({
+      colorIndex: before.colorIndex,
+      recentColorIndexes: before.recentColorIndexes,
+    });
+    await sending;
+  });
+
+  // Ne fait rien d'une place qui n'existe pas
+  it("does nothing with a slot that does not exist", () => {
+    const { store } = setup();
+    store.enterDraftMode();
+    const before = store.getView();
+
+    store.selectRecentColor(5);
+    store.selectRecentColor(-1);
+
+    expect(store.getView()).toBe(before);
+  });
+});

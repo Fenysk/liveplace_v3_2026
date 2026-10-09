@@ -4,7 +4,15 @@ import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { CanvasScene } from "../canvas/canvas-scene";
-import { type DraftKeyCommand, type KeyMode, type KeyPress, keyCommand, targetStep } from "./draft-keys";
+import { PALETTE_SELECTOR } from "../design/swatch-keys";
+import {
+  type DraftKeyCommand,
+  isTypingElement,
+  type KeyAction,
+  type KeyMode,
+  type KeyPress,
+  keyAction,
+} from "./draft-keys";
 import { submitDraft } from "./use-draft-pill";
 
 type KeyStores = { canvas: CanvasStore; draft: DraftStore };
@@ -12,10 +20,12 @@ type KeyStores = { canvas: CanvasStore; draft: DraftStore };
 // L'Espace qui entre en Dessin ne trace qu'après avoir été relâchée : la case sous la souris n'est pas prise.
 type SpaceState = { isEntering: boolean };
 
-// Les raccourcis se taisent quand un champ de saisie a le focus (CDC 2026).
 const isTyping = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+  target instanceof HTMLElement && isTypingElement(target);
+
+// Le focus est dans la palette : ses touches sont à elle (draft-keys.ts, `keyAction`).
+const isInPalette = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && target.closest(PALETTE_SELECTOR) !== null;
 
 // La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
 const isWindowOpen = (): boolean => document.querySelector("dialog[open]") !== null;
@@ -49,22 +59,39 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores, scen
   commands[command]();
 };
 
-const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
-  if (isTyping(event.target) || isWindowOpen()) return;
-  const press = toKeyPress(event);
-  const step = targetStep(press);
-  // Une flèche tenue répète : la case visée file, comme un curseur de texte (CDC 2026).
-  if (step) {
-    event.preventDefault();
-    scene?.moveTarget(step.dx, step.dy);
+type AimAction = Exclude<KeyAction, { kind: "command" }>;
+
+const runAim = (action: AimAction, event: KeyboardEvent, { draft }: KeyStores, scene?: CanvasScene): void => {
+  // Un chiffre tenu ne reprend pas la couleur en boucle : 1 alterne entre deux couleurs, une fois par appui.
+  if (action.kind === "pickRecentColor") {
+    if (!event.repeat) draft.selectRecentColor(action.slot);
     return;
   }
-  const command = keyCommand(press, keyModeOf(stores));
+  // Une flèche tenue répète : la case visée file, comme un curseur de texte (CDC 2026).
+  event.preventDefault();
+  scene?.moveTarget(action.step.dx, action.step.dy);
+};
+
+const pressCommand = (
+  command: DraftKeyCommand,
+  event: KeyboardEvent,
+  stores: KeyStores,
+  space: SpaceState,
+  scene?: CanvasScene,
+): void => {
   // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
-  if (command || event.code === "Space") event.preventDefault();
-  if (!command || event.repeat || (command === "startTrace" && space.isEntering)) return;
+  event.preventDefault();
+  if (event.repeat || (command === "startTrace" && space.isEntering)) return;
   if (command === "enterDraftMode") space.isEntering = event.code === "Space";
   runCommand(command, stores, scene);
+};
+
+const pressKey = (event: KeyboardEvent, stores: KeyStores, space: SpaceState, scene?: CanvasScene): void => {
+  if (isTyping(event.target) || isWindowOpen()) return;
+  const action = keyAction(toKeyPress(event), keyModeOf(stores), isInPalette(event.target));
+  if (action?.kind === "command") pressCommand(action.command, event, stores, space, scene);
+  else if (action) runAim(action, event, stores, scene);
+  else if (event.code === "Space") event.preventDefault();
 };
 
 const releaseSpace = (stores: KeyStores, space: SpaceState): void => {
