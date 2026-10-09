@@ -15,6 +15,14 @@ import {
   toggleDraftCell,
   traceDraftCells,
 } from "./draft";
+import {
+  type DraftHistory,
+  type DraftTravel,
+  EMPTY_DRAFT_HISTORY,
+  recordDraftStep,
+  redoDraftStep,
+  undoDraftStep,
+} from "./draft-history";
 import { predictGauge } from "./gauge";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "./recent-color-indexes";
 import { type DraftStorage, getSavedDraft, saveDraft } from "./saved-draft";
@@ -49,6 +57,8 @@ export type DraftStore = {
   traceCells(cells: readonly { x: number; y: number }[]): void;
   endTrace(): void;
   toggleTouchTracing(): void;
+  undo(): void; // Ctrl+Z : le brouillon d'avant la dernière étape (CDC 2026, §8 Historique)
+  redo(): void; // Ctrl+Maj+Z, Ctrl+Y : ce que Ctrl+Z vient de défaire
   submit(): Promise<void>;
   dispose(): void;
 };
@@ -85,11 +95,24 @@ export function createDraftStore(
   let lastColorIndex = FIRST_COLOR_INDEX;
   let loadedUserId: string | undefined;
   let hasShakenThisTrace = false;
+  // CDC 2026, §8 Historique : en mémoire seulement, hors de la vue et de la sauvegarde.
+  let history: DraftHistory = EMPTY_DRAFT_HISTORY;
+  let isTraceRecorded = false; // l'étape du tracé en cours est déjà dans l'historique
   const listeners = new Set<() => void>();
 
   const publish = (next: Partial<DraftView>): void => {
     view = { ...view, ...next };
     for (const listener of listeners) listener();
+  };
+
+  const forgetHistory = (): void => {
+    history = EMPTY_DRAFT_HISTORY;
+    isTraceRecorded = false;
+  };
+
+  // Une étape : le brouillon d'avant entre dans l'historique, et ce qui pouvait être rétabli s'efface.
+  const recordStep = (): void => {
+    history = recordDraftStep(history, view.draft);
   };
 
   const leaveDraftMode = (): void =>
@@ -100,6 +123,7 @@ export function createDraftStore(
     const { userId, status, width, height, palette } = canvas.getView();
     if (!userId || status !== "live" || userId === loadedUserId) return;
     loadedUserId = userId;
+    forgetHistory();
     const bounds = { width, height, paletteSize: palette.length };
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
   };
@@ -109,10 +133,13 @@ export function createDraftStore(
     const { isBanned, isArchived } = canvas.getView();
     if ((isBanned || isArchived) && view.mode === "draft") leaveDraftMode();
   };
+  const fitted = (draft: Draft): Draft => {
+    const { width, height } = canvas.getView();
+    return width > 0 ? fitDraft(draft, { width, height }) : draft;
+  };
   // §5.3 : le canvas a rétréci, ce qui sort du cadre quitte le brouillon.
   const fitToCanvas = (): void => {
-    const { width, height } = canvas.getView();
-    if (width > 0 && loadedUserId) setDraft(fitDraft(view.draft, { width, height }));
+    if (loadedUserId) setDraft(fitted(view.draft));
   };
   const unsubscribe = canvas.subscribe(() => {
     applySavedDraft();
@@ -150,9 +177,32 @@ export function createDraftStore(
     if (colorIndex !== TRANSPARENT_COLOR_INDEX) selectColor(colorIndex);
   };
 
+  const shakeGauge = (): void => publish({ shakeCount: view.shakeCount + 1 });
+
   const applyEdit = (edit: DraftEdit, canShake: boolean): void => {
     setDraft(edit.draft);
-    if (edit.isCapped && canShake) publish({ shakeCount: view.shakeCount + 1 });
+    if (edit.isCapped && canShake) shakeGauge();
+  };
+
+  // Un changement du brouillon d'un coup (Vider, Retour arrière) est une étape.
+  const commitStep = (draft: Draft): void => {
+    if (draft === view.draft) return;
+    recordStep();
+    setDraft(draft);
+  };
+
+  // Annuler et Rétablir (CDC 2026, §8) : pas pendant un tracé, jamais au-delà de la jauge, et dans le cadre d'aujourd'hui.
+  const travel = (move: (from: DraftHistory, current: Draft) => DraftTravel | null): void => {
+    if (!isEditable() || view.isTracing) return;
+    const step = move(history, view.draft);
+    if (!step) return;
+    const draft = fitted(step.draft);
+    if (draft.size > view.draft.size && draft.size > context().charges) {
+      shakeGauge();
+      return;
+    }
+    history = step.history;
+    setDraft(draft);
   };
 
   // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde. Tous portent la pose de la validation.
@@ -174,6 +224,7 @@ export function createDraftStore(
   const submit = async (): Promise<void> => {
     const { status, isBanned, isArchived } = canvas.getView();
     if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned || isArchived) return;
+    forgetHistory(); // CDC 2026, §8 : une vraie pose ne s'annule jamais
     publish({ isSending: true });
     try {
       await sendBatches();
@@ -200,7 +251,7 @@ export function createDraftStore(
       if (!view.isSending) leaveDraftMode();
     },
     discardDraft() {
-      if (isEditable()) setDraft(EMPTY_DRAFT);
+      if (isEditable() && view.draft.size > 0) commitStep(EMPTY_DRAFT);
     },
     selectColor,
     selectRecentColor(slot) {
@@ -217,24 +268,32 @@ export function createDraftStore(
     },
     toggleCell(x, y) {
       if (view.mode === "draft" && view.isPicking) return pickColorAt(x, y);
-      if (isEditable())
-        applyEdit(toggleDraftCell(view.draft, { x, y, colorIndex: view.colorIndex }, context()), true);
+      if (!isEditable()) return;
+      const edit = toggleDraftCell(view.draft, { x, y, colorIndex: view.colorIndex }, context());
+      if (edit.draft !== view.draft) recordStep();
+      applyEdit(edit, true);
     },
     discardCell(x, y) {
-      if (isEditable()) setDraft(discardDraftCell(view.draft, x, y));
+      if (isEditable()) commitStep(discardDraftCell(view.draft, x, y));
     },
     startTrace() {
       if (!isEditable() || view.isTracing || view.isPicking) return;
       hasShakenThisTrace = false;
+      isTraceRecorded = false;
       publish({ isTracing: true });
     },
     // Le plafond atteint pendant un tracé ne fait vibrer la jauge qu'une fois (CDC 2026).
+    // Un tracé entier est une seule étape, ouverte à sa première case.
     traceCells(cells) {
       if (!isEditable() || !view.isTracing) return;
       const pixels = cells.map(({ x, y }) => ({ x, y, colorIndex: view.colorIndex }));
       const edit = traceDraftCells(view.draft, pixels, context());
       const canShake = !hasShakenThisTrace;
       if (edit.isCapped) hasShakenThisTrace = true; // avant la publication : un abonné qui retrace ne revibre pas
+      if (!isTraceRecorded && edit.draft !== view.draft) {
+        isTraceRecorded = true; // de même : un abonné qui retrace n'ouvre pas une seconde étape
+        recordStep();
+      }
       applyEdit(edit, canShake);
     },
     endTrace() {
@@ -243,6 +302,8 @@ export function createDraftStore(
     toggleTouchTracing() {
       if (view.mode === "draft") publish({ isTouchTracing: !view.isTouchTracing });
     },
+    undo: () => travel(undoDraftStep),
+    redo: () => travel(redoDraftStep),
     submit,
     dispose: unsubscribe,
   };

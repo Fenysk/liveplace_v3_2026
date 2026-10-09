@@ -711,3 +711,380 @@ describe("createDraftStore — the recent color keys (JOURNAL 2026-10-09)", () =
     expect(store.getView()).toBe(before);
   });
 });
+
+describe("createDraftStore — the history (CDC 2026, §8 Historique)", () => {
+  const gaugeOf = (charges: number) => ({ charges, max: 200, nextRefillAt: now + refillMs, claimable: 0 });
+
+  // Le Dessin ouvert, avec de quoi cliquer (ligne 1) et tracer (ligne 0), et lire les colonnes du brouillon
+  const drawing = (options: Setup = {}) => {
+    const context = setup(options);
+    context.store.enterDraftMode();
+    const xs = () => context.cells().map(({ x }) => x);
+    const click = (x: number) => context.store.toggleCell(x, 1);
+    const trace = (...columns: number[]) => {
+      context.store.startTrace();
+      context.store.traceCells(columns.map((x) => ({ x, y: 0 })));
+      context.store.endTrace();
+    };
+    return { ...context, xs, click, trace };
+  };
+
+  // Un clic qui ajoute, un clic qui retire : une étape chacun
+  it("makes a click that adds, and a click that takes out, one step each", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    click(1);
+    expect(xs()).toEqual([2]);
+
+    store.undo();
+    expect(xs()).toEqual([1, 2]);
+    store.undo();
+    expect(xs()).toEqual([1]);
+    store.undo();
+    expect(xs()).toEqual([]);
+    store.undo();
+    expect(xs()).toEqual([]);
+  });
+
+  // Un tracé entier, en plusieurs morceaux, est une seule étape
+  it("makes a whole trace, in several pieces, one single step", () => {
+    const { store, click, xs } = drawing();
+    click(9);
+
+    store.startTrace();
+    store.traceCells([0, 1, 2].map((x) => ({ x, y: 0 })));
+    store.traceCells([3, 4].map((x) => ({ x, y: 0 })));
+    store.endTrace();
+    expect(xs()).toEqual([9, 0, 1, 2, 3, 4]);
+
+    store.undo();
+    expect(xs()).toEqual([9]);
+    store.undo();
+    expect(xs()).toEqual([]);
+  });
+
+  // Un tracé qui s'arrête parce qu'on sort du Dessin est quand même une étape
+  it("makes a trace that ends because draft mode is left a step all the same", () => {
+    const { store, xs } = drawing();
+
+    store.startTrace();
+    store.traceCells([0, 1].map((x) => ({ x, y: 0 })));
+    store.exitDraftMode();
+    store.enterDraftMode();
+    store.undo();
+
+    expect(xs()).toEqual([]);
+  });
+
+  // Deux tracés sont deux étapes
+  it("makes two traces two steps", () => {
+    const { store, trace, xs } = drawing();
+    trace(0, 1);
+    trace(5, 6);
+
+    store.undo();
+    expect(xs()).toEqual([0, 1]);
+    store.undo();
+    expect(xs()).toEqual([]);
+  });
+
+  // Un tracé qui n'ajoute rien n'est pas une étape
+  it("makes a trace that adds nothing no step", () => {
+    const { store, trace, xs } = drawing();
+    trace(0, 1);
+
+    trace();
+    trace(0, 1);
+    store.undo();
+
+    expect(xs()).toEqual([]);
+  });
+
+  // Retour arrière ou Suppr au clavier : une étape quand il retire une case, aucune quand la case n'y est pas
+  it("makes Backspace on a cell of the draft a step, and Backspace on an absent cell none", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+
+    store.discardCell(1, 1);
+    store.discardCell(7, 1);
+    expect(xs()).toEqual([2]);
+
+    store.undo();
+    expect(xs()).toEqual([1, 2]);
+  });
+
+  // Un coup de gomme et un tracé de gomme sont des étapes
+  it("makes an eraser click and an eraser stroke steps", () => {
+    const { store, click, trace, cells, xs } = drawing();
+    click(1);
+    store.toggleEraser();
+    click(2);
+    trace(3, 4);
+    expect(cells().map(({ colorIndex }) => colorIndex)).toEqual([1, 0, 0, 0]);
+
+    store.undo();
+    expect(xs()).toEqual([1, 2]);
+    store.undo();
+    expect(xs()).toEqual([1]);
+  });
+
+  // La gomme sur un pixel transparent ne fait rien, donc n'est pas une étape
+  it("makes the eraser on a transparent pixel no step", () => {
+    const { store, click, xs, setCanvasView } = drawing();
+    click(1);
+    setCanvasView(liveView({ pixels: new Uint8Array(256 * 4) }));
+    store.toggleEraser();
+
+    click(5);
+    store.undo();
+
+    expect(xs()).toEqual([]);
+  });
+
+  // Vider est une étape, qu'on annule et qu'on rétablit ; vider un brouillon vide n'en est pas une
+  it("makes Vider a step that can be undone and redone, and Vider on an empty draft none", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+
+    store.discardDraft();
+    expect(xs()).toEqual([]);
+    store.undo();
+    expect(xs()).toEqual([1, 2]);
+    store.redo();
+    expect(xs()).toEqual([]);
+
+    store.discardDraft();
+    store.undo();
+    expect(xs()).toEqual([1, 2]);
+  });
+
+  // Changer de couleur, la gomme, la pipette, les récentes, le tracé tactile et un tracé vide ne sont pas des étapes
+  it("makes colors, the eraser toggle, the picker, the recent colors, touch tracing and an empty trace no steps", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+
+    store.selectColor(12);
+    store.toggleEraser();
+    store.toggleEraser();
+    store.selectRecentColor(0);
+    store.togglePicker();
+    store.toggleCell(3, 1);
+    store.toggleTouchTracing();
+    store.startTrace();
+    store.endTrace();
+    const { colorIndex } = store.getView();
+    store.undo();
+
+    expect(xs()).toEqual([]);
+    expect(store.getView().colorIndex).toBe(colorIndex);
+  });
+
+  // Rétablir rejoue les étapes annulées, dans l'ordre, puis s'arrête
+  it("redoes the undone steps in order, then stops", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    store.undo();
+    store.undo();
+    expect(xs()).toEqual([]);
+
+    store.redo();
+    expect(xs()).toEqual([1]);
+    store.redo();
+    expect(xs()).toEqual([1, 2]);
+    store.redo();
+    expect(xs()).toEqual([1, 2]);
+  });
+
+  // Une nouvelle étape après des annulations efface ce qui pouvait être rétabli
+  it("loses what could be redone when a new step comes after undoing", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    store.undo();
+
+    click(3);
+    store.redo();
+
+    expect(xs()).toEqual([1, 3]);
+  });
+
+  // Le brouillon sauvegardé suit l'annulation
+  it("saves the draft an undo comes back to", () => {
+    const { store, click, entries, cells } = drawing();
+    click(1);
+    click(2);
+
+    store.undo();
+
+    expect(JSON.parse(entries.get("liveplace:draft:canvas-1:user-1") ?? "[]")).toEqual(cells());
+  });
+
+  // Ne dépasse jamais la jauge : annuler un Vider qui rendrait plus de cases que de charges n'est pas appliqué, et la jauge vibre
+  it("refuses an undo that would put more cells than charges in the draft, and shakes the gauge", () => {
+    const { store, click, xs, setCanvasView } = drawing({ view: liveView({ gauge: gaugeOf(3) }) });
+    click(1);
+    click(2);
+    click(3);
+    store.discardDraft();
+
+    setCanvasView(liveView({ gauge: gaugeOf(1) }));
+    store.undo();
+    expect(xs()).toEqual([]);
+    expect(store.getView().shakeCount).toBe(1);
+
+    setCanvasView(liveView({ gauge: gaugeOf(3) }));
+    store.undo();
+    expect(xs()).toEqual([1, 2, 3]);
+    expect(store.getView().shakeCount).toBe(1);
+  });
+
+  // Rétablir non plus ne dépasse la jauge
+  it("refuses a redo that would put more cells than charges in the draft, and shakes the gauge", () => {
+    const { store, click, xs, setCanvasView } = drawing({ view: liveView({ gauge: gaugeOf(3) }) });
+    click(1);
+    click(2);
+    store.undo();
+
+    setCanvasView(liveView({ gauge: gaugeOf(1) }));
+    store.redo();
+    expect(xs()).toEqual([1]);
+    expect(store.getView().shakeCount).toBe(1);
+
+    setCanvasView(liveView({ gauge: gaugeOf(2) }));
+    store.redo();
+    expect(xs()).toEqual([1, 2]);
+  });
+
+  // Un brouillon déjà au-dessus de la jauge peut quand même se réduire en annulant
+  it("lets an undo shrink a draft that is already over the gauge", () => {
+    const { store, click, xs, setCanvasView } = drawing({ view: liveView({ gauge: gaugeOf(3) }) });
+    click(1);
+    click(2);
+    click(3);
+
+    setCanvasView(liveView({ gauge: gaugeOf(1) }));
+    store.undo();
+
+    expect(xs()).toEqual([1, 2]);
+    expect(store.getView().shakeCount).toBe(0);
+  });
+
+  // Valider vide l'historique : le brouillon qui garde des pixels refusés repart sans historique
+  it("empties the history on validation: a draft that keeps refused pixels starts again without history", async () => {
+    const rejected = { ...acceptAll([]), accepted: 1, rejected: [{ index: 1, reason: "gauge" }] };
+    const { store, click, xs } = drawing({ results: [{ ok: true, value: rejected }] });
+    click(1);
+    click(2);
+
+    await store.submit();
+    expect(xs()).toEqual([2]);
+    store.undo();
+
+    expect(xs()).toEqual([2]);
+    expect(store.getView().mode).toBe("draft");
+  });
+
+  // Une vraie pose ne s'annule jamais : tout est posé, on revient en Vue, et en Dessin il n'y a rien à annuler ni à rétablir
+  it("never undoes a real placement: after a full validation there is nothing to undo or redo", async () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    store.undo();
+
+    await store.submit();
+    store.enterDraftMode();
+    store.undo();
+    store.redo();
+
+    expect(xs()).toEqual([]);
+  });
+
+  // Une validation qui ne part pas (connexion tombée) ne vide pas l'historique
+  it("keeps the history when the validation does not leave", async () => {
+    const { store, click, xs, setCanvasView } = drawing();
+    click(1);
+    click(2);
+    setCanvasView(liveView({ status: "closed" }));
+
+    await store.submit();
+    store.undo();
+
+    expect(xs()).toEqual([1]);
+  });
+
+  // Hors du Dessin rien ne bouge ; le brouillon gardé garde aussi son historique
+  it("does nothing in view mode, and the draft that is kept keeps its history", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    store.exitDraftMode();
+
+    store.undo();
+    store.redo();
+    expect(xs()).toEqual([1, 2]);
+
+    store.enterDraftMode();
+    store.undo();
+    expect(xs()).toEqual([1]);
+  });
+
+  // Pendant l'envoi, la pill est verrouillée : ni annuler ni rétablir
+  it("does nothing while sending, the pill being locked", async () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+
+    const sending = store.submit();
+    store.undo();
+    store.redo();
+    expect(xs()).toEqual([1, 2]);
+    await sending;
+  });
+
+  // Pendant un tracé, rien n'est annulé : il n'est pas encore une étape finie
+  it("does nothing during a trace, which is not a finished step yet", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+
+    store.startTrace();
+    store.traceCells([{ x: 0, y: 0 }]);
+    store.undo();
+    expect(xs()).toEqual([1, 0]);
+
+    store.endTrace();
+    store.undo();
+    expect(xs()).toEqual([1]);
+  });
+
+  // L'historique vit en mémoire : seul le brouillon est sauvegardé, et une page rechargée repart sans historique
+  it("keeps the history in memory only: a reloaded page starts without history", () => {
+    const first = drawing();
+    first.click(1);
+    first.click(2);
+    first.store.undo();
+    expect([...first.entries.keys()]).toEqual(["liveplace:draft:canvas-1:user-1"]);
+
+    const reloaded = setup({ saved: JSON.stringify([{ x: 1, y: 1, colorIndex: 4 }]) });
+    reloaded.store.enterDraftMode();
+    reloaded.store.undo();
+
+    expect(reloaded.cells()).toEqual([{ x: 1, y: 1, colorIndex: 4 }]);
+  });
+
+  // Un canvas qui rétrécit fait sortir des cases du brouillon : annuler ne les ramène pas
+  it("does not bring back cells that left the draft when the canvas shrank", () => {
+    const { store, click, xs, setCanvasView } = drawing();
+    click(200);
+    click(1);
+
+    setCanvasView(liveView({ width: 100 }));
+    expect(xs()).toEqual([1]);
+    store.undo();
+
+    expect(xs()).toEqual([]);
+  });
+});

@@ -7,12 +7,14 @@ import {
   keyCommand,
   recentColorSlot,
   targetStep,
+  toKeyPress,
 } from "./draft-keys";
 
 const press = (key: string, code: string, hasModifier = false, isShifted = false): KeyPress => ({
   key,
   code,
   hasModifier,
+  isCtrlOrCmd: hasModifier,
   isShifted,
 });
 
@@ -246,6 +248,125 @@ describe("keyAction (JOURNAL 2026-10-09, la palette au clavier)", () => {
   // Dans la palette, Ctrl + flèche reste au navigateur et ne bouge rien non plus
   it("in the palette, an arrow held with Ctrl does nothing", () => {
     expect(keyAction(press("ArrowRight", "ArrowRight", true), "draft", true)).toBeNull();
+  });
+});
+
+describe("Annuler et Rétablir au clavier (CDC 2026, §8 Historique)", () => {
+  const DRAWING: readonly KeyMode[] = ["draft", "picking"];
+  const ctrl = (key: string, code: string, isShifted = false): KeyPress => press(key, code, true, isShifted);
+  // Alt seul, ou AltGr (Ctrl + Alt) : une touche à lettres, jamais Ctrl ou Cmd
+  const alt = (key: string, code: string): KeyPress => ({ ...press(key, code, true), isCtrlOrCmd: false });
+
+  // Ctrl+Z annule, Ctrl+Maj+Z et Ctrl+Y rétablissent, pipette armée ou non
+  it("undoes with Ctrl+Z, redoes with Ctrl+Shift+Z and Ctrl+Y, with the picker armed or not", () => {
+    for (const mode of DRAWING) {
+      expect(keyCommand(ctrl("z", "KeyZ"), mode)).toBe("undo");
+      expect(keyCommand(ctrl("Z", "KeyZ", true), mode)).toBe("redo");
+      expect(keyCommand(ctrl("y", "KeyY"), mode)).toBe("redo");
+    }
+  });
+
+  // Lit la lettre en minuscule : Verr. Maj. allumé, Ctrl+Z reste Annuler et Ctrl+Maj+Z Rétablir
+  it("reads the letter in lowercase: with Caps Lock on, Ctrl+Z still undoes and Ctrl+Shift+Z still redoes", () => {
+    expect(keyCommand(ctrl("Z", "KeyZ"), "draft")).toBe("undo");
+    expect(keyCommand(ctrl("z", "KeyZ", true), "draft")).toBe("redo");
+    expect(keyCommand(ctrl("Y", "KeyY"), "draft")).toBe("redo");
+  });
+
+  // Sur un clavier AZERTY, le Z est à la place du W : Ctrl+Z annule, et la touche W de l'AZERTY, à la place du Z, non
+  it("works on an AZERTY keyboard: Z is where the W of QWERTY is, and the W key, where the QWERTY Z is, does nothing", () => {
+    expect(keyCommand(ctrl("z", "KeyW"), "draft")).toBe("undo");
+    expect(keyCommand(ctrl("Z", "KeyW", true), "draft")).toBe("redo");
+    expect(keyCommand(ctrl("y", "KeyY"), "draft")).toBe("redo");
+    expect(keyCommand(ctrl("w", "KeyZ"), "draft")).toBeNull();
+  });
+
+  // Sur un QWERTZ, Z et Y sont échangés : la touche qui porte la lettre décide
+  it("works on a QWERTZ keyboard, where Z and Y are swapped: the key that carries the letter decides", () => {
+    expect(keyCommand(ctrl("z", "KeyY"), "draft")).toBe("undo");
+    expect(keyCommand(ctrl("y", "KeyZ"), "draft")).toBe("redo");
+  });
+
+  // Une disposition qui n'a pas de lettre latine (cyrillique, grec) retombe sur la place de la touche
+  it("falls back on the place of the key when the layout types no Latin letter", () => {
+    expect(keyCommand(ctrl("я", "KeyZ"), "draft")).toBe("undo");
+    expect(keyCommand(ctrl("Я", "KeyZ", true), "draft")).toBe("redo");
+    expect(keyCommand(ctrl("н", "KeyY"), "draft")).toBe("redo");
+    expect(keyCommand(ctrl("ζ", "KeyZ"), "draft")).toBe("undo");
+    expect(keyCommand(ctrl("ч", "KeyX"), "draft")).toBeNull();
+  });
+
+  // Ctrl+Maj+Y n'est pas à nous (Firefox y ouvre les téléchargements), Alt et AltGr non plus, et Z seul ne fait rien
+  it("leaves Ctrl+Shift+Y, Alt+Z, AltGr+Z and a plain Z alone", () => {
+    expect(keyCommand(ctrl("Y", "KeyY", true), "draft")).toBeNull();
+    expect(keyCommand(alt("z", "KeyZ"), "draft")).toBeNull();
+    expect(keyCommand(alt("y", "KeyY"), "draft")).toBeNull();
+    expect(keyCommand(press("z", "KeyZ"), "draft")).toBeNull();
+    expect(keyCommand(press("Z", "KeyZ", false, true), "draft")).toBeNull();
+    expect(keyCommand(ctrl("x", "KeyX"), "draft")).toBeNull();
+  });
+
+  // Rien en Vue, ni pendant une inspection : Ctrl+Z y reste au navigateur
+  it("does nothing in view mode or while inspecting, leaving Ctrl+Z to the browser", () => {
+    for (const mode of ["view", "inspecting"] as const) {
+      expect(keyCommand(ctrl("z", "KeyZ"), mode)).toBeNull();
+      expect(keyAction(ctrl("z", "KeyZ", true), mode, false)).toBeNull();
+      expect(keyAction(ctrl("y", "KeyY"), mode, false)).toBeNull();
+    }
+  });
+
+  // Dans la palette, Ctrl+Z reste à nous : elle ne garde que ses touches de déplacement
+  it("still undoes while the focus is in the palette", () => {
+    expect(keyAction(ctrl("z", "KeyZ"), "draft", true)).toEqual({ kind: "command", command: "undo" });
+    expect(keyAction(ctrl("y", "KeyY"), "picking", true)).toEqual({ kind: "command", command: "redo" });
+  });
+
+  // Les autres touches du Dessin gardent leur sens, et un Ctrl + chiffre ou Ctrl + E restent au navigateur
+  it("leaves the other draft keys as they were, and Ctrl+E or Ctrl+1 to the browser", () => {
+    expect(keyAction(press("e", "KeyE"), "draft", false)).toEqual({
+      kind: "command",
+      command: "toggleEraser",
+    });
+    expect(keyAction(ctrl("e", "KeyE"), "draft", false)).toBeNull();
+    expect(keyAction(ctrl("1", "Digit1"), "draft", false)).toBeNull();
+  });
+});
+
+describe("toKeyPress (CDC 2026, §8 Historique : Ctrl sur PC, Cmd sur Mac)", () => {
+  const event = (overrides: Partial<Parameters<typeof toKeyPress>[0]> = {}) => ({
+    key: "z",
+    code: "KeyZ",
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...overrides,
+  });
+
+  // Ctrl et Cmd sont la même touche de raccourci
+  it("takes Ctrl and Cmd for the same shortcut key", () => {
+    expect(toKeyPress(event({ ctrlKey: true }))).toMatchObject({ hasModifier: true, isCtrlOrCmd: true });
+    expect(toKeyPress(event({ metaKey: true }))).toMatchObject({ hasModifier: true, isCtrlOrCmd: true });
+  });
+
+  // Alt seul est un modificateur, mais pas Ctrl ou Cmd ; AltGr (Ctrl + Alt) non plus
+  it("takes Alt, and AltGr which is Ctrl plus Alt, for modifiers that are not Ctrl or Cmd", () => {
+    expect(toKeyPress(event({ altKey: true }))).toMatchObject({ hasModifier: true, isCtrlOrCmd: false });
+    expect(toKeyPress(event({ ctrlKey: true, altKey: true }))).toMatchObject({
+      hasModifier: true,
+      isCtrlOrCmd: false,
+    });
+  });
+
+  // Sans modificateur, rien ; Maj se lit à part, et la touche passe telle quelle
+  it("has no modifier on a plain key, reads Shift apart, and passes the key through", () => {
+    expect(toKeyPress(event({ shiftKey: true, key: "Z" }))).toEqual({
+      key: "Z",
+      code: "KeyZ",
+      hasModifier: false,
+      isCtrlOrCmd: false,
+      isShifted: true,
+    });
   });
 });
 

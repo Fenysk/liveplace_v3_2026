@@ -10,8 +10,8 @@ import {
   isTypingElement,
   type KeyAction,
   type KeyMode,
-  type KeyPress,
   keyAction,
+  toKeyPress,
 } from "./draft-keys";
 import { submitDraft } from "./use-draft-pill";
 
@@ -30,13 +30,6 @@ const isInPalette = (target: EventTarget | null): boolean =>
 // La fenêtre ouverte garde le clavier pour elle : Espace ou `D` n'agissent pas derrière le voile.
 const isWindowOpen = (): boolean => document.querySelector("dialog[open]") !== null;
 
-const toKeyPress = (event: KeyboardEvent): KeyPress => ({
-  key: event.key,
-  code: event.code,
-  hasModifier: event.ctrlKey || event.metaKey || event.altKey,
-  isShifted: event.shiftKey,
-});
-
 const keyModeOf = ({ canvas, draft }: KeyStores): KeyMode => {
   const { mode, isPicking } = draft.getView();
   if (mode === "draft") return isPicking ? "picking" : "draft";
@@ -54,6 +47,8 @@ const runCommand = (command: DraftKeyCommand, { canvas, draft }: KeyStores, scen
     startTrace: () => draft.startTrace(),
     pickTarget: () => scene?.pickTarget(),
     discardTarget: () => scene?.discardTarget(),
+    undo: () => draft.undo(),
+    redo: () => draft.redo(),
     closeInspection: () => canvas.closeInspection(),
   };
   commands[command]();
@@ -72,6 +67,9 @@ const runAim = (action: AimAction, event: KeyboardEvent, { draft }: KeyStores, s
   scene?.moveTarget(action.step.dx, action.step.dy);
 };
 
+// Une commande tenue ne se répète pas, sauf Annuler et Rétablir : elles remontent les étapes comme dans un éditeur.
+const REPEATING_COMMANDS: readonly DraftKeyCommand[] = ["undo", "redo"];
+
 const pressCommand = (
   command: DraftKeyCommand,
   event: KeyboardEvent,
@@ -79,9 +77,10 @@ const pressCommand = (
   space: SpaceState,
   scene?: CanvasScene,
 ): void => {
-  // Espace ne fait jamais défiler la page, et ne reclique pas un bouton (CDC 2026).
+  // Espace ne fait jamais défiler la page, ni Ctrl+Z annuler dans le navigateur, et rien ne reclique un bouton (CDC 2026).
   event.preventDefault();
-  if (event.repeat || (command === "startTrace" && space.isEntering)) return;
+  const isRepeated = event.repeat && !REPEATING_COMMANDS.includes(command);
+  if (isRepeated || (command === "startTrace" && space.isEntering)) return;
   if (command === "enterDraftMode") space.isEntering = event.code === "Space";
   runCommand(command, stores, scene);
 };

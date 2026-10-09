@@ -4,7 +4,14 @@
 import type { DraftMode } from "../../state/draft-store";
 import { isSwatchKey } from "../design/swatch-keys";
 
-export type KeyPress = { key: string; code: string; hasModifier: boolean; isShifted: boolean };
+// `hasModifier` : Ctrl, Alt ou Cmd. `isCtrlOrCmd` : Ctrl ou Cmd, et pas Alt (AltGr est Ctrl + Alt).
+export type KeyPress = {
+  key: string;
+  code: string;
+  hasModifier: boolean;
+  isCtrlOrCmd: boolean;
+  isShifted: boolean;
+};
 export type KeyMode = DraftMode | "inspecting" | "picking";
 export type DraftKeyCommand =
   | "enterDraftMode"
@@ -15,6 +22,8 @@ export type DraftKeyCommand =
   | "startTrace"
   | "pickTarget"
   | "discardTarget"
+  | "undo"
+  | "redo"
   | "closeInspection";
 // Le pas de la case visée au clavier, en cases.
 export type TargetStep = { dx: number; dy: number };
@@ -52,9 +61,42 @@ const ARROWS: Record<string, TargetStep> = {
 };
 const LONG_STEP = 10;
 
-// Ctrl, Alt ou Cmd : la touche appartient au navigateur (Ctrl+E, Ctrl+D…).
+// Ce que l'écouteur lit d'un `KeyboardEvent`.
+type KeyEventLike = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey">;
+
+export function toKeyPress(event: KeyEventLike): KeyPress {
+  return {
+    key: event.key,
+    code: event.code,
+    hasModifier: event.ctrlKey || event.metaKey || event.altKey,
+    isCtrlOrCmd: (event.ctrlKey || event.metaKey) && !event.altKey,
+    isShifted: event.shiftKey,
+  };
+}
+
+const isDrawing = (mode: KeyMode): boolean => mode === "draft" || mode === "picking";
+
+const LATIN_LETTER = /^[a-z]$/;
+const LETTER_CODE = /^Key([A-Z])$/;
+
+// La lettre d'un raccourci : celle que la touche tape si elle est latine (AZERTY), sinon sa place (cyrillique, grec).
+const shortcutLetter = ({ key, code }: KeyPress): string => {
+  const typed = key.toLowerCase();
+  if (LATIN_LETTER.test(typed)) return typed;
+  return LETTER_CODE.exec(code)?.[1]?.toLowerCase() ?? typed;
+};
+
+// CDC 2026, §8 : Ctrl ou Cmd + Z annule, avec Maj ou avec Y il rétablit ; en Dessin seulement.
+function historyCommand(press: KeyPress, mode: KeyMode): DraftKeyCommand | null {
+  if (!press.isCtrlOrCmd || !isDrawing(mode)) return null;
+  const letter = shortcutLetter(press);
+  if (letter === "z") return press.isShifted ? "redo" : "undo";
+  return letter === "y" && !press.isShifted ? "redo" : null;
+}
+
+// Ctrl, Alt ou Cmd : la touche appartient au navigateur (Ctrl+E, Ctrl+D…), sauf Annuler et Rétablir.
 export function keyCommand(press: KeyPress, mode: KeyMode): DraftKeyCommand | null {
-  if (press.hasModifier) return null;
+  if (press.hasModifier) return historyCommand(press, mode);
   if (press.code === "Space") return SPACE_COMMANDS[mode];
   return KEYS_BY_MODE[mode][press.key.toLowerCase()] ?? null;
 }
@@ -82,8 +124,6 @@ export type KeyAction =
   | { kind: "moveTarget"; step: TargetStep }
   | { kind: "pickRecentColor"; slot: number }
   | { kind: "command"; command: DraftKeyCommand };
-
-const isDrawing = (mode: KeyMode): boolean => mode === "draft" || mode === "picking";
 
 // Ce que fait une touche, selon le mode. `isInPalette` : le focus est dans la palette, qui garde alors ses touches
 // (flèches, Début, Fin, Entrée, Espace, Échap) ; E, I, Retour arrière et les chiffres continuent.
