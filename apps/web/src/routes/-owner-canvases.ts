@@ -14,7 +14,7 @@ import { reopenCanvas } from "../usecase/reopen-canvas";
 import { setCanvasTheme } from "../usecase/set-canvas-theme";
 
 // Les identifiants de canvas sont des UUID : une borne large suffit à refuser ce qui n'en est pas.
-const CanvasIdSchema = z.string().min(1).max(100);
+export const CanvasIdSchema = z.string().min(1).max(100);
 const ProgressChoiceSchema = z.enum(["keep", "restart"]);
 
 // Le thème est nettoyé par `toTheme` : ici, seulement une borne pour ne pas lire un corps démesuré.

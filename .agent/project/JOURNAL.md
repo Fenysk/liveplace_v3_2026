@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-09 — Écart §4.2 (amende celui du 08/10 sur la récupération) : une page à qui le gateway dit « introuvable » demande au web si le canvas peut revenir
+
+**Contexte.** Le gateway ne dit `canvas_recovering` que sur `meta.ready` à 0, posé par le worker (tour de 5 s) ou au rendu d'une page : une page déjà ouverte (reprise de socket, pose refusée) lisait `canvas_not_found` et disait « pas encore de canvas » jusqu'à la marque, puis jusqu'à la reprise suivante de sa socket (1 à 2 s). Seul le web parle à Convex.
+**Décision.** `CanvasStoreOptions.isMissingConfirmed` : sur `canvas_not_found` (jamais en vue OBS), la page ne dit rien, appelle la fonction serveur `POST` `getCanvasVerdictFn` (`markRecoveringIfLost` : marque le canvas perdu dont ce scope garde une sauvegarde, rend `live`, `recovering`, `missing` ou `unknown`), puis passe à `canvas_recovering` sauf pour `missing`, qui garde « introuvable » ; un canvas confirmé introuvable n'est pas redemandé à la reprise suivante. Le canvas neuf d'un archivage (`version` sans `ready`) est `live` : jamais marqué, au pire un bref message d'attente jusqu'à la reprise. Ni code ni champ de plus : `PROTOCOL_VERSION` reste 19.
+**Renoncement.** Convex lu par le gateway ; un hint dans le `hello` ; élargir `isRecovering` à tout canvas sans `version` (les actions Twitch d'un canvas jamais sauvegardé attendraient sans fin) ; accélérer le tour du worker.
+
 ## 2026-10-09 — Écart §4.3 et §5.1 : la section Capacité compte ce que bloquent les protections du gateway, sans plafond et hors de la saturation
 
 **Contexte.** Le gateway refuse une pose au-delà de dix par seconde et par connexion (`rate_limited`) et ferme en `1013` une connexion qui ne suit pas ; rien ne dit si cela arrive en production.

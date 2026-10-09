@@ -3,6 +3,7 @@
 import { createRouter } from "@tanstack/react-router";
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { createWsClient } from "../net/ws-client";
+import { getCanvasVerdictFn } from "../routes/-canvas-verdict";
 import { type CanvasMode, createCanvasStore } from "../state/canvas-store";
 import { routeTree } from "./routeTree.gen";
 
@@ -20,6 +21,8 @@ export function getRouter() {
           mode,
           now: Date.now,
           reload: () => window.location.reload(),
+          // Écart §4.2 (JOURNAL 2026-10-09) : le web marque le canvas perdu, et dit si rien ne le ramènera.
+          isMissingConfirmed: async (id: string) => (await getCanvasVerdictFn({ data: id })) === "missing",
         }),
     },
   });

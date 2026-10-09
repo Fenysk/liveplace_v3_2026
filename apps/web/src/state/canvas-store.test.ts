@@ -1,3 +1,4 @@
+import { setImmediate as nextTurn } from "node:timers/promises";
 import { PALETTE, toStateOffset } from "@liveplace/domain";
 import type { AckFrame, Transport, TransportListeners } from "@liveplace/domain/ports";
 import { type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -145,6 +146,166 @@ describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
     receive({ ...welcome, version: 1_000_275 });
 
     expect(store.getView()).toMatchObject({ lastError: null, version: 1_000_275 });
+  });
+});
+
+// Le web répond quand on le lui demande : `answer` dit « rien ne le ramènera », `fail` est une panne du web.
+const webConfirmation = () => {
+  const asked: string[] = [];
+  const pending = {
+    answer: (_isMissing: boolean): void => undefined,
+    fail: (_error: Error): void => undefined,
+  };
+  const isMissingConfirmed = (canvasId: string) =>
+    new Promise<boolean>((resolve, reject) => {
+      asked.push(canvasId);
+      pending.answer = resolve;
+      pending.fail = reject;
+    });
+  return { asked, isMissingConfirmed, pending };
+};
+
+describe("a canvas the gateway cannot find, which the web confirms (Écart §4.2, JOURNAL 2026-10-09)", () => {
+  // Tant que le web n'a pas répondu, la page ne dit ni « introuvable » ni rien d'autre : elle ne ment pas
+  it("says neither missing nor recovering while the web has not answered, and asks about this canvas", () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+
+    receive({ t: "error", code: "canvas_not_found" });
+
+    expect(store.getView().lastError).toBeNull();
+    expect(web.asked).toEqual(["canvas-1"]);
+  });
+
+  // Le web sait qu'une sauvegarde peut le ramener : la page passe directement au message d'attente, jamais à « introuvable »
+  it("goes straight to canvas_recovering when the web says the canvas can come back", async () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+    const seen: (string | null)[] = [];
+    store.subscribe(() => seen.push(store.getView().lastError));
+
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.answer(false);
+    await nextTurn();
+
+    expect(store.getView().lastError).toBe("canvas_recovering");
+    expect(seen).not.toContain("canvas_not_found");
+  });
+
+  // Un vrai canvas introuvable (rien à remettre en place) garde son message, une fois le web d'accord
+  it("keeps canvas_not_found once the web confirms nothing will bring the canvas back", async () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.answer(true);
+    await nextTurn();
+
+    expect(store.getView().lastError).toBe("canvas_not_found");
+  });
+
+  // Un web qui ne répond pas ne fait pas dire à la page que le canvas n'existe pas : elle attend, et redemandera
+  it("waits rather than saying missing when the web fails to answer", async () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.fail(new Error("le web a coupé"));
+    await nextTurn();
+
+    expect(store.getView().lastError).toBe("canvas_recovering");
+  });
+
+  // Une réponse qui arrive après le welcome ne remet pas d'erreur : le canvas est revenu entre-temps
+  it("drops an answer that comes after a welcome", async () => {
+    const web = webConfirmation();
+    const { store, receive, close, open } = setup({
+      storeOptions: { isMissingConfirmed: web.isMissingConfirmed },
+    });
+    receive({ t: "error", code: "canvas_not_found" });
+    close();
+    open();
+    receive(welcome);
+
+    web.pending.answer(true);
+    await nextTurn();
+
+    expect(store.getView()).toMatchObject({ lastError: null, status: "live" });
+  });
+
+  // Un canvas confirmé introuvable n'est pas redemandé à chaque reprise de la socket : Convex n'est pas lu en boucle
+  it("does not ask again at the next reconnection once the canvas is confirmed missing", async () => {
+    const web = webConfirmation();
+    const { store, receive, close, open } = setup({
+      storeOptions: { isMissingConfirmed: web.isMissingConfirmed },
+    });
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.answer(true);
+    await nextTurn();
+    close();
+    open();
+
+    receive({ t: "error", code: "canvas_not_found" });
+
+    expect(web.asked).toEqual(["canvas-1"]);
+    expect(store.getView().lastError).toBe("canvas_not_found");
+  });
+
+  // Mais si le web a dit « il revient » et que le gateway ne le trouve toujours pas, la page redemande
+  it("asks again when the web said it comes back and the gateway still cannot find it", async () => {
+    const web = webConfirmation();
+    const { store, receive, close, open } = setup({
+      storeOptions: { isMissingConfirmed: web.isMissingConfirmed },
+    });
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.answer(false);
+    await nextTurn();
+    close();
+    open();
+
+    receive({ t: "error", code: "canvas_not_found" });
+    web.pending.answer(true);
+    await nextTurn();
+
+    expect(web.asked).toEqual(["canvas-1", "canvas-1"]);
+    expect(store.getView().lastError).toBe("canvas_not_found");
+  });
+
+  // Le gateway dit déjà « en récupération » : rien à confirmer
+  it("asks nothing when the gateway itself says the canvas is being recovered", () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+
+    receive({ t: "error", code: "canvas_recovering" });
+
+    expect(web.asked).toEqual([]);
+    expect(store.getView().lastError).toBe("canvas_recovering");
+  });
+
+  // La vue OBS reste vide et silencieuse : elle ne demande rien au web
+  it("asks nothing in the OBS view", () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({
+      storeOptions: { mode: "obs", isMissingConfirmed: web.isMissingConfirmed },
+    });
+
+    receive({ t: "error", code: "canvas_not_found" });
+
+    expect(web.asked).toEqual([]);
+    expect(store.getView().lastError).toBe("canvas_not_found");
+  });
+
+  // Une page fermée (elle change de canvas) ne reçoit plus rien de la réponse qu'elle attendait
+  it("drops an answer that comes after the page closed the store", async () => {
+    const web = webConfirmation();
+    const { store, receive } = setup({ storeOptions: { isMissingConfirmed: web.isMissingConfirmed } });
+    receive({ t: "error", code: "canvas_not_found" });
+    store.close();
+
+    web.pending.answer(true);
+    await nextTurn();
+
+    expect(store.getView().lastError).toBeNull();
   });
 });
 
