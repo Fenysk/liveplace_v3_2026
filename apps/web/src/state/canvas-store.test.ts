@@ -566,6 +566,48 @@ describe("moderation (§5.4, JOURNAL 2026-09-25)", () => {
     expect(await refusing).toEqual({ ok: false, error: "forbidden" });
   });
 
+  // N'échoue que la requête qu'un forbidden nomme : l'autre requête et le lot en vol attendent, aucun refus n'est montré
+  it("fails only the request a forbidden names: another request and a lot in flight keep waiting, no refusal is shown", async () => {
+    const { store, sent, receive, lastPlace, ackOf, pixelAt } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const placed = lastPlace();
+    const listing = store.listBans();
+    const listingId = lastRequestId(sent);
+    let isModerationSettled = false;
+    const moderating = store.moderate({ action: "ban", target: "user-2" }).then((result) => {
+      isModerationSettled = true;
+      return result;
+    });
+    const moderatingId = lastRequestId(sent);
+
+    receive({ t: "error", code: "forbidden", requestId: listingId });
+
+    expect(await listing).toEqual({ ok: false, error: "forbidden" });
+    expect(isModerationSettled).toBe(false);
+    expect(pixelAt(1, 2)).toBe(5);
+    expect(store.getView().lastError).toBeNull();
+    const ack = ackOf(placed);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
+    receive({ t: "moderated", requestId: moderatingId, version: 9, cells: 1, done: true });
+    expect(await moderating).toEqual({ ok: true, value: { cells: 1 } });
+  });
+
+  // Ne montre aucun refus pour un réglage que le gateway refuse en le nommant, et laisse le lot en vol
+  it("shows no refusal for a setting the gateway refuses by name, and leaves a lot in flight", async () => {
+    const { store, sent, receive, lastPlace, ackOf } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const placed = lastPlace();
+
+    store.setObsDelay(60_000);
+    receive({ t: "error", code: "forbidden", requestId: lastRequestId(sent) });
+
+    expect(store.getView().lastError).toBeNull();
+    const ack = ackOf(placed);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
+  });
+
   // Passe en banni sur banned, et en sort sur unbanned
   it("turns banned on banned, and back on unbanned", () => {
     const { store, receive } = setup();

@@ -565,7 +565,8 @@ export function createConnection(
     if (!isPlaceAllowed(deps.now()))
       return socket.sendFrame({ t: "error", code: "rate_limited", requestId: frame.requestId });
     // Un invité reste connecté : il regarde, il ne pose pas (§10.2).
-    if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated" });
+    if (!session)
+      return socket.sendFrame({ t: "error", code: "unauthenticated", requestId: frame.requestId });
     const result = await deps.core.place(canvasId, {
       userId: session.userId,
       requestId: frame.requestId,
@@ -628,7 +629,8 @@ export function createConnection(
     return twitchLive ? { ...inspected, twitchLive } : inspected;
   };
 
-  const forbid = (): void => socket.sendFrame({ t: "error", code: "forbidden" });
+  // Audit de sécurité §4 : un rôle qui ne suffit pas se dit toujours `forbidden`, nommé par sa requête.
+  const forbid = (requestId: string): void => socket.sendFrame({ t: "error", code: "forbidden", requestId });
 
   // Le gateway enchaîne les tranches jusqu'à la fin (§4.3), même si la socket se ferme : l'action était confirmée.
   const moderateSlices = async (
@@ -638,7 +640,7 @@ export function createConnection(
   ) => {
     const result = await deps.core.moderate(canvasId, { ...moderation, nowMs: deps.now() });
     if (!result.ok) {
-      if (result.error === "forbidden") return forbid();
+      if (result.error === "forbidden") return forbid(requestId);
       return result.error === "canvas_archived" ? refuseArchived(requestId) : refuseMissing(canvasId);
     }
     const { version, cells, isDone } = result.value;
@@ -647,25 +649,25 @@ export function createConnection(
   };
 
   const moderateCanvas = async ({ requestId, action }: ModerateFrame, ready: ReadyState): Promise<void> => {
-    if (!session || !canModerate(ready.role)) return forbid();
+    if (!session || !canModerate(ready.role)) return forbid(requestId);
     await moderateSlices(ready.canvasId, requestId, { by: session.userId, action, slice: "first" });
   };
 
   // §4.2 : les pixels d'un auteur, pour qui modère ou pour l'auteur lui-même.
   const listPixels = async ({ requestId, userId }: ListPixelsFrame, ready: ReadyState): Promise<void> => {
-    if (!canModerate(ready.role) && userId !== session?.userId) return forbid();
+    if (!canModerate(ready.role) && userId !== session?.userId) return forbid(requestId);
     const pixels = await deps.core.listPixels(ready.canvasId, userId);
     socket.sendFrame({ t: "pixels", requestId, userId, pixels });
   };
 
   const listBans = async (requestId: string, ready: ReadyState): Promise<void> => {
-    if (!canModerate(ready.role)) return forbid();
+    if (!canModerate(ready.role)) return forbid(requestId);
     socket.sendFrame({ t: "bans", requestId, users: await deps.core.listBans(ready.canvasId) });
   };
 
   // §4.2 : pour qui modère, comme la liste des bannis, avec l'état de la synchro Twitch.
   const listModerators = async (requestId: string, ready: ReadyState): Promise<void> => {
-    if (!canModerate(ready.role)) return forbid();
+    if (!canModerate(ready.role)) return forbid(requestId);
     const [users, twitchSync] = await Promise.all([
       deps.core.listModerators(ready.canvasId),
       deps.core.getTwitchSync(ready.canvasId),
@@ -675,17 +677,16 @@ export function createConnection(
 
   // JOURNAL 2026-09-27 : le streamer seul, et l'origine LivePlace seule : un rôle venu de Twitch se retire sur Twitch.
   const setModerator = async ({ requestId, userId, isModerator }: SetModeratorFrame, ready: ReadyState) => {
-    if (ready.role !== "owner") return forbid();
+    if (ready.role !== "owner") return forbid(requestId);
     const result = await deps.core.setModerator(ready.canvasId, { userId, source: "liveplace", isModerator });
-    if (!result.ok) return result.error === "canvas_archived" ? refuseArchived(requestId) : forbid();
+    if (!result.ok) return result.error === "canvas_archived" ? refuseArchived(requestId) : forbid(requestId);
     await listModerators(requestId, ready);
   };
 
   // §4.2 : tout compte connecté signale ; le seuil suit les comptes connectés au canvas.
   const reportPlacement = async ({ requestId, x, y, placementId, range }: ReportFrame, ready: ReadyState) => {
     if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
-    if (x >= ready.width || y >= ready.height)
-      return socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    if (x >= ready.width || y >= ready.height) return forbid(requestId);
     const result = await deps.core.report(ready.canvasId, {
       reporterId: session.userId,
       x,
@@ -698,7 +699,7 @@ export function createConnection(
     if (result.ok) return socket.sendFrame({ t: "reported", requestId });
     if (result.error === "canvas_archived") return refuseArchived(requestId);
     if (result.error === "canvas_not_found") return refuseMissing(ready.canvasId);
-    socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    forbid(requestId);
   };
 
   // §4.2 : pour choisir la plage à signaler. Sans identifiant, au débit d'`inspect`.
@@ -711,7 +712,7 @@ export function createConnection(
       return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
     const isInside = x < ready.width && y < ready.height;
     const pixels = isInside ? await deps.core.listAuthorPixels(ready.canvasId, x, y, placementId) : null;
-    if (!pixels) return socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    if (!pixels) return forbid(requestId);
     socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
@@ -722,33 +723,36 @@ export function createConnection(
         ? await deps.core.resizeCanvas(ready.canvasId, { by: session.userId, width, height })
         : null;
     if (result && !result.ok && result.error === "canvas_archived") return refuseArchived(requestId);
-    if (!result?.ok) return socket.sendFrame({ t: "error", code: "forbidden", requestId });
+    if (!result?.ok) return forbid(requestId);
     socket.sendFrame({ t: "resized", requestId });
   };
 
   const listReports = async (requestId: string, ready: ReadyState): Promise<void> => {
-    if (!canModerate(ready.role)) return forbid();
+    if (!canModerate(ready.role)) return forbid(requestId);
     socket.sendFrame({ t: "reports", requestId, reports: await deps.core.listReports(ready.canvasId) });
   };
 
   // CDC 2026 §1 : le streamer seul. Le schéma n'a laissé passer qu'un cran.
-  const setObsDelay = async ({ obsDelayMs }: SetObsDelayFrame, ready: ReadyState): Promise<void> => {
-    if (ready.role !== "owner") return forbid();
+  const setObsDelay = async (
+    { requestId, obsDelayMs }: SetObsDelayFrame,
+    ready: ReadyState,
+  ): Promise<void> => {
+    if (ready.role !== "owner") return forbid(requestId);
     await deps.core.setObsDelay(ready.canvasId, obsDelayMs);
   };
 
   // CDC 2026 §1 : le streamer seul, comme le délai.
-  const setObsBackground = async ({ obsBackground }: SetObsBackgroundFrame, ready: ReadyState) => {
-    if (ready.role !== "owner") return forbid();
+  const setObsBackground = async ({ requestId, obsBackground }: SetObsBackgroundFrame, ready: ReadyState) => {
+    if (ready.role !== "owner") return forbid(requestId);
     await deps.core.setObsBackground(ready.canvasId, obsBackground);
   };
 
   // JOURNAL 2026-09-30 : le streamer seul. Le schéma n'a laissé passer que des bornes valides.
   const setGaugeLimits = async (
-    { gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
+    { requestId, gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
     ready: ReadyState,
   ) => {
-    if (ready.role !== "owner") return forbid();
+    if (ready.role !== "owner") return forbid(requestId);
     await deps.core.setGaugeLimits(ready.canvasId, { gaugeMaxStart, gaugeMaxCeiling });
   };
 

@@ -216,6 +216,7 @@ type SetupOptions = {
   archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
   theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
+  isForbiddenByScripts?: boolean; // les scripts répondent `forbidden`, comme après un rôle perdu que le gateway ignore encore
   isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
   isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
@@ -225,6 +226,7 @@ type SetupOptions = {
 
 // Ce que répond un script à qui écrit sur une archive.
 const archivedRefusal = { ok: false as const, error: "canvas_archived" as const };
+const forbiddenRefusal = { ok: false as const, error: "forbidden" as const };
 
 const setup = (options: SetupOptions = {}) => {
   const placements: Placement[] = [];
@@ -280,6 +282,7 @@ const setup = (options: SetupOptions = {}) => {
     async moderate(_asked: string, moderation: Moderation) {
       moderations.push(moderation);
       if (options.isRefusedByScripts) return archivedRefusal;
+      if (options.isForbiddenByScripts) return forbiddenRefusal;
       const slice = options.slices?.[moderations.length - 1] ?? { version: 9, cells: 0, isDone: true };
       return { ok: true as const, value: slice };
     },
@@ -329,6 +332,7 @@ const setup = (options: SetupOptions = {}) => {
     },
     async setModerator(_asked: string, role: ModeratorRole) {
       namedModerators.push(role);
+      if (options.isForbiddenByScripts) return forbiddenRefusal;
       return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: undefined };
     },
     async getModeratorOrigin() {
@@ -561,7 +565,7 @@ describe("createConnection (§6.1)", () => {
 
     await connection.receive(place());
 
-    expect(sent.at(-1)).toEqual({ t: "error", code: "unauthenticated" });
+    expect(sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: ack.requestId });
     expect(placements).toEqual([]);
     expect(closed).toEqual([]);
   });
@@ -837,8 +841,8 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
 
     expect(sent.slice(-2)).toEqual([
-      { t: "error", code: "forbidden" },
-      { t: "error", code: "forbidden" },
+      { t: "error", code: "forbidden", requestId: "moderate-1" },
+      { t: "error", code: "forbidden", requestId: "bans-1" },
     ]);
     expect(moderations).toEqual([]);
     expect(closed).toEqual([]);
@@ -882,7 +886,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     const answer = { t: "pixels", requestId: "pixels-1", userId: session.userId, pixels: proof };
     expect(context.sent.at(-1)).toEqual(answer);
     expect(self.sent.at(-1)).toEqual(answer);
-    expect(other.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+    expect(other.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "pixels-1" });
     expect(context.listedPixels).toEqual([session.userId, session.userId]);
   });
 
@@ -911,7 +915,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     const answer = { t: "moderators", requestId: "mods-1", users: moderators };
     expect(byOwner.sent.at(-1)).toEqual(answer);
     expect(byModerator.sent.at(-1)).toEqual(answer);
-    expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+    expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "mods-1" });
   });
 
   // Joint aux modérateurs l'état de la synchro Twitch, quand elle a été faite (JOURNAL 2026-09-27)
@@ -944,7 +948,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     expect(byOwner.namedModerators).toEqual([{ userId: "user-2", source: "liveplace", isModerator: true }]);
     expect(byOwner.sent.at(-1)).toEqual({ t: "moderators", requestId: "name-1", users: moderators });
     expect(byModerator.namedModerators).toEqual([]);
-    expect(byModerator.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+    expect(byModerator.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "name-1" });
   });
 
   // Envoie banned juste après le welcome et le snapshot d'un banni
@@ -996,7 +1000,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await flush();
     expect(context.sent.at(-1)).toEqual({ t: "role", role: "viewer" });
     await context.connection.receive(moderate("clearUser"));
-    expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden" });
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "moderate-1" });
     expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
   });
 
@@ -1013,8 +1017,8 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     await context.connection.receive(moderate("clearUser"));
     await context.connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
     expect(context.sent.slice(-2)).toEqual([
-      { t: "error", code: "forbidden" },
-      { t: "error", code: "forbidden" },
+      { t: "error", code: "forbidden", requestId: "moderate-1" },
+      { t: "error", code: "forbidden", requestId: "bans-1" },
     ]);
     expect(context.moderations).toEqual([]);
 
@@ -1191,7 +1195,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     await context.connection.receive(setObsDelay);
     context.control({ t: "obsDelay", obsDelayMs: 60_000 });
 
-    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden" });
+    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden", requestId: "delay-1" });
     expect(context.obsDelays).toEqual([60_000]);
     for (const opened of [context, viewer, guest])
       expect(opened.sent.at(-1)).toEqual({ t: "obsDelay", obsDelayMs: 60_000 });
@@ -1209,7 +1213,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     context.control({ t: "obsBackground", obsBackground: "white" });
 
     expect(viewer.sent[0]).toMatchObject({ t: "welcome", params: { obsBackground: "transparent" } });
-    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden" });
+    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden", requestId: "bg-1" });
     expect(context.obsBackgrounds).toEqual(["white"]);
     for (const opened of [context, viewer])
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
@@ -1292,7 +1296,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(viewer.sent[0]).toMatchObject({ t: "welcome", params: { gaugeMaxStart: meta.gaugeMaxStart } });
-    expect(viewer.sent.at(-3)).toEqual({ t: "error", code: "forbidden" });
+    expect(viewer.sent.at(-3)).toEqual({ t: "error", code: "forbidden", requestId: "limits-1" });
     expect(context.gaugeLimits).toEqual([limits]);
     for (const opened of [context, viewer]) {
       expect(opened.sent.at(-2)).toEqual({ t: "gaugeLimits", ...limits });
@@ -1462,6 +1466,155 @@ describe("reports in the connection (JOURNAL 2026-09-28)", () => {
     shown[2 * meta.width + 1] = 9;
     expect(byObs.sent.at(-1)).toEqual({ snapshot: shown });
     expect(byPage.sent.at(-1)).toEqual({ snapshot: new Uint8Array(meta.width * meta.height) });
+  });
+});
+
+describe("role refusals in the connection (audit de sécurité du 26/09, §4)", () => {
+  const requestId = "reserved-1";
+  const send = (frame: Record<string, unknown>) => JSON.stringify({ requestId, ...frame });
+
+  type Reserved = { name: string; minimum: "moderator" | "owner"; frame: Record<string, unknown> };
+  // Chaque commande réservée à un rôle, et le rôle qui suffit : qui modère, ou le streamer seul.
+  const reserved: Reserved[] = [
+    {
+      name: "moderate",
+      minimum: "moderator",
+      frame: { t: "moderate", action: { action: "clearUser", target: "user-2" } },
+    },
+    { name: "listPixels", minimum: "moderator", frame: { t: "listPixels", userId: "user-2" } },
+    { name: "listBans", minimum: "moderator", frame: { t: "listBans" } },
+    { name: "listModerators", minimum: "moderator", frame: { t: "listModerators" } },
+    { name: "listReports", minimum: "moderator", frame: { t: "listReports" } },
+    {
+      name: "setModerator",
+      minimum: "owner",
+      frame: { t: "setModerator", userId: "user-2", isModerator: true },
+    },
+    { name: "setObsDelay", minimum: "owner", frame: { t: "setObsDelay", obsDelayMs: 60_000 } },
+    { name: "setObsBackground", minimum: "owner", frame: { t: "setObsBackground", obsBackground: "white" } },
+    {
+      name: "setGaugeLimits",
+      minimum: "owner",
+      frame: { t: "setGaugeLimits", gaugeMaxStart: 20, gaugeMaxCeiling: 40 },
+    },
+    { name: "resizeCanvas", minimum: "owner", frame: { t: "resizeCanvas", width: 64, height: 36 } },
+  ];
+  const ownerOnly = reserved.filter(({ minimum }) => minimum === "owner");
+  const moderatorLevel = reserved.filter(({ minimum }) => minimum === "moderator");
+
+  // Ce que le noyau a reçu en écriture ou en lecture réservée : rien, quand le rôle ne suffit pas.
+  const reachedCore = (context: ReturnType<typeof setup>) => [
+    ...context.moderations,
+    ...context.listedPixels,
+    ...context.namedModerators,
+    ...context.obsDelays,
+    ...context.obsBackgrounds,
+    ...context.gaugeLimits,
+  ];
+
+  // Refuse chaque commande réservée à un viewer et à un invité par forbidden, nommée par sa requête, sans toucher au noyau ni fermer
+  it.each(reserved)(
+    "refuses $name to a viewer and to a guest with forbidden, naming the request, and keeps them connected",
+    async ({ frame }) => {
+      for (const context of [setup(), setup({ session: null })]) {
+        await context.connection.receive(hello());
+
+        await context.connection.receive(send(frame));
+
+        expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId });
+        expect(reachedCore(context)).toEqual([]);
+        expect(context.closed).toEqual([]);
+      }
+    },
+  );
+
+  // Refuse à un modérateur ce qui est au streamer seul, de la même façon
+  it.each(ownerOnly)("refuses $name to a moderator with forbidden, naming the request", async ({ frame }) => {
+    const context = setup({ isModerator: true });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(send(frame));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId });
+    expect(reachedCore(context)).toEqual([]);
+    expect(context.closed).toEqual([]);
+  });
+
+  // Ne refuse à un modérateur aucune des commandes de modération
+  it.each(moderatorLevel)("does not refuse $name to a moderator", async ({ frame }) => {
+    const context = setup({ isModerator: true });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(send(frame));
+
+    expect(context.sent.at(-1)).not.toMatchObject({ t: "error" });
+  });
+
+  // Ne refuse au streamer aucune des commandes réservées
+  it.each(reserved)("does not refuse $name to the owner", async ({ frame }) => {
+    const context = setup({ session: owner });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(send(frame));
+
+    expect(context.sent.at(-1)).not.toMatchObject({ t: "error" });
+  });
+
+  // Nomme aussi la requête quand ce sont les scripts qui refusent : le rôle a changé depuis que le gateway l'a lu
+  it("names the request too when the scripts refuse with forbidden", async () => {
+    const byModerator = setup({ isModerator: true, isForbiddenByScripts: true });
+    const byOwner = setup({ session: owner, isForbiddenByScripts: true });
+    await byModerator.connection.receive(hello());
+    await byOwner.connection.receive(hello());
+
+    await byModerator.connection.receive(
+      send({ t: "moderate", action: { action: "clearUser", target: "user-2" } }),
+    );
+    await byOwner.connection.receive(send({ t: "setModerator", userId: "user-2", isModerator: true }));
+
+    expect(byModerator.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId });
+    expect(byOwner.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId });
+    expect([...byModerator.closed, ...byOwner.closed]).toEqual([]);
+  });
+
+  // Garde unauthenticated, nommé par sa requête, à l'invité qui doit se connecter : poser, réclamer, signaler, lister les pixels d'un auteur
+  it("keeps unauthenticated, naming the request, for a guest on what any signed-in account may do", async () => {
+    const { connection, sent, closed } = setup({ session: null });
+    await connection.receive(hello());
+    const placement = { placementId: "puser2001", x: 1, y: 2 };
+    const frames = [
+      place(requestId),
+      send({ t: "claimGauge" }),
+      send({ t: "report", ...placement }),
+      send({ t: "listAuthorPixels", ...placement }),
+    ];
+
+    for (const frame of frames) {
+      await connection.receive(frame);
+
+      expect(sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId });
+    }
+    expect(closed).toEqual([]);
+  });
+
+  // Garde invalid_frame, et la fermeture, à la frame mal formée, même d'un viewer : le schéma passe avant le rôle
+  it("keeps invalid_frame and the close for a malformed frame, even from a viewer: the schema comes before the role", async () => {
+    const malformed = [
+      { t: "moderate", action: { action: "clearUser" } },
+      { t: "setObsDelay", obsDelayMs: 1234 },
+      { t: "setModerator", userId: "user-2" },
+      { t: "listBans", isExtra: true },
+    ];
+
+    for (const frame of malformed) {
+      const { connection, sent, closed } = setup();
+      await connection.receive(hello());
+
+      await connection.receive(send(frame));
+
+      expect(sent.at(-1)).toEqual({ t: "error", code: "invalid_frame" });
+      expect(closed).toEqual([1008]);
+    }
   });
 });
 
