@@ -72,7 +72,7 @@ const setup = ({ storeOptions = {}, isWelcomed = true }: SetupOptions = {}) => {
     gauge: { ...gauge, charges: 1 },
   });
   const pixelAt = (x: number, y: number) => store.getView().pixels[toStateOffset(x, y, width)];
-  const close = () => listening.listeners?.onClose(1006);
+  const close = (code = 1006) => listening.listeners?.onClose(code);
   return {
     store,
     sent,
@@ -285,6 +285,64 @@ describe("placeBatch (§9.2, §9.3)", () => {
 
     expect(await placing).toEqual({ ok: false, error: "unauthenticated" });
     expect(pixelAt(1, 2)).toBe(0);
+  });
+
+  // Résout en refus le lot que le gateway refuse en le nommant (§6.3 : 10 poses par seconde), rend les couleurs d'avant, redessine,
+  // et laisse la jauge et le dernier refus tels quels
+  it("settles a lot the gateway refuses by name as a refusal, gives the colors back and redraws", async () => {
+    const { store, receive, lastPlace, pixelAt } = setup();
+    let redraws = 0;
+    store.subscribe(() => {
+      redraws += 1;
+    });
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const redrawsBefore = redraws;
+    receive({ t: "error", code: "rate_limited", requestId: lastPlace().requestId });
+
+    expect(await placing).toEqual({ ok: false, error: "rate_limited" });
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(redraws).toBeGreaterThan(redrawsBefore);
+    expect(store.getView()).toMatchObject({ gauge, lastError: null });
+  });
+
+  // Ne refuse que le lot nommé : un autre lot en attente garde sa pose optimiste et sa promesse
+  it("refuses only the lot it names: another pending lot keeps its optimistic pixel and its promise", async () => {
+    const { store, receive, sent, pixelAt } = setup();
+    let isOtherSettled = false;
+
+    const refused = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const refusedFrame = sent.at(-1);
+    void store.placeBatch([{ x: 2, y: 2, colorIndex: 6 }], PLACEMENT_ID).then(() => {
+      isOtherSettled = true;
+    });
+    if (refusedFrame?.t !== "place") throw new Error("aucune frame place envoyée");
+    receive({ t: "error", code: "rate_limited", requestId: refusedFrame.requestId });
+    await refused;
+
+    expect(isOtherSettled).toBe(false);
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(pixelAt(2, 2)).toBe(6);
+  });
+
+  // Rouvre après une fermeture en 1013 (§6.3, « réessayez plus tard ») comme après toute coupure : reprise par lastVersion, lot gardé
+  it("reconnects after a 1013 close like after any drop: resumes from lastVersion and keeps the lot", async () => {
+    const { store, sent, close, open, receive, lastPlace, ackOf, pixelAt } = setup();
+    receive(cellsFrame(2, 2, 9));
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const first = lastPlace();
+
+    close(1013);
+
+    expect(store.getView().status).toBe("reconnecting");
+    expect(pixelAt(1, 2)).toBe(5);
+    open();
+    expect(sent.at(-1)).toMatchObject({ t: "hello", lastVersion: 8 });
+    receive(welcome);
+    expect(lastPlace()).toEqual(first);
+    const ack = ackOf(first);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
   });
 
   // Garde un lot parti avant une coupure, couleurs comprises, et le renvoie avec son requestId au welcome suivant

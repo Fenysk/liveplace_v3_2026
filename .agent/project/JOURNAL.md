@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-09 — Écart §6.3 : une connexion qui ne suit pas se ferme en `1013` à 1 Mio de plus que la plus grosse frame qu'on lui a envoyée
+
+**Contexte.** Le snapshot pèse 64 Kio au plus (256×256, un octet par case), mais le `recent` du `welcome` d'une vue OBS et le resync d'une page revenue peuvent peser des Mio (2000 événements × jusqu'à 64 cases × 117 octets) : « plus de 1 Mo en file » fermerait une page saine pendant qu'elle vide son arrivée, et elle reprendrait le même arrivage en boucle.
+**Décision.** `toClientSocket` ferme en `1013` avant d'envoyer quand `bufferedAmount` dépasse 1 Mio plus la plus grosse frame déjà envoyée à cette socket, puis ne lui envoie plus rien : une page qui suit n'y arrive jamais, une page figée y arrive avec ses seules frames de diffusion. `PROTOCOL_VERSION` ne bouge pas, le web rouvre déjà sur tout code.
+**Renoncement.** Le seuil fixe de 1 Mo du §6.3 (boucle de reconnexion sur une vue OBS à long délai) ; un seuil mesuré dans le temps (une minuterie par socket, plus de pièces pour le même effet).
+
 ## 2026-10-08 — Écart §8.1 (amende celui du 08/10 sur les deux lignes de Capacité) : un compteur de fichiers pas recompté n'est pas un stock, un déploiement jamais lu se dépose « jamais lu »
 
 **Contexte.** « Stockage des fichiers » a affiché 37,3 Ko, le dev seul, quand prod et dev pesaient 436 Ko. Deux chaînons de l'écart précédent le produisent : `usage:files` rend 0 tant que `usage:ensure` n'a pas posé `ready` (le web lit au démarrage, avant le worker) et le web dépose ce 0 ; et un déploiement dont l'usage échoue n'était pas déposé du tout, donc le gateway, qui ne connaît que les déposés, sommait les seuls autres.

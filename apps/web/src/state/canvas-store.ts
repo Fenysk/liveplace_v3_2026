@@ -410,8 +410,15 @@ export function createCanvasStore(
     publish({ isArchived: true });
   };
 
-  // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle.
+  // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle. Un lot refusé (§6.3 : dix poses par seconde) rend ses
+  // pixels, comme sans ack : la page se redessine.
   const refuseRequest = (requestId: string, code: ErrorCode): void => {
+    const batch = pending.get(requestId);
+    if (batch) {
+      settle(requestId, batch, { ok: false, error: code });
+      publish({});
+      return;
+    }
     if (requestId === inspectRequestId) {
       inspectRequestId = null;
       publish({ inspection: previousInspection });

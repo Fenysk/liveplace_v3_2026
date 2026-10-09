@@ -10,6 +10,10 @@ const MAX_PAYLOAD_BYTES = 8 * 1024;
 const HELLO_TIMEOUT_MS = 5000;
 const CLOSE_POLICY = 1008;
 const CLOSE_INTERNAL = 1011;
+// « try again later » : la page se reconnecte et reprend par `lastVersion`, on ne garde jamais de file qui grossit pour elle.
+const CLOSE_TRY_AGAIN_LATER = 1013;
+// §6.3, Écart §6.3 (JOURNAL 2026-10-09) : 1 Mio de plus que la plus grosse frame déjà envoyée, que la page met le temps de vider.
+export const MAX_BUFFERED_BYTES = 1024 * 1024;
 // Une réponse HTTP brute : avant l'upgrade, la socket n'est encore qu'un flux TCP.
 const FORBIDDEN_HANDSHAKE = ["HTTP/1.1 403 Forbidden", "Connection: close", "Content-Length: 0", "", ""].join(
   "\r\n",
@@ -37,20 +41,31 @@ const encode = (frame: ServerFrame): Buffer => {
 // Les octets comptés sont ceux des frames et des snapshots, sans l'en-tête WebSocket ni TLS : pour chaque socket, même quand
 // la frame est partagée.
 export const toClientSocket = (
-  socket: Pick<WebSocket, "send" | "close">,
+  socket: Pick<WebSocket, "send" | "close" | "bufferedAmount">,
   onBytesSent: (bytes: number) => void,
-): ClientSocket => ({
-  sendFrame: (frame) => {
-    const encoded = encode(frame);
-    onBytesSent(encoded.length);
-    socket.send(encoded, { binary: false });
-  },
-  sendSnapshot: (state) => {
-    onBytesSent(state.length);
-    socket.send(state, { binary: true });
-  },
-  close: (code) => socket.close(code),
-});
+): ClientSocket => {
+  let largestSent = 0;
+  let isBehind = false;
+
+  // Vérifié avant chaque envoi : une page qui ne suit pas est fermée en 1013, puis plus rien ne part vers elle.
+  const deliver = (payload: Uint8Array, isBinary: boolean): void => {
+    if (isBehind) return;
+    if (socket.bufferedAmount > MAX_BUFFERED_BYTES + largestSent) {
+      isBehind = true;
+      socket.close(CLOSE_TRY_AGAIN_LATER);
+      return;
+    }
+    largestSent = Math.max(largestSent, payload.length);
+    onBytesSent(payload.length);
+    socket.send(payload, { binary: isBinary });
+  };
+
+  return {
+    sendFrame: (frame) => deliver(encode(frame), false),
+    sendSnapshot: (state) => deliver(state, true),
+    close: (code) => socket.close(code),
+  };
+};
 
 // JOURNAL 2026-09-29 : une page d'une autre origine n'ouvre pas le WebSocket au nom d'un viewer connecté.
 // Sans `Origin`, ce n'est pas un navigateur : les bots des preuves et le test de charge passent.

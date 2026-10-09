@@ -50,6 +50,20 @@ const CLOSE_POLICY = 1008;
 const RESYNC_MAX_VERSIONS = 2000;
 // §4.3 : un humain n'y arrive jamais, un script ne balaie plus le canvas.
 const INSPECT_MAX_PER_SECOND = 10;
+// §6.3 : le brouillon envoie un lot à la fois, 8 par seconde au plus (`SEND_INTERVAL_MS` du web).
+const PLACE_MAX_PER_SECOND = 10;
+
+// Une fenêtre glissante d'une seconde : la plus ancienne des dernières admissions doit en être sortie.
+const createPerSecondLimit = (maxPerSecond: number) => {
+  const admittedAt: Timestamp[] = [];
+  return (nowMs: Timestamp): boolean => {
+    const oldest = admittedAt.length < maxPerSecond ? undefined : admittedAt[0];
+    if (oldest !== undefined && nowMs - oldest < 1000) return false;
+    admittedAt.push(nowMs);
+    if (admittedAt.length > maxPerSecond) admittedAt.shift();
+    return true;
+  };
+};
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
 type HelloFrame = Extract<ClientFrame, { t: "hello" }>;
@@ -253,7 +267,9 @@ export function createConnection(
   let state: State = { status: "awaitingHello" };
   let member: ActivityMember | null = null;
   let queue: Promise<void> = Promise.resolve();
-  const inspectedAt: Timestamp[] = []; // les dernières inspections acceptées, la plus ancienne en tête
+  // Un budget par connexion et par genre : les inspections ne mangent pas celui des poses, ni l'inverse.
+  const isInspectAllowed = createPerSecondLimit(INSPECT_MAX_PER_SECOND);
+  const isPlaceAllowed = createPerSecondLimit(PLACE_MAX_PER_SECOND);
 
   const listener: CellsListener = (frame) => {
     if (state.status === "joining") state.pendingFrames.push(frame);
@@ -545,6 +561,9 @@ export function createConnection(
   };
 
   const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
+    // §6.3 : au-delà, la frame est refusée avant Redis, nommée par son `requestId`, et la connexion reste ouverte.
+    if (!isPlaceAllowed(deps.now()))
+      return socket.sendFrame({ t: "error", code: "rate_limited", requestId: frame.requestId });
     // Un invité reste connecté : il regarde, il ne pose pas (§10.2).
     if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated" });
     const result = await deps.core.place(canvasId, {
@@ -571,15 +590,6 @@ export function createConnection(
     if (!result.ok)
       return result.error === "canvas_archived" ? refuseArchived(requestId) : refuseMissing(canvasId);
     socket.sendFrame(result.value);
-  };
-
-  // Une fenêtre glissante d'une seconde : la plus ancienne des dernières inspections doit en être sortie.
-  const isInspectAllowed = (nowMs: Timestamp): boolean => {
-    const oldest = inspectedAt.length < INSPECT_MAX_PER_SECOND ? undefined : inspectedAt[0];
-    if (oldest !== undefined && nowMs - oldest < 1000) return false;
-    inspectedAt.push(nowMs);
-    if (inspectedAt.length > INSPECT_MAX_PER_SECOND) inspectedAt.shift();
-    return true;
   };
 
   // Ouverte à tous, invités compris : l'auteur d'un pixel est public (CDC 2026).

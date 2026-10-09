@@ -179,10 +179,10 @@ const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", request
 const hello = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui", ...overrides });
 
-const place = () =>
+const place = (requestId = ack.requestId) =>
   JSON.stringify({
     t: "place",
-    requestId: ack.requestId,
+    requestId,
     placementId: "puser1001",
     pixels: [{ x: 1, y: 2, colorIndex: 3 }],
   });
@@ -682,6 +682,56 @@ describe("createConnection (§6.1)", () => {
     clock.nowMs += 1000;
     await connection.receive(inspect(1, 2));
     expect(sent.at(-1)).toMatchObject({ t: "inspected", requestId: "inspect-1" });
+  });
+
+  // Refuse la 11e pose d'une même seconde sans appeler le noyau ni fermer, en nommant la requête, puis accepte une seconde plus tard
+  it("refuses the 11th placement within a second without asking the core or closing, naming the request, then accepts a second later", async () => {
+    const { connection, sent, closed, placements, clock } = setup();
+    await connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await connection.receive(place(`place-${count}`));
+
+    await connection.receive(place("place-10"));
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "place-10" });
+    expect(placements).toHaveLength(10);
+    expect(closed).toEqual([]);
+
+    clock.nowMs += 1000;
+    await connection.receive(place("place-11"));
+    expect(placements).toHaveLength(11);
+    expect(sent.at(-1)).toEqual(ack);
+  });
+
+  // Donne à chaque connexion son budget de poses : un autre onglet n'est pas freiné par celui qui déborde
+  it("gives every connection its own placement budget", async () => {
+    const context = setup();
+    const other = context.open(session);
+    await context.connection.receive(hello());
+    await other.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await context.connection.receive(place(`place-${count}`));
+
+    await context.connection.receive(place("place-10"));
+    await other.connection.receive(place("other-0"));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "place-10" });
+    expect(other.sent.at(-1)).toEqual(ack);
+  });
+
+  // Tient le budget des poses à part de celui des inspections, dans les deux sens
+  it("keeps the placement budget and the inspection budget apart, both ways", async () => {
+    const inspecting = setup();
+    await inspecting.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await inspecting.connection.receive(inspect(1, 2));
+    for (let count = 0; count < 10; count += 1) await inspecting.connection.receive(place(`place-${count}`));
+
+    const placing = setup();
+    await placing.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await placing.connection.receive(place(`place-${count}`));
+    await placing.connection.receive(inspect(1, 2));
+
+    expect(inspecting.placements).toHaveLength(10);
+    expect(inspecting.sent.at(-1)).toEqual(ack);
+    expect(placing.sent.at(-1)).toMatchObject({ t: "inspected", requestId: "inspect-1" });
   });
 
   // Répond sans entrée pour une case où personne n'a posé
