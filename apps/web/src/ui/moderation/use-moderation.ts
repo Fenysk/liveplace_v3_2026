@@ -4,7 +4,6 @@
 // fait, la fenêtre propose de bannir l'auteur (JOURNAL 2026-09-29).
 
 import { canModerate } from "@liveplace/domain";
-import type { AuthoredPixel } from "@liveplace/domain/ports";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
@@ -17,6 +16,7 @@ import type {
   ModerationTarget,
   ModerationWindowProps,
 } from "./moderation-window";
+import { usePixelListing } from "./pixel-listing";
 
 // Ce que propose qui modère : retirer ses pixels, ou le bannir.
 type ModeratorKind = "clear" | "ban" | "banAfterClear";
@@ -43,28 +43,23 @@ export function useModeration(canvas: CanvasStore): {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const toast = useToast();
   const [request, setRequest] = useState<ModeratorRequest | null>(null);
-  const [pixels, setPixels] = useState<readonly AuthoredPixel[] | null>(null);
+  const { pixels, list, drop } = usePixelListing();
   const [scope, setScope] = useState<ClearScope>(PLACEMENT_ONLY);
   const [status, setStatus] = useState<ModerationStatus>("idle");
-  // La demande en cours : une réponse arrivée pour une demande abandonnée n'y touche plus.
+  // La demande en cours : la réponse d'un retrait ou d'un ban d'une demande abandonnée n'y touche plus.
   const current = useRef<ModeratorRequest | null>(null);
 
   const show = (next: ModeratorRequest | null): void => {
     current.current = next;
     setRequest(next);
     setStatus("idle");
+    if (!next) drop();
   };
 
   const open = (kind: ModeratorKind, author: ModerationTarget): void => {
-    const next = { kind, author };
-    show(next);
-    setPixels(null);
+    show({ kind, author });
     setScope(PLACEMENT_ONLY);
-    void canvas.listPixels(author.userId).then((result) => {
-      if (current.current !== next) return;
-      setPixels(result.ok ? result.value : []);
-      if (!result.ok) setStatus("failed");
-    });
+    list(canvas.listPixels(author.userId), () => setStatus("failed"));
   };
 
   // Pas d'étape « après » un ban : la fenêtre et l'inspection se ferment, les pixels partent par le flux.
