@@ -34,6 +34,7 @@ import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { useDraftingAttribute } from "../ui/draft/use-drafting-attribute";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
+import { linkPreviewMeta } from "../ui/link-preview/link-preview";
 import { BannedWindow } from "../ui/moderation/banned-window";
 import { ModerationTab } from "../ui/moderation/moderation-tab";
 import { ModerationWindow } from "../ui/moderation/moderation-window";
@@ -270,6 +271,8 @@ const CanvasPage = () => {
 export const Route = createFileRoute("/$login")({
   loader: resolveGameCanvasPage,
   headers: noStoreHeaders,
+  // La carte d'aperçu du lien, rendue par le serveur ; un login sans canvas (loader en `notFound`) n'en a pas.
+  head: ({ loaderData }) => ({ meta: loaderData ? linkPreviewMeta(loaderData) : [] }),
   component: CanvasPage,
   notFoundComponent: CanvasNotFound,
 });
