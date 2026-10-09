@@ -1,16 +1,19 @@
 // Le toast (CDC 2026, Toasts) : une pill courte, une icône et une phrase, 3 s, un seul à la fois,
 // succès ou erreur. Il monte du bas en fondu et y redescend. `ToastProvider` le tient pour toute la page,
-// `useToast` l'affiche.
+// `useToast` l'affiche. Il s'entend par les régions de `toast-announcement.tsx`, pas par lui-même : l'image n'est pas lue.
 
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from "react";
 import { Pill } from "./pill";
+import {
+  ToastAnnouncement,
+  ToastAnnouncementContext,
+  type ToastMessage,
+  type ToastTone,
+} from "./toast-announcement";
 import { useShownWhileClosing } from "./window";
 
-export type ToastTone = "success" | "error";
-
-// `id` : deux fois la même phrase font deux toasts.
-export type ToastMessage = { id: number; tone: ToastTone; text: string };
+export type { ToastMessage, ToastTone };
 
 const TOAST_MS = 3000;
 
@@ -23,7 +26,7 @@ export const Toast = ({ message, isDocked = true }: ToastProps) => {
   // Une clé par message : celui qui en remplace un autre refait son entrée.
   return (
     <Pill key={shown.id} dock={isDocked ? "toast" : undefined} isVisible={message !== null}>
-      <span className={`lp-toast lp-toast--${shown.tone} lp-type-body`} role="status">
+      <span className={`lp-toast lp-toast--${shown.tone} lp-type-body`}>
         <Icon aria-hidden="true" />
         {shown.text}
       </span>
@@ -48,8 +51,11 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   return (
     <ToastContext.Provider value={show}>
-      {children}
-      <Toast message={message} />
+      <ToastAnnouncementContext.Provider value={message}>
+        {children}
+        <ToastAnnouncement />
+        <Toast message={message} />
+      </ToastAnnouncementContext.Provider>
     </ToastContext.Provider>
   );
 };

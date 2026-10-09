@@ -4,8 +4,9 @@
 import type { Moderator } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
 import { WindowRow } from "../design/window";
+import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
-import { CONNECTION_LOST, moderatorMention } from "./moderation-texts";
+import { moderatorMention } from "./moderation-texts";
 
 export type ModeratorListView =
   | { status: "loading" }
@@ -21,7 +22,7 @@ type ModeratorUsersProps = {
 
 const listContent = ({ list, removingUserId, onRemove }: ModeratorUsersProps) => {
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{CONNECTION_LOST}</span>;
+  if (list.status === "failed") return null; // `ConnectionLost`, juste après
   if (list.users.length === 0) return <span className="lp-type-caption lp-muted">Aucun modérateur.</span>;
   return list.users.map((user) => (
     <WindowRow
@@ -44,5 +45,6 @@ export const ModeratorUsers = (props: ModeratorUsersProps) => (
   <>
     <span className="lp-type-body">Modérateurs</span>
     {listContent(props)}
+    <ConnectionLost isFailed={props.list.status === "failed"} />
   </>
 );

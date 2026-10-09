@@ -9,6 +9,7 @@ import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
+import { ToastAnnouncement } from "./toast-announcement";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
 
@@ -108,6 +109,8 @@ const WindowShell = ({
         <Grabber label="Fermer" onUp={doNothing} onDown={onClose} onTap={doNothing} />
       </div>
       {children}
+      {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}
+      <ToastAnnouncement />
     </dialog>
   );
 };

@@ -321,7 +321,7 @@ export const ModerationEntry = () => {
       slug="moderation"
       components={["ReportedPlacements", "TwitchSyncBlock", "ModeratorUsers", "BannedUsers"]}
       file="ui/moderation/{reported-placements,twitch-sync,moderator-users,banned-users}.tsx"
-      note="Dans la fenêtre, pour le streamer et ses modérateurs."
+      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran."
     >
       <Block title="Signalements">
         {REPORT_STATES(nowMs).map(({ name, detail, props }) => (
@@ -440,7 +440,7 @@ export const ModerationWindowEntry = () => {
       slug="retirer-bannir-signaler"
       components={["ModerationWindow"]}
       file="ui/moderation/moderation-window.tsx"
-      note={DIALOG_NOTE}
+      note={`${DIALOG_NOTE} Un lecteur d'écran entend le décompte quand l'aperçu arrive, la question qui suit un retrait, et l'échec.`}
     >
       <Block title="États">
         {WINDOW_DEMOS.map((demo) => (

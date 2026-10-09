@@ -9,8 +9,9 @@ import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
 import { formatPlacedAgo } from "../inspection/placed-ago";
 import { canBan } from "./can-ban";
+import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
-import { CONNECTION_LOST, reportCountLabel } from "./moderation-texts";
+import { reportCountLabel } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 import { type PendingReport, pendingReportKey } from "./pending-reports";
 
@@ -76,7 +77,7 @@ const ReportRow = ({
 
 const listContent = ({ list, ...rowProps }: ReportedPlacementsProps) => {
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{CONNECTION_LOST}</span>;
+  if (list.status === "failed") return null; // `ConnectionLost`, juste après
   if (list.reports.length === 0)
     return <span className="lp-type-caption lp-muted">Aucun signalement en attente.</span>;
   return list.reports.map((report) => (
@@ -88,5 +89,6 @@ export const ReportedPlacements = (props: ReportedPlacementsProps) => (
   <>
     <span className="lp-type-body">Signalements</span>
     {listContent(props)}
+    <ConnectionLost isFailed={props.list.status === "failed"} />
   </>
 );

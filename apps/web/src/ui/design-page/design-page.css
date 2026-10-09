@@ -269,6 +269,27 @@
   width: 100%;
 }
 
+/* Les régions d'un toast pour un lecteur d'écran, rendues visibles pour se lire : leur rôle, puis ce qu'elles disent */
+.design-announcement {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.design-announcement .lp-visually-hidden {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+
+.design-announcement [role]::before {
+  content: attr(role) " : ";
+  color: var(--muted);
+}
+
 /* La place entre les pills Canvas et Compte : un thème trop long s'y coupe par « … » */
 .design-in-top-room {
   --lp-theme-room: 360px;

@@ -5,13 +5,16 @@
 // (JOURNAL 2026-09-29). L'affichage seul, nourri par `useModeration` et `useReport`.
 
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
+import { useRef } from "react";
 import { Button } from "../design/button";
 import { Checkbox } from "../design/checkbox";
+import { classNames } from "../design/class-names";
 import { PixelPreview } from "../design/pixel-preview";
 import { Slider } from "../design/slider";
 import { SmallWindow, useShownWhileClosing } from "../design/window";
 import { type ClearScope, type ClearTarget, clearSpanSteps } from "./cleared-pixels";
-import { CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
+import { ConnectionLost } from "./connection-lost";
+import { pixelCountLabel } from "./moderation-texts";
 
 // Retirer ses pixels, bannir (qui les retire aussi), bannir juste après un retrait, ou signaler.
 export type ModerationKind = "clear" | "ban" | "banAfterClear" | "report";
@@ -142,13 +145,18 @@ export const ModerationWindow = ({
   onClose,
 }: ModerationWindowProps) => {
   const shown = useShownWhileClosing(request);
+  const count = useRef<string | null>(null);
   if (!shown) return null;
   const texts = TEXTS[shown.kind];
   const hasScope = shown.kind === "clear" || shown.kind === "report";
+  const title = titleOf(shown, scope);
+  // Fermée, la fenêtre garde son dernier décompte : sans demande, les hooks rendent tous les pixels, un chiffre que
+  // personne n'a demandé, que la région dirait pendant la fermeture.
+  if (request) count.current = pixels ? `${pixelCountLabel(pixels.length)}. ${texts.consequence}` : null;
   return (
     <SmallWindow
       isOpen={request !== null}
-      title={titleOf(shown, scope)}
+      title={title}
       onClose={onClose}
       isLocked={status === "running"}
       actions={
@@ -167,13 +175,19 @@ export const ModerationWindow = ({
           placementCount={placementCountOf(shown)}
         />
       )}
+      {/* « C'est retiré. » n'est écrit que dans le titre de cette étape, qui change fenêtre ouverte : la région le redit, avant le décompte. */}
+      <span role="status" className="lp-visually-hidden">
+        {shown.kind === "banAfterClear" ? title : null}
+      </span>
       <Preview pixels={pixels} canvas={canvas} name={shown.author.displayName} />
-      {pixels && (
-        <p className="lp-type-body lp-prompt">
-          {pixelCountLabel(pixels.length)}. {texts.consequence}
-        </p>
-      )}
-      {status === "failed" && <p className="lp-type-caption lp-danger lp-prompt">{CONNECTION_LOST}</p>}
+      {/* Des régions toujours là, vides jusqu'à leur message : le décompte arrive avec l'aperçu et suit la plage, l'échec s'alerte. */}
+      <p
+        role="status"
+        className={classNames("lp-type-body lp-prompt", !count.current && "lp-visually-hidden")}
+      >
+        {count.current}
+      </p>
+      <ConnectionLost isFailed={status === "failed"} className="lp-prompt" />
     </SmallWindow>
   );
 };

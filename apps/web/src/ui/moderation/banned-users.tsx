@@ -7,8 +7,9 @@ import { Eye } from "lucide-react";
 import { Button } from "../design/button";
 import { PixelPreview } from "../design/pixel-preview";
 import { SmallWindow, useShownWhileClosing, WindowRow } from "../design/window";
+import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
-import { banMention, CONNECTION_LOST, pixelCountLabel } from "./moderation-texts";
+import { banMention, pixelCountLabel } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 
 export type BannedList =
@@ -85,7 +86,7 @@ const PreviewWindow = ({ isOpen, shown, canvas, onClose }: PreviewWindowProps) =
 
 const listContent = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
   if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
-  if (list.status === "failed") return <span className="lp-type-caption lp-danger">{CONNECTION_LOST}</span>;
+  if (list.status === "failed") return null; // `ConnectionLost`, juste après
   if (list.users.length === 0) return <span className="lp-type-caption lp-muted">Personne n'est banni.</span>;
   return list.users.map((user) => (
     <BannedRow
@@ -113,6 +114,7 @@ export const BannedUsers = (props: BannedUsersProps) => {
     <>
       <span className="lp-type-body">Utilisateurs bannis</span>
       {listContent(props)}
+      <ConnectionLost isFailed={list.status === "failed"} />
       {list.status === "ready" && (
         <PreviewWindow isOpen={preview !== null} shown={shown} canvas={canvas} onClose={close} />
       )}
