@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './../routes/$login'
 import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
+import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
@@ -44,6 +45,11 @@ const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
 const DesignRoute = DesignRouteImport.update({
   id: '/design',
   path: '/design',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginObsRoute = LoginObsRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/$login/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/$login_/obs': typeof LoginObsRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/robots.txt'
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/robots.txt'
     | '/$login/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/robots.txt'
     | '/$login_/obs'
     | '/auth/signout'
     | '/auth/twitch'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   AdsDottxtRoute: typeof AdsDottxtRoute
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   LoginObsRoute: typeof LoginObsRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/design'
       fullPath: '/design'
       preLoaderRoute: typeof DesignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$login_/obs': {
@@ -272,6 +292,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdsDottxtRoute: AdsDottxtRoute,
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   LoginObsRoute: LoginObsRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
