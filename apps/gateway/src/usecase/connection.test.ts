@@ -22,6 +22,7 @@ import type {
   Moderation,
   ModerationSlice,
   Moderator,
+  ModeratorOrigin,
   ModeratorRole,
   OffStreamCell,
   Pixel,
@@ -30,6 +31,7 @@ import type {
   ReportedPlacement,
   ScoreboardEntry,
   ScoreboardRank,
+  TwitchLive,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -77,6 +79,10 @@ const activityStore: ActivityStore = {
   listCanvasHistory: async () => [],
   getCanvasAudience: async () => ({ today: noCanvasAudience, month: noCanvasAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
+  storeActivityGap: async () => undefined,
+  storeSeen: async () => undefined,
+  listSeen: async () => new Map(),
+  pruneSeen: async () => undefined,
 };
 // La capacité non plus : rien à relire, la machine est celle d'un test (écart §5.1, JOURNAL 2026-10-07).
 const capacityStore: CapacityStore = {
@@ -87,6 +93,7 @@ const capacityStore: CapacityStore = {
     outOfMemoryRefusals: 0,
   }),
   getWebMeasure: async () => null,
+  getSnapshotMeasure: async () => null,
   getConvexDeposit: async () => null,
   listCeilingsReached: async () => new Map(),
   storeCeilingReached: async () => undefined,
@@ -163,15 +170,19 @@ const entry: InspectEntry = { userId: "user-2", ...publicEntry };
 // Laisse finir ce qu'un message de contrôle a lancé : la relecture d'un rôle est asynchrone.
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+// Une frame JSON de ce type, par opposition au snapshot binaire.
+const hasFrame = (frame: unknown, t: string): boolean =>
+  typeof frame === "object" && frame !== null && "t" in frame && frame.t === t;
+
 const inspect = (x: number, y: number) => JSON.stringify({ t: "inspect", requestId: "inspect-1", x, y });
 
 const hello = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId, mode: "ui", ...overrides });
 
-const place = () =>
+const place = (requestId = ack.requestId) =>
   JSON.stringify({
     t: "place",
-    requestId: ack.requestId,
+    requestId,
     placementId: "puser1001",
     pixels: [{ x: 1, y: 2, colorIndex: 3 }],
   });
@@ -190,6 +201,7 @@ const moderate = (action: string, target = "user-2") =>
 type SetupOptions = {
   session?: Session | null;
   isModerator?: boolean;
+  authorOrigin?: ModeratorOrigin; // ce que rend `getModeratorOrigin` (l'auteur inspecté est modérateur) ; absent : il ne l'est pas
   twitchSync?: TwitchSync; // l'état de la synchro Twitch lu dans `meta`
   version?: number;
   duringSnapshot?: () => void;
@@ -202,9 +214,13 @@ type SetupOptions = {
   canReport?: boolean; // ce que rend `canReport`
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
   archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
+  theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
+  isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
+  isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
+  twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (Écart §4, JOURNAL 2026-10-07)
 };
 
 // Ce que répond un script à qui écrit sur une archive.
@@ -223,17 +239,24 @@ const setup = (options: SetupOptions = {}) => {
   const gaugeLimits: GaugeLimits[] = [];
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
+  const twitchLiveReads: string[] = []; // les comptes dont le live a été lu
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
   // `resizeCanvas` la change, comme resize.lua
-  let currentMeta: CanvasMeta =
-    options.archivedAt === undefined ? meta : { ...meta, archivedAt: options.archivedAt };
+  let currentMeta: CanvasMeta = {
+    ...meta,
+    ...(options.archivedAt === undefined ? {} : { archivedAt: options.archivedAt }),
+    ...(options.theme === undefined ? {} : { theme: options.theme }),
+  };
   const core = {
     async getCanvas(asked: string) {
       return asked === canvasId ? currentMeta : null;
     },
     async isModerator() {
       return roles.isModerator;
+    },
+    async isRecovering() {
+      return options.isRecovering ?? false;
     },
     async getSnapshot() {
       options.duringSnapshot?.();
@@ -251,6 +274,7 @@ const setup = (options: SetupOptions = {}) => {
     },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
+      if (options.isLost) return { ok: false as const, error: "canvas_not_found" as const };
       return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: ack };
     },
     async moderate(_asked: string, moderation: Moderation) {
@@ -274,6 +298,13 @@ const setup = (options: SetupOptions = {}) => {
     },
     async getTwitchSync() {
       return options.twitchSync ?? null;
+    },
+    async getTwitchLive(userId: string) {
+      twitchLiveReads.push(userId);
+      return options.twitchLives?.[userId] ?? null;
+    },
+    async listTwitchLives() {
+      return new Map<string, TwitchLive>();
     },
     async listEvents() {
       return options.resync ?? null;
@@ -301,7 +332,7 @@ const setup = (options: SetupOptions = {}) => {
       return options.isRefusedByScripts ? archivedRefusal : { ok: true as const, value: undefined };
     },
     async getModeratorOrigin() {
-      return roles.isModerator ? { isFromTwitch: true, isNamedHere: false } : null;
+      return options.authorOrigin ?? null;
     },
     async report(_asked: string, sent: Report) {
       reports.push(sent);
@@ -406,6 +437,7 @@ const setup = (options: SetupOptions = {}) => {
     gaugeLimits,
     namedModerators,
     reports,
+    twitchLiveReads,
     clock,
     roles,
     open,
@@ -483,6 +515,40 @@ describe("createConnection (§6.1)", () => {
     const { connection, sent, closed } = setup();
 
     await connection.receive(hello({ canvasId: "unknown-canvas" }));
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_not_found" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Un canvas que Redis remet en place se dit « en récupération », jamais « introuvable » (Écart §4.2, JOURNAL 2026-10-08)
+  it("says a canvas being recovered is being recovered, not that it is missing", async () => {
+    const { connection, sent, closed } = setup({ isRecovering: true });
+
+    await connection.receive(hello({ canvasId: "unknown-canvas" }));
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_recovering" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Une page qui jouait quand Redis a tout perdu l'apprend à sa prochaine pose : le canvas revient, elle se reconnecte
+  it("tells a page that was playing that the canvas is being recovered when its placement finds it lost", async () => {
+    const { connection, sent, closed } = setup({ isLost: true, isRecovering: true });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(place());
+
+    expect(sent).toEqual([{ t: "error", code: "canvas_recovering" }]);
+    expect(closed).toEqual([1008]);
+  });
+
+  // Le canvas qui n'est pas en récupération reste « introuvable » quand les scripts ne le trouvent plus
+  it("still says missing for a canvas the scripts no longer find when it is not being recovered", async () => {
+    const { connection, sent, closed } = setup({ isLost: true });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(place());
 
     expect(sent).toEqual([{ t: "error", code: "canvas_not_found" }]);
     expect(closed).toEqual([1008]);
@@ -575,23 +641,30 @@ describe("createConnection (§6.1)", () => {
     expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
   });
 
-  // Dit au propriétaire, en inspectant, que l'auteur est modérateur et d'où il vient, et à lui seul (JOURNAL 2026-09-27)
-  it("tells the owner, on inspection, that the author is a moderator and where from, and only the owner", async () => {
-    const byOwner = setup({ session: owner, isModerator: true });
-    const byModerator = setup({ isModerator: true });
+  // Dit à qui modère, en inspectant, que l'auteur est modérateur et d'où il vient, au streamer (JOURNAL 2026-09-27) comme à un
+  // modérateur (Écart §4.3, JOURNAL 2026-10-08), et à personne d'autre
+  it("tells whoever moderates, on inspection, that the author is a moderator and where from, and no one else", async () => {
+    const namedHere = { isFromTwitch: false, isNamedHere: true };
+    const fromTwitch = { isFromTwitch: true, isNamedHere: false };
+    const byOwner = setup({ session: owner, authorOrigin: fromTwitch });
+    const byModerator = setup({ isModerator: true, authorOrigin: namedHere });
+    const byViewer = setup({ authorOrigin: namedHere });
 
-    for (const { connection } of [byOwner, byModerator]) {
+    for (const { connection } of [byOwner, byModerator, byViewer]) {
       await connection.receive(hello());
       await connection.receive(inspect(1, 2));
     }
 
     const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
-    const moderatorOrigin = { isFromTwitch: true, isNamedHere: false };
     expect(byOwner.sent.at(-1)).toEqual({
       ...inspected,
-      entry: { ...entry, canReport: true, moderatorOrigin },
+      entry: { ...entry, canReport: true, moderatorOrigin: fromTwitch },
     });
-    expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
+    expect(byModerator.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...entry, canReport: true, moderatorOrigin: namedHere },
+    });
+    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
   });
 
   // Refuse la 11e inspection d'une même seconde sans fermer, en nommant la requête, puis accepte une seconde plus tard
@@ -609,6 +682,56 @@ describe("createConnection (§6.1)", () => {
     clock.nowMs += 1000;
     await connection.receive(inspect(1, 2));
     expect(sent.at(-1)).toMatchObject({ t: "inspected", requestId: "inspect-1" });
+  });
+
+  // Refuse la 11e pose d'une même seconde sans appeler le noyau ni fermer, en nommant la requête, puis accepte une seconde plus tard
+  it("refuses the 11th placement within a second without asking the core or closing, naming the request, then accepts a second later", async () => {
+    const { connection, sent, closed, placements, clock } = setup();
+    await connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await connection.receive(place(`place-${count}`));
+
+    await connection.receive(place("place-10"));
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "place-10" });
+    expect(placements).toHaveLength(10);
+    expect(closed).toEqual([]);
+
+    clock.nowMs += 1000;
+    await connection.receive(place("place-11"));
+    expect(placements).toHaveLength(11);
+    expect(sent.at(-1)).toEqual(ack);
+  });
+
+  // Donne à chaque connexion son budget de poses : un autre onglet n'est pas freiné par celui qui déborde
+  it("gives every connection its own placement budget", async () => {
+    const context = setup();
+    const other = context.open(session);
+    await context.connection.receive(hello());
+    await other.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await context.connection.receive(place(`place-${count}`));
+
+    await context.connection.receive(place("place-10"));
+    await other.connection.receive(place("other-0"));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "place-10" });
+    expect(other.sent.at(-1)).toEqual(ack);
+  });
+
+  // Tient le budget des poses à part de celui des inspections, dans les deux sens
+  it("keeps the placement budget and the inspection budget apart, both ways", async () => {
+    const inspecting = setup();
+    await inspecting.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await inspecting.connection.receive(inspect(1, 2));
+    for (let count = 0; count < 10; count += 1) await inspecting.connection.receive(place(`place-${count}`));
+
+    const placing = setup();
+    await placing.connection.receive(hello());
+    for (let count = 0; count < 10; count += 1) await placing.connection.receive(place(`place-${count}`));
+    await placing.connection.receive(inspect(1, 2));
+
+    expect(inspecting.placements).toHaveLength(10);
+    expect(inspecting.sent.at(-1)).toEqual(ack);
+    expect(placing.sent.at(-1)).toMatchObject({ t: "inspected", requestId: "inspect-1" });
   });
 
   // Répond sans entrée pour une case où personne n'a posé
@@ -877,6 +1000,53 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
   });
 
+  // Un modérateur banni perd son rôle en direct et ne modère plus, jusqu'à son déban (Écart §10.3, JOURNAL 2026-10-08)
+  it("rereads, live, the role of a moderator who is banned then unbanned: he moderates nothing while banned", async () => {
+    const context = setup({ isModerator: true });
+    await context.connection.receive(hello());
+    expect(context.sent[0]).toMatchObject({ t: "welcome", you: { role: "moderator" } });
+
+    context.roles.isModerator = false; // ce que rend le noyau pour un banni, même resté dans mods
+    context.control({ t: "banned", userId: session.userId });
+    await flush();
+    expect(context.sent.slice(-2)).toEqual([{ t: "banned" }, { t: "role", role: "viewer" }]);
+    await context.connection.receive(moderate("clearUser"));
+    await context.connection.receive(JSON.stringify({ t: "listBans", requestId: "bans-1" }));
+    expect(context.sent.slice(-2)).toEqual([
+      { t: "error", code: "forbidden" },
+      { t: "error", code: "forbidden" },
+    ]);
+    expect(context.moderations).toEqual([]);
+
+    context.roles.isModerator = true;
+    context.control({ t: "unbanned", userId: session.userId });
+    await flush();
+    expect(context.sent.slice(-3)).toEqual([
+      { t: "unbanned" },
+      { t: "role", role: "moderator" },
+      { t: "reportCount", count: 0 },
+    ]);
+    await context.connection.receive(moderate("clearUser"));
+    expect(context.moderations).toHaveLength(1);
+  });
+
+  // Un ban tombé pendant l'arrivée d'un modérateur lui ôte son rôle juste après le welcome (Écart §10.3, JOURNAL 2026-10-08)
+  it("takes the role of a moderator whose ban lands during his arrival, right after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ isModerator: true, duringSnapshot: () => during.run?.() });
+    during.run = () => {
+      context.roles.isModerator = false;
+      context.control({ t: "banned", userId: session.userId });
+    };
+
+    await context.connection.receive(hello());
+
+    const kinds = context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"));
+    expect(kinds.slice(0, 2)).toEqual(["welcome", "snapshot"]);
+    expect(kinds).toContain("banned");
+    expect(context.sent.at(-1)).toEqual({ t: "role", role: "viewer" });
+  });
+
   // Garde un ban tombé pendant l'arrivée, et l'envoie après le welcome
   it("holds a ban that lands during the arrival, and sends it after the welcome", async () => {
     const during: { run?: () => void } = {};
@@ -1043,6 +1213,56 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     expect(context.obsBackgrounds).toEqual(["white"]);
     for (const opened of [context, viewer])
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
+  });
+
+  // Donne le thème du canvas dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-07)
+  it("gives the canvas theme in the params of the welcome, to everyone, and none when the canvas has none", async () => {
+    const themed = setup({ session: owner, theme: "Halloween" });
+    const viewer = themed.open(session);
+    const guest = themed.open(null);
+    const obs = themed.open(null);
+    const plain = setup();
+
+    for (const opened of [themed, viewer, guest]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    await plain.connection.receive(hello());
+
+    for (const opened of [themed, viewer, guest, obs])
+      expect(opened.sent[0]).toMatchObject({ t: "welcome", params: { theme: "Halloween" } });
+    const plainWelcome = plain.sent[0];
+    expect(plainWelcome).toMatchObject({ t: "welcome" });
+    expect(plainWelcome && "params" in plainWelcome && "theme" in plainWelcome.params).toBe(false);
+  });
+
+  // Transmet un thème qui change, ou qui disparaît, à toutes les pages du canvas, tel que le web l'a publié
+  it("hands a theme that changes or goes away to every page of the canvas, as the web published it", async () => {
+    const context = setup({ session: owner, theme: "Halloween" });
+    const viewer = context.open(session);
+    const guest = context.open(null);
+    for (const opened of [context, viewer, guest]) await opened.connection.receive(hello());
+
+    context.control({ t: "theme", theme: "Noël" });
+    for (const opened of [context, viewer, guest])
+      expect(opened.sent.at(-1)).toEqual({ t: "theme", theme: "Noël" });
+
+    context.control({ t: "theme" });
+    for (const opened of [context, viewer, guest]) expect(opened.sent.at(-1)).toEqual({ t: "theme" });
+  });
+
+  // Garde un thème tombé pendant l'arrivée, et l'envoie après le welcome : il est plus récent que celui du welcome
+  it("holds a theme that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ theme: "Halloween", duringSnapshot: () => during.run?.() });
+    during.run = () => context.control({ t: "theme", theme: "Noël" });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "theme",
+    ]);
+    expect(context.sent.at(-1)).toEqual({ t: "theme", theme: "Noël" });
   });
 
   // Le fond noir passe comme le blanc : le streamer le demande, le cœur l'écrit
@@ -1754,5 +1974,192 @@ describe("the scoreboard of a canvas, for each page (JOURNAL 2026-10-06)", () =>
       top: options.scoreboard,
       you: { rank: 8, pixels: 2 },
     });
+  });
+});
+
+describe("the Twitch live in the connection (Écart §4, JOURNAL 2026-10-07)", () => {
+  const art: TwitchLive = { category: "Art" };
+  const chatting: TwitchLive = { category: "Just Chatting" };
+  const lives = { [meta.ownerId]: art, [session.userId]: chatting, "user-2": { category: "Music" } };
+  const archivedAt = now - 86_400_000;
+
+  // Dit dans le welcome si le streamer est en live et si la personne connectée l'est, avec leur catégorie
+  it("tells in the welcome whether the owner is live and whoever is signed in, with their category", async () => {
+    const { connection, sent } = setup({ twitchLives: lives });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({
+      t: "welcome",
+      canvas: { ownerTwitchLive: art },
+      you: { userId: session.userId, twitchLive: chatting },
+    });
+  });
+
+  // Ne dit rien dans le welcome quand personne n'est en live
+  it("says nothing in the welcome when nobody is live", async () => {
+    const { connection, sent } = setup();
+
+    await connection.receive(hello());
+
+    expect(sent[0]).not.toHaveProperty("canvas.ownerTwitchLive");
+    expect(sent[0]).not.toHaveProperty("you.twitchLive");
+  });
+
+  // À un invité, le welcome ne dit que le live du streamer ; le streamer sur son canvas n'en lit qu'un, le sien
+  it("tells a guest only the owner's live, and reads the owner's live once for the owner on his canvas", async () => {
+    const asGuest = setup({ session: null, twitchLives: lives });
+    const asOwner = setup({ session: owner, twitchLives: lives });
+
+    await asGuest.connection.receive(hello());
+    await asOwner.connection.receive(hello());
+
+    expect(asGuest.sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art } });
+    expect(asGuest.sent[0]).not.toHaveProperty("you.twitchLive");
+    expect(asGuest.twitchLiveReads).toEqual([meta.ownerId]);
+    expect(asOwner.sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art }, you: { twitchLive: art } });
+    expect(asOwner.twitchLiveReads).toEqual([meta.ownerId]);
+  });
+
+  // La vue OBS n'affiche aucun profil : elle ne lit aucun live et n'en reçoit aucun, même annoncé ensuite
+  it("reads no live for an OBS view, and hands it none, even announced later", async () => {
+    const { connection, sent, twitchLiveReads, broadcast } = setup({ session: null, twitchLives: lives });
+
+    await connection.receive(hello({ mode: "obs" }));
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    expect(twitchLiveReads).toEqual([]);
+    expect(sent[0]).not.toHaveProperty("canvas.ownerTwitchLive");
+    expect(sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
+  });
+
+  // Une archive porte aussi le live de son streamer : son bandeau a un profil
+  it("tells the live of the owner of an archive too, whose banner has a profile", async () => {
+    const { connection, sent } = setup({ session: null, archivedAt, twitchLives: lives });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({ canvas: { ownerTwitchLive: art } });
+  });
+
+  // Joint à l'inspection le live de l'auteur du pixel, avec son identifiant ou sans, et rien quand il n'est pas en live
+  it("joins to an inspection the live of the pixel's author, with its id or without, and nothing when it is not live", async () => {
+    const byViewer = setup({ twitchLives: lives });
+    const byModerator = setup({ isModerator: true, twitchLives: lives });
+    const authorNotLive = setup({ twitchLives: { [meta.ownerId]: art } });
+    for (const { connection } of [byViewer, byModerator, authorNotLive]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
+    const music = { category: "Music" };
+    expect(byViewer.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...publicEntry, canReport: true, twitchLive: music },
+    });
+    expect(byModerator.sent.at(-1)).toEqual({
+      ...inspected,
+      entry: { ...entry, canReport: true, twitchLive: music },
+    });
+    expect(authorNotLive.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
+    expect(byViewer.twitchLiveReads).toContain("user-2");
+  });
+
+  // Lit le live de l'auteur seulement quand une case a un auteur, et le garde dans l'inspection d'une archive
+  it("reads an author's live only when a cell has one, and keeps it in the inspection of an archive", async () => {
+    const empty = setup({ twitchLives: lives });
+    const inArchive = setup({ archivedAt, twitchLives: lives });
+    await empty.connection.receive(hello());
+    await empty.connection.receive(inspect(0, 0));
+    await inArchive.connection.receive(hello());
+    await inArchive.connection.receive(inspect(1, 2));
+
+    expect(empty.twitchLiveReads).toEqual([meta.ownerId, session.userId]);
+    expect(inArchive.sent.at(-1)).toEqual({
+      t: "inspected",
+      requestId: "inspect-1",
+      x: 1,
+      y: 2,
+      entry: { ...publicEntry, twitchLive: { category: "Music" } },
+    });
+  });
+
+  // Passe un live annoncé aux pages du streamer et aux connexions du compte lui-même, et à personne d'autre
+  it("passes an announced live to the owner's pages and to the account's own connections, nobody else's", async () => {
+    const context = setup();
+    const otherViewer = context.open({ userId: "user-2", login: "user2", displayName: "User 2" });
+    const guest = context.open(null);
+    const obs = context.open(null);
+    await context.connection.receive(hello());
+    await otherViewer.connection.receive(hello());
+    await guest.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    const heard = (opened: { sent: unknown[] }) =>
+      opened.sent.filter((frame) => hasFrame(frame, "twitchLive"));
+
+    context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+    const ownerLive = { t: "twitchLive", userId: meta.ownerId, twitchLive: art };
+    for (const opened of [context, otherViewer, guest]) expect(heard(opened)).toEqual([ownerLive]);
+    expect(heard(obs)).toEqual([]);
+
+    context.broadcast.announce({ t: "twitchLive", userId: session.userId, twitchLive: chatting });
+    expect(heard(context).at(-1)).toEqual({ t: "twitchLive", userId: session.userId, twitchLive: chatting });
+    for (const opened of [otherViewer, guest]) expect(heard(opened)).toEqual([ownerLive]);
+
+    context.broadcast.announce({ t: "twitchLive", userId: "user-9", twitchLive: chatting });
+    expect(heard(context)).toHaveLength(2);
+    for (const opened of [otherViewer, guest]) expect(heard(opened)).toHaveLength(1);
+  });
+
+  // Annonce la fin d'un live sans live, pour que la page efface le sien
+  it("announces the end of a live without a live, so the page clears its own", async () => {
+    const { connection, sent, broadcast } = setup({ twitchLives: lives });
+    await connection.receive(hello());
+
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId });
+
+    expect(sent.at(-1)).toEqual({ t: "twitchLive", userId: meta.ownerId });
+    expect(sent.at(-1)).not.toHaveProperty("twitchLive");
+  });
+
+  // Garde un live qui tombe pendant l'arrivée, et l'envoie après le welcome
+  it("holds a live that lands during the arrival, and sends it after the welcome", async () => {
+    const during: { run?: () => void } = {};
+    const context = setup({ duringSnapshot: () => during.run?.() });
+    during.run = () => context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+      "twitchLive",
+    ]);
+  });
+
+  // Ne passe rien d'un live à une page qui n'a pas encore dit bonjour
+  it("passes nothing to a page that has not said hello yet", async () => {
+    const { sent, broadcast } = setup();
+
+    broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: art });
+
+    expect(sent).toEqual([]);
+  });
+
+  // À une nouvelle taille, le nouveau welcome reprend les lives, lus de nouveau : la page ne les perd pas
+  it("gives the lives again in the welcome of a new size, read again: the page does not lose them", async () => {
+    const context = setup({ session: owner, twitchLives: lives });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(
+      JSON.stringify({ t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 }),
+    );
+    context.control({ t: "resize" });
+    await flush();
+
+    const welcomes = context.sent.filter((frame) => hasFrame(frame, "welcome"));
+    expect(welcomes).toHaveLength(2);
+    expect(welcomes.at(-1)).toMatchObject({ canvas: { ownerTwitchLive: art }, you: { twitchLive: art } });
   });
 });

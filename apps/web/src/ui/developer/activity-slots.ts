@@ -18,11 +18,11 @@ import {
   activePlayersLabel,
   activeStreamersLabel,
   connectedPeopleLabel,
-  obsViewsLabel,
   placedPixelsLabel,
   signupsLabel,
   slotTitle,
   streamedCanvasesLabel,
+  streamedMinutesLabel,
   visitMinutesLabel,
   visitsLabel,
 } from "./activity-labels";
@@ -35,7 +35,8 @@ const TIME_SPENT_LINE: TimeChartLine = { title: "Temps passé (min)", countLabel
 const PIXELS_LINE: TimeChartLine = { title: "Pixels posés", countLabel: placedPixelsLabel };
 
 // Les six courbes, de haut en bas, dans l'ordre des valeurs de chaque créneau : leur titre, et leur valeur accordée
-// dans l'infobulle. Les visites et le temps passé suivent les personnes (JOURNAL 2026-10-07).
+// dans l'infobulle. Les visites et le temps passé suivent les personnes (JOURNAL 2026-10-07) ; les canvas streamés sont
+// ceux dont une vue OBS est ouverte et le streamer en live (JOURNAL 2026-10-08).
 export const CHART_LINES: readonly TimeChartLine[] = [
   PEOPLE_LINE,
   VISITS_LINE,
@@ -58,13 +59,13 @@ const ALL_CHART_LINES: readonly TimeChartLine[] = [
 export const chartLinesFor = (period: ActivityPeriod): readonly TimeChartLine[] =>
   period === "all" ? ALL_CHART_LINES : CHART_LINES;
 
-// Celles d'un canvas : ses vues OBS à la place des canvas streamés, les nouveaux comptes venus de sa page, et sur Tout ses
-// joueurs actifs de chaque jour.
+// Celles d'un canvas : ses minutes streamées à la place des canvas streamés, les nouveaux comptes venus de sa page, et sur
+// Tout ses joueurs actifs de chaque jour. Ses vues OBS ouvertes ne sont qu'un détail de l'instant, sans courbe.
 const CANVAS_CHART_LINES: readonly TimeChartLine[] = [
   PEOPLE_LINE,
   VISITS_LINE,
   TIME_SPENT_LINE,
-  { title: "Vues OBS ouvertes", countLabel: obsViewsLabel },
+  { title: "Temps streamé (min)", countLabel: streamedMinutesLabel },
   PIXELS_LINE,
   { title: "Nouveaux comptes venus de sa page", countLabel: signupsLabel },
 ];
@@ -130,13 +131,13 @@ export function toActivitySlots(
 
 // Les valeurs d'un créneau d'un canvas, dans l'ordre de ses courbes : les joueurs actifs sur Tout seulement.
 const toCanvasValues = (
-  { people, visits, visitMinutes, obsViews, pixels, signups, activePlayers = 0 }: CanvasActivityPoint,
+  { people, visits, visitMinutes, streamedMinutes, pixels, signups, activePlayers = 0 }: CanvasActivityPoint,
   period: ActivityPeriod,
 ): number[] => [
   people,
   visits,
   visitMinutes,
-  obsViews,
+  streamedMinutes,
   pixels,
   signups,
   ...(period === "all" ? [activePlayers] : []),

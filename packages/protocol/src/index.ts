@@ -10,6 +10,7 @@ import {
   OBS_BACKGROUNDS,
   ROLES,
   SCOREBOARD_SIZE,
+  THEME_MAX_LENGTH,
   type Timestamp,
 } from "@liveplace/domain";
 import { CAPACITY_LINKS, CAPACITY_RESOURCE_IDS, CAPACITY_UNITS } from "@liveplace/domain/capacity";
@@ -31,7 +32,11 @@ import { z } from "zod";
 // 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (Écart §15, JOURNAL 2026-10-06), et le fond
 // noir de la vue OBS.
 // 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
-export const PROTOCOL_VERSION = 15;
+// 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (Écart §4.3, JOURNAL 2026-10-07).
+// 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (Écart §4 et §10.1, JOURNAL 2026-10-07).
+// 18 : un canvas en récupération, le code d'erreur `canvas_recovering` (Écart §4.2, JOURNAL 2026-10-08).
+// 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (Écart §4.3, JOURNAL 2026-10-08).
+export const PROTOCOL_VERSION = 19;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -140,12 +145,16 @@ const RejectedPixelSchema = z.object({
 // L'origine d'un rôle de modérateur : nommé sur Twitch, ici, ou les deux (JOURNAL 2026-09-27).
 const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
 
+// Écart §4.3 (JOURNAL 2026-10-07) : le live Twitch d'un compte ; `category` vide : le stream n'en a pas. Absent : hors live.
+const TwitchLiveSchema = z.object({ category: z.string() });
+
 const InspectEntrySchema = z.object({
   userId: UserIdSchema.optional(), // §4.3 : seulement pour qui modère
-  moderatorOrigin: ModeratorOriginSchema.optional(), // pour le seul streamer, quand l'auteur est modérateur
+  moderatorOrigin: ModeratorOriginSchema.optional(), // pour qui modère (Écart §4.3, JOURNAL 2026-10-08), quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
+  twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : lu à l'inspection
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
   placementId: PlacementIdSchema, // §4.3 : la pose, pour la signaler ou la retirer
@@ -160,6 +169,7 @@ const ErrorCodeSchema = z.enum([
   "invalid_frame",
   "canvas_not_found",
   "canvas_archived", // Écart §15 (JOURNAL 2026-10-06) : une écriture sur une archive, refusée sans fermer la connexion
+  "canvas_recovering", // Écart §4.2 (JOURNAL 2026-10-08) : Convex le connaît, Redis le remet en place ; la page reprend seule
   "server_full",
 ]);
 
@@ -352,6 +362,13 @@ export type ClientFrame = z.infer<typeof ClientFrameSchema>;
 // Le snapshot est hors bande : une frame binaire (width × height octets),
 // jamais un objet `t`-discriminé, donc pas de schéma Zod ici.
 
+// Écart §4.3 (JOURNAL 2026-10-07) : borné par caractères comme `toTheme` ; `.max` compterait les unités UTF-16, et un
+// thème de 40 émojis serait refusé.
+const ThemeSchema = z
+  .string()
+  .min(1)
+  .refine((theme) => Array.from(theme).length <= THEME_MAX_LENGTH, "thème trop long");
+
 const WelcomeFrameSchema = z.object({
   t: z.literal("welcome"),
   canvas: z.object({
@@ -360,6 +377,7 @@ const WelcomeFrameSchema = z.object({
     height: z.number().int().positive(),
     ownerId: UserIdSchema,
     archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
+    ownerTwitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : le streamer est en live
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
@@ -368,6 +386,7 @@ const WelcomeFrameSchema = z.object({
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
     obsBackground: z.enum(OBS_BACKGROUNDS), // JOURNAL 2026-09-29
+    theme: ThemeSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : absent, le canvas n'a pas de thème
   }),
   palette: z.array(z.string()),
   version: VersionSchema,
@@ -376,6 +395,7 @@ const WelcomeFrameSchema = z.object({
     login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
     avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
+    twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : la personne connectée est en live
     role: RoleSchema,
   }),
   gauge: GaugeSchema.optional(),
@@ -480,6 +500,7 @@ const ReportedPlacementSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   hasAccount: z.boolean(),
+  moderatorOrigin: ModeratorOriginSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit pas
   placementId: PlacementIdSchema,
   reportCount: z.number().int().positive(),
   reportedAt: TimestampSchema, // le premier signalement
@@ -539,6 +560,10 @@ const ObsBackgroundFrameSchema = z.object({
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
 
+// Le thème vient de changer : toutes les pages du canvas le prennent aussitôt ; sans `theme`, il n'y en a plus
+// (Écart §4.3, JOURNAL 2026-10-07).
+const ThemeFrameSchema = z.object({ t: z.literal("theme"), theme: ThemeSchema.optional() });
+
 // Les bornes viennent de changer : chaque page les prend, et reçoit ensuite sa jauge (JOURNAL 2026-09-30).
 const GaugeLimitsFrameSchema = z.object({
   t: z.literal("gaugeLimits"),
@@ -550,13 +575,21 @@ const GaugeLimitsFrameSchema = z.object({
 // actif ; redevenu actif, une page d'archive part sur `/{login}` ; supprimé, elle montre l'introuvable.
 const CanvasStatusFrameSchema = z.object({ t: z.literal("canvasStatus"), status: z.enum(CANVAS_STATUSES) });
 
+// Écart §4.3 (JOURNAL 2026-10-07) : le live du streamer de la page ou de la personne connectée vient de changer.
+// `twitchLive` absent : plus en live.
+const TwitchLiveFrameSchema = z.object({
+  t: z.literal("twitchLive"),
+  userId: UserIdSchema,
+  twitchLive: TwitchLiveSchema.optional(),
+});
+
 // Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, pour le développeur seul.
 const CountSchema = z.number().int().nonnegative();
 
 // Ce que l'historique garde, et ce que disent les chiffres de l'instant : des nombres, aucun nom (écart §5.1, JOURNAL 2026-10-06).
 const ActivityCountsSchema = z.object({
   people: CountSchema,
-  streamed: CountSchema, // les canvas où une vue OBS est ouverte
+  streamed: CountSchema, // les canvas streamés : une vue OBS ouverte et le streamer en live (Écart §5.1, JOURNAL 2026-10-08)
   pixels: CountSchema,
   signups: CountSchema,
 });
@@ -576,10 +609,14 @@ const ConnectedAccountSchema = ActivityUserSchema.extend({
   devices: z.array(z.enum(DEVICES)),
 });
 
-// `obsViews` au-dessus de zéro : le canvas est streamé. `heat` : ses pixels de la dernière heure.
+// `isStreamed` : une vue OBS est ouverte et son streamer est en live, l'état de l'instant sans la tolérance de l'historique
+// (Écart §5.1, JOURNAL 2026-10-08) ; `obsViews`, ses vues OBS ouvertes, n'en est qu'un détail. `heat` : ses pixels de la dernière
+// heure. Le streamer porte son live Twitch quand il en a un (Écart §4.3, JOURNAL 2026-10-07) ; les comptes connectés, eux, n'en
+// portent pas.
 const ActivityCanvasSchema = z.object({
   canvasId: CanvasIdSchema,
-  owner: ActivityUserSchema,
+  owner: ActivityUserSchema.extend({ twitchLive: TwitchLiveSchema.optional() }),
+  isStreamed: z.boolean(),
   obsViews: CountSchema,
   people: CountSchema,
   guests: CountSchema,
@@ -626,8 +663,8 @@ const ActivityFrameSchema = z.object({
   here: ActivityHereSchema.optional(),
 });
 
-// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels, des comptes, des visites
-// et du temps passé. Un point d'avant l'audience se lit à zéro ; les distincts ne se gardent que par jour.
+// Un point, à `at` son début : le pic des personnes et des canvas streamés, la somme des pixels, des comptes, des visites et du
+// temps passé. Un point d'avant l'audience se lit à zéro ; les distincts ne se gardent que par jour.
 const ActivityPointSchema = ActivityCountsSchema.extend({
   at: TimestampSchema,
   visits: CountSchema.default(0),
@@ -638,12 +675,13 @@ const ActivityPointSchema = ActivityCountsSchema.extend({
   activeStreamers: CountSchema.optional(),
 });
 
-// Un point d'un canvas (JOURNAL 2026-10-07), à `at` son début : le pic des personnes et des vues OBS, la somme des pixels,
-// des visites, du temps passé et des nouveaux comptes venus de sa page. Les joueurs actifs ne se gardent que par jour.
+// Un point d'un canvas (JOURNAL 2026-10-07), à `at` son début : le pic des personnes, la somme des pixels, des visites, du
+// temps passé, des minutes streamées (0 ou 1 à la minute, JOURNAL 2026-10-08) et des nouveaux comptes venus de sa page. Les
+// joueurs actifs ne se gardent que par jour.
 const CanvasPointSchema = z.object({
   at: TimestampSchema,
   people: CountSchema,
-  obsViews: CountSchema,
+  streamedMinutes: CountSchema,
   pixels: CountSchema,
   visits: CountSchema,
   visitMinutes: CountSchema,
@@ -738,6 +776,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ObsBackgroundFrameSchema,
+  ThemeFrameSchema,
   GaugeLimitsFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,
@@ -747,6 +786,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   StaleListFrameSchema,
   ScoreboardFrameSchema,
   CanvasStatusFrameSchema,
+  TwitchLiveFrameSchema,
   ActivityFrameSchema,
   ActivityHistoryFrameSchema,
   CapacityFrameSchema,

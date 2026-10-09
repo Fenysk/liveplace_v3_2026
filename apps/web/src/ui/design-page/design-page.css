@@ -101,7 +101,7 @@
   box-shadow: var(--pill-shadow);
 }
 
-/* Thème et Pointeur, sous le sommaire : séparés par un filet, comme dans la fenêtre du jeu */
+/* Apparence et Pointeur, sous le sommaire : séparés par un filet, comme dans la fenêtre du jeu */
 .design-nav-controls {
   display: flex;
   flex-direction: column;
@@ -269,6 +269,97 @@
   width: 100%;
 }
 
+/* La place entre les pills Canvas et Compte : un thème trop long s'y coupe par « … » */
+.design-in-top-room {
+  --lp-theme-room: 360px;
+  width: 360px;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous, le toast sous elle. Ce que
+   `@media (max-width: 640px), (pointer: coarse)` fait au vrai écran (tokens.css, pill.css, theme-pill.css) : contrôles de
+   44 px, la pill Canvas bornée à la place que la pill Compte lui laisse (112 px et un espace, ici celle d'un invité), la
+   bande sur toute la largeur, « Thème » devant le thème, qui prend la taille « title » et tient sur deux lignes au plus */
+.design-in-phone-top {
+  --control-size: var(--control-size-touch);
+  --lp-phone-width: 359px;
+  width: var(--lp-phone-width);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.design-in-phone-top--narrow {
+  --lp-phone-width: 300px;
+}
+
+.design-phone-row {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.design-phone-row-start {
+  --lp-canvas-room: calc(var(--lp-phone-width) - 120px);
+  min-width: 0;
+}
+
+.design-phone-row-start .lp-pill-content {
+  max-width: var(--lp-canvas-room);
+}
+
+.design-phone-row-start .lp-live-category {
+  max-width: none;
+}
+
+.design-in-phone-top > .lp-pill--title,
+.design-in-phone-top > .lp-pill--title .lp-pill-content {
+  width: 100%;
+  max-width: none;
+}
+
+.design-in-phone-top .lp-theme {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+}
+
+.design-in-phone-top .lp-theme-line {
+  display: block;
+}
+
+.design-in-phone-top .lp-theme-wide {
+  display: none;
+}
+
+.design-in-phone-top .lp-theme-narrow {
+  display: inline;
+}
+
+.design-in-phone-top .lp-theme-caption {
+  margin-inline-end: var(--space-2);
+}
+
+.design-in-phone-top .lp-theme .lp-theme-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+  font-weight: var(--type-title-weight);
+}
+
 /* Ce que `@media (max-width: 640px)` fait au vrai écran (tokens.css, window.css) */
 .design-in-phone--window.lp-pill {
   --control-size: var(--control-size-touch);
@@ -380,7 +471,7 @@
   height: 24px;
 }
 
-/* Les choix de thème et de pointeur, un peu plus serrés : les trois options tiennent dans les 264 px du sommaire */
+/* Les choix d'apparence et de pointeur, un peu plus serrés : les trois options tiennent dans les 264 px du sommaire */
 .design-nav .lp-segmented-option {
   gap: var(--space-1);
   padding: 0 10px;

@@ -3,15 +3,16 @@
 
 import { isLinkCode, type Timestamp } from "@liveplace/domain";
 import type { DurableStore } from "@liveplace/domain/ports";
-import { type CanvasOwner, toCanvasOwner } from "./resolve-canvas";
+import { type CanvasOwner, getCanvasOwner, toCanvasOwner } from "./resolve-canvas";
+import type { TwitchLiveTracker } from "./twitch-live";
 
-// De quoi montrer le bandeau : ses dates, et son nom s'il en a un.
+// De quoi montrer le bandeau : ses dates, et son thème s'il en a un.
 export type ResolvedArchive = {
   canvasId: string;
   owner: CanvasOwner;
   createdAt: Timestamp;
   archivedAt: Timestamp;
-  name?: string;
+  theme?: string;
 };
 
 // `active` : le code est celui d'une archive rouverte, redevenue le canvas actif : la page est `/{login}`.
@@ -25,6 +26,7 @@ export async function resolveArchive(
   durable: Pick<DurableStore, "getUserByLogin" | "getArchiveByLinkCode">,
   login: string,
   code: string,
+  tracker?: Pick<TwitchLiveTracker, "getLive">,
 ): Promise<ArchivePage | null> {
   const owner = await durable.getUserByLogin(login.toLowerCase());
   if (!owner) return null;
@@ -32,9 +34,15 @@ export async function resolveArchive(
   const linked = isLinkCode(code) ? await durable.getArchiveByLinkCode(owner.userId, code) : null;
   if (!linked) return { status: "missing", owner: toCanvasOwner(owner) };
   if (linked.status === "active") return { status: "active", login: owner.login };
-  const { canvasId, createdAt, archivedAt, name } = linked.archive;
+  const { canvasId, createdAt, archivedAt, theme } = linked.archive;
   return {
     status: "archived",
-    archive: { canvasId, owner: toCanvasOwner(owner), createdAt, archivedAt, ...(name ? { name } : {}) },
+    archive: {
+      canvasId,
+      owner: await getCanvasOwner(owner, tracker),
+      createdAt,
+      archivedAt,
+      ...(theme ? { theme } : {}),
+    },
   };
 }

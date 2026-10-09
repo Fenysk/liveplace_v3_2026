@@ -15,6 +15,7 @@ import {
   INSTANT_WINDOW_MS,
   isWithoutNews,
   projectMonth,
+  SNAPSHOT_DELAY_CEILING_MS,
   TOTAL_CONNECTIONS_CEILING,
   toInstantResource,
   toMonthlyResource,
@@ -23,6 +24,7 @@ import {
   toRatio,
   toSaturation,
   toSaturationColor,
+  toStockResource,
   toThousandth,
 } from "./capacity";
 import { HOUR_MS, MINUTE_MS } from "./index";
@@ -40,10 +42,10 @@ const withoutNews = (id: CapacityResourceId): CapacityResource => {
 
 // Écart §5.1 et §6 (JOURNAL 2026-10-07) : les plafonds fixes de la capacité, dans domain.
 describe("the fixed ceilings (JOURNAL 2026-10-07)", () => {
-  // Fixe le débit sortant à 200 Mbit/s, le délai de diffusion à 250 ms, et les connexions à 1 000 et 1 750
-  it("fixes the outbound rate at 200 Mbit/s, the broadcast delay at 250 ms, and the connections at 1,000 and 1,750", () => {
+  // Fixe le débit sortant à 200 Mbit/s, le retard de diffusion à 100 ms, et les connexions à 1 000 et 1 750
+  it("fixes the outbound rate at 200 Mbit/s, the broadcast lateness at 100 ms, and the connections at 1,000 and 1,750", () => {
     expect(GATEWAY_OUTBOUND_CEILING_BPS).toBe(200_000_000);
-    expect(BROADCAST_DELAY_CEILING_MS).toBe(250);
+    expect(BROADCAST_DELAY_CEILING_MS).toBe(100);
     expect(CANVAS_CONNECTIONS_CEILING).toBe(1000);
     expect(TOTAL_CONNECTIONS_CEILING).toBe(1750);
   });
@@ -76,6 +78,79 @@ describe("the fixed ceilings (JOURNAL 2026-10-07)", () => {
     expect(getCapacitySpec("gatewayDelay").cadenceMs).toBe(CAPACITY_SAMPLE_MS);
     expect(getCapacitySpec("convexCalls").cadenceMs).toBe(CONVEX_USAGE_MS);
     expect(CONVEX_USAGE_MS).toBe(15 * MINUTE_MS);
+  });
+});
+
+describe("the file stock and the snapshot delay (JOURNAL 2026-10-08)", () => {
+  // Les deux nouvelles ressources se rangent à la fin, sous Convex : la position d'une ressource est écrite dans l'historique
+  it("appends the two new resources at the end, under Convex", () => {
+    expect(CAPACITY_RESOURCE_IDS.slice(-2)).toEqual(["convexFiles", "snapshotDelay"]);
+    expect(getCapacitySpec("convexFiles").link).toBe("convex");
+    expect(getCapacitySpec("snapshotDelay").link).toBe("convex");
+  });
+
+  // Le stock de fichiers : le quota de 1 Go du plan, lu toutes les 15 minutes comme l'usage du mois
+  it("measures the files in bytes against the 1 GB quota of the plan, every 15 minutes", () => {
+    expect(getCapacitySpec("convexFiles")).toMatchObject({
+      unit: "bytes",
+      ceiling: CONVEX_CEILINGS[CONVEX_PLAN].filesGb * 1024 ** 3,
+      cadenceMs: CONVEX_USAGE_MS,
+    });
+  });
+
+  // La sauvegarde : un retard en secondes face à un plafond de 15 minutes, mesuré toutes les 10 secondes
+  it("measures the snapshot delay in seconds against a ceiling of 15 minutes", () => {
+    expect(SNAPSHOT_DELAY_CEILING_MS).toBe(15 * MINUTE_MS);
+    expect(getCapacitySpec("snapshotDelay")).toMatchObject({
+      unit: "seconds",
+      ceiling: 900,
+      cadenceMs: CAPACITY_SAMPLE_MS,
+    });
+  });
+
+  // Un stock se lit tel quel : face à son plafond, sans projection ni jour plein
+  it("reads a stock as it is, against its ceiling, with no projection", () => {
+    const spec = getCapacitySpec("convexFiles");
+    const at = now - 5 * MINUTE_MS;
+
+    const resource = toStockResource(spec, { used: 512 * 1024 ** 2, at }, now);
+
+    expect(resource).toEqual({
+      link: "convex",
+      id: "convexFiles",
+      unit: "bytes",
+      state: "measured",
+      value: 512 * 1024 ** 2,
+      ceiling: 1024 ** 3,
+      ratio: 50,
+    });
+  });
+
+  // Un stock sans lecture, ou lu il y a plus de trois cadences, est sans nouvelles
+  it("has no news of a stock that was never read or was read more than three cadences ago", () => {
+    const spec = getCapacitySpec("convexFiles");
+    const read = now - 45 * MINUTE_MS;
+
+    expect(toStockResource(spec, undefined, now).state).toBe("withoutNews");
+    expect(toStockResource(spec, { used: 1, at: read }, read + 45 * MINUTE_MS).state).toBe("measured");
+    expect(toStockResource(spec, { used: 1, at: read }, read + 45 * MINUTE_MS + 1).state).toBe("withoutNews");
+  });
+
+  // Le retard, comme toute ressource instantanée : son pic des 5 dernières minutes face au plafond
+  it("takes the delay as the peak of the last 5 minutes against 15 minutes", () => {
+    const spec = getCapacitySpec("snapshotDelay");
+    const samples = [
+      { at: now - 4 * MINUTE_MS, value: 280 },
+      { at: now - 3 * MINUTE_MS, value: 40 },
+      { at: now - 10_000, value: 90 },
+    ];
+
+    expect(toInstantResource(spec, samples, undefined, now)).toMatchObject({
+      state: "measured",
+      value: 280,
+      ceiling: 900,
+      ratio: 31.1,
+    });
   });
 });
 
@@ -154,8 +229,8 @@ describe("the value of an instant resource: the peak of the last 5 minutes (JOUR
       unit: "milliseconds",
       state: "measured",
       value: 120, // un p99 sur 5 minutes déjà : la fenêtre ne garde que le dernier échantillon
-      ceiling: 250,
-      ratio: 48,
+      ceiling: 100,
+      ratio: 120,
     });
     expect(toInstantResource(getCapacitySpec("redisMemory"), samples, 512, now)).toMatchObject({
       state: "measured",

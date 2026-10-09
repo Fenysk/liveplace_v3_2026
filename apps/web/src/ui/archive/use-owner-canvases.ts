@@ -20,7 +20,7 @@ import {
   archiveHref,
   type SwitchFailure,
   shouldReloadAfter,
-  startingName,
+  startingTheme,
 } from "./archive-texts";
 import type { ArchivesList } from "./canvas-cards";
 import type { OwnSwitchTracker } from "./own-switch";
@@ -37,7 +37,7 @@ export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: Ow
   const [list, setList] = useState<ArchivesList>({ status: "loading" });
   const [request, setRequest] = useState<SwitchRequest | null>(null);
   const [discarding, setDiscarding] = useState<ListedArchive | null>(null);
-  const [name, setName] = useState("");
+  const [theme, setTheme] = useState("");
   const [progress, setProgress] = useState<ProgressChoice | null>(null);
   const [status, setStatus] = useState<SwitchStatus>("idle");
   const [failure, setFailure] = useState<SwitchFailure | null>(null);
@@ -84,7 +84,7 @@ export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: Ow
   };
 
   const open = (next: SwitchRequest) => {
-    setName(startingName(next));
+    setTheme(startingTheme(next));
     setProgress(null);
     setStatus("idle");
     setFailure(null);
@@ -95,7 +95,7 @@ export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: Ow
     if (!request || !progress) return;
     if (request.kind === "archive") {
       const { canvasId } = request.canvas;
-      void run(() => archiveCanvasFn({ data: { canvasId, name, progress } }), t.ownerToast.archive, true);
+      void run(() => archiveCanvasFn({ data: { canvasId, theme, progress } }), t.ownerToast.archive, true);
     } else {
       const { canvasId } = request.archive;
       void run(() => reopenCanvasFn({ data: { canvasId, progress } }), t.ownerToast.reopen, true);
@@ -130,8 +130,8 @@ export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: Ow
     },
     switchWindow: {
       request,
-      name,
-      onName: setName,
+      theme,
+      onTheme: setTheme,
       progress,
       onProgress: setProgress,
       pendingReports: reportCount,

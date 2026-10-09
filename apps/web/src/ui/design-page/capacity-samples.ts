@@ -44,7 +44,7 @@ const base = (): Resource[] => [
   measured("redisMemory", 318 * MIB, 512 * MIB),
   measured("redisCpu", 0.09, 1),
   measured("gatewayUtilization", 8, 100),
-  measured("gatewayDelay", 140, 250),
+  measured("gatewayDelay", 40, 100),
   measured("gatewayOutbound", 9_000_000, 200_000_000),
   measured("gatewayCanvasConnections", 120, 1000),
   measured("gatewayConnections", 410, 1750),
@@ -56,6 +56,8 @@ const base = (): Resource[] => [
   measured("convexDatabaseIo", 0.35, 1, { deployments: DEPLOYMENTS }),
   measured("convexEgress", 0.12, 1, { deployments: DEPLOYMENTS }),
   measured("convexCompute", 4.2, 20, { deployments: DEPLOYMENTS }),
+  measured("convexFiles", 312 * MIB, GIB, { deployments: DEPLOYMENTS }),
+  measured("snapshotDelay", 270, 900),
 ];
 
 // Une ressource de l'exemple, remplacée.
@@ -75,7 +77,7 @@ const toFrame = (resources: Resource[], nowMs: number): CapacityFrame => {
 const CALM = replaced(
   base(),
   measured("redisMemory", 96 * MIB, 512 * MIB),
-  measured("gatewayDelay", 40, 250),
+  measured("gatewayDelay", 12, 100),
   measured("machineDisk", 12 * GIB, 80 * GIB),
 );
 
@@ -107,6 +109,7 @@ export const sampleCapacityFrame = (variant: CapacityVariant, nowMs: number): Ca
           missing("redisMemory", "withoutNews"),
           missing("redisCpu", "withoutNews"),
           missing("webUtilization", "withoutNews"),
+          missing("snapshotDelay", "withoutNews"),
         ),
         nowMs,
       );
@@ -114,9 +117,16 @@ export const sampleCapacityFrame = (variant: CapacityVariant, nowMs: number): Ca
       return toFrame(
         replaced(
           CALM,
-          ...(["convexCalls", "convexDatabaseIo", "convexEgress", "convexCompute"] as const).map((id) =>
-            missing(id, "unmeasured"),
-          ),
+          ...(
+            [
+              "convexCalls",
+              "convexDatabaseIo",
+              "convexEgress",
+              "convexCompute",
+              "convexFiles",
+              "snapshotDelay",
+            ] as const
+          ).map((id) => missing(id, "unmeasured")),
         ),
         nowMs,
       );

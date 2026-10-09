@@ -13,7 +13,7 @@ const canvas: OwnedCanvas = { canvasId: "opaque-canvas", width: 256, height: 256
 
 // Un double qui ne connaît qu'un propriétaire, avec ou sans canvas actif.
 const durableWith = (
-  activeCanvas: OwnedCanvas | null,
+  activeCanvas: (OwnedCanvas & { theme?: string }) | null,
   user: User = owner,
 ): Pick<DurableStore, "getUserByLogin" | "getActiveCanvasForOwner"> => ({
   getUserByLogin: async (login) => (login === user.login ? user : null),
@@ -38,6 +38,18 @@ describe("resolveCanvas (§9.1, D-14)", () => {
     });
   });
 
+  // Rend le thème du canvas actif avec la page, dans le même appel que le canvas, et sans thème la clé est absente
+  // (Écart §8.1, JOURNAL 2026-10-07)
+  it("gives the theme of the active canvas with the page, and leaves the key out without one", async () => {
+    expect(await resolveCanvas(durableWith({ ...canvas, theme: "Halloween" }), "fenysk")).toEqual({
+      canvasId: canvas.canvasId,
+      owner: { displayName: owner.displayName, login: owner.login, avatarUrl: owner.avatarUrl },
+      theme: "Halloween",
+    });
+    expect(await resolveCanvas(durableWith(canvas), "fenysk")).not.toHaveProperty("theme");
+    expect(await resolveCanvas(durableWith({ ...canvas, theme: "" }), "fenysk")).not.toHaveProperty("theme");
+  });
+
   // Cherche le pseudo en minuscules, comme Twitch les écrit
   it("looks the login up in lowercase, as Twitch writes them", async () => {
     expect(await resolveCanvas(durableWith(canvas), "Fenysk")).not.toBeNull();
@@ -47,6 +59,54 @@ describe("resolveCanvas (§9.1, D-14)", () => {
   it("gives null for an unknown login, or for an owner without an active canvas", async () => {
     expect(await resolveCanvas(durableWith(canvas), "inconnu")).toBeNull();
     expect(await resolveCanvas(durableWith(null), "fenysk")).toBeNull();
+  });
+});
+
+describe("resolveCanvas, le live du propriétaire (Écart §4, JOURNAL 2026-10-07)", () => {
+  const trackerOf = (twitchLive?: { category: string }) => {
+    const asked: string[] = [];
+    return {
+      asked,
+      tracker: {
+        getLive: async (ownerId: string) => {
+          asked.push(ownerId);
+          return twitchLive;
+        },
+      },
+    };
+  };
+
+  // Quand le propriétaire est en live, le profil de la pill Canvas le porte dès le rendu serveur
+  it("carries the owner's live in the profile, as soon as the server renders", async () => {
+    const { tracker, asked } = trackerOf({ category: "Art" });
+
+    const page = await resolveCanvas(durableWith(canvas), "fenysk", undefined, tracker);
+
+    expect(page?.owner).toEqual({
+      displayName: owner.displayName,
+      login: owner.login,
+      avatarUrl: owner.avatarUrl,
+      twitchLive: { category: "Art" },
+    });
+    expect(asked).toEqual([owner.userId]);
+  });
+
+  // Hors live, le profil ne porte aucune clé de live
+  it("leaves the live out of the profile when the owner is not live", async () => {
+    const { tracker } = trackerOf();
+
+    const page = await resolveCanvas(durableWith(canvas), "fenysk", undefined, tracker);
+
+    expect(page?.owner).not.toHaveProperty("twitchLive");
+  });
+
+  // Pour un pseudo sans canvas, ou sans suivi (la vue OBS), le live n'est pas demandé
+  it("does not ask for the live of a login without a canvas, nor without tracking", async () => {
+    const { tracker, asked } = trackerOf({ category: "Art" });
+
+    expect(await resolveCanvas(durableWith(null), "fenysk", undefined, tracker)).toBeNull();
+    expect((await resolveCanvas(durableWith(canvas), "fenysk"))?.owner).not.toHaveProperty("twitchLive");
+    expect(asked).toEqual([]);
   });
 });
 

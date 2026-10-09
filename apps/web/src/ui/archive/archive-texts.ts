@@ -63,14 +63,14 @@ const frenchFull = (date: ParisDate): string => `${frenchDay(date)} ${frenchMont
 const englishMonth = ({ month }: ParisDate): string => ENGLISH_MONTHS[month - 1] ?? "";
 const englishFull = (date: ParisDate): string => `${englishMonth(date)} ${date.day}, ${date.year}`;
 
-type Named = { name?: string | undefined };
+type Themed = { theme?: string | undefined };
 type Dated = { createdAt: Timestamp; archivedAt?: Timestamp | undefined };
-type NameRequest =
-  | { kind: "archive"; canvas: { name?: string } }
-  | { kind: "reopen"; archive: { name?: string } };
+type ThemeRequest =
+  | { kind: "archive"; canvas: { theme?: string } }
+  | { kind: "reopen"; archive: { theme?: string } };
 
-// Pourquoi le nom n'a pas été enregistré, en un toast. `network` : pas de réponse, comme `failed` pour le streamer.
-export type RenameFailure = "not_active" | "failed" | "network" | "unauthenticated";
+// Pourquoi le thème n'a pas été enregistré, en un toast. `network` : pas de réponse, comme `failed` pour le streamer.
+export type ThemeFailure = "not_active" | "failed" | "network" | "unauthenticated";
 
 // Pourquoi un changement n'a pas eu lieu, dit au streamer dans la fenêtre qui l'a demandé. `network` : la page n'a
 // pas eu de réponse du tout.
@@ -152,21 +152,26 @@ export const ARCHIVE_TEXTS = defineTexts({
     en: "Can't read your canvases right now. Try again in a moment.",
   },
 
-  // Le nom du champ propose un exemple, jamais une consigne.
-  namePlaceholder: { fr: "Ex. : Pixel war de la rentrée", en: "E.g. Autumn pixel war" },
+  // Le champ propose un exemple, jamais une consigne.
+  themePlaceholder: { fr: "Ex. : Halloween", en: "E.g. Halloween" },
 
-  // Le champ de l'onglet Canvas : le nom du canvas en cours, enregistré quand le champ perd le focus, sans bouton.
-  canvasNameLabel: { fr: "Nom du canvas", en: "Canvas name" },
-  nameSaved: { fr: "Nom enregistré", en: "Name saved" },
+  // Le champ de l'onglet Canvas et celui de la fenêtre Archiver : le thème du canvas en cours, enregistré dans l'onglet
+  // quand le champ perd le focus, sans bouton.
+  themeLabel: { fr: "Thème", en: "Theme" },
+  themeCaption: {
+    fr: "Affiché en haut du canvas, pour tout le monde.",
+    en: "Shown at the top of the canvas, for everyone.",
+  },
+  themeSaved: { fr: "Thème enregistré", en: "Theme saved" },
   // Des `switch` exhaustifs : le compilateur signale toute raison laissée sans phrase.
-  renameFailure: localized({
-    fr: (failure: RenameFailure) => {
+  themeFailure: localized({
+    fr: (failure: ThemeFailure) => {
       switch (failure) {
         case "not_active":
-          return "Le canvas en cours a changé : son nom est rechargé.";
+          return "Le canvas en cours a changé : son thème est rechargé.";
         case "failed":
         case "network":
-          return "Le nom n'a pas pu être enregistré. Réessaie dans un instant.";
+          return "Le thème n'a pas pu être enregistré. Réessaie dans un instant.";
         case "unauthenticated":
           return "Ta session a expiré. Reconnecte-toi, puis réessaie.";
       }
@@ -174,10 +179,10 @@ export const ARCHIVE_TEXTS = defineTexts({
     en: (failure) => {
       switch (failure) {
         case "not_active":
-          return "The current canvas changed: its name was reloaded.";
+          return "The current canvas changed: its theme was reloaded.";
         case "failed":
         case "network":
-          return "The name couldn't be saved. Try again in a moment.";
+          return "The theme couldn't be saved. Try again in a moment.";
         case "unauthenticated":
           return "Your session expired. Sign in again, then try again.";
       }
@@ -188,7 +193,6 @@ export const ARCHIVE_TEXTS = defineTexts({
   archiveTitle: { fr: "Archiver ce canvas ?", en: "Archive this canvas?" },
   reopenTitle: { fr: "Rouvrir cette archive ?", en: "Reopen this archive?" },
   discardTitle: { fr: "Supprimer cette archive ?", en: "Delete this archive?" },
-  archiveName: { fr: "Nom de l'archive (facultatif)", en: "Archive name (optional)" },
   archiveSentence: {
     fr: "Ton dessin est figé et garde son lien. Tes viewers passent sur un canvas vide.",
     en: "Your drawing is frozen and keeps its link. Your viewers move to an empty canvas.",
@@ -291,8 +295,7 @@ export const ARCHIVE_TEXTS = defineTexts({
     },
   }),
 
-  // Le bandeau d'une archive : le nom en titre, sinon à qui elle est ; la légende dit les dates, et à qui elle est quand
-  // le nom a pris le titre.
+  // Le bandeau d'une archive : le thème en titre, sinon à qui elle est.
   archiveOf: localized({
     fr: (displayName: string) => `Archive de ${displayName}`,
     en: (displayName) => `${displayName}'s archive`,
@@ -333,42 +336,42 @@ export function datesLabel(createdAt: Timestamp, archivedAt: Timestamp | undefin
 export const datesTitle = (createdAt: Timestamp, archivedAt: Timestamp | undefined, locale: Locale): string =>
   capitalized(datesLabel(createdAt, archivedAt, locale));
 
-// Le nom d'abord ; sans nom, ce sont ses dates.
-export function canvasTitle({ name, createdAt, archivedAt }: Named & Dated, locale: Locale): string {
-  return name ?? datesTitle(createdAt, archivedAt, locale);
+// Le thème d'abord ; sans thème, ce sont ses dates.
+export function canvasTitle({ theme, createdAt, archivedAt }: Themed & Dated, locale: Locale): string {
+  return theme ?? datesTitle(createdAt, archivedAt, locale);
 }
 
-// La ligne du canvas en cours : le nom en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
+// La ligne du canvas en cours : le thème en titre, sinon « Depuis le … » ; la légende dit depuis quand, sauf si le titre
 // le dit déjà.
-export const currentCanvasTitle = ({ name, createdAt }: Named & Dated, locale: Locale): string =>
-  name ?? datesTitle(createdAt, undefined, locale);
+export const currentCanvasTitle = ({ theme, createdAt }: Themed & Dated, locale: Locale): string =>
+  theme ?? datesTitle(createdAt, undefined, locale);
 
-export const currentCanvasCaption = ({ name, createdAt }: Named & Dated, locale: Locale): string | null =>
-  name ? datesLabel(createdAt, undefined, locale) : null;
+export const currentCanvasCaption = ({ theme, createdAt }: Themed & Dated, locale: Locale): string | null =>
+  theme ? datesLabel(createdAt, undefined, locale) : null;
 
 // La légende d'une archive : ses dates, sauf si elles sont déjà son titre.
 export const archiveCaption = (
-  { name, createdAt, archivedAt }: Named & Required<Dated>,
+  { theme, createdAt, archivedAt }: Themed & Required<Dated>,
   locale: Locale,
-): string | null => (name ? datesTitle(createdAt, archivedAt, locale) : null);
+): string | null => (theme ? datesTitle(createdAt, archivedAt, locale) : null);
 
-// Écart §15 (JOURNAL 2026-10-06) : en archivant, le champ propose le nom du canvas actif, qu'une archive rouverte a
-// gardé ; vide, il l'effacerait. Rouvrir n'a pas de nom à donner.
-export const startingName = (request: NameRequest): string =>
-  request.kind === "archive" ? (request.canvas.name ?? "") : "";
+// Écart §8.1 (JOURNAL 2026-10-07) : en archivant, le champ propose le thème du canvas actif, qu'une archive rouverte a
+// gardé ; vide, il l'effacerait. Rouvrir n'a pas de thème à donner.
+export const startingTheme = (request: ThemeRequest): string =>
+  request.kind === "archive" ? (request.canvas.theme ?? "") : "";
 
-type BannerArchive = Named & Required<Dated> & { displayName: string };
+type BannerArchive = Themed & Required<Dated> & { displayName: string };
 
 export const bannerTitle = (
-  { displayName, name }: Pick<BannerArchive, "displayName" | "name">,
+  { displayName, theme }: Pick<BannerArchive, "displayName" | "theme">,
   locale: Locale,
-): string => name ?? ARCHIVE_TEXTS[locale].archiveOf(displayName);
+): string => theme ?? ARCHIVE_TEXTS[locale].archiveOf(displayName);
 
 export const bannerCaption = (
-  { displayName, name, createdAt, archivedAt }: BannerArchive,
+  { displayName, theme, createdAt, archivedAt }: BannerArchive,
   locale: Locale,
 ): string =>
-  name
+  theme
     ? `${ARCHIVE_TEXTS[locale].archiveOf(displayName)} · ${datesLabel(createdAt, archivedAt, locale)}`
     : datesTitle(createdAt, archivedAt, locale);
 

@@ -3,11 +3,13 @@
 import { defaultCanvasMeta, type Timestamp, type User } from "@liveplace/domain";
 import type {
   DurableStore,
+  RecoveryStore,
   SessionSigner,
   SignedInUser,
   SignInWrites,
   TwitchAuth,
 } from "@liveplace/domain/ports";
+import type { TwitchLiveTracker } from "./twitch-live";
 
 export type SignInDeps = {
   twitch: TwitchAuth;
@@ -17,7 +19,10 @@ export type SignInDeps = {
     "upsertUserFromTwitch" | "getUserByLogin" | "ensureCanvasForOwner" | "getActiveCanvasForOwner"
   >;
   redis: SignInWrites;
+  // Écart §7.2 (JOURNAL 2026-10-08) : absent sans `DURABLE_SCOPE`, la connexion crée le canvas comme avant.
+  recovery?: Pick<RecoveryStore, "hasSnapshot"> | undefined;
   signer: SessionSigner;
+  tracker: Pick<TwitchLiveTracker, "track">; // Écart §4 et §10.1 (JOURNAL 2026-10-07) : jamais bloquant, ni en échec
   randomCanvasId: () => string;
   now: () => Timestamp;
 };
@@ -71,7 +76,9 @@ export async function signInTwitchUser(
     height: meta.height,
   });
   await deps.redis.setUser(user);
-  await deps.redis.createCanvas(canvasId, meta);
+  // Un canvas dont ce scope garde une sauvegarde ne naît jamais vide : Redis l'a perdu, le worker le remet en place. Une
+  // Convex muette fait échouer la connexion : mieux vaut qu'elle recommence qu'un canvas vide que la récupération ne remplace plus.
+  if (!(await deps.recovery?.hasSnapshot(canvasId))) await deps.redis.createCanvas(canvasId, meta);
   // Écart §5.1 (JOURNAL 2026-10-06) : le candidat retenu, c'est un nouveau compte.
   if (canvasId === candidateCanvasId) {
     const discoveredViaCanvasId = await getDiscoveredViaCanvasId(deps.durable, discoveredViaUserId);
@@ -81,5 +88,7 @@ export async function signInTwitchUser(
       ...(discoveredViaCanvasId ? { discoveredViaCanvasId } : {}),
     });
   }
-  return { signedSession: await deps.signer.sign(user), login: user.login };
+  const signedSession = await deps.signer.sign(user);
+  deps.tracker.track(user.userId); // en arrière-plan : la connexion n'attend pas Twitch
+  return { signedSession, login: user.login };
 }

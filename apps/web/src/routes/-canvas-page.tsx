@@ -9,22 +9,40 @@ import { DESIGN_TEXTS } from "../ui/design/design-texts";
 import { NoticePill } from "../ui/design/pill";
 import { SignInButton, SignInNote } from "../ui/design/twitch";
 import { useTexts } from "../ui/locale/use-locale";
+import { markRecoveringIfLost } from "../usecase/mark-recovering";
 import { type ResolvedCanvas, resolveCanvas } from "../usecase/resolve-canvas";
 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
 const getCanvasPage = createServerFn({ method: "GET" })
   .validator((login: string) => login)
-  .handler(({ data: login, context }) => resolveCanvas(context.deps.durable, login));
+  .handler(async ({ data: login, context }) => {
+    const page = await resolveCanvas(context.deps.durable, login);
+    // Écart §4.2 (JOURNAL 2026-10-08) : un canvas que Redis a perdu se dit « en récupération » dès ce rendu.
+    if (page)
+      await markRecoveringIfLost(
+        { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
+        page.canvasId,
+      );
+    return page;
+  });
 
 // La page du jeu lit en plus le cookie de session (JOURNAL 2026-10-06) ; la vue OBS n'en a pas besoin.
 const getGameCanvasPage = createServerFn({ method: "GET" })
   .validator((login: string) => login)
-  .handler(({ data: login, context }) =>
-    resolveCanvas(context.deps.durable, login, {
-      verifier: context.deps.verifier,
-      cookieHeader: getRequestHeader("cookie"),
-    }),
-  );
+  .handler(async ({ data: login, context }) => {
+    const page = await resolveCanvas(
+      context.deps.durable,
+      login,
+      { verifier: context.deps.verifier, cookieHeader: getRequestHeader("cookie") },
+      context.deps.tracker, // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, lu à Redis, jamais à Twitch
+    );
+    if (page)
+      await markRecoveringIfLost(
+        { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
+        page.canvasId,
+      );
+    return page;
+  });
 
 const toPage = (page: ResolvedCanvas | null): ResolvedCanvas => {
   if (!page) throw notFound();

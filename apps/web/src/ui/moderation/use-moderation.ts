@@ -9,6 +9,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import { useTexts } from "../locale/use-locale";
+import { canBan } from "./can-ban";
 import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toClearActions } from "./cleared-pixels";
 import { moderateInOrder } from "./moderate-in-order";
 import { MODERATION_TEXTS } from "./moderation-texts";
@@ -21,7 +22,12 @@ import type {
 
 // Ce que propose qui modère : retirer ses pixels, ou le bannir.
 type ModeratorKind = "clear" | "ban" | "banAfterClear";
-type ModeratorRequest = { kind: ModeratorKind; author: ModerationTarget };
+export type ModeratorRequest = { kind: ModeratorKind; author: ModerationTarget };
+
+// Un retrait fait, la fenêtre propose de bannir (JOURNAL 2026-09-29) ; `null` : rien après. Écart §5.4 (JOURNAL 2026-10-08) :
+// pas pour un modérateur nommé ici, le retrait suffit.
+export const askBanAfterClear = ({ kind, author }: ModeratorRequest): ModeratorRequest | null =>
+  kind === "clear" && canBan(author) ? { kind: "banAfterClear", author } : null;
 
 // Ce que la pill Inspection et la liste des signalements reçoivent quand on peut modérer. Le web affiche, le gateway
 // décide (§10.3).
@@ -87,9 +93,10 @@ export function useModeration(canvas: CanvasStore): {
     if (current.current !== active) return;
     if (!done.ok) return setStatus("failed");
     // La preuve du ban qui suivrait : tous ses pixels d'avant le retrait, que le serveur garde une heure.
-    if (active.kind === "clear") return show({ kind: "banAfterClear", author: active.author });
+    const next = askBanAfterClear(active);
+    if (next) return show(next);
     finish();
-    toast("success", t.bannedToast(active.author.displayName));
+    if (active.kind !== "clear") toast("success", t.bannedToast(active.author.displayName));
   };
 
   // La pill se relit après : elle montre alors le nouveau rôle de l'auteur.

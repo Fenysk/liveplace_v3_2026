@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ACCOUNT_TEXTS } from "./account-texts";
 
 describe("the account sentences in both languages (Écart §14, JOURNAL 2026-10-07)", () => {
-  // Le point des signalements dans le titre de la photo : le nombre déjà accordé, puis « en attente »
-  it("says the pending reports in the title of the photo", () => {
-    expect(ACCOUNT_TEXTS.fr.myAccountPending("2 signalements")).toBe(
+  // Le point des signalements dans le titre de la photo ou de Modération : le nombre déjà accordé, puis « en attente »
+  it("says the pending reports in the title of the photo and of Moderation", () => {
+    expect(ACCOUNT_TEXTS.fr.withPending("Mon compte", "2 signalements")).toBe(
       "Mon compte · 2 signalements en attente",
     );
-    expect(ACCOUNT_TEXTS.en.myAccountPending("2 reports")).toBe("My account · 2 reports pending");
+    expect(ACCOUNT_TEXTS.en.withPending("My account", "2 reports")).toBe("My account · 2 reports pending");
   });
 
   // La route de retour de Twitch répond en texte brut : ces deux phrases se lisent dans la langue du visiteur

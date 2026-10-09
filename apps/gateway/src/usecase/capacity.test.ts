@@ -9,6 +9,7 @@ import type {
   ConvexDeposit,
   ConvexUsage,
   RedisUsage,
+  SnapshotMeasure,
   WebMeasure,
 } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
@@ -52,6 +53,7 @@ const setup = (options: { isProduction?: boolean } = {}) => {
     redis: redisUsage() as RedisUsage | Error,
     isWebAlive: true, // le web dépose son occupation à chaque lecture ; sinon, `web` : ce qu'il a déposé, ou rien
     web: null as WebMeasure | null,
+    snapshot: null as SnapshotMeasure | null, // ce que le worker a déposé : le retard de la sauvegarde
     convex: { status: "unconfigured" } as ConvexDeposit | null,
     isRefusingMinutes: false,
     reachedBefore: new Map<CapacityResourceId, Timestamp>(),
@@ -79,6 +81,9 @@ const setup = (options: { isProduction?: boolean } = {}) => {
     },
     async getWebMeasure() {
       return state.isWebAlive ? { at: clock.nowMs, utilization: 5 } : state.web;
+    },
+    async getSnapshotMeasure() {
+      return state.snapshot;
     },
     async getConvexDeposit() {
       return state.convex;
@@ -267,7 +272,7 @@ describe("what the capacity measures (JOURNAL 2026-10-07)", () => {
       redisMemory: { value: 318_000_000, ceiling: 512_000_000, ratio: 62.1, unit: "bytes" },
       redisCpu: { value: 0.2, ceiling: 1, ratio: 20, unit: "cores" }, // 2 s de processeur en 10 s : 20 % d'un cœur
       gatewayUtilization: { value: 40, ceiling: 100, ratio: 40, unit: "percent" },
-      gatewayDelay: { value: 0, ceiling: 250, ratio: 0, unit: "milliseconds" },
+      gatewayDelay: { value: 0, ceiling: 100, ratio: 0, unit: "milliseconds" },
       gatewayOutbound: { value: 1_000_000, ceiling: 200_000_000, ratio: 0.5, unit: "bitsPerSecond" },
       gatewayCanvasConnections: { value: 500, ceiling: 1000, ratio: 50, unit: "connections" },
       gatewayConnections: { value: 875, ceiling: 1750, ratio: 50, unit: "connections" },
@@ -323,15 +328,15 @@ describe("what the capacity measures (JOURNAL 2026-10-07)", () => {
     expect(resourceOf("redisCpu")).toMatchObject({ value: 0.25 }); // aucun échantillon négatif : le pic reste celui d'avant
   });
 
-  // Dit le délai de diffusion au p99 des poses envoyées depuis les 5 dernières minutes
-  it("tells the broadcast delay at the p99 of the poses sent in the last 5 minutes", async () => {
+  // Dit le retard de diffusion au p99 des poses envoyées depuis les 5 dernières minutes
+  it("tells the broadcast lateness at the p99 of the poses sent in the last 5 minutes", async () => {
     const { delays, sampleAfter, resourceOf } = setup();
     for (let pose = 0; pose < 98; pose++) delays.record(40);
     for (let pose = 0; pose < 2; pose++) delays.record(310);
 
     await sampleAfter(0);
 
-    expect(resourceOf("gatewayDelay")).toMatchObject({ state: "measured", value: 310, ratio: 124 });
+    expect(resourceOf("gatewayDelay")).toMatchObject({ state: "measured", value: 310, ratio: 310 });
   });
 
   // Ne compte que les octets envoyés depuis le dernier échantillon, et rien au premier : il n'y a pas de durée
@@ -524,6 +529,151 @@ describe("the Convex ceilings (JOURNAL 2026-10-07)", () => {
     expect(frame().saturation).toMatchObject({ percent: expect.any(Number), resource: "convexCalls" });
     expect(frame().saturation.percent).toBeGreaterThanOrEqual(100);
     expect(state.storedReached).toEqual([["convexCalls", clock.nowMs]]);
+  });
+});
+
+describe("the file stock of Convex (JOURNAL 2026-10-08)", () => {
+  const GIB = 1024 ** 3;
+
+  // Somme les stocks des déploiements, tels qu'ils sont : aucune projection de fin de mois, et les déploiements sont nommés
+  it("sums the stocks of the deployments as they are, with no projection, and names the deployments counted", async () => {
+    const { state, sampleAfter, resourceOf } = setup();
+    state.convex = configured(
+      ["watchful-spider-409", convexUsage({ filesBytes: 300 * 1024 ** 2 })],
+      ["dev-deployment", convexUsage({ filesBytes: 100 * 1024 ** 2 })],
+    );
+
+    await sampleAfter(0);
+
+    expect(resourceOf("convexFiles")).toMatchObject({
+      state: "measured",
+      unit: "bytes",
+      value: 400 * 1024 ** 2,
+      ceiling: GIB,
+      ratio: 39.1,
+      deployments: ["dev-deployment", "watchful-spider-409"],
+    });
+    expect(resourceOf("convexFiles")).not.toHaveProperty("fullAt");
+  });
+
+  // Sans nouvelles tant qu'un déploiement ne dit pas son stock : les autres lignes de Convex restent mesurées
+  it("has no news of the stock while a deployment does not say it, and leaves the other Convex lines measured", async () => {
+    const { state, sampleAfter, resourceOf } = setup();
+    state.convex = configured(
+      ["watchful-spider-409", convexUsage({ calls: 5, filesBytes: 1000 })],
+      ["dev-deployment", convexUsage({ calls: 5 })],
+    );
+
+    await sampleAfter(0);
+
+    expect(resourceOf("convexFiles").state).toBe("withoutNews");
+    expect(resourceOf("convexCalls").state).toBe("measured");
+  });
+
+  // Un déploiement jamais lu (instant 0, comme le web le dépose) rend le stock sans nouvelles : jamais la somme des seuls autres
+  it("has no news of the stock nor of the month while a deployment was never read, never the sum of the others alone", async () => {
+    const { state, sampleAfter, resourceOf, frame } = setup({ isProduction: true });
+    state.convex = configured(
+      ["watchful-spider-409", convexUsage({ calls: 5, filesBytes: 38_389 })],
+      ["valiant-panther-436", convexUsage({ at: 0 })],
+    );
+
+    await sampleAfter(0);
+
+    expect(resourceOf("convexFiles")).toEqual({
+      state: "withoutNews",
+      link: "convex",
+      id: "convexFiles",
+      unit: "bytes",
+      deployments: ["valiant-panther-436", "watchful-spider-409"],
+    });
+    expect(resourceOf("convexCalls").state).toBe("withoutNews");
+    expect(frame().saturation.isIncomplete).toBe(true);
+  });
+
+  // Atteint son plafond quand le stock vaut le quota : 100 % pendant une heure
+  it("reaches its ceiling when the stock is the quota: 100 % for an hour", async () => {
+    const { state, clock, sampleAfter, frame } = setup();
+    state.convex = configured(["watchful-spider-409", convexUsage({ filesBytes: GIB - 1 })]);
+    await sampleAfter(0);
+    expect(state.storedReached).toEqual([]);
+
+    state.convex = configured([
+      "watchful-spider-409",
+      convexUsage({ at: clock.nowMs + SAMPLE_MS, filesBytes: GIB }),
+    ]);
+    await sampleAfter();
+
+    expect(frame().saturation).toMatchObject({ resource: "convexFiles" });
+    expect(frame().saturation.percent).toBeGreaterThanOrEqual(100);
+    expect(state.storedReached).toEqual([["convexFiles", clock.nowMs]]);
+  });
+});
+
+describe("the snapshot delay (JOURNAL 2026-10-08)", () => {
+  // Met le retard du worker face à ses 15 minutes, en secondes, et le compte une fois même s'il est relu
+  it("puts the delay the worker deposited against 15 minutes, in seconds, and counts it once even if read again", async () => {
+    const { state, clock, sampleAfter, resourceOf } = setup();
+    state.snapshot = { at: clock.nowMs, delayMs: 270_000 };
+
+    await sampleAfter(0);
+    await sampleAfter(5_000); // la même mesure relue ne s'ajoute pas
+
+    expect(resourceOf("snapshotDelay")).toMatchObject({
+      state: "measured",
+      unit: "seconds",
+      value: 270,
+      ceiling: 900,
+      ratio: 30,
+    });
+  });
+
+  // Garde le pic des 5 dernières minutes : un retard qui retombe à zéro ne s'efface pas aussitôt
+  it("keeps the peak of the last 5 minutes: a delay falling back to zero does not vanish at once", async () => {
+    const { state, clock, sampleAfter, resourceOf } = setup();
+    state.snapshot = { at: clock.nowMs, delayMs: 270_000 };
+    await sampleAfter(0);
+
+    state.snapshot = { at: clock.nowMs + SAMPLE_MS, delayMs: 0 };
+    await sampleAfter();
+
+    expect(resourceOf("snapshotDelay")).toMatchObject({ state: "measured", value: 270, ratio: 30 });
+  });
+
+  // Dit « non mesuré » quand aucun worker n'a rien déposé hors production, et « sans nouvelles » en production, où ce serait une panne
+  it("says not measured when no worker ever deposited outside production, and without news in production", async () => {
+    const dev = setup();
+    const production = setup({ isProduction: true });
+
+    await dev.sampleAfter(0);
+    await production.sampleAfter(0);
+
+    expect(dev.resourceOf("snapshotDelay").state).toBe("unmeasured");
+    expect(production.resourceOf("snapshotDelay").state).toBe("withoutNews");
+  });
+
+  // Sans nouvelles quand le worker n'a rien déposé depuis trois cadences, partout : il a existé, il ne bat plus
+  it("has no news after three cadences without a deposit, in production or not", async () => {
+    const { state, clock, sampleAfter, resourceOf } = setup();
+    state.snapshot = { at: clock.nowMs, delayMs: 10_000 };
+    await sampleAfter(0);
+    expect(resourceOf("snapshotDelay").state).toBe("measured");
+
+    await sampleAfter(3 * SAMPLE_MS);
+    expect(resourceOf("snapshotDelay").state).toBe("measured");
+
+    await sampleAfter(1);
+    expect(resourceOf("snapshotDelay").state).toBe("withoutNews");
+  });
+
+  // Atteindre 15 minutes de retard, c'est la saturation : rouge, portée par la sauvegarde
+  it("is the carrier of the saturation at 15 minutes of delay", async () => {
+    const { state, clock, sampleAfter, frame } = setup();
+    state.snapshot = { at: clock.nowMs, delayMs: 15 * MINUTE_MS };
+
+    await sampleAfter(0);
+
+    expect(frame().saturation).toMatchObject({ percent: 100, resource: "snapshotDelay" });
   });
 });
 

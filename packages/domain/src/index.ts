@@ -138,6 +138,8 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     // Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus aucune écriture ; `successorId` est le canvas qui l'a remplacée.
     archivedAt?: Timestamp;
     successorId?: string;
+    // Écart §8.1 (JOURNAL 2026-10-07) : la copie du gateway ; Convex fait foi. Absent : pas de thème.
+    theme?: string;
   };
 
 // Écart §15 (JOURNAL 2026-10-06) : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.
@@ -146,7 +148,8 @@ export type CanvasStatus = (typeof CANVAS_STATUSES)[number];
 
 // Écart §15 (JOURNAL 2026-10-06) : un canvas actif, et au plus cinq archives.
 export const MAX_ARCHIVES = 5;
-export const ARCHIVE_NAME_MAX_LENGTH = 40;
+// Écart §8.1 (JOURNAL 2026-10-07) : le thème d'un canvas, un texte libre et facultatif.
+export const THEME_MAX_LENGTH = 40;
 
 // base58, sans les caractères qu'on confond (0, O, I, l) : le code d'une archive dans son lien.
 export const LINK_CODE_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -173,14 +176,14 @@ export function isLinkCode(code: string): boolean {
   return LINK_CODE_PATTERN.test(code);
 }
 
-// Le nom donné à l'archivage : libre et facultatif, nettoyé, vide = pas de nom. Coupé par caractères, jamais au milieu d'un.
-export function toArchiveName(raw: string): string | undefined {
+// Le thème d'un canvas, nettoyé : vide = pas de thème. Coupé par caractères, jamais au milieu d'un.
+export function toTheme(raw: string): string | undefined {
   const cleaned = raw
     .replace(/\p{Cc}/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const name = Array.from(cleaned).slice(0, ARCHIVE_NAME_MAX_LENGTH).join("").trim();
-  return name === "" ? undefined : name;
+  const theme = Array.from(cleaned).slice(0, THEME_MAX_LENGTH).join("").trim();
+  return theme === "" ? undefined : theme;
 }
 
 // CDC 2026 §1 : le fond de la vue OBS, transparent, noir ou blanc. Transparent par défaut, et sur un canvas d'avant.
@@ -269,6 +272,19 @@ export function toHourStart(nowMs: Timestamp): Timestamp {
 
 export function toActivityPointStarts(nowMs: Timestamp): ActivityPointStarts {
   return { minute: toMinuteStart(nowMs), hour: toHourStart(nowMs), day: toParisDayStart(nowMs) };
+}
+
+// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes, côté OBS ou côté Twitch, se comble dans l'historique.
+export const STREAM_GRACE_MS = 5 * MINUTE_MS;
+
+// Les minutes entières strictement entre la fin d'une coupure et sa reprise : celles de la fin et de la reprise sont déjà
+// comptées. Aucune pour une coupure de `STREAM_GRACE_MS` ou plus.
+export function toGapMinutes(endedAt: Timestamp, resumedAt: Timestamp): Timestamp[] {
+  const minutes: Timestamp[] = [];
+  if (resumedAt - endedAt >= STREAM_GRACE_MS) return minutes;
+  for (let at = toMinuteStart(endedAt) + MINUTE_MS; at < toMinuteStart(resumedAt); at += MINUTE_MS)
+    minutes.push(at);
+  return minutes;
 }
 
 // JOURNAL 2026-10-07 : l'audience compte les 30 derniers jours de Paris, aujourd'hui compris.

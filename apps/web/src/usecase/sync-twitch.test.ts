@@ -52,6 +52,7 @@ const doubles = () => {
         return "signed-session";
       },
     },
+    tracker: { track: () => undefined },
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };

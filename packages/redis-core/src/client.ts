@@ -64,11 +64,15 @@ import {
   TWITCH_COMMANDS_KEY,
   TWITCH_COMMANDS_MAXLEN,
   TWITCH_COMMANDS_READER,
+  TWITCH_MESSAGE_TTL_SECONDS,
   toPlacementKey,
   toPlacementRef,
   toScorePixels,
+  twitchMessageKey,
   userKey,
 } from "./keys";
+import { parsePileEntry } from "./pile-entry";
+import { getTwitchLiveState, listTwitchLives } from "./twitch-live";
 
 declare module "ioredis" {
   interface RedisCommander<Context> {
@@ -86,22 +90,12 @@ declare module "ioredis" {
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
 
-// §5.1 : une entrée de pile, lue par la fin comme dans pile.lua.
+type PileHead = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
+
 // Un pixel d'avant le protocole 6 a pour pose sa version.
-const PILE_ENTRY = /^(.*):(\d+):(\d+):(\d+)(?::([A-Za-z][A-Za-z0-9]*))?$/;
-
-type PileEntry = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
-
-const parseEntry = (entry: string): PileEntry => {
-  const [, authorId, colorIndex, placedAt, version, placementId] = PILE_ENTRY.exec(entry) ?? [];
-  if (authorId === undefined || colorIndex === undefined || placedAt === undefined || version === undefined)
-    throw new Error(`entrée d'historique illisible (${entry})`);
-  return {
-    authorId,
-    colorIndex: Number(colorIndex),
-    placedAt: Number(placedAt),
-    placementId: placementId ?? version,
-  };
+const parseEntry = (entry: string): PileHead => {
+  const { authorId, colorIndex, placedAt, version, placementId } = parsePileEntry(entry);
+  return { authorId, colorIndex, placedAt, placementId: placementId ?? String(version) };
 };
 
 // Un pixel visible d'un auteur : son heure et sa pose sont connues.
@@ -149,6 +143,8 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
       OBS_BACKGROUNDS.find((background) => background === fields.obsBackground) ?? OBS_BACKGROUND,
     ...(fields.archivedAt === undefined ? {} : { archivedAt: metaNumber(fields, "archivedAt") }),
     ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
+    // Écart §8.1 (JOURNAL 2026-10-07) : un champ vide vaut pas de thème.
+    ...(fields.theme ? { theme: fields.theme } : {}),
   };
 }
 
@@ -224,6 +220,17 @@ export function createTwitchWrites(redis: Redis): TwitchWrites {
         );
       await transaction.exec();
     },
+
+    // `NX` : le premier message de cet identifiant gagne, une redélivrance trouve la clé posée (JOURNAL 2026-10-08).
+    async reserveTwitchMessage(messageId) {
+      return (
+        (await redis.set(twitchMessageKey(messageId), 1, "EX", TWITCH_MESSAGE_TTL_SECONDS, "NX")) === "OK"
+      );
+    },
+
+    async releaseTwitchMessage(messageId) {
+      await redis.del(twitchMessageKey(messageId));
+    },
   };
 }
 
@@ -248,6 +255,7 @@ const TWITCH_COMMANDS_READ_COUNT = 50;
 export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   let hasReader = false;
   let isRecovered = false; // ce qu'un arrêt a laissé lu mais pas acquitté passe avant les nouvelles actions
+  let pendingFrom = "0"; // après la dernière action non acquittée rendue : une action gardée sans acquit ne bloque pas la suite
 
   // Ce qui a été lu par ce consommateur sans être acquitté : rendu tout de suite, sans attendre.
   const listUnacknowledged = () =>
@@ -259,7 +267,7 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
       TWITCH_COMMANDS_READ_COUNT,
       "STREAMS",
       TWITCH_COMMANDS_KEY,
-      "0",
+      pendingFrom,
     );
 
   // Ce qu'aucun consommateur n'a encore lu : attend au plus `blockMs`.
@@ -287,15 +295,34 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
     hasReader = true;
   };
 
+  const listNext = async (blockMs: number) => {
+    await ensureReader();
+    if (!isRecovered) {
+      const pending = streamEntriesOf(await listUnacknowledged());
+      const last = pending.at(-1);
+      if (last) {
+        pendingFrom = last.id;
+        return pending;
+      }
+      isRecovered = true;
+    }
+    return streamEntriesOf(await listUnread(blockMs));
+  };
+
   return {
     async listTwitchCommands(blockMs) {
-      await ensureReader();
-      if (!isRecovered) {
-        const pending = streamEntriesOf(await listUnacknowledged());
-        if (pending.length > 0) return pending;
-        isRecovered = true;
+      try {
+        return await listNext(blockMs);
+      } catch (error) {
+        // NOGROUP : le groupe est parti. UNBLOCKED : le flux est supprimé pendant que la lecture l'attendait.
+        const isReaderLost = error instanceof Error && /^(NOGROUP|UNBLOCKED)/.test(error.message);
+        if (!isReaderLost) throw error;
+        // Écart §7.2 (JOURNAL 2026-10-08) : Redis a tout perdu, le groupe avec : il se refait, sans arrêter le gateway.
+        hasReader = false;
+        isRecovered = false;
+        pendingFrom = "0";
+        return listNext(blockMs);
       }
-      return streamEntriesOf(await listUnread(blockMs));
     },
 
     async ackTwitchCommand(id) {
@@ -314,8 +341,8 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const gauge = scriptOf("gauge.lua");
   redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withPile("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
-  redis.defineCommand("moderate", { numberOfKeys: 19, lua: withPile("moderate.lua") });
-  redis.defineCommand("moderators", { numberOfKeys: 4, lua: scriptOf("moderators.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 20, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderators", { numberOfKeys: 5, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
   redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
   redis.defineCommand("resize", { numberOfKeys: 3, lua: withPile("resize.lua") });
@@ -346,6 +373,19 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
       hasAccount,
     };
+  };
+
+  // Un seul MULTI : `mods` et ses deux origines se lisent du même instant. `null` : pas modérateur.
+  const getModeratorOriginOf = async (keys: CanvasKeys, userId: string): Promise<ModeratorOrigin | null> => {
+    const results = await redis
+      .multi()
+      .sismember(keys.mods, userId)
+      .sismember(keys.modsTwitch, userId)
+      .sismember(keys.modsLiveplace, userId)
+      .exec();
+    if (!results) throw new Error(`getModeratorOrigin ${keys.prefix} : transaction annulée`);
+    const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
+    return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
   };
 
   // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. §5.7 : dans le
@@ -385,9 +425,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     setUser,
 
     getCanvas: (canvasId: string): Promise<CanvasMeta | null> => getCanvasMeta(redis, canvasId),
+    // `ready` à 0, posé par la récupération : un canvas absent, ou neuf d'un archivage (sans `ready`), n'en est pas un.
+    isRecovering: async (canvasId: string): Promise<boolean> =>
+      (await redis.hget(buildCanvasKeys(canvasId).meta, "ready")) === "0",
 
+    // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère pas, même modérateur Twitch ; un MULTI, comme getModeratorOrigin.
     async isModerator(canvasId: string, userId: string): Promise<boolean> {
-      return (await redis.sismember(buildCanvasKeys(canvasId).mods, userId)) === 1;
+      const keys = buildCanvasKeys(canvasId);
+      const results = await redis.multi().sismember(keys.mods, userId).sismember(keys.bans, userId).exec();
+      if (!results) throw new Error(`isModerator ${canvasId} : transaction annulée`);
+      const [isMember, isBannedUser] = results.map((entry) => unwrap(entry) === 1);
+      return isMember === true && isBannedUser !== true;
     },
 
     // Un seul MULTI : entre deux commandes, une pose donnerait un état d'avant et une version d'après (§6.1).
@@ -544,6 +592,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.recentlyCleared(target),
         keys.scoreboard,
         keys.scoreboardBanned,
+        keys.modsLiveplace,
         keys.histPrefix,
         keys.cellsPrefix,
         keys.live,
@@ -669,13 +718,22 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
             .filter((pixel) => pixel.placementId === placementId)
             .map(({ x, y, colorIndex }) => ({ x, y, colorIndex }));
           if (pixels.length === 0) return null;
-          const [profile, reportCount, isOffStream] = await Promise.all([
+          const [profile, reportCount, isOffStream, moderatorOrigin] = await Promise.all([
             getProfile(keys, authorId),
             redis.scard(keys.reports(placementKey)),
             redis.sismember(keys.offStream, placementKey),
+            getModeratorOriginOf(keys, authorId),
           ]);
           const reportedAt = Number(flat[index * 2 + 1]);
-          return { ...profile, placementId, reportCount, reportedAt, isOffStream: isOffStream === 1, pixels };
+          return {
+            ...profile,
+            ...(moderatorOrigin ? { moderatorOrigin } : {}), // Écart §4.3 (JOURNAL 2026-10-08) : Bannir se cache
+            placementId,
+            reportCount,
+            reportedAt,
+            isOffStream: isOffStream === 1,
+            pixels,
+          };
         }),
       );
       await settleReports(
@@ -782,6 +840,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.mods,
         keys.modsTwitch,
         keys.modsLiveplace,
+        keys.bans,
         keys.live,
         userId,
         source,
@@ -809,18 +868,14 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return moderators.sort((left, right) => left.displayName.localeCompare(right.displayName));
     },
 
-    async getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null> {
-      const keys = buildCanvasKeys(canvasId);
-      const results = await redis
-        .multi()
-        .sismember(keys.mods, userId)
-        .sismember(keys.modsTwitch, userId)
-        .sismember(keys.modsLiveplace, userId)
-        .exec();
-      if (!results) throw new Error(`getModeratorOrigin ${canvasId} : transaction annulée`);
-      const [isModerator, isFromTwitch, isNamedHere] = results.map((entry) => unwrap(entry) === 1);
-      return isModerator ? { isFromTwitch: isFromTwitch === true, isNamedHere: isNamedHere === true } : null;
+    getModeratorOrigin: (canvasId: string, userId: string) =>
+      getModeratorOriginOf(buildCanvasKeys(canvasId), userId),
+
+    async getTwitchLive(userId) {
+      return (await getTwitchLiveState(redis, userId))?.twitchLive ?? null;
     },
+
+    listTwitchLives: (userIds) => listTwitchLives(redis, userIds),
 
     // Écrit par le web dans `meta` (createTwitchWrites), lu ici pour l'onglet Modération (JOURNAL 2026-09-27).
     async getTwitchSync(canvasId: string): Promise<TwitchSync | null> {

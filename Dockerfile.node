@@ -1,4 +1,4 @@
-# L'image d'une app Node du dépôt (§11.4) : `APP` vaut `gateway`, puis `worker` à son jour.
+# L'image d'une app Node du dépôt (§11.4) : `APP` vaut `gateway` ou `worker`.
 # docker build -f Dockerfile.node --build-arg APP=gateway .
 
 ARG NODE_IMAGE=node:22-alpine

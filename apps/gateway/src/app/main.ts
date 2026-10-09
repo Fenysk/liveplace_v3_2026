@@ -6,6 +6,7 @@ import {
   createCanvasCore,
   createCapacityStore,
   createTwitchCommandQueue,
+  revokeBannedModerators,
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createHostProbe } from "../infra/host";
@@ -29,11 +30,20 @@ const redis = new Redis(config.redisUrl);
 // En mode abonné, Redis n'accepte plus les autres commandes : il faut sa propre connexion (§6.3).
 const liveSubscriber = new Redis(config.redisUrl);
 const core = createCanvasCore(redis, liveSubscriber);
-// Écart §5.1 (JOURNAL 2026-10-07) : le délai de diffusion, d'une pose reçue à l'envoi de sa frame.
+// Écart §5.4 (JOURNAL 2026-10-08) : avant la première page, les modérateurs nommés ici que le bug avait laissés bannis perdent ce
+// rôle. Un échec se journalise : les scripts tiennent déjà la règle, et le prochain démarrage recommence.
+await revokeBannedModerators(redis).then(
+  (revoked) => {
+    if (revoked > 0) console.info(`gateway: ${revoked} rôle(s) de modérateur retiré(s) à des bannis`);
+  },
+  (error: unknown) => console.error("gateway: modérateurs bannis non retirés", error),
+);
+// Écart §5.1 et §6 (JOURNAL 2026-10-07) : le retard de diffusion, d'une pose reçue à l'envoi de sa frame, sans l'attente du tick.
+const tickMs = Math.round(1000 / config.broadcastHz);
 const delays = createDelayTally();
-const broadcast = createBroadcast(core, { now: Date.now, record: delays.record });
+const broadcast = createBroadcast(core, { now: Date.now, record: delays.record, tickMs });
 
-setInterval(broadcast.tick, Math.round(1000 / config.broadcastHz));
+setInterval(broadcast.tick, tickMs);
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
 setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
 
@@ -69,7 +79,7 @@ setInterval(capacity.tick, CAPACITY_TICK_MS);
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
-  { core, now: Date.now, wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+  { core, broadcast, now: Date.now, wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
   createTwitchCommandQueue(new Redis(config.redisUrl)),
   () => isRunning,
 ).catch((error: unknown) => {

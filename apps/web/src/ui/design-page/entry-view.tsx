@@ -40,6 +40,7 @@ import {
   CanvasPillEntry,
   DraftPillEntry,
   NoticeEntry,
+  ThemePillEntry,
   ViewportPillEntry,
 } from "./game-entries";
 import { GaugeEntry } from "./gauge-entry";
@@ -85,6 +86,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
 
   "pill-canvas": CanvasPillEntry,
   "bandeau-d-archive": ArchiveBannerEntry,
+  "pill-theme": ThemePillEntry,
   "pill-compte": AccountPillEntry,
   "pill-classement": ScoreboardPillEntry,
   inspection: InspectionEntry,

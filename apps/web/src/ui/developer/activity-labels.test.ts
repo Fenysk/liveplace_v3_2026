@@ -13,7 +13,6 @@ import {
   formatDuration,
   guestsNote,
   heatLabel,
-  obsViewsLabel,
   PERIOD_OPTIONS,
   peopleLabel,
   phoneShareNote,
@@ -22,6 +21,7 @@ import {
   signupsLabel,
   slotTitle,
   streamedCanvasesLabel,
+  streamedMinutesLabel,
   toAudienceRows,
   toCanvasActivityCard,
   toCanvasAudienceRows,
@@ -78,11 +78,12 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
     expect(slotTitle(now, "all")).not.toContain("14:30");
   });
 
-  // Montre d'un canvas son streamer, sa pastille OBS, ses chiffres, et ses comptes avec leur rôle et leur appareil
-  it("shows a canvas's owner, its OBS badge, its numbers, and its accounts with their role and device", () => {
+  // Montre d'un canvas son streamer, ses chiffres, et ses comptes avec leur rôle et leur appareil
+  it("shows a canvas's owner, its numbers, and its accounts with their role and device", () => {
     const canvas: ActivityCanvas = {
       canvasId: "c1",
       owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+      isStreamed: true,
       obsViews: 2,
       people: 3,
       guests: 1,
@@ -102,17 +103,68 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
 
     expect(toCanvasActivityCard(canvas, now)).toEqual({
       owner: canvas.owner,
-      obsTitle: "2 vues OBS ouvertes",
       facts: ["3 personnes, dont 1 invité", "120 px/h", "1 nouveau compte"],
       accounts: [
         { user: canvas.accounts[0], mention: "Modérateur · depuis 12 min", devices: ["desktop", "phone"] },
       ],
       guestsLine: "+ 1 invité",
     });
-    expect(toCanvasActivityCard({ ...canvas, obsViews: 0, guests: 0 }, now)).toMatchObject({
-      obsTitle: null,
-      guestsLine: null,
-    });
+    expect(toCanvasActivityCard({ ...canvas, isStreamed: false, obsViews: 0, guests: 0 }, now)).toMatchObject(
+      { guestsLine: null },
+    );
+  });
+
+  // La ligne d'un canvas streamé est celle d'un canvas qui ne l'est pas : le bouton Twitch de son streamer dit le live, aucune pastille ne s'y ajoute
+  it("gives a streamed canvas the same row as one that is not, whatever its OBS views", () => {
+    const canvas: ActivityCanvas = {
+      canvasId: "c1",
+      owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+      isStreamed: true,
+      obsViews: 3,
+      people: 0,
+      guests: 0,
+      heat: 0,
+      signups: 0,
+      accounts: [],
+    };
+
+    const streamed = toCanvasActivityCard(canvas, now);
+
+    expect(streamed).toEqual(toCanvasActivityCard({ ...canvas, isStreamed: false, obsViews: 0 }, now));
+    expect(streamed).not.toHaveProperty("streamedTitle");
+    expect(streamed).not.toHaveProperty("isStreamed");
+    expect(streamed).not.toHaveProperty("isLive");
+  });
+
+  // Les vues OBS ouvertes ne se disent plus sur la ligne d'un canvas : la tuile de Ce canvas les compte seule
+  it("tells nothing of the OBS views on the row of a canvas", () => {
+    const canvas: ActivityCanvas = {
+      canvasId: "c1",
+      owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+      isStreamed: true,
+      obsViews: 2,
+      people: 3,
+      guests: 0,
+      heat: 120,
+      signups: 0,
+      accounts: [],
+    };
+
+    const row = toCanvasActivityCard(canvas, now);
+
+    expect(Object.keys(row)).toEqual(["owner", "facts", "accounts", "guestsLine"]);
+    expect(JSON.stringify(row)).not.toContain("OBS");
+  });
+
+  // Écart §5.1 (JOURNAL 2026-10-08) : l'infobulle des courbes accorde les minutes streamées, « minute » au singulier jusqu'à 1
+  it("agrees the streamed minutes of the curves' tooltip, in the singular up to 1", () => {
+    expect([streamedMinutesLabel(0), streamedMinutesLabel(1), streamedMinutesLabel(12)]).toEqual([
+      "0 minute streamée",
+      "1 minute streamée",
+      "12 minutes streamées",
+    ]);
+    expect(streamedMinutesLabel(1500)).toBe(`${(1500).toLocaleString("fr-FR")} minutes streamées`);
+    expect(streamedCanvasesLabel(1)).toBe("1 canvas streamé");
   });
 
   // Dans l'infobulle des courbes, accorde chaque valeur en minuscules, comme les lignes des canvas
@@ -232,15 +284,6 @@ describe("the words of the audience (JOURNAL 2026-10-07)", () => {
 describe("the words of the canvas section (JOURNAL 2026-10-07)", () => {
   const today = { visits: 38, phoneVisits: 19, visitMinutes: 200, activePlayers: 9, signups: 2 };
   const month = { visits: 1214, phoneVisits: 497, visitMinutes: 5461, activePlayers: 131, signups: 40 };
-
-  // Accorde les vues OBS ouvertes, au singulier jusqu'à 1
-  it("agrees the open OBS views, in the singular up to 1", () => {
-    expect([obsViewsLabel(0), obsViewsLabel(1), obsViewsLabel(2)]).toEqual([
-      "0 vue OBS ouverte",
-      "1 vue OBS ouverte",
-      "2 vues OBS ouvertes",
-    ]);
-  });
 
   // Met l'audience d'un canvas dans les mêmes lignes que celle de tout LivePlace, avec ses joueurs actifs et les nouveaux comptes venus de sa page à la fin
   it("lays the audience of a canvas out in the same rows as the whole one, its active players and the signups from its page at the end", () => {

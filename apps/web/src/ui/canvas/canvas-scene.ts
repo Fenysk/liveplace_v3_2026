@@ -5,6 +5,7 @@ import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
+import { measureArrivalInsets } from "./arrival-insets";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { createGestureTracker, type Gesture, type PointerInput, wheelFactor } from "./gestures";
@@ -17,6 +18,7 @@ import {
   fitViewport,
   type Insets,
   isArrivalView,
+  NO_INSETS,
   panBy,
   panToShow,
   type ScreenPoint,
@@ -41,8 +43,10 @@ export type CanvasScene = {
 // `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
 // `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
 // et fait dériver son motif (`checkerTiles`).
+// `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
 type SceneOptions = {
   initialViewport: Viewport | null;
+  isFramedInFreeArea: boolean;
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
   checker: HTMLElement;
@@ -60,6 +64,9 @@ const CHECKER_DRIFT_MS = 20_000;
 
 const isSameFraming = (a: Framing | null, b: Framing) =>
   a?.zoomPercent === b.zoomPercent && a.isArrival === b.isArrival;
+
+const isSameInsets = (a: Insets, b: Insets) =>
+  a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
 
 const MIDDLE_BUTTON = 1;
 // Au clavier, la case visée garde ses distances avec les bords de l'écran et les pills qui y flottent (CDC 2026).
@@ -91,6 +98,11 @@ export function createCanvasScene(
   const root = document.documentElement;
   let shades = getSceneShades(root);
   let viewport = options.initialViewport;
+  // Les marges du cadrage d'arrivée, et si la vue est restée à l'arrivée : un viewport retrouvé après F5, ou déplacé, n'est
+  // jamais recadré quand elles changent.
+  let insets: Insets = NO_INSETS;
+  let isAtArrival = false;
+  const measureInsets = (): Insets => (options.isFramedInFreeArea ? measureArrivalInsets(root) : NO_INSETS);
   let targetCell: Cell | null = null;
   let lastTracedCell: Cell | null = null;
   let isImageStale = true;
@@ -104,8 +116,8 @@ export function createCanvasScene(
 
   const reportFraming = (current: Viewport, canvas: Size) => {
     const framing = {
-      zoomPercent: zoomPercent(current, screen, canvas),
-      isArrival: isArrivalView(current, screen, canvas),
+      zoomPercent: zoomPercent(current, screen, canvas, insets),
+      isArrival: isArrivalView(current, screen, canvas, insets),
     };
     if (isSameFraming(lastFraming, framing)) return;
     lastFraming = framing;
@@ -139,7 +151,12 @@ export function createCanvasScene(
     const view = store.getView();
     if (view.width === 0 || screen.width === 0) return;
     const canvas = { width: view.width, height: view.height };
-    viewport ??= fitViewport(screen, canvas);
+    if (!viewport) {
+      // Les pills ont eu le temps de se mesurer depuis la création de la scène : la première arrivée les relit.
+      insets = measureInsets();
+      viewport = fitViewport(screen, canvas, insets);
+      isAtArrival = true;
+    }
     reportFraming(viewport, canvas);
     clipChecker(viewport, canvas);
     if (isImageStale) {
@@ -182,8 +199,25 @@ export function createCanvasScene(
 
   const moveViewport = (next: Viewport) => {
     viewport = next;
+    isAtArrival = false;
     options.onViewportMove(next);
     requestRender();
+  };
+
+  // Le cadrage d'arrivée, avec les marges d'aujourd'hui : l'arrivée elle-même, Recentrer, une nouvelle taille de canvas.
+  const frameArrival = (canvas: Size) => {
+    moveViewport(fitViewport(screen, canvas, insets));
+    isAtArrival = true;
+  };
+
+  // Les pills se mesurent après le premier cadrage (le thème arrive, l'encoche change) : si la vue n'a pas bougé depuis
+  // l'arrivée, elle suit la nouvelle zone libre ; sinon, seul le pourcentage du zoom se relit.
+  const refreshInsets = () => {
+    const next = measureInsets();
+    if (isSameInsets(next, insets)) return;
+    insets = next;
+    if (viewport && isAtArrival && store.getView().width > 0) frameArrival(canvasSize());
+    else requestRender();
   };
 
   const setTargetCell = (cell: Cell | null) => {
@@ -246,12 +280,14 @@ export function createCanvasScene(
         moveViewport(panBy(viewport, gesture.dx, gesture.dy));
         break;
       case "zoom":
-        moveViewport(zoomAt(viewport, gesture.point, gesture.factor, zoomLimits(screen, canvasSize())));
+        moveViewport(
+          zoomAt(viewport, gesture.point, gesture.factor, zoomLimits(screen, canvasSize(), insets)),
+        );
         break;
       case "pinch": {
         setPanning(true);
         const panned = panBy(viewport, gesture.dx, gesture.dy);
-        moveViewport(zoomAt(panned, gesture.point, gesture.factor, zoomLimits(screen, canvasSize())));
+        moveViewport(zoomAt(panned, gesture.point, gesture.factor, zoomLimits(screen, canvasSize(), insets)));
         break;
       }
       default:
@@ -269,6 +305,8 @@ export function createCanvasScene(
     if (!entry) return;
     screen = { width: entry.contentRect.width, height: entry.contentRect.height };
     pixelRatio = window.devicePixelRatio;
+    // Un autre écran, d'autres marges : la vue, elle, ne bouge pas (elle n'a jamais été recadrée à un redimensionnement).
+    insets = measureInsets();
     surface.width = Math.round(screen.width * pixelRatio);
     surface.height = Math.round(screen.height * pixelRatio);
     const tile = checkerTile(screen);
@@ -278,12 +316,16 @@ export function createCanvasScene(
   });
   resizeObserver.observe(surface);
 
-  // Le thème change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
-  const themeObserver = new MutationObserver(() => {
+  // L'apparence change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
+  const appearanceObserver = new MutationObserver(() => {
     shades = getSceneShades(root);
     requestRender();
   });
-  themeObserver.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  appearanceObserver.observe(root, { attributes: true, attributeFilter: ["data-appearance"] });
+
+  // Les pills publient leur taille sur <html> (pill.tsx) : un thème qui paraît ou change de hauteur change la zone libre.
+  const insetsObserver = new MutationObserver(refreshInsets);
+  insetsObserver.observe(root, { attributes: true, attributeFilter: ["style"] });
 
   // §5.3 : une nouvelle taille ramène la vue à l'arrivée.
   let knownSize: Size | null = null;
@@ -291,7 +333,7 @@ export function createCanvasScene(
     const { width, height } = store.getView();
     const isResized = knownSize !== null && (width !== knownSize.width || height !== knownSize.height);
     if (width > 0) knownSize = { width, height };
-    if (isResized && viewport && width > 0) moveViewport(fitViewport(screen, { width, height }));
+    if (isResized && viewport && width > 0) frameArrival({ width, height });
     isImageStale = true;
     requestRender();
   });
@@ -370,7 +412,9 @@ export function createCanvasScene(
     },
     // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui.
     recenter() {
-      if (viewport && store.getView().width > 0) moveViewport(fitViewport(screen, canvasSize()));
+      if (!viewport || store.getView().width === 0) return;
+      insets = measureInsets();
+      frameArrival(canvasSize());
     },
     // Au clavier (CDC 2026, raccourcis) : pendant un tracé, chaque case visée entre au brouillon, sans trou.
     moveTarget(dx, dy) {
@@ -394,7 +438,8 @@ export function createCanvasScene(
       cancelAnimationFrame(frameRequest);
       resizeObserver.disconnect();
       checkerDrift?.cancel();
-      themeObserver.disconnect();
+      appearanceObserver.disconnect();
+      insetsObserver.disconnect();
       setPanning(false);
       unsubscribe();
       unsubscribeDraft();

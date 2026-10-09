@@ -107,6 +107,19 @@ export const InPhone = ({ isWindow = false, children }: { isWindow?: boolean; ch
   </div>
 );
 
+// La place entre les pills Canvas et Compte, en haut de l'écran d'un PC (la pill Thème, Écart §8.1, JOURNAL 2026-10-07).
+export const InTopRoom = ({ children }: { children: ReactNode }) => (
+  <div className="design-in-top-room">{children}</div>
+);
+
+// Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous (Écart §8.1, JOURNAL 2026-10-08), et
+// le toast qui se pose sous elle. `isNarrow` : un petit téléphone, où la pill Canvas manque de place.
+export const InPhoneTop = ({ isNarrow = false, children }: { isNarrow?: boolean; children: ReactNode }) => (
+  <div className={isNarrow ? "design-in-phone-top design-in-phone-top--narrow" : "design-in-phone-top"}>
+    {children}
+  </div>
+);
+
 // L'heure de la page : les exemples datent d'« il y a trois heures » par rapport à elle, et elle ne bouge pas.
 export const useNowMs = (): number => useState(() => Date.now())[0];
 

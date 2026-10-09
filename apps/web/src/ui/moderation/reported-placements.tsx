@@ -1,7 +1,7 @@
 // Les signalements en attente, dans l'onglet Modération (CDC 2026, Signalement ; JOURNAL 2026-09-28) : une ligne par
 // signalement (JOURNAL 2026-10-07), avec l'aperçu de son dessin entier, son auteur, le nombre de signalements, s'il
-// est caché du stream, puis Retirer la pose (ou les poses), Bannir ou Rétablir. L'affichage seul, nourri par
-// `useReportsProps`.
+// est caché du stream, puis Retirer la pose (ou les poses), Bannir (sauf un modérateur nommé ici, Écart §5.4 JOURNAL
+// 2026-10-08) ou Rétablir. L'affichage seul, nourri par `useReportsProps`.
 
 import { EyeOff } from "lucide-react";
 import { Badge } from "../design/badge";
@@ -10,6 +10,7 @@ import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { formatPlacedAgo } from "../inspection/placed-ago";
 import { useLocale, useTexts } from "../locale/use-locale";
+import { canBan } from "./can-ban";
 import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
@@ -64,7 +65,7 @@ const ReportRow = ({
             label={t.clearPlacements[hasSeveralPlacements ? "several" : "one"]}
             onPress={() => onClear(report)}
           />
-          <Button label={t.ban} variant="danger" onPress={() => onBan(report)} />
+          {canBan(report) && <Button label={t.ban} variant="danger" onPress={() => onBan(report)} />}
           <Button
             label={t.restore}
             variant="ghost"

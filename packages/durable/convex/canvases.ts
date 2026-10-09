@@ -7,12 +7,15 @@ import {
   pickLinkedCanvas,
   planArchive,
   planDiscard,
-  planRename,
+  planNameToTheme,
   planReopen,
+  planSetTheme,
+  toActiveCanvas,
   toOwnerCanvases,
 } from "../src/canvas-plan";
 import { requireServiceKey } from "../src/service-key";
-import { type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 
 const activeCanvasOf = (db: QueryCtx["db"], ownerId: string) =>
   db
@@ -83,8 +86,7 @@ export const getActiveForOwner = query({
   handler: async (ctx, { serviceKey, ownerId }) => {
     requireServiceKey(serviceKey);
     const active = await activeCanvasOf(ctx.db, ownerId);
-    if (!active) return null;
-    return { canvasId: active.canvasId, width: active.width, height: active.height };
+    return active ? toActiveCanvas(active) : null;
   },
 });
 
@@ -93,6 +95,19 @@ export const listForOwner = query({
   handler: async (ctx, { serviceKey, ownerId }) => {
     requireServiceKey(serviceKey);
     return toOwnerCanvases(await canvasesOf(ctx.db, ownerId));
+  },
+});
+
+// Écart §7.2 (JOURNAL 2026-10-08) : ce canvas existe-t-il encore ? Une archive supprimée n'est pas récupérée. Un seul index.
+export const exists = query({
+  args: { serviceKey: v.string(), canvasId: v.string() },
+  handler: async (ctx, { serviceKey, canvasId }) => {
+    requireServiceKey(serviceKey);
+    const found = await ctx.db
+      .query("canvases")
+      .withIndex("by_canvasId", (q) => q.eq("canvasId", canvasId))
+      .first();
+    return found !== null;
   },
 });
 
@@ -116,7 +131,8 @@ export const archiveActive = mutation({
     height: v.number(),
     archivedAt: v.number(),
     linkCode: v.string(),
-    name: v.optional(v.string()),
+    theme: v.optional(v.string()),
+    name: v.optional(v.string()), // ancien appel, pris comme thème quand `theme` est absent, retiré au prochain changement de schéma
     maxArchives: v.number(),
   },
   handler: async (ctx, { serviceKey, incomingId, width, height, ...input }) => {
@@ -146,21 +162,56 @@ export const reopen = mutation({
   },
 });
 
-// Sans `name`, le canvas n'en a plus : le patch retire le champ.
+// Sans `theme`, le canvas n'en a plus : le patch retire le champ.
+export const setTheme = mutation({
+  args: { serviceKey: v.string(), ownerId: v.string(), canvasId: v.string(), theme: v.optional(v.string()) },
+  handler: async (ctx, { serviceKey, ownerId, canvasId, theme }) => {
+    requireServiceKey(serviceKey);
+    const docs = await canvasesOf(ctx.db, ownerId);
+    return settle(ctx.db, docs, planSetTheme(docs, ownerId, canvasId, theme));
+  },
+});
+
+// Ancien appel, retiré au prochain changement de schéma : le code d'avant règle le thème par `name`. Le nouveau code ne
+// l'appelle jamais.
 export const rename = mutation({
   args: { serviceKey: v.string(), ownerId: v.string(), canvasId: v.string(), name: v.optional(v.string()) },
   handler: async (ctx, { serviceKey, ownerId, canvasId, name }) => {
     requireServiceKey(serviceKey);
     const docs = await canvasesOf(ctx.db, ownerId);
-    return settle(ctx.db, docs, planRename(docs, ownerId, canvasId, name));
+    return settle(ctx.db, docs, planSetTheme(docs, ownerId, canvasId, name));
   },
 });
+
+// Écart §8.1 (JOURNAL 2026-10-07) : `npx convex run canvases:moveNameToTheme`, juste après le push du schéma. Interne : aucun
+// client ne l'appelle. Non destructive et idempotente, et d'un coup : quelques centaines de canvas au plus tiennent dans
+// une transaction.
+export const moveNameToTheme = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const docs = await ctx.db.query("canvases").collect();
+    const writes = planNameToTheme(docs);
+    await applyWrites(ctx.db, docs, writes);
+    return { moved: writes.length };
+  },
+});
+
+// Écart §8.1 (JOURNAL 2026-10-08) : le ménage n'est jamais une raison de refuser la suppression.
+const purgeLater = async (ctx: MutationCtx, canvasId: string): Promise<void> => {
+  try {
+    await ctx.scheduler.runAfter(0, internal.purge.byCanvas, { canvasId });
+  } catch (error) {
+    console.error(`purge de ${canvasId} non planifiée`, error);
+  }
+};
 
 export const discard = mutation({
   args: { serviceKey: v.string(), ownerId: v.string(), canvasId: v.string() },
   handler: async (ctx, { serviceKey, ownerId, canvasId }) => {
     requireServiceKey(serviceKey);
     const docs = await canvasesOf(ctx.db, ownerId);
-    return settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
+    const settled = await settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
+    if (settled.ok) await purgeLater(ctx, canvasId);
+    return settled;
   },
 });

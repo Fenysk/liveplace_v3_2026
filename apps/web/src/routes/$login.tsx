@@ -5,19 +5,24 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
-import { type AccountSection, AccountWindow, SETTINGS_SECTION } from "../ui/account/account-window";
+import { accountPillOpeners } from "../ui/account/account-pill-openers";
+import { type AccountSection, AccountWindow } from "../ui/account/account-window";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
 import { ArchivesTab } from "../ui/archive/archives-tab";
 import { createOwnSwitchTracker } from "../ui/archive/own-switch";
 import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill } from "../ui/canvas/canvas-pill";
+import { CanvasRecovering, useIsCanvasRecovering } from "../ui/canvas/canvas-recovering";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
+import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
+import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
 import type { ProfileUser } from "../ui/design/profile";
+import { ThemePill } from "../ui/design/theme-pill";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DeveloperWindow } from "../ui/developer/developer-window";
@@ -27,6 +32,7 @@ import { useDeveloperWindow } from "../ui/developer/use-developer-window";
 import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
+import { useDraftingAttribute } from "../ui/draft/use-drafting-attribute";
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
 import { FixedLocale, useTexts } from "../ui/locale/use-locale";
@@ -82,6 +88,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   // Écart §15 (JOURNAL 2026-10-06) : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
   const [switchTracker] = useState(createOwnSwitchTracker);
   const draft = useDraftPillProps(stores, login, signingIn);
+  useDraftingAttribute(stores.draft); // Écart §8.1 (JOURNAL 2026-10-08) : en Dessin sur mobile, seule la bande Thème reste en haut
   const moderation = useModeration(stores.canvas);
   const reporting = useReport(stores.canvas);
   useCanvasToasts(stores, switchTracker, owner.displayName);
@@ -90,6 +97,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   const developer = useDeveloperWindow(stores.canvas); // écart §10.3 (JOURNAL 2026-10-06) : le développeur seul
   const scoreboard = useScoreboardRows(stores.canvas);
   const scoreboardCollapse = useScoreboardCollapse();
+  const ownerProfile = useOwnerProfile(stores.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
   const getRole = () => stores.canvas.getView().role;
   const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
   const isOwner = role === "owner";
@@ -100,13 +108,12 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   return (
     <>
       {/* Sur son canvas, le streamer n'a qu'une pill : la pill Compte porte ses Réglages. */}
-      {!isOwner && !isWaitingForOwner && <CanvasPill owner={owner} isCompact={isCompact} />}
+      {!isOwner && !isWaitingForOwner && <CanvasPill owner={ownerProfile} isCompact={isCompact} />}
       <AccountPill
         {...account}
         isCompact={isCompact}
         isVisible={!isWaitingForOwner}
-        onOpenAccount={() => openWindow(account.pendingReports ? "moderation" : "account")}
-        onOpenSettings={isOwner ? () => openWindow(SETTINGS_SECTION) : undefined}
+        {...accountPillOpeners(role, account.pendingReports, openWindow)}
         onOpenDeveloper={developer.onOpen}
         onSignIn={signingIn.onSignIn}
       />
@@ -138,8 +145,8 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
           onClose={() => setWindowState((shown) => ({ ...shown, isOpen: false }))}
           user={account.identity.user}
           signOutHref={signOutHref}
-          themeChoice={account.themeChoice}
-          onPickTheme={account.onPickTheme}
+          appearanceChoice={account.appearanceChoice}
+          onPickAppearance={account.onPickAppearance}
           moderationTab={
             moderation.controls && (
               <ModerationTab
@@ -182,14 +189,24 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession }: LivePill
   );
 };
 
+// Écart §8.1 (JOURNAL 2026-10-07) : le thème du canvas, pour tous, dès le rendu serveur ; le gateway le suit ensuite en direct.
+const CanvasThemePill = ({
+  canvas,
+  loaded,
+}: {
+  canvas: CanvasStore | undefined;
+  loaded: string | undefined;
+}) => <ThemePill theme={useCanvasTheme(canvas, loaded)} />;
+
 const GamePage = () => {
-  const { canvasId, owner, isOwnerSession = false } = Route.useLoaderData();
+  const { canvasId, owner, theme, isOwnerSession = false } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
   const t = useTexts(CANVAS_TEXTS);
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
+  const isCanvasRecovering = useIsCanvasRecovering(stores?.canvas);
   // Écart §15 (JOURNAL 2026-10-06) : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
   useFollowActiveCanvas(stores?.canvas);
 
@@ -206,7 +223,10 @@ const GamePage = () => {
     };
   }, [canvasId, openCanvas]);
 
-  // Le gateway ne connaît pas ce canvas : la page du canvas introuvable. Les stores restent ouverts, la page se rétablit seule.
+  // Redis remet ce canvas en place (Écart §4.2, JOURNAL 2026-10-08) : le message d'attente, pour tous. Puis, comme le canvas
+  // introuvable, la page se rétablit seule : les stores restent ouverts.
+  if (isCanvasRecovering) return <CanvasRecovering />;
+  // Le gateway ne connaît pas ce canvas : la page du canvas introuvable.
   if (isCanvasMissing) return <CanvasNotFound />;
 
   // Empilés en Z (CDC 2026) : le vide, qui est le fond de la page, puis le canvas, puis les pills.
@@ -220,8 +240,11 @@ const GamePage = () => {
           draftStore={stores.draft}
           canvasId={canvasId}
           ownerName={owner.displayName}
+          isFramedInFreeArea
         />
       )}
+      {/* Le store d'un canvas qu'on quitte (le streamer vient d'archiver) ne dit plus le thème de celui-ci. */}
+      <CanvasThemePill canvas={stores?.canvasId === canvasId ? stores.canvas : undefined} loaded={theme} />
       {stores ? (
         // CDC 2026, Toasts : un seul à la fois, pour toute la page.
         <ToastProvider>

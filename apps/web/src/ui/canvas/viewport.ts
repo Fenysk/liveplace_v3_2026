@@ -12,19 +12,24 @@ export type Insets = { top: number; right: number; bottom: number; left: number 
 // Ce que la pill Pratique montre du cadrage : le pourcentage, et si la vue a bougé depuis l'arrivée.
 export type Framing = { zoomPercent: number; isArrival: boolean };
 
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
 const ARRIVAL_RATIO = 0.9;
 const MAX_CELL_SIZE = 64;
 
-// Centré, à 90 % du côté qui limite : jamais de débordement à l'arrivée (CDC 2026).
-export function fitViewport(screen: Size, canvas: Size): Viewport {
+// Centré, à 90 % du côté qui limite : jamais de débordement à l'arrivée (CDC 2026). Avec des marges (Écart §9.3, JOURNAL
+// 2026-10-08), c'est dans la zone libre entre elles : sur mobile, celle que les pills du haut et du bas laissent.
+export function fitViewport(screen: Size, canvas: Size, insets: Insets = NO_INSETS): Viewport {
+  const freeWidth = Math.max(1, screen.width - insets.left - insets.right);
+  const freeHeight = Math.max(1, screen.height - insets.top - insets.bottom);
   const scale = Math.min(
-    (screen.width * ARRIVAL_RATIO) / canvas.width,
-    (screen.height * ARRIVAL_RATIO) / canvas.height,
+    (freeWidth * ARRIVAL_RATIO) / canvas.width,
+    (freeHeight * ARRIVAL_RATIO) / canvas.height,
   );
   return {
     scale,
-    offsetX: (screen.width - canvas.width * scale) / 2,
-    offsetY: (screen.height - canvas.height * scale) / 2,
+    offsetX: insets.left + (freeWidth - canvas.width * scale) / 2,
+    offsetY: insets.top + (freeHeight - canvas.height * scale) / 2,
   };
 }
 
@@ -36,8 +41,8 @@ export function viewportToCell(viewport: Viewport, point: ScreenPoint, canvas: S
   return { x, y };
 }
 
-export function zoomLimits(screen: Size, canvas: Size): ZoomLimits {
-  return { minScale: fitViewport(screen, canvas).scale / 2, maxScale: MAX_CELL_SIZE };
+export function zoomLimits(screen: Size, canvas: Size, insets: Insets = NO_INSETS): ZoomLimits {
+  return { minScale: fitViewport(screen, canvas, insets).scale / 2, maxScale: MAX_CELL_SIZE };
 }
 
 // Le point visé garde sa place dans le canvas : l'écart entre lui et le coin grandit comme l'échelle.
@@ -56,14 +61,24 @@ export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
 }
 
 // Le pourcentage de la pill Pratique : 100 % au cadrage de l'arrivée (CDC 2026).
-export function zoomPercent(viewport: Viewport, screen: Size, canvas: Size): number {
-  return Math.round((viewport.scale / fitViewport(screen, canvas).scale) * 100);
+export function zoomPercent(
+  viewport: Viewport,
+  screen: Size,
+  canvas: Size,
+  insets: Insets = NO_INSETS,
+): number {
+  return Math.round((viewport.scale / fitViewport(screen, canvas, insets).scale) * 100);
 }
 
 // Sur mobile, Recentrer n'apparaît que quand la vue a bougé (CDC 2026, Mobile).
 // À moins d'un pixel près : un arrondi n'est pas un déplacement.
-export function isArrivalView(viewport: Viewport, screen: Size, canvas: Size): boolean {
-  const arrival = fitViewport(screen, canvas);
+export function isArrivalView(
+  viewport: Viewport,
+  screen: Size,
+  canvas: Size,
+  insets: Insets = NO_INSETS,
+): boolean {
+  const arrival = fitViewport(screen, canvas, insets);
   const isNear = (a: number, b: number) => Math.abs(a - b) < 1;
   return (
     isNear(viewport.scale * canvas.width, arrival.scale * canvas.width) &&

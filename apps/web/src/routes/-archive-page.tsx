@@ -5,6 +5,7 @@
 import { notFound, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { markRecoveringIfLost } from "../usecase/mark-recovering";
 import { resolveArchive } from "../usecase/resolve-archive";
 
 const ArchiveParamsSchema = z.object({ login: z.string().min(1).max(100), code: z.string().min(1).max(100) });
@@ -12,7 +13,16 @@ const ArchiveParamsSchema = z.object({ login: z.string().min(1).max(100), code: 
 // Toujours exécutée sur le serveur, où que tourne le loader : la clé de Convex n'en sort jamais.
 const getArchivePage = createServerFn({ method: "GET" })
   .validator(ArchiveParamsSchema)
-  .handler(({ data, context }) => resolveArchive(context.deps.durable, data.login, data.code));
+  .handler(async ({ data, context }) => {
+    const page = await resolveArchive(context.deps.durable, data.login, data.code, context.deps.tracker);
+    // Écart §4.2 (JOURNAL 2026-10-08) : une archive que Redis a perdue se dit « en récupération » dès ce rendu.
+    if (page?.status === "archived")
+      await markRecoveringIfLost(
+        { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
+        page.archive.canvasId,
+      );
+    return page;
+  });
 
 type ArchivePageLoaderArgs = { params: { login: string; code: string } };
 

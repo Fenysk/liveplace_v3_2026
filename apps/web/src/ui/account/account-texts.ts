@@ -7,10 +7,10 @@ export const ACCOUNT_TEXTS = defineTexts({
   signIn: { fr: "Se connecter", en: "Sign in" },
   signOut: { fr: "Se déconnecter", en: "Sign out" },
   myAccount: { fr: "Mon compte", en: "My account" },
-  // `reports` : « 2 signalements », dit dans la langue de la page.
-  myAccountPending: localized({
-    fr: (reports: string) => `Mon compte · ${reports} en attente`,
-    en: (reports) => `My account · ${reports} pending`,
+  // `reports` : « 2 signalements », dit dans la langue de la page ; `title` : Mon compte ou Modération.
+  withPending: localized({
+    fr: (title: string, reports: string) => `${title} · ${reports} en attente`,
+    en: (title, reports) => `${title} · ${reports} pending`,
   }),
 
   // Les sections de la fenêtre.

@@ -62,3 +62,32 @@ export const getByLogin = query({
     };
   },
 });
+
+// Écart §7.2 (JOURNAL 2026-10-08) : le miroir `user:<id>` de ces personnes, perdu avec Redis. Jamais l'e-mail. Une lecture par
+// identifiant dans une seule requête : la récupération en demande par lots, et seulement pour un canvas à remettre.
+export const listByUserIds = query({
+  args: { serviceKey: v.string(), userIds: v.array(v.string()) },
+  handler: async (ctx, { serviceKey, userIds }) => {
+    requireServiceKey(serviceKey);
+    const found = await Promise.all(
+      userIds.map((userId) =>
+        ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .first(),
+      ),
+    );
+    return found.flatMap((user) =>
+      user
+        ? [
+            {
+              userId: user.userId,
+              login: user.login,
+              displayName: user.displayName,
+              ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+            },
+          ]
+        : [],
+    );
+  },
+});

@@ -22,6 +22,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
   const mirrored: object[] = [];
   const signed: object[] = [];
   const signups: Signup[] = [];
+  const tracked: string[] = [];
   const known = [user, owner];
   const deps: SignInDeps = {
     twitch: {
@@ -59,11 +60,17 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
         return "signed-session";
       },
     },
+    tracker: {
+      track: (trackedUserId) => {
+        tracked.push(trackedUserId);
+      },
+    },
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };
   return {
     deps,
+    tracked,
     activeCanvasReads,
     createdCanvases,
     mirroredUsers,
@@ -85,6 +92,51 @@ describe("completeSignIn (§10.1)", () => {
     expect(createdCanvases).toEqual(["existing-canvas"]);
   });
 
+  // Un canvas dont ce scope garde une sauvegarde ne naît jamais vide : Redis l'a perdu, le worker le remet (JOURNAL 2026-10-08)
+  it("creates no canvas in Redis when Convex holds a save of it for this scope: it never is born empty", async () => {
+    const asked: string[] = [];
+    const { deps, createdCanvases, mirroredUsers, signedUsers } = doubles("existing-canvas");
+    deps.recovery = {
+      hasSnapshot: async (canvasId) => {
+        asked.push(canvasId);
+        return true;
+      },
+    };
+
+    const result = await completeSignIn(deps, "code", null);
+
+    expect(asked).toEqual(["existing-canvas"]);
+    expect(createdCanvases).toEqual([]);
+    expect(mirroredUsers).toEqual([user.userId]);
+    expect(signedUsers).toEqual([user.userId]);
+    expect(result).toEqual({ signedSession: "signed-session", login: user.login });
+  });
+
+  // Sans sauvegarde de ce canvas dans ce scope, la connexion le crée comme avant
+  it("still creates the canvas when the scope holds no save of it", async () => {
+    const { deps, createdCanvases } = doubles("existing-canvas");
+    deps.recovery = { hasSnapshot: async () => false };
+
+    await completeSignIn(deps, "code", null);
+
+    expect(createdCanvases).toEqual(["existing-canvas"]);
+  });
+
+  // Convex qui ne dit pas s'il y a une sauvegarde : la connexion échoue, plutôt que de créer un canvas qui pourrait naître vide
+  it("fails rather than creating a canvas that might be born empty when Convex cannot say", async () => {
+    const { deps, createdCanvases, signedUsers } = doubles("existing-canvas");
+    deps.recovery = {
+      hasSnapshot: async () => {
+        throw new Error("Convex a coupé");
+      },
+    };
+
+    await expect(completeSignIn(deps, "code", null)).rejects.toThrow("Convex a coupé");
+
+    expect(createdCanvases).toEqual([]);
+    expect(signedUsers).toEqual([]);
+  });
+
   // Écrit le miroir user: et signe la session de l'utilisateur rendu par Twitch
   it("mirrors and signs the user Twitch returns", async () => {
     const { deps, mirroredUsers, signedUsers } = doubles("existing-canvas");
@@ -94,6 +146,18 @@ describe("completeSignIn (§10.1)", () => {
     expect(mirroredUsers).toEqual([user.userId]);
     expect(signedUsers).toEqual([user.userId]);
     expect(result).toEqual({ signedSession: "signed-session", login: user.login });
+  });
+
+  // À chaque connexion, le live Twitch du compte est suivi (écart §4 et §10.1, JOURNAL 2026-10-07)
+  it("has the account's Twitch live tracked at each sign-in, new account or not", async () => {
+    const first = doubles("random-candidate");
+    const later = doubles("existing-canvas");
+
+    await completeSignIn(first.deps, "code", null);
+    await completeSignIn(later.deps, "code", "/benitoad");
+
+    expect(first.tracked).toEqual([user.userId]);
+    expect(later.tracked).toEqual([user.userId]);
   });
 
   // Garde l'e-mail pour Convex seulement : jamais dans le miroir Redis ni dans la session (écart §10.1, JOURNAL 2026-09-27)

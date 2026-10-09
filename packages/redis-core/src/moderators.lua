@@ -2,6 +2,7 @@
 -- `mods` reste le seul ensemble lu (§5.1) : l'union de ce que Twitch et LivePlace ont nommé.
 
 local metaKey, modsKey, twitchKey, liveplaceKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
+local bansKey = KEYS[5]
 local liveChannel, userId, source, isModerator = ARGV[1], ARGV[2], ARGV[3], ARGV[4] == "1"
 
 -- Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
@@ -14,6 +15,10 @@ if meta[3] then
 end
 -- Le streamer a déjà tous les droits sur son canvas : il n'en est jamais modérateur.
 if userId == meta[2] then
+  return "forbidden"
+end
+-- Écart §5.4 (JOURNAL 2026-10-08) : on ne nomme pas ici un banni ; le rôle Twitch, lui, se reflète tel quel.
+if isModerator and source == "liveplace" and redis.call("SISMEMBER", bansKey, userId) == 1 then
   return "forbidden"
 end
 

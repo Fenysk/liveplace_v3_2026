@@ -1,4 +1,4 @@
-// Un choix exclusif, aussi large que ses options (le thème dans Mon compte).
+// Un choix exclusif, aussi large que ses options (l'apparence dans Mon compte).
 // De vrais boutons radio sous les étiquettes : le clavier (flèches, Tab) et les lecteurs d'écran les connaissent déjà.
 
 import type { LucideIcon } from "lucide-react";

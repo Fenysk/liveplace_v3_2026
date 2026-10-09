@@ -23,7 +23,7 @@ const point = (at: number): ActivityPoint => ({
 const canvasPoint = (at: number): CanvasActivityPoint => ({
   at,
   people: 1,
-  obsViews: 0,
+  streamedMinutes: 0,
   pixels: 2,
   visits: 0,
   visitMinutes: 0,

@@ -1,7 +1,13 @@
 // L'ensemble de diffusion d'un canvas et son tick (§6.2, §6.3).
 
 import type { Timestamp } from "@liveplace/domain";
-import type { CanvasCore, LiveControl, ScoreboardRank, Unsubscribe } from "@liveplace/domain/ports";
+import type {
+  CanvasCore,
+  LiveControl,
+  ScoreboardRank,
+  TwitchLive,
+  Unsubscribe,
+} from "@liveplace/domain/ports";
 import type { Event, ServerFrame } from "@liveplace/protocol";
 import { conflate } from "./conflate";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
@@ -10,8 +16,10 @@ import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => void;
 // JOURNAL 2026-10-06 : le classement, au plus une fois par fenêtre ; la frame est celle de cette page.
 export type ScoreboardControl = { t: "scoreboard"; frame: ScoreboardFrame };
-// Un message de contrôle de moderate.lua (§5.4), ou le classement : ni tick ni conflation, il n'a aucune case.
-export type ControlMessage = LiveControl | ScoreboardControl;
+// Écart §4 (JOURNAL 2026-10-07) : le live d'un compte a changé ; chaque page décide s'il la regarde. Absent : plus en live.
+export type TwitchLiveControl = { t: "twitchLive"; userId: string; twitchLive?: TwitchLive };
+// Un message de contrôle de moderate.lua (§5.4), le classement ou un live : ni tick ni conflation, il n'a aucune case.
+export type ControlMessage = LiveControl | ScoreboardControl | TwitchLiveControl;
 export type ControlListener = (control: ControlMessage) => void;
 
 export interface Broadcast {
@@ -27,18 +35,22 @@ export interface Broadcast {
   // JOURNAL 2026-10-06 : une fenêtre du classement. Ne relit que les canvas où une pose, un ban ou un déban a eu lieu.
   tickScoreboard(): Promise<void>;
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
+  // Écart §4 (JOURNAL 2026-10-07) : un message de contrôle à toutes les pages jointes, tous canvas confondus.
+  announce(control: ControlMessage): void;
   // Écart §5.1 (JOURNAL 2026-10-07) : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
   countConnections(): { total: number; largestCanvas: number };
 }
 
-// Écart §5.1 (JOURNAL 2026-10-07) : la capacité mesure, à l'envoi de chaque frame, le délai de chaque pose qu'elle porte.
-export type DelayRecorder = { now(): Timestamp; record(delayMs: number): void };
+// Écart §5.1 et §6 (JOURNAL 2026-10-07) : la capacité mesure, à l'envoi de chaque frame, le retard de chaque pose qu'elle porte :
+// sans l'attente voulue du tick. `tickMs` : l'intervalle du tick, celui de la minuterie qui l'appelle.
+export type DelayRecorder = { now(): Timestamp; record(delayMs: number): void; tickMs: number };
 
 type Member = { onControl: ControlListener; accountId: string | undefined };
 
 type CanvasBroadcast = {
   listeners: Map<CellsListener, Member>;
   pendingEvents: Event[];
+  pendingArrivals: Timestamp[]; // l'instant où chaque évènement du tampon est arrivé, dans le même ordre
   ticksWaited: number;
   subscription: Promise<Unsubscribe>;
   isScoreboardStale: boolean; // une pose, un ban ou un déban depuis la dernière lecture
@@ -99,16 +111,22 @@ export function createBroadcast(
 ): Broadcast {
   const canvases = new Map<string, CanvasBroadcast>();
 
+  // Un évènement arrive dans le tampon du canvas, avec l'instant de son arrivée : le retard en retranche l'attente voulue.
+  const enqueue = (canvas: CanvasBroadcast, event: Event): void => {
+    canvas.pendingEvents.push(event);
+    canvas.pendingArrivals.push(delays?.now() ?? 0);
+    if (changesScoreboard(event)) canvas.isScoreboardStale = true;
+  };
+
   const start = (canvasId: string): CanvasBroadcast => {
     const canvas: CanvasBroadcast = {
       listeners: new Map(),
       pendingEvents: [],
+      pendingArrivals: [],
       ticksWaited: 0,
       subscription: core.subscribe(canvasId, (message) => {
-        if ("e" in message) {
-          canvas.pendingEvents.push(message.e);
-          if (changesScoreboard(message.e)) canvas.isScoreboardStale = true;
-        } else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
+        if ("e" in message) enqueue(canvas, message.e);
+        else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
       }),
       isScoreboardStale: false,
       isReadingScoreboard: false,
@@ -133,11 +151,41 @@ export function createBroadcast(
     }
   };
 
-  // Une pose reçue et partie dans une frame : un seul compteur de plus, et l'horloge lue une fois par frame.
-  const recordDelays = (events: readonly Event[]): void => {
-    if (!delays) return;
-    const sentAt = delays.now();
-    for (const { kind, occurredAt } of events) if (kind === "place") delays.record(sentAt - occurredAt);
+  // L'heure prévue de ce tick : celle du précédent, plus l'intervalle, comme la minuterie de Node ; au premier tick, la sienne.
+  let previousTickAt: Timestamp | undefined;
+  const takeExpectedTickAt = (recorder: DelayRecorder): Timestamp => {
+    const tickAt = recorder.now();
+    const expectedAt = previousTickAt === undefined ? tickAt : previousTickAt + recorder.tickMs;
+    previousTickAt = tickAt;
+    return expectedAt;
+  };
+
+  // Le retard d'une pose partie dans une frame : l'envoi − `occurredAt` − l'attente voulue, de son arrivée à l'heure prévue du
+  // tick qui l'envoie (un tick sauté en fait partie). Un seul nombre de plus en mémoire par pose, l'horloge lue une fois par frame.
+  const recordDelays = (
+    events: readonly Event[],
+    arrivals: readonly Timestamp[],
+    expectedAt: Timestamp,
+    recorder: DelayRecorder,
+  ): void => {
+    const sentAt = recorder.now();
+    events.forEach(({ kind, occurredAt }, index) => {
+      if (kind !== "place") return;
+      const arrivedAt = arrivals[index] ?? sentAt;
+      recorder.record(sentAt - occurredAt - Math.max(0, expectedAt - arrivedAt));
+    });
+  };
+
+  // La frame du canvas : ce que son tampon a reçu depuis son dernier envoi, conflaté, puis le retard de chaque pose.
+  const flush = (canvas: CanvasBroadcast, expectedAt: Timestamp): void => {
+    const { pendingEvents: events, pendingArrivals: arrivals } = canvas;
+    canvas.pendingEvents = [];
+    canvas.pendingArrivals = [];
+    const conflated = conflate(events);
+    if (!conflated) return;
+    const frame = { t: "cells" as const, ...conflated };
+    for (const listener of canvas.listeners.keys()) listener(frame);
+    if (delays) recordDelays(events, arrivals, expectedAt, delays);
   };
 
   return {
@@ -160,17 +208,12 @@ export function createBroadcast(
     },
 
     tick() {
+      const expectedAt = delays ? takeExpectedTickAt(delays) : 0;
       for (const canvas of canvases.values()) {
         canvas.ticksWaited += 1;
         if (canvas.ticksWaited < ticksBetweenFrames(canvas.listeners.size)) continue;
         canvas.ticksWaited = 0;
-        const events = canvas.pendingEvents;
-        const conflated = conflate(events);
-        canvas.pendingEvents = [];
-        if (!conflated) continue;
-        const frame = { t: "cells" as const, ...conflated };
-        for (const listener of canvas.listeners.keys()) listener(frame);
-        recordDelays(events);
+        flush(canvas, expectedAt);
       }
     },
 
@@ -183,6 +226,11 @@ export function createBroadcast(
 
     countAccounts(canvasId) {
       return accountIdsOf(canvases.get(canvasId)).size;
+    },
+
+    announce(control) {
+      for (const { listeners } of canvases.values())
+        for (const { onControl } of listeners.values()) onControl(control);
     },
 
     countConnections() {

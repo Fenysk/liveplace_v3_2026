@@ -14,6 +14,7 @@ const audienceDay = { visits: 12, phoneVisits: 5, visitMinutes: 80, activePlayer
 const here: ActivityHere = {
   canvasId: "c1",
   owner: { userId: "1", login: "kalyss", displayName: "Kalyss" },
+  isStreamed: true,
   obsViews: 1,
   people: 4,
   guests: 2,
@@ -53,7 +54,7 @@ const frame = (shown: ActivityHere | null): ActivityFrame => ({
 const canvasPoint: CanvasActivityPoint = {
   at: lastMinute,
   people: 3,
-  obsViews: 1,
+  streamedMinutes: 0,
   pixels: 40,
   visits: 2,
   visitMinutes: 7,
@@ -74,13 +75,12 @@ const render = (view: ActivityWatchView): string =>
   renderToStaticMarkup(createElement(CanvasSection, { view, nowMs: now, onSelectPeriod: () => undefined }));
 
 describe("the canvas section (JOURNAL 2026-10-07)", () => {
-  // Montre, de haut en bas, le streamer avec sa pastille OBS, les chiffres de l'instant, l'audience, qui est là, puis les courbes
-  it("shows, top to bottom, the owner with the OBS badge, the numbers of the moment, the audience, who is there, then the curves", () => {
+  // Montre, de haut en bas, le streamer, les chiffres de l'instant, l'audience, qui est là, puis les courbes
+  it("shows, top to bottom, the owner, the numbers of the moment, the audience, who is there, then the curves", () => {
     const markup = render(ready("day", [canvasPoint]));
 
     const order = [
       "Kalyss",
-      ">OBS<",
       "Maintenant",
       "dont 2 invités",
       "Vues OBS ouvertes",
@@ -121,13 +121,32 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(table).not.toContain("Streamers actifs");
   });
 
-  // Ne met pas de pastille OBS à un canvas non streamé, et dit que personne n'est là quand personne n'y est
-  it("puts no OBS badge on a canvas that is not streamed, and says nobody is there when nobody is", () => {
-    const empty = { ...here, obsViews: 0, guests: 0, people: 0, accounts: [] };
+  // Écart §5.1 (JOURNAL 2026-10-08) : en tête, le streamer seul, sans pastille ; une courbe de ses minutes streamées, aucune de ses vues OBS
+  it("puts the owner alone at the top, with no badge, and draws its streamed minutes, not its OBS views", () => {
+    const streamed = render(ready("day", [{ ...canvasPoint, streamedMinutes: 1 }]));
 
+    const top = streamed.slice(0, streamed.indexOf("Maintenant"));
+    expect(top).toContain("Kalyss");
+    expect(top).not.toContain(">Streamé<");
+    expect(top).not.toContain("lp-badge");
+    expect(top).not.toContain('title="1 vue OBS ouverte"');
+    expect(top).not.toContain(">OBS<");
+    expect(top).not.toContain("En live");
+    expect(streamed).toContain("Temps streamé (min)");
+    expect(streamed).not.toContain("Temps en live");
+    expect(streamed.match(/Vues OBS ouvertes/g)).toHaveLength(1);
+  });
+
+  // Ne met pas de pastille à un canvas non streamé, même avec une vue OBS ouverte, et dit que personne n'est là quand personne n'y est
+  it("puts no badge on a canvas that is not streamed, even with an OBS view open, and says nobody is there when nobody is", () => {
+    const empty = { ...here, isStreamed: false, obsViews: 0, guests: 0, people: 0, accounts: [] };
+
+    const openView = render(ready("day", [], { ...here, isStreamed: false }));
     const markup = render(ready("day", [], empty));
 
-    expect(markup).not.toContain(">OBS<");
+    expect(openView).not.toContain("lp-badge");
+    expect(openView).toContain("Vues OBS ouvertes");
+    expect(markup).not.toContain("lp-badge");
     expect(markup).toContain("Personne sur ce canvas en ce moment.");
     expect(markup).not.toContain("+ 0 invité");
   });

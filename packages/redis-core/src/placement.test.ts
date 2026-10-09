@@ -379,6 +379,25 @@ describe("approvePlacement and the reports list (JOURNAL 2026-09-28)", () => {
     await redis.del("user:troll");
   });
 
+  // Dit d'où vient l'auteur d'une pose signalée quand il est modérateur, pour que Bannir se cache (Écart §4.3, JOURNAL 2026-10-08)
+  it("tells where the author of a reported placement comes from when he is a moderator, and nothing otherwise", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 4 }]);
+    await placeAs(canvasId, "mod-here", "pmod000001", [{ x: 1, y: 0, colorIndex: 5 }]);
+    await core.setModerator(canvasId, { userId: "mod-here", source: "liveplace", isModerator: true });
+    await core.setModerator(canvasId, { userId: "mod-here", source: "twitch", isModerator: true });
+    await report(canvasId, { reporterId: "viewer-1" });
+    await report(canvasId, { reporterId: "viewer-1", x: 1, placementId: "pmod000001", nowMs: now + 1000 });
+
+    const reports = await core.listReports(canvasId);
+
+    expect(reports.map(({ userId, moderatorOrigin }) => ({ userId, moderatorOrigin }))).toEqual([
+      { userId: "troll", moderatorOrigin: undefined },
+      { userId: "mod-here", moderatorOrigin: { isFromTwitch: true, isNamedHere: true } },
+    ]);
+    expect(reports[0]).not.toHaveProperty("moderatorOrigin");
+  });
+
   // Élague une pose signalée qui n'a plus aucun pixel visible
   it("prunes a reported placement that no longer has a visible pixel", async () => {
     const { canvasId } = await readyCanvas();

@@ -64,6 +64,8 @@ export const DRAFT_TEXTS = defineTexts({
           return "Cette demande n'a pas été comprise : recharge la page.";
         case "canvas_not_found":
           return "Ce canvas n'existe pas.";
+        case "canvas_recovering":
+          return "On remet chaque pixel à sa place : réessaie dans un instant.";
         case "canvas_archived":
           return "Ce canvas est archivé : on n'y pose plus.";
         case "server_full":
@@ -84,6 +86,8 @@ export const DRAFT_TEXTS = defineTexts({
           return "That request wasn't understood: reload the page.";
         case "canvas_not_found":
           return "This canvas doesn't exist.";
+        case "canvas_recovering":
+          return "We're putting every pixel back in place: try again in a moment.";
         case "canvas_archived":
           return "This canvas is archived: nothing can be placed on it.";
         case "server_full":

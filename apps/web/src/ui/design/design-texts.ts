@@ -18,11 +18,17 @@ export const DESIGN_TEXTS = defineTexts({
     fr: { fr: "Passer en français", en: "Passer en anglais" },
     en: { fr: "Switch to French", en: "Switch to English" },
   },
+  appearance: { fr: "Apparence", en: "Appearance" },
+  appearanceAuto: { fr: "Auto", en: "Auto" },
+  appearanceLight: { fr: "Clair", en: "Light" },
+  appearanceDark: { fr: "Sombre", en: "Dark" },
+  appearanceTip: localized({
+    fr: (choice: string) => `Apparence : ${choice}`,
+    en: (choice) => `Appearance: ${choice}`,
+  }),
+  // La pill Thème, en haut : le thème du canvas, donné par le streamer. Le petit mot seul sert sur mobile.
   theme: { fr: "Thème", en: "Theme" },
-  themeAuto: { fr: "Auto", en: "Auto" },
-  themeLight: { fr: "Clair", en: "Light" },
-  themeDark: { fr: "Sombre", en: "Dark" },
-  themeTip: localized({ fr: (choice: string) => `Thème : ${choice}`, en: (choice) => `Theme: ${choice}` }),
+  themeDraw: { fr: "Dessine sur le thème", en: "Draw the theme" },
 
   viewCanvasOf: localized({
     fr: (name: string) => `Voir le canvas de ${name}`,
@@ -32,6 +38,13 @@ export const DESIGN_TEXTS = defineTexts({
     fr: (name: string) => `Chaîne Twitch de ${name}`,
     en: (name) => `${name}'s Twitch channel`,
   }),
+  // Un compte en live : l'infobulle de son bouton Twitch (la catégorie, si Twitch la donne), et le mot sans catégorie.
+  liveOnTwitch: localized({
+    fr: (name: string, category: string | undefined) =>
+      `${name} est en live sur Twitch${category ? ` : ${category}` : ""}`,
+    en: (name, category) => `${name} is live on Twitch${category ? `: ${category}` : ""}`,
+  }),
+  liveLabel: { fr: "En live", en: "Live" },
   noAccount: {
     fr: "Cette personne n'a pas de compte LivePlace.",
     en: "This person doesn't have a LivePlace account.",

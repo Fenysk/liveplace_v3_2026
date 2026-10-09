@@ -1,4 +1,4 @@
-// Un champ de texte (Écart §15, JOURNAL 2026-10-06) : le nom facultatif d'une archive. Son libellé est lié au champ, et
+// Un champ de texte (Écart §15, JOURNAL 2026-10-06) : le thème facultatif d'un canvas. Son libellé est lié au champ, et
 // les raccourcis du jeu se taisent pendant qu'on y écrit (use-draft-keys.ts). Avec `onCommit`, il se valide en perdant
 // le focus, ou par Entrée : un réglage sans bouton Enregistrer.
 

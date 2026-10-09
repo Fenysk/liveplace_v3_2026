@@ -20,11 +20,12 @@ import { SAMPLE_BROKEN_PHOTO, SAMPLE_OWNER, SAMPLE_VIEWER } from "./design-fixtu
 
 const DAY_MS = 24 * HOUR_MS;
 
-// Des courbes qui ondulent, et un trou : le serveur arrêté une quarantaine de minutes, ou quelques heures.
+// Des courbes qui ondulent, et un trou : le serveur arrêté une quarantaine de minutes, ou quelques heures. `streamedMinutes` :
+// les minutes streamées d'un canvas qui l'est pendant tout son créneau.
 export const PERIOD_SHAPES = {
-  day: { count: 1440, stepMs: MINUTE_MS, gap: [600, 640] },
-  month: { count: 720, stepMs: HOUR_MS, gap: [200, 206] },
-  all: { count: 120, stepMs: DAY_MS, gap: [40, 42] },
+  day: { count: 1440, stepMs: MINUTE_MS, gap: [600, 640], streamedMinutes: 1 },
+  month: { count: 720, stepMs: HOUR_MS, gap: [200, 206], streamedMinutes: 45 },
+  all: { count: 120, stepMs: DAY_MS, gap: [40, 42], streamedMinutes: 400 },
 } as const;
 
 // Le début du dernier point d'une période : la dernière minute écoulée, l'heure ou le jour en cours.
@@ -43,7 +44,8 @@ export const sampleCanvasPoints = (period: ActivityPeriod, nowMs: number): Canva
     .map((index) => ({
       at: lastAt - (count - 1 - index) * stepMs,
       people: Math.round(2 + 2 * Math.sin(index / 30) + (index % 3)),
-      obsViews: index % 100 < 40 ? 1 : 0,
+      // 0 ou 1 à la minute, la somme de ses minutes à l'heure et au jour
+      streamedMinutes: index % 100 < 25 ? PERIOD_SHAPES[period].streamedMinutes : 0,
       pixels: Math.round(20 + 15 * Math.sin(index / 20) + (index % 7) * 2),
       visits: index % 4,
       visitMinutes: Math.round(4 + 3 * Math.sin(index / 25) + (index % 5)),
@@ -105,7 +107,8 @@ export const sampleAccounts = (nowMs: number): ConnectedAccount[] => [
 export const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
   {
     canvasId: "kalyss",
-    owner: { userId: "1", ...SAMPLE_OWNER },
+    owner: { userId: "1", ...SAMPLE_OWNER, twitchLive: { category: "Art" } },
+    isStreamed: true,
     obsViews: 2,
     people: 4,
     guests: 1,
@@ -116,6 +119,7 @@ export const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
   {
     canvasId: "fenysk",
     owner: { userId: DEVELOPER_USER_ID, login: "fenysk", displayName: "Fenysk" },
+    isStreamed: false,
     obsViews: 0,
     people: 2,
     guests: 2,
@@ -126,11 +130,24 @@ export const sampleCanvases = (nowMs: number): ActivityCanvas[] => [
   {
     canvasId: "pixelmoth",
     owner: { userId: "2", ...SAMPLE_VIEWER },
+    isStreamed: false,
     obsViews: 0,
     people: 0,
     guests: 0,
     heat: 35,
     signups: 1,
+    accounts: [],
+  },
+  // Une vue OBS ouverte, mais son streamer n'est pas en live : pas streamé.
+  {
+    canvasId: "nuagelle",
+    owner: { userId: "3", ...SAMPLE_BROKEN_PHOTO },
+    isStreamed: false,
+    obsViews: 1,
+    people: 1,
+    guests: 0,
+    heat: 210,
+    signups: 0,
     accounts: [],
   },
 ];
@@ -148,6 +165,7 @@ export const NO_AUDIENCE = {
 export const sampleHere = (nowMs: number): ActivityHere => ({
   canvasId: "kalyss",
   owner: { userId: "1", ...SAMPLE_OWNER },
+  isStreamed: true,
   obsViews: 2,
   people: 4,
   guests: 1,
@@ -163,6 +181,7 @@ export const sampleHere = (nowMs: number): ActivityHere => ({
 // Un canvas où personne n'est, où personne n'a rien posé, et que personne ne streame.
 export const quietHere = (nowMs: number): ActivityHere => ({
   ...sampleHere(nowMs),
+  isStreamed: false,
   obsViews: 0,
   people: 0,
   guests: 0,

@@ -25,6 +25,7 @@ export type ButtonProps = ButtonText &
     isPressed?: boolean; // un outil armé : gomme, tracé
     isExpanded?: boolean; // un contrôle qui replie ou déplie ce qu'il commande
     isDisabled?: boolean;
+    hasDot?: boolean; // quelque chose attend : le point rouge de l'avatar (profile.css), dans l'angle du bouton
   };
 
 // Rendre le focus après un clic de souris : sinon Espace et Entrée recliqueraient le bouton au lieu de tracer ou de valider.
@@ -35,11 +36,12 @@ export const blurAfterClick = (onPress: () => void) => (event: MouseEvent<HTMLBu
 };
 
 export const Button = (props: ButtonProps) => {
-  const { label, title, icon: Icon, kbd, variant, isPressed, isExpanded, isDisabled } = props;
+  const { label, title, icon: Icon, kbd, variant, isPressed, isExpanded, isDisabled, hasDot } = props;
   const className = classNames(
     "lp-btn lp-type-body",
     variant && `lp-btn--${variant}`,
     !label && "lp-btn--icon",
+    hasDot && "lp-btn--dot",
   );
   const content = (
     <>
@@ -50,6 +52,7 @@ export const Button = (props: ButtonProps) => {
           {kbd}
         </span>
       )}
+      {hasDot && <span className="lp-avatar-dot" aria-hidden="true" />}
     </>
   );
   const accessibleName = label ? undefined : title;

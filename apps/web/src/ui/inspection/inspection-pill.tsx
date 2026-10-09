@@ -16,6 +16,7 @@ import { Profile } from "../design/profile";
 import { TwitchGlyph } from "../design/twitch";
 import { formatDateTime } from "../locale/locale";
 import { useLocale, useTexts } from "../locale/use-locale";
+import { canBan } from "../moderation/can-ban";
 import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { INSPECTION_TEXTS } from "./inspection-texts";
@@ -89,7 +90,8 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
   );
 };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant.
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant. Écart §5.4 (JOURNAL
+// 2026-10-08) : pas de Bannir sur un modérateur nommé ici.
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const t = useTexts(INSPECTION_TEXTS);
   const { userId } = author;
@@ -99,7 +101,9 @@ const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
     <>
       <div className="lp-row lp-row--ruled">
         <Button label={t.clearTheirPixels} onPress={() => moderation.onModerate("clear", moderated)} />
-        <Button label={t.ban} variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+        {canBan(moderated) && (
+          <Button label={t.ban} variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+        )}
       </div>
       {moderation.onSetModerator && <RoleRow author={moderated} onSetModerator={moderation.onSetModerator} />}
     </>

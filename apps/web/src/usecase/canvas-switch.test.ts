@@ -41,6 +41,7 @@ type Convex = "refuses-full" | "refuses-stale" | "throws" | "commits-then-throws
 type Scenario = {
   active?: ActiveCanvas | null;
   archives?: Archive[];
+  activeTheme?: string; // le thème du canvas actif dans la copie de Redis
   isLocked?: boolean; // un autre changement tient le verrou
   failsAt?: string; // la méthode de Redis qui lève
   convex?: Convex;
@@ -65,7 +66,7 @@ const setup = (scenario: Scenario = {}) => {
   const redis: SwitchDeps["redis"] = {
     getCanvas: async (canvasId) =>
       canvasId === store.active?.canvasId
-        ? metaOfActive
+        ? { ...metaOfActive, ...(scenario.activeTheme ? { theme: scenario.activeTheme } : {}) }
         : {
             ...metaOfActive,
             archivedAt: 900,
@@ -92,6 +93,8 @@ const setup = (scenario: Scenario = {}) => {
     copyProgress: async (from, to) => act("copyProgress", from, to),
     settleReports: async (canvasId) => act("settleReports", canvasId),
     publishStatus: async (canvasId, status) => act("publishStatus", canvasId, status),
+    setTheme: async (canvasId, theme) => act("setTheme", canvasId, theme ?? null),
+    publishTheme: async (canvasId, theme) => act("publishTheme", canvasId, theme ?? null),
     discardCanvas: async (canvasId) => act("discardCanvas", canvasId),
     getCanvasImage: async () => null,
   };
@@ -147,7 +150,7 @@ const setup = (scenario: Scenario = {}) => {
   return { deps, log, sent };
 };
 
-const archiveRequest = { canvasId: active.canvasId, name: "", progress: "keep" } as const;
+const archiveRequest = { canvasId: active.canvasId, theme: "", progress: "keep" } as const;
 const reopenRequest = { canvasId: archived.canvasId, progress: "keep" } as const;
 
 let logged: ReturnType<typeof vi.spyOn>;
@@ -196,8 +199,8 @@ describe("withOwnerLock (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
 describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
   // Dans l'ordre : le nouveau canvas sans `ready`, l'ancien figé, le commun, la progression, `ready`, Convex, les
-  // signalements classés, le statut publié, le verrou rendu
-  it("goes in order: the new canvas without ready, the old one frozen, the shared part, the progress, ready, Convex, reports settled, status published, lock given back", async () => {
+  // signalements classés, le thème de l'archive, le statut publié, le verrou rendu
+  it("goes in order: the new canvas without ready, the old one frozen, the shared part, the progress, ready, Convex, reports settled, the theme of the archive, status published, lock given back", async () => {
     const { deps, log } = setup();
 
     expect(await archiveCanvas(deps, ownerId, archiveRequest)).toEqual({ ok: true, value: undefined });
@@ -211,6 +214,7 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
       "markReady new-1",
       "convex.archive canvas-a new-1",
       "settleReports canvas-a",
+      "setTheme canvas-a null",
       "publishStatus canvas-a archived",
       "unlock",
     ]);
@@ -236,11 +240,11 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
     expect(sent.prepared).not.toHaveProperty("archivedAt");
   });
 
-  // Donne à Convex le nom nettoyé, le code tiré, la date, et le nouveau canvas
-  it("hands Convex the cleaned name, the drawn code, the date and the new canvas", async () => {
+  // Donne à Convex le thème nettoyé, le code tiré, la date, et le nouveau canvas
+  it("hands Convex the cleaned theme, the drawn code, the date and the new canvas", async () => {
     const { deps, sent } = setup();
 
-    await archiveCanvas(deps, ownerId, { ...archiveRequest, name: "  Fête   du\t14  " });
+    await archiveCanvas(deps, ownerId, { ...archiveRequest, theme: "  Fête   du\t14  " });
 
     expect(sent.archive).toEqual({
       ownerId,
@@ -248,18 +252,47 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
       incoming: { canvasId: "new-1", width: 50, height: 50 },
       archivedAt: now,
       linkCode: "freshcode1",
-      name: "Fête du 14",
+      theme: "Fête du 14",
     });
   });
 
-  // Sans nom donné, aucun nom ; un canvas rouvert garde son code
-  it("gives no name when none is given, and lets a reopened canvas keep its code", async () => {
-    const { deps, sent } = setup({ active: { ...active, linkCode: "mycode1234", name: "Avant" } });
+  // Sans thème donné, aucun thème ; un canvas rouvert garde son code
+  it("gives no theme when none is given, and lets a reopened canvas keep its code", async () => {
+    const { deps, sent } = setup({ active: { ...active, linkCode: "mycode1234", theme: "Avant" } });
 
-    await archiveCanvas(deps, ownerId, { ...archiveRequest, name: "   " });
+    await archiveCanvas(deps, ownerId, { ...archiveRequest, theme: "   " });
 
-    expect(sent.archive).not.toHaveProperty("name");
+    expect(sent.archive).not.toHaveProperty("theme");
     expect(sent.archive?.linkCode).toBe("mycode1234");
+  });
+
+  // Le thème du dialogue va sur le canvas archivé, dans la copie de Redis, sans rien publier : ses pages changent de canvas
+  it("puts the theme of the dialog on the archived canvas in Redis, publishing nothing: its pages move to another canvas", async () => {
+    const { deps, log } = setup({ activeTheme: "Avant" });
+
+    await archiveCanvas(deps, ownerId, { ...archiveRequest, theme: "  Fête   du\t14  " });
+
+    expect(log).toContain("setTheme canvas-a Fête du 14");
+    expect(log.some((entry) => entry.startsWith("publishTheme"))).toBe(false);
+  });
+
+  // Sans thème dans le dialogue, la copie de Redis perd l'ancien : elle égale toujours Convex
+  it("drops the old theme from the copy in Redis when the dialog gives none: it always equals Convex", async () => {
+    const { deps, log } = setup({ activeTheme: "Avant" });
+
+    await archiveCanvas(deps, ownerId, { ...archiveRequest, theme: "" });
+
+    expect(log).toContain("setTheme canvas-a null");
+  });
+
+  // Le canvas neuf part sans thème, même quand l'ancien en avait un
+  it("starts the new canvas with no theme, even when the old one had one", async () => {
+    const { deps, sent } = setup({ activeTheme: "Halloween" });
+
+    await archiveCanvas(deps, ownerId, { ...archiveRequest, theme: "Halloween" });
+
+    expect(sent.prepared).toEqual(metaOfActive);
+    expect(sent.prepared).not.toHaveProperty("theme");
   });
 
   // Refuse quand un autre changement est en cours
@@ -307,6 +340,7 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
       expect(log.slice(-3)).toEqual(["markActive canvas-a", "discardCanvas new-1", "unlock"]);
       expect(log.some((entry) => entry.startsWith("convex."))).toBe(false);
       expect(log.some((entry) => entry.startsWith("publishStatus"))).toBe(false);
+      expect(log.some((entry) => entry.startsWith("setTheme"))).toBe(false);
       expect(logged).toHaveBeenCalled();
     });
   }
@@ -327,6 +361,7 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
         "discardCanvas new-1",
         "unlock",
       ]);
+      expect(log.some((entry) => entry.startsWith("setTheme"))).toBe(false);
     }
   });
 
@@ -345,18 +380,19 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
     expect(await archiveCanvas(deps, ownerId, archiveRequest)).toEqual({ ok: true, value: undefined });
 
-    expect(log.slice(-4)).toEqual([
+    expect(log.slice(-5)).toEqual([
       "convex.archive canvas-a new-1",
       "settleReports canvas-a",
+      "setTheme canvas-a null",
       "publishStatus canvas-a archived",
       "unlock",
     ]);
     expect(log).not.toContain("markActive canvas-a");
   });
 
-  // Après Convex, rien ne fait échouer l'archivage : classer et publier sont journalisés s'ils manquent
-  it("fails nothing once Convex has decided: settling and publishing are logged when they fail", async () => {
-    for (const failsAt of ["settleReports", "publishStatus"]) {
+  // Après Convex, rien ne fait échouer l'archivage : classer, copier le thème et publier sont journalisés s'ils manquent
+  it("fails nothing once Convex has decided: settling, copying the theme and publishing are logged when they fail", async () => {
+    for (const failsAt of ["settleReports", "setTheme", "publishStatus"]) {
       const { deps, log } = setup({ failsAt });
 
       expect(await archiveCanvas(deps, ownerId, archiveRequest)).toEqual({ ok: true, value: undefined });
@@ -379,8 +415,8 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
 describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
   // Dans l'ordre : le successeur de l'archive retiré, l'actif figé, le commun, Convex, la progression, les
-  // signalements classés, l'archive défigée, les statuts publiés, le verrou rendu
-  it("goes in order: the archive's successor removed, the active one frozen, the shared part, Convex, the progress, reports settled, the archive thawed, statuses published, lock given back", async () => {
+  // signalements classés, le thème de l'archive, l'archive défigée, les statuts publiés, le verrou rendu
+  it("goes in order: the archive's successor removed, the active one frozen, the shared part, Convex, the progress, reports settled, the archive's theme, the archive thawed, statuses published, lock given back", async () => {
     const { deps, log } = setup();
 
     expect(await reopenCanvas(deps, ownerId, reopenRequest)).toEqual({ ok: true, value: undefined });
@@ -393,11 +429,22 @@ describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
       "convex.reopen canvas-a canvas-c",
       "copyProgress canvas-a canvas-c",
       "settleReports canvas-a",
+      "setTheme canvas-c null",
       "markActive canvas-c",
       "publishStatus canvas-a archived",
       "publishStatus canvas-c active",
       "unlock",
     ]);
+  });
+
+  // La copie de Redis du canvas rouvert reprend le thème de Convex, celui que l'archive avait : il s'affiche à tous
+  it("gives the reopened canvas the theme Convex has for it in the copy in Redis, the one the archive had", async () => {
+    const { deps, log } = setup({ archives: [archiveOf("canvas-c", { theme: "Printemps" })] });
+
+    await reopenCanvas(deps, ownerId, reopenRequest);
+
+    expect(log).toContain("setTheme canvas-c Printemps");
+    expect(log.some((entry) => entry.startsWith("setTheme canvas-a"))).toBe(false);
   });
 
   // « Repartir de la progression de ce canvas » : l'archive garde la sienne, rien n'est recopié
@@ -463,6 +510,7 @@ describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
       expect(log.slice(-3)).toEqual(["markActive canvas-a", "setSuccessor canvas-c canvas-old", "unlock"]);
       expect(log.some((entry) => entry.startsWith("convex."))).toBe(false);
+      expect(log.some((entry) => entry.startsWith("setTheme"))).toBe(false);
     });
   }
 
@@ -509,14 +557,33 @@ describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
     expect(await reopenCanvas(deps, ownerId, reopenRequest)).toEqual({ ok: true, value: undefined });
 
-    expect(log.slice(-5)).toEqual([
+    expect(log.slice(-6)).toEqual([
       "settleReports canvas-a",
+      "setTheme canvas-c null",
       "markActive canvas-c",
       "publishStatus canvas-a archived",
       "publishStatus canvas-c active",
       "unlock",
     ]);
     expect(logged).toHaveBeenCalled();
+  });
+
+  // Une copie du thème qui ne s'écrit pas n'empêche ni de défiger l'archive ni d'annoncer le changement : journalisée
+  it("lets a theme that cannot be copied stop neither the archive from being thawed nor the change from being announced", async () => {
+    const { deps, log } = setup({ failsAt: "setTheme" });
+
+    expect(await reopenCanvas(deps, ownerId, reopenRequest)).toEqual({ ok: true, value: undefined });
+
+    expect(log.slice(-4)).toEqual([
+      "markActive canvas-c",
+      "publishStatus canvas-a archived",
+      "publishStatus canvas-c active",
+      "unlock",
+    ]);
+    expect(logged).toHaveBeenCalledWith(
+      "canvases : thème de l'archive rouverte non copié",
+      expect.any(Error),
+    );
   });
 });
 

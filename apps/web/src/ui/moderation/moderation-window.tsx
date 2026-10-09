@@ -23,8 +23,11 @@ export type ModeratedAuthor = InspectEntry & { userId: string };
 
 // La cible est l'auteur et la pose affichés au moment du clic, jamais la case relue : elle peut changer pendant
 // qu'on hésite. Une ligne de signalements la donne aussi (JOURNAL 2026-09-28), avec toutes ses poses si elle en a
-// plusieurs (JOURNAL 2026-10-07).
-export type ModerationTarget = Pick<ModeratedAuthor, "userId" | "displayName" | "placementId"> &
+// plusieurs (JOURNAL 2026-10-07). `moderatorOrigin` : un modérateur nommé ici ne se bannit pas (Écart §5.4, JOURNAL 2026-10-08).
+export type ModerationTarget = Pick<
+  ModeratedAuthor,
+  "userId" | "displayName" | "placementId" | "moderatorOrigin"
+> &
   Pick<ClearTarget, "placementIds">;
 
 // Qui signale n'a pas l'identifiant de l'auteur : la case inspectée et sa pose le désignent (JOURNAL 2026-09-29).

@@ -15,7 +15,7 @@ export type Thumbnail = { width: number; height: number; state: string };
 export type ListedCanvas = {
   canvasId: string;
   createdAt: Timestamp;
-  name?: string;
+  theme?: string;
   linkCode?: string;
   // Redis fait foi pour la taille : Convex garde celle de la naissance. Sans image, ni taille ni miniature.
   thumbnail: Thumbnail | null;
@@ -57,16 +57,16 @@ export async function listCanvases(
         active: active && {
           canvasId: active.canvasId,
           createdAt: active.createdAt,
-          ...(active.name ? { name: active.name } : {}),
+          ...(active.theme ? { theme: active.theme } : {}),
           ...(active.linkCode ? { linkCode: active.linkCode } : {}),
           thumbnail: activeThumbnail ?? null,
         },
-        archives: sorted.map(({ canvasId, createdAt, archivedAt, linkCode, name }, index) => ({
+        archives: sorted.map(({ canvasId, createdAt, archivedAt, linkCode, theme }, index) => ({
           canvasId,
           createdAt,
           archivedAt,
           linkCode,
-          ...(name ? { name } : {}),
+          ...(theme ? { theme } : {}),
           thumbnail: archiveThumbnails[index] ?? null,
         })),
       },

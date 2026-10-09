@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
-  ARCHIVE_NAME_MAX_LENGTH,
   AUDIENCE_DAYS,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
@@ -25,6 +24,7 @@ import {
   LINK_CODE_ALPHABET,
   LINK_CODE_LENGTH,
   MAX_ARCHIVES,
+  MINUTE_MS,
   OBS_BACKGROUND,
   OBS_BACKGROUNDS,
   OBS_DELAY_MS,
@@ -37,17 +37,20 @@ import {
   reportThreshold,
   roleFor,
   type Session,
+  STREAM_GRACE_MS,
   type StateOffset,
+  THEME_MAX_LENGTH,
   TRANSPARENT_COLOR_INDEX,
   toActivityPointStarts,
-  toArchiveName,
   toAudienceDays,
   toCell,
   toCellKey,
+  toGapMinutes,
   toParisDay,
   toSession,
   toSessionClaims,
   toStateOffset,
+  toTheme,
 } from "./index";
 
 describe("roleFor (§10.3)", () => {
@@ -432,20 +435,20 @@ describe("the archives (Écart §15, JOURNAL 2026-10-06)", () => {
     expect(isLinkCode("")).toBe(false);
   });
 
-  // Le nom d'une archive est nettoyé : sans espace en trop, sans caractère de contrôle, 40 caractères au plus
-  it("cleans an archive name: no extra spaces, no control characters, 40 characters at most", () => {
-    expect(toArchiveName("  Fête du 14  ")).toBe("Fête du 14");
-    expect(toArchiveName("Fête \n du\t14")).toBe("Fête du 14");
-    expect(toArchiveName("a".repeat(60))).toBe("a".repeat(ARCHIVE_NAME_MAX_LENGTH));
-    expect(toArchiveName(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
+  // Le thème d'un canvas est nettoyé : sans espace en trop, sans caractère de contrôle, 40 caractères au plus
+  it("cleans a theme: no extra spaces, no control characters, 40 characters at most", () => {
+    expect(toTheme("  Fête du 14  ")).toBe("Fête du 14");
+    expect(toTheme("Fête \n du\t14")).toBe("Fête du 14");
+    expect(toTheme("a".repeat(60))).toBe("a".repeat(THEME_MAX_LENGTH));
+    expect(toTheme(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
   });
 
-  // Un nom vide ne donne aucun nom, et un caractère hors du plan de base n'est jamais coupé en deux
-  it("gives no name for an empty one, and never cuts a character outside the basic plane in two", () => {
-    expect(toArchiveName("")).toBeUndefined();
-    expect(toArchiveName("   ")).toBeUndefined();
-    expect(toArchiveName("\u0000\u0007")).toBeUndefined();
-    expect(toArchiveName("🎨".repeat(41))).toBe("🎨".repeat(ARCHIVE_NAME_MAX_LENGTH));
+  // Un thème vide ne donne aucun thème, et un caractère hors du plan de base n'est jamais coupé en deux
+  it("gives no theme for an empty one, and never cuts a character outside the basic plane in two", () => {
+    expect(toTheme("")).toBeUndefined();
+    expect(toTheme("   ")).toBeUndefined();
+    expect(toTheme("\u0000\u0007")).toBeUndefined();
+    expect(toTheme("🎨".repeat(41))).toBe("🎨".repeat(THEME_MAX_LENGTH));
   });
 });
 
@@ -499,5 +502,42 @@ describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
     expect(after.some(({ day }) => day === "2026-10-25")).toBe(true);
     expect(before.at(-1)?.day).toBe("2026-03-30");
     expect(before.some(({ day }) => day === "2026-03-29")).toBe(true);
+  });
+});
+
+// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes se comble dans l'historique.
+describe("the gap of a stream (écart §5.1, JOURNAL 2026-10-08)", () => {
+  const at = (minutes: number, seconds = 0) => Date.UTC(2026, 9, 8, 12, minutes, seconds);
+
+  // La tolérance est de 5 minutes
+  it("lasts 5 minutes", () => {
+    expect(STREAM_GRACE_MS).toBe(5 * MINUTE_MS);
+  });
+
+  // Rend les minutes entières strictement entre la fin et la reprise, ni celle de la fin ni celle de la reprise
+  it("gives the whole minutes strictly between the end and the resumption, neither the end's nor the resumption's", () => {
+    expect(toGapMinutes(at(0, 30), at(3, 10))).toEqual([at(1), at(2)]);
+    expect(toGapMinutes(at(0, 59), at(4, 58))).toEqual([at(1), at(2), at(3)]);
+    expect(toGapMinutes(at(0, 0), at(4, 59))).toEqual([at(1), at(2), at(3)]);
+  });
+
+  // Ne rend rien pour une coupure qui tient dans la minute de la fin ou dans la suivante
+  it("gives nothing for a gap within the end's minute or the next one", () => {
+    expect(toGapMinutes(at(0, 10), at(0, 50))).toEqual([]);
+    expect(toGapMinutes(at(0, 50), at(1, 5))).toEqual([]);
+  });
+
+  // Ne rend rien pour une coupure de 5 minutes ou plus : elle ne se comble pas
+  it("gives nothing for a gap of 5 minutes or more", () => {
+    expect(toGapMinutes(at(0, 0), at(5, 0))).toEqual([]);
+    expect(toGapMinutes(at(0, 30), at(6, 0))).toEqual([]);
+  });
+
+  // Rend les minutes d'une coupure qui passe l'heure
+  it("gives the minutes of a gap across the hour", () => {
+    expect(toGapMinutes(Date.UTC(2026, 9, 8, 12, 58, 20), Date.UTC(2026, 9, 8, 13, 1, 5))).toEqual([
+      Date.UTC(2026, 9, 8, 12, 59),
+      Date.UTC(2026, 9, 8, 13, 0),
+    ]);
   });
 });

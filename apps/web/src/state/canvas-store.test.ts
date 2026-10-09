@@ -72,7 +72,7 @@ const setup = ({ storeOptions = {}, isWelcomed = true }: SetupOptions = {}) => {
     gauge: { ...gauge, charges: 1 },
   });
   const pixelAt = (x: number, y: number) => store.getView().pixels[toStateOffset(x, y, width)];
-  const close = () => listening.listeners?.onClose(1006);
+  const close = (code = 1006) => listening.listeners?.onClose(code);
   return {
     store,
     sent,
@@ -117,6 +117,34 @@ describe("a canvas the gateway does not know (§4.2)", () => {
     receive(welcome);
 
     expect(store.getView().lastError).toBe("rate_limited");
+  });
+});
+
+describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+  // Le canvas revient : le welcome démentit canvas_recovering, la page reprend d'elle-même
+  it("forgets canvas_recovering when a welcome comes, and goes on reconnecting until then", () => {
+    const { store, receive, close, open } = setup({ isWelcomed: false });
+    receive({ t: "error", code: "canvas_recovering" });
+    close();
+
+    expect(store.getView()).toMatchObject({ lastError: "canvas_recovering", status: "reconnecting" });
+
+    open();
+    receive(welcome);
+
+    expect(store.getView()).toMatchObject({ lastError: null, status: "live" });
+  });
+
+  // Une page qui jouait quand Redis a tout perdu reprend un snapshot entier au welcome suivant, sans erreur gardée
+  it("takes a whole snapshot again when the canvas comes back to a page that was playing", () => {
+    const { store, receive, close, open } = setup();
+    receive({ t: "error", code: "canvas_recovering" });
+    close();
+    open();
+
+    receive({ ...welcome, version: 1_000_275 });
+
+    expect(store.getView()).toMatchObject({ lastError: null, version: 1_000_275 });
   });
 });
 
@@ -257,6 +285,64 @@ describe("placeBatch (§9.2, §9.3)", () => {
 
     expect(await placing).toEqual({ ok: false, error: "unauthenticated" });
     expect(pixelAt(1, 2)).toBe(0);
+  });
+
+  // Résout en refus le lot que le gateway refuse en le nommant (§6.3 : 10 poses par seconde), rend les couleurs d'avant, redessine,
+  // et laisse la jauge et le dernier refus tels quels
+  it("settles a lot the gateway refuses by name as a refusal, gives the colors back and redraws", async () => {
+    const { store, receive, lastPlace, pixelAt } = setup();
+    let redraws = 0;
+    store.subscribe(() => {
+      redraws += 1;
+    });
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const redrawsBefore = redraws;
+    receive({ t: "error", code: "rate_limited", requestId: lastPlace().requestId });
+
+    expect(await placing).toEqual({ ok: false, error: "rate_limited" });
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(redraws).toBeGreaterThan(redrawsBefore);
+    expect(store.getView()).toMatchObject({ gauge, lastError: null });
+  });
+
+  // Ne refuse que le lot nommé : un autre lot en attente garde sa pose optimiste et sa promesse
+  it("refuses only the lot it names: another pending lot keeps its optimistic pixel and its promise", async () => {
+    const { store, receive, sent, pixelAt } = setup();
+    let isOtherSettled = false;
+
+    const refused = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const refusedFrame = sent.at(-1);
+    void store.placeBatch([{ x: 2, y: 2, colorIndex: 6 }], PLACEMENT_ID).then(() => {
+      isOtherSettled = true;
+    });
+    if (refusedFrame?.t !== "place") throw new Error("aucune frame place envoyée");
+    receive({ t: "error", code: "rate_limited", requestId: refusedFrame.requestId });
+    await refused;
+
+    expect(isOtherSettled).toBe(false);
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(pixelAt(2, 2)).toBe(6);
+  });
+
+  // Rouvre après une fermeture en 1013 (§6.3, « réessayez plus tard ») comme après toute coupure : reprise par lastVersion, lot gardé
+  it("reconnects after a 1013 close like after any drop: resumes from lastVersion and keeps the lot", async () => {
+    const { store, sent, close, open, receive, lastPlace, ackOf, pixelAt } = setup();
+    receive(cellsFrame(2, 2, 9));
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const first = lastPlace();
+
+    close(1013);
+
+    expect(store.getView().status).toBe("reconnecting");
+    expect(pixelAt(1, 2)).toBe(5);
+    open();
+    expect(sent.at(-1)).toMatchObject({ t: "hello", lastVersion: 8 });
+    receive(welcome);
+    expect(lastPlace()).toEqual(first);
+    const ack = ackOf(first);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
   });
 
   // Garde un lot parti avant une coupure, couleurs comprises, et le renvoie avec son requestId au welcome suivant
@@ -614,6 +700,40 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
     });
   });
 
+  // Prend le thème du welcome, puis celui d'une frame qui le change, puis plus aucun quand la frame n'en porte pas, sans
+  // toucher au reste des params (Écart §8.1, JOURNAL 2026-10-07)
+  it("takes the theme of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    const withoutTheme = { ...welcome, params: { ...welcome.params } };
+    if (withoutTheme.t !== "welcome") throw new Error("le welcome d'exemple n'en est pas un");
+
+    receive({ ...withoutTheme, params: { ...withoutTheme.params, theme: "Halloween" } });
+    expect(store.getView().params?.theme).toBe("Halloween");
+
+    receive({ t: "theme", theme: "Noël" });
+    expect(store.getView().params).toEqual({ ...withoutTheme.params, theme: "Noël" });
+
+    receive({ t: "theme" });
+    expect(store.getView().params).toEqual(withoutTheme.params);
+    expect(store.getView().params).not.toHaveProperty("theme");
+  });
+
+  // Une reconnexion dit le thème du moment : un welcome sans thème retire celui qu'on avait ; une frame arrivée avant le
+  // premier welcome n'a rien à changer
+  it("lets a reconnection's welcome without a theme drop the one it had, and ignores a frame before the first welcome", () => {
+    const { store, receive, close } = setup({ isWelcomed: false });
+
+    receive({ t: "theme", theme: "Trop tôt" });
+    expect(store.getView().params).toBeUndefined();
+
+    receive(welcome);
+    receive({ t: "theme", theme: "Halloween" });
+    close();
+    receive(welcome);
+
+    expect(store.getView().params).not.toHaveProperty("theme");
+  });
+
   // Prend de nouvelles bornes et la jauge qui suit, et n'envoie que les deux bornes, jamais tout `params` (JOURNAL 2026-09-30)
   it("takes new limits and the gauge that follows, and sends only the two limits, never the whole params", () => {
     const { store, sent, receive } = setup();
@@ -910,7 +1030,7 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
     const canvasPoint = {
       at: 60_000,
       people: 1,
-      obsViews: 0,
+      streamedMinutes: 0,
       pixels: 4,
       visits: 1,
       visitMinutes: 2,
@@ -1033,5 +1153,126 @@ describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
 
     close();
     expect(store.getView().scoreboard).toBeUndefined();
+  });
+});
+
+describe("the Twitch live in the canvas view (Écart §4, JOURNAL 2026-10-07)", () => {
+  const art = { category: "Art" };
+  const chatting = { category: "Just Chatting" };
+  const welcomeWith = (
+    ownerTwitchLive?: typeof art,
+    twitchLive?: typeof art,
+  ): Extract<ServerFrame, { t: "welcome" }> => ({
+    t: "welcome",
+    canvas: {
+      canvasId: "canvas-1",
+      width,
+      height: 4,
+      ownerId: "owner-1",
+      ...(ownerTwitchLive ? { ownerTwitchLive } : {}),
+    },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: [...PALETTE],
+    version: 7,
+    you: {
+      userId: "user-1",
+      login: "user1",
+      displayName: "User 1",
+      role: "viewer",
+      ...(twitchLive ? { twitchLive } : {}),
+    },
+    gauge,
+  });
+
+  // Prend du welcome le live du streamer et celui de la personne connectée, avec leur catégorie
+  it("takes from the welcome the live of the owner and of whoever is signed in, with their category", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+
+    receive(welcomeWith(art, chatting));
+
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(chatting);
+  });
+
+  // Sans live dans le welcome, personne n'est en live ; un nouveau welcome efface ce que l'ancien disait
+  it("has nobody live when the welcome says none, and a new welcome clears what the old one said", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith(art, chatting));
+
+    receive(welcomeWith());
+
+    expect(store.getView().ownerTwitchLive).toBeUndefined();
+    expect(store.getView().twitchLive).toBeUndefined();
+  });
+
+  // Suit le live annoncé : le streamer d'abord, la personne ensuite, par l'identifiant de la frame
+  it("follows an announced live, the owner's then the person's, by the id of the frame", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith());
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: art });
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toBeUndefined();
+
+    receive({ t: "twitchLive", userId: "user-1", twitchLive: chatting });
+    expect(store.getView().twitchLive).toEqual(chatting);
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: chatting });
+    expect(store.getView().ownerTwitchLive).toEqual(chatting);
+  });
+
+  // Efface le live sur une frame sans live, et ignore un compte qui n'est ni le streamer ni la personne
+  it("clears a live on a frame without one, and ignores an account that is neither the owner nor the person", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive(welcomeWith(art, chatting));
+
+    receive({ t: "twitchLive", userId: "user-9", twitchLive: { category: "Music" } });
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(chatting);
+
+    receive({ t: "twitchLive", userId: "owner-1" });
+    expect(store.getView().ownerTwitchLive).toBeUndefined();
+    expect(store.getView().twitchLive).toEqual(chatting);
+  });
+
+  // Quand le streamer est la personne connectée, un seul live le dit aux deux
+  it("tells both when the owner is the person signed in", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    receive({
+      ...welcomeWith(),
+      you: { userId: "owner-1", login: "owner1", displayName: "Owner 1", role: "owner" },
+    });
+
+    receive({ t: "twitchLive", userId: "owner-1", twitchLive: art });
+
+    expect(store.getView().ownerTwitchLive).toEqual(art);
+    expect(store.getView().twitchLive).toEqual(art);
+  });
+
+  // Garde le live de l'auteur dans l'inspection
+  it("keeps the author's live in the inspection", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+    const requestId = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+    const author = {
+      login: "user2",
+      displayName: "User 2",
+      colorIndex: 5,
+      placedAt: now,
+      placementId: "puser2001",
+      twitchLive: art,
+    };
+
+    receive({ t: "inspected", requestId, x: 1, y: 2, entry: author });
+
+    expect(store.getView().inspection).toEqual({ status: "found", x: 1, y: 2, entry: author });
   });
 });

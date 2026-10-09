@@ -12,10 +12,13 @@ import { ArchiveBanner } from "../archive/archive-banner";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { ArchivesSection } from "../archive/canvas-cards";
 import { DownloadWindow } from "../archive/download-window";
+import { CanvasRecovering } from "../canvas/canvas-recovering";
 import { CanvasSettings, ResizeWindow } from "../canvas/canvas-settings";
 import { ViewportPill } from "../canvas/viewport-pill";
 import { ClaimButton } from "../design/gauge";
 import { Palette } from "../design/palette";
+import { Profile } from "../design/profile";
+import { ThemePill } from "../design/theme-pill";
 import { SignInNote } from "../design/twitch";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { InspectionPill } from "../inspection/inspection-pill";
@@ -55,8 +58,8 @@ const accountPill = (props: Partial<Parameters<typeof AccountPill>[0]> = {}): st
     createElement(AccountPill, {
       identity: kalyss,
       signInHref: "#",
-      themeChoice: "auto",
-      onPickTheme: doNothing,
+      appearanceChoice: "auto",
+      onPickAppearance: doNothing,
       onOpenAccount: doNothing,
       ...props,
     }),
@@ -69,14 +72,24 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
 
     expect(markup).toContain('title="Settings"');
     expect(markup).toContain('title="My account · 2 reports pending"');
-    expect(markup).toContain('title="Theme: Auto"');
+    expect(markup).toContain('title="Appearance: Auto"');
     expect(markup).toContain('title="Switch to French"');
     expect(markup).toContain(">EN</span>");
     expect(accountPill({ identity: { kind: "guest" } })).toContain(">Sign in</span>");
     expect(accountPill({ identity: { kind: "guest" } })).toContain('title="Sign in with Twitch"');
   });
 
-  // La fenêtre : ses sections, Se déconnecter, le thème et la langue
+  // Qui modère sur le canvas d'un autre : Modération porte le point des signalements, la photo n'en a pas
+  it("says the Moderation button of the account pill in English, with the pending reports", () => {
+    const markup = accountPill({ onOpenModeration: doNothing, pendingReports: 2 });
+
+    expect(markup).toContain('title="Moderation · 2 reports pending"');
+    expect(markup).toContain('title="My account"');
+    expect(markup).toContain('title="Appearance: Auto"');
+    expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
+  });
+
+  // La fenêtre : ses sections, Se déconnecter, l'apparence et la langue
   it("says the sections of the window and the account section in English", () => {
     const tab = (text: string) => createElement("p", null, text);
     const markup = inEnglish(
@@ -87,8 +100,8 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
         onClose: doNothing,
         user: { displayName: "Kalyss", login: "kalyss" },
         signOutHref: "#",
-        themeChoice: "dark",
-        onPickTheme: doNothing,
+        appearanceChoice: "dark",
+        onPickAppearance: doNothing,
         canvasTab: tab("a"),
         canvasesTab: tab("b"),
         obsTab: tab("c"),
@@ -109,7 +122,7 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
       "My account",
     ]);
     expect(markup).toContain("Sign out");
-    expect(markup).toMatch(/aria-label="Theme"/);
+    expect(markup).toMatch(/aria-label="Appearance"/);
     expect(markup).toContain("Light");
     expect(markup).toContain("Dark");
     expect(markup).toMatch(/aria-label="Language"/);
@@ -145,6 +158,9 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
     expect(markup).toContain('title="Switch to Draw mode"');
     expect(markup).toContain("Too fast: try again in a moment.");
     expect(markup).not.toContain("rate_limited");
+    expect(
+      draftPill({ kind: "view", gauge: GAUGE, canClaim: false, refusal: "canvas_recovering" }),
+    ).toContain("We&#x27;re putting every pixel back in place: try again in a moment.");
   });
 
   // Le mode Dessin : ses boutons et leurs infobulles
@@ -289,6 +305,35 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
     expect(found).toMatch(/title="Placed on [^"]+"/);
   });
 
+  // Le thème du canvas en haut, le canvas en récupération, et le bouton Twitch d'un compte en live
+  it("says the theme pill, the waiting message and the live button in English", () => {
+    const theme = inEnglish(createElement(ThemePill, { theme: "Halloween", isDocked: false }));
+    const recovering = inEnglish(createElement(CanvasRecovering));
+    const live = inEnglish(
+      createElement(Profile, {
+        user: { displayName: "Kalyss", login: "kalyss", twitchLive: { category: "Art" } },
+        variant: "full",
+      }),
+    );
+    const liveWithoutCategory = inEnglish(
+      createElement(Profile, {
+        user: { displayName: "Kalyss", login: "kalyss", twitchLive: { category: "" } },
+        variant: "full",
+      }),
+    );
+
+    expect(theme).toContain(">Draw the theme</span>");
+    expect(theme).toContain(">Theme</span>");
+    expect(theme).toContain("Halloween");
+    expect(recovering).toContain(
+      "We&#x27;re putting every pixel back in place. The canvas will be back in a moment!",
+    );
+    expect(live).toContain('title="Kalyss is live on Twitch: Art"');
+    expect(live).toContain(">Art</span>");
+    expect(liveWithoutCategory).toContain('title="Kalyss is live on Twitch"');
+    expect(liveWithoutCategory).toContain(">Live</span>");
+  });
+
   // Le scoreboard : rang à l'anglaise, nombres à l'anglaise
   it("says the scoreboard with English ranks and numbers", () => {
     const rows = toScoreboardRows(
@@ -317,11 +362,11 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
 describe("the canvas settings and the archives in English (Écart §14, JOURNAL 2026-10-07)", () => {
   const current = { width: 32, height: 32 };
 
-  // Le nom, la taille, le format et la confirmation
+  // Le thème, la taille, le format et la confirmation
   it("says the Canvas section and the resize confirmation in English", () => {
     const section = inEnglish(
       createElement(CanvasSettings, {
-        name: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
+        theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
         current,
         choice: { format: "16:9", sizeIndex: 1 },
         chosen: { width: 64, height: 36 },
@@ -340,7 +385,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
       }),
     );
 
-    expect(section).toContain("Canvas name");
+    expect(section).toContain(">Theme</label>");
     expect(section).toContain("Currently 32 × 32 cells.");
     expect(section).toContain("Landscape 16:9, 64 × 36 cells. Nothing is lost");
     for (const label of ["Small", "Medium", "Large", "Change size"]) expect(section).toContain(label);

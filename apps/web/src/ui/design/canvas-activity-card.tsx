@@ -1,11 +1,10 @@
-// Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, la pastille OBS s'il est streamé,
-// ses chiffres, et, déplié, ses comptes connectés puis ses invités. Une ligne sur grand écran, une carte sur mobile.
+// Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, ses chiffres, et, déplié, ses comptes
+// connectés puis ses invités. Une ligne sur grand écran, une carte sur mobile.
 // Avatars et noms suivent la règle des profils (profile.tsx) : ils mènent au canvas de la personne.
 // Le streamer et la liste des comptes servent aussi seuls, dans la section Ce canvas (JOURNAL 2026-10-07).
 
 import type { Device } from "@liveplace/domain";
-import { ChevronDown, Monitor, MonitorPlay, Smartphone } from "lucide-react";
-import { Badge } from "./badge";
+import { ChevronDown, Monitor, Smartphone } from "lucide-react";
 import { Button } from "./button";
 import { classNames } from "./class-names";
 import { Profile, type ProfileUser } from "./profile";
@@ -19,7 +18,6 @@ export type CanvasActivityAccount = {
 
 export type CanvasActivityCardProps = {
   owner: ProfileUser;
-  obsTitle: string | null; // streamé : la pastille, et ses vues OBS en infobulle
   facts: readonly string[]; // personnes, température, nouveaux comptes
   accounts: readonly CanvasActivityAccount[];
   guestsLine: string | null; // « + 2 invités », après les comptes
@@ -42,13 +40,12 @@ const DeviceIcon = ({ device }: { device: Device }) => {
   );
 };
 
-type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner" | "obsTitle">;
+type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner">;
 
-// Le streamer d'un canvas, et sa pastille OBS s'il est streamé.
-export const CanvasActivityOwner = ({ owner, obsTitle }: CanvasActivityOwnerProps) => (
+// Le streamer d'un canvas : le bouton Twitch de son profil dit s'il est en live.
+export const CanvasActivityOwner = ({ owner }: CanvasActivityOwnerProps) => (
   <span className="lp-canvas-activity-owner">
     <Profile user={owner} />
-    {obsTitle && <Badge label="OBS" icon={MonitorPlay} title={obsTitle} />}
   </span>
 );
 
@@ -79,7 +76,6 @@ export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: Connected
 
 export const CanvasActivityCard = ({
   owner,
-  obsTitle,
   facts,
   accounts,
   guestsLine,
@@ -89,7 +85,7 @@ export const CanvasActivityCard = ({
   <article className={classNames("lp-canvas-activity", isOpen && "is-open")}>
     <div className="lp-canvas-activity-head">
       <span className="lp-canvas-activity-summary">
-        <CanvasActivityOwner owner={owner} obsTitle={obsTitle} />
+        <CanvasActivityOwner owner={owner} />
         <span className="lp-canvas-activity-facts lp-type-caption lp-muted">
           {facts.map((fact) => (
             <span key={fact}>{fact}</span>

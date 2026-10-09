@@ -151,9 +151,9 @@ if #accepted > 0 then
     redis.call("ZADD", scoreboardKey, score, userId)
   end
 
-  -- 9. Publication. MAXLEN se place avant l'ID.
+  -- 9. Publication. MAXLEN se place avant l'ID. Le champ `p` (JOURNAL 2026-10-08) dit la pose à l'historique, jamais aux clients.
   local event = cjson.encode({ version = version, kind = "place", authorId = userId, occurredAt = nowMs, cells = cells })
-  redis.call("XADD", eventsKey, "MAXLEN", "~", eventsMaxlen, version .. "-0", "e", event)
+  redis.call("XADD", eventsKey, "MAXLEN", "~", eventsMaxlen, version .. "-0", "e", event, "p", placementId)
   redis.call("PUBLISH", liveChannel, '{"e":' .. event .. "}")
 end
 

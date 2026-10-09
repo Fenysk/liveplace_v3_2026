@@ -31,6 +31,34 @@ const durableWith = (linked: LinkedCanvas | null) => {
   return { durable, lookups };
 };
 
+describe("resolveArchive, le live du propriétaire (Écart §4, JOURNAL 2026-10-07)", () => {
+  // Le bandeau d'une archive porte le live de son streamer dès le rendu serveur ; pour une archive introuvable, il n'a rien à montrer
+  it("carries the owner's live in the banner's profile, and asks for it nowhere else", async () => {
+    const asked: string[] = [];
+    const tracker = {
+      getLive: async (ownerId: string) => {
+        asked.push(ownerId);
+        return { category: "Art" };
+      },
+    };
+    const found = durableWith({ status: "archived", archive });
+    const missing = durableWith(null);
+
+    const page = await resolveArchive(found.durable, "fenysk", "3mAqXz9RbK", tracker);
+    const absent = await resolveArchive(missing.durable, "fenysk", "3mAqXz9RbK", tracker);
+
+    expect(page).toMatchObject({
+      status: "archived",
+      archive: { owner: { twitchLive: { category: "Art" } } },
+    });
+    expect(absent).toEqual({
+      status: "missing",
+      owner: expect.not.objectContaining({ twitchLive: expect.anything() }),
+    });
+    expect(asked).toEqual([owner.userId]);
+  });
+});
+
 describe("resolveArchive (Écart §10.3, JOURNAL 2026-10-06)", () => {
   // Résout un pseudo et un code en archive, avec le profil du propriétaire pour le bandeau et les dates
   it("resolves a login and a code to an archive, with the owner's profile and the dates", async () => {
@@ -48,13 +76,13 @@ describe("resolveArchive (Écart §10.3, JOURNAL 2026-10-06)", () => {
     expect(lookups).toEqual([{ ownerId: "1234", linkCode: "3mAqXz9RbK" }]);
   });
 
-  // Garde le nom d'une archive qui en a un, et cherche le pseudo en minuscules
-  it("keeps the name of an archive that has one, and looks the login up in lowercase", async () => {
-    const { durable } = durableWith({ status: "archived", archive: { ...archive, name: "Printemps" } });
+  // Garde le thème d'une archive qui en a un, et cherche le pseudo en minuscules
+  it("keeps the theme of an archive that has one, and looks the login up in lowercase", async () => {
+    const { durable } = durableWith({ status: "archived", archive: { ...archive, theme: "Printemps" } });
 
     expect(await resolveArchive(durable, "Fenysk", "3mAqXz9RbK")).toMatchObject({
       status: "archived",
-      archive: { name: "Printemps" },
+      archive: { theme: "Printemps" },
     });
   });
 

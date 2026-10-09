@@ -6,8 +6,8 @@ import type { TwitchChannel, TwitchEventSub, TwitchWrites } from "@liveplace/dom
 import { type SignInDeps, type SignInResult, signInTwitchUser } from "./sign-in";
 
 export type TwitchSyncDeps = SignInDeps & {
-  twitchWrites: TwitchWrites;
-  eventSub: TwitchEventSub;
+  twitchWrites: Pick<TwitchWrites, "setTwitchUsers" | "queueTwitchCommands" | "setTwitchSync">;
+  eventSub: Pick<TwitchEventSub, "subscribeToModeration">;
   now: () => Timestamp;
 };
 

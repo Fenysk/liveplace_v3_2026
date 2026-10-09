@@ -2,11 +2,12 @@
 
 import { toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
-import { Brush, Eraser, LogOut, Trash, X } from "lucide-react";
+import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { pngBackgroundOptions } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
+import { AppearanceButton, AppearancePicker } from "../design/appearance-controls";
 import { Badge } from "../design/badge";
 import { Button, type ButtonProps } from "../design/button";
 import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../design/canvas-activity-card";
@@ -19,16 +20,15 @@ import { LocaleButton, LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
-import { Avatar, AvatarButton, Profile, type ProfileVariant } from "../design/profile";
+import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
 import { SaturationFigure } from "../design/saturation-figure";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import { TextField } from "../design/text-field";
-import { ThemeButton, ThemePicker } from "../design/theme-controls";
 import { TimeCharts } from "../design/time-charts";
 import { TwitchGlyph } from "../design/twitch";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import {
   AUDIENCE_COLUMNS,
   toActivityAccounts,
@@ -36,7 +36,6 @@ import {
   toCanvasActivityCard,
   toCanvasAudienceRows,
   toGuestsLine,
-  toObsTitle,
 } from "../developer/activity-labels";
 import {
   canvasChartLinesFor,
@@ -106,12 +105,52 @@ const PROFILE_USERS = [
 ];
 const PROFILE_VARIANTS: readonly ProfileVariant[] = ["avatar", "name", "full"];
 
+// Écart §4 (JOURNAL 2026-10-07) : le bouton Twitch d'un compte en live, dans chacun de ses états.
+const PROFILE_LIVE_STATES: readonly {
+  name: string;
+  detail: string;
+  user: ProfileUser;
+  variant: ProfileVariant;
+}[] = [
+  {
+    name: "Hors live",
+    detail: "Le bouton fantôme avec le logo.",
+    user: SAMPLE_OWNER,
+    variant: "full",
+  },
+  {
+    name: "En live",
+    detail: "Le bouton se teinte, le logo prend un rond et cligne des yeux, la catégorie du stream s'écrit.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Art" } },
+    variant: "full",
+  },
+  {
+    name: "En live, sans catégorie",
+    detail: "Le texte « En live ».",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "" } },
+    variant: "full",
+  },
+  {
+    name: "Catégorie longue",
+    detail:
+      "Coupée par « … » à 170 px, 64 px sur mobile ; dans la pill Canvas, elle prend toute la place qui reste.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Software and Game Development" } },
+    variant: "full",
+  },
+  {
+    name: "Compact, en live",
+    detail: "Sur mobile, sans logo hors live : en live, le bouton paraît quand même.",
+    user: { ...SAMPLE_OWNER, twitchLive: { category: "Just Chatting" } },
+    variant: "name",
+  },
+];
+
 export const ProfileEntry = () => (
   <Entry
     slug="avatar-et-profil"
     components={["Avatar", "Profile", "AvatarButton"]}
     file="ui/design/profile.tsx"
-    note="L'avatar et le nom mènent au canvas ; seule l'icône Twitch mène à la chaîne."
+    note="L'avatar et le nom mènent au canvas ; seul le bouton Twitch mène à la chaîne, et il dit quand la personne est en live."
   >
     <Block title="Avatar">
       {PROFILE_USERS.map(({ name, detail, user }) => (
@@ -125,6 +164,18 @@ export const ProfileEntry = () => (
         <StateRow key={variant} name={variant}>
           <Pill>
             <Profile user={SAMPLE_OWNER} variant={variant} />
+          </Pill>
+        </StateRow>
+      ))}
+    </Block>
+    <Block
+      title="Bouton Twitch"
+      note="Seules les personnes qui ont un compte LivePlace ont un statut. L'infobulle dit : « Kalyss est en live sur Twitch : Art »."
+    >
+      {PROFILE_LIVE_STATES.map(({ name, detail, user, variant }) => (
+        <StateRow key={name} name={name} detail={detail}>
+          <Pill>
+            <Profile user={user} variant={variant} />
           </Pill>
         </StateRow>
       ))}
@@ -187,6 +238,10 @@ const ICON_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
     },
   },
   { name: "Fermer", props: { icon: X, variant: "ghost", title: "Fermer (Échap)", onPress: noop } },
+  {
+    name: "Quelque chose attend",
+    props: { icon: Shield, variant: "ghost", title: "Modération", hasDot: true, onPress: noop },
+  },
 ];
 
 export const ButtonEntry = () => (
@@ -239,7 +294,11 @@ const ActivityCardScene = ({
 const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
 
 // Écart §14 (JOURNAL 2026-10-07) : les exemples de /design gardent le français de la page.
-const { namePlaceholder: NAME_PLACEHOLDER, progressLabel: PROGRESS_LABEL } = ARCHIVE_TEXTS.fr;
+const {
+  themeLabel: THEME_LABEL,
+  themePlaceholder: THEME_PLACEHOLDER,
+  progressLabel: PROGRESS_LABEL,
+} = ARCHIVE_TEXTS.fr;
 const PNG_BACKGROUND_OPTIONS = pngBackgroundOptions(DESIGN_TEXTS.fr.backgroundNames);
 
 export const ActivityCardEntry = () => {
@@ -256,7 +315,10 @@ export const ActivityCardEntry = () => {
     >
       <Block title="Carte">
         {kalyss && (
-          <StateRow name="Streamé, déplié" detail="Rôles, depuis quand, PC ou téléphone, puis les invités.">
+          <StateRow
+            name="Streamé, déplié"
+            detail="Le bouton Twitch de son streamer, en live ; rôles, depuis quand, PC ou téléphone, puis les invités."
+          >
             <ActivityCardScene canvas={kalyss} nowMs={nowMs} isOpen />
           </StateRow>
         )}
@@ -278,16 +340,11 @@ export const ActivityCardEntry = () => {
       </Block>
       <Block
         title="Streamer"
-        note="Le streamer d'un canvas, et sa pastille OBS quand il est streamé : en tête de Ce canvas, et dans chaque carte."
+        note="Le streamer d'un canvas : en tête de Ce canvas, et dans chaque carte. Le bouton Twitch de son profil dit s'il est en live."
       >
-        <StateRow name="Streamé" detail="La pastille, ses vues OBS en infobulle.">
+        <StateRow name="Streamer">
           <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(here.obsViews)} />
-          </Pill>
-        </StateRow>
-        <StateRow name="Pas streamé" detail="Aucune pastille.">
-          <Pill>
-            <CanvasActivityOwner owner={here.owner} obsTitle={toObsTitle(0)} />
+            <CanvasActivityOwner owner={here.owner} />
           </Pill>
         </StateRow>
       </Block>
@@ -334,16 +391,16 @@ export const FieldsEntry = () => (
     note="Un curseur à crans fixes, une case à cocher, et une valeur à copier : tout le champ est le bouton."
   >
     <Block title="Champ de texte">
-      <StateRow name="Champ de texte" detail="Le nom facultatif d'une archive.">
+      <StateRow name="Champ de texte" detail="Le thème facultatif d'un canvas.">
         <InSmallWindow>
           <WithValue initial="">
-            {(name, setName) => (
+            {(theme, setTheme) => (
               <TextField
-                label="Nom de l'archive (facultatif)"
-                placeholder={NAME_PLACEHOLDER}
-                value={name}
+                label={THEME_LABEL}
+                placeholder={THEME_PLACEHOLDER}
+                value={theme}
                 maxLength={40}
-                onInput={setName}
+                onInput={setTheme}
               />
             )}
           </WithValue>
@@ -351,7 +408,7 @@ export const FieldsEntry = () => (
       </StateRow>
       <StateRow name="Champ de texte désactivé">
         <InSmallWindow>
-          <TextField label="Nom de l'archive (facultatif)" value="Printemps" onInput={noop} isDisabled />
+          <TextField label={THEME_LABEL} value="Printemps" onInput={noop} isDisabled />
         </InSmallWindow>
       </StateRow>
     </Block>
@@ -577,20 +634,20 @@ export const StatTilesEntry = () => {
 };
 
 export const ChoicesEntry = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="choix"
       components={[
         "ChoiceList",
-        "ThemePicker",
-        "ThemeButton",
+        "AppearancePicker",
+        "AppearanceButton",
         "LocalePicker",
         "LocaleButton",
         "SwatchChoice",
       ]}
-      file="ui/design/{choice-list,theme-controls,locale-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton de thème fait le cycle auto, clair, sombre ; celui de langue bascule entre le français et l'anglais."
+      file="ui/design/{choice-list,appearance-controls,locale-controls,palette}.tsx"
+      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; celui de langue bascule entre le français et l'anglais."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -619,12 +676,12 @@ export const ChoicesEntry = () => {
           </InSmallWindow>
         </StateRow>
       </Block>
-      <Block title="Thème">
-        <StateRow name="Thème, comme dans Mon compte">
-          <ThemePicker choice={themeChoice} onPick={pickTheme} />
+      <Block title="Apparence">
+        <StateRow name="Apparence, comme dans Mon compte">
+          <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
-        <StateRow name="Thème, comme dans la pill Compte">
-          <ThemeButton choice={themeChoice} onPick={pickTheme} />
+        <StateRow name="Apparence, comme dans la pill Compte">
+          <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
       </Block>
       <Block title="Langue">

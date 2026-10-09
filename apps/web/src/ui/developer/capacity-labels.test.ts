@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatBitRate,
   formatBytes,
+  formatDuration,
   formatMilliseconds,
   formatRate,
   toCapacityLinks,
@@ -80,6 +81,15 @@ describe("the numbers of the capacity section, in French (JOURNAL 2026-10-07)", 
     expect(formatMilliseconds(0)).toBe("0\u00a0ms");
   });
 
+  // Dit un retard en minutes et secondes entières, sans zéro de trop
+  it("says a delay in whole minutes and seconds, with no useless zero", () => {
+    expect(formatDuration(0)).toBe("0\u00a0s");
+    expect(formatDuration(45)).toBe("45\u00a0s");
+    expect(formatDuration(270)).toBe("4\u00a0min\u00a030\u00a0s");
+    expect(formatDuration(900)).toBe("15\u00a0min");
+    expect(formatDuration(59.6)).toBe("1\u00a0min");
+  });
+
   // Dit un taux au dixième sous 10 %, entier au-dessus, jamais arrondi vers le haut : l'affichage et la couleur s'accordent
   it("says a ratio to the tenth under 10 %, whole above, never rounded up: the display and the color agree", () => {
     expect(formatRate(0.4)).toBe("0,4\u00a0%");
@@ -95,7 +105,7 @@ describe("the value of a resource, in its unit (JOURNAL 2026-10-07)", () => {
   it("says each value against its ceiling, in the unit of the resource", () => {
     const texts = [
       measured("redisMemory", "bytes", 333_447_168, 536_870_912, 62.1),
-      measured("gatewayDelay", "milliseconds", 140, 250, 56),
+      measured("gatewayDelay", "milliseconds", 40, 100, 40),
       measured("gatewayConnections", "connections", 410, 1750, 23.4),
       measured("gatewayOutbound", "bitsPerSecond", 9_000_000, 200_000_000, 4.5),
       measured("gatewayUtilization", "percent", 40, 100, 40),
@@ -104,11 +114,13 @@ describe("the value of a resource, in its unit (JOURNAL 2026-10-07)", () => {
       measured("convexCalls", "calls", 55_000, 1_000_000, 5.5),
       measured("convexDatabaseIo", "gigabytes", 0.35, 1, 35),
       measured("convexCompute", "gigabyteHours", 17.8, 20, 89),
+      measured("convexFiles", "bytes", 327_155_712, 1_073_741_824, 30.5),
+      measured("snapshotDelay", "seconds", 270, 900, 30),
     ].map(toResourceText);
 
     expect(texts).toEqual([
       "318\u00a0Mo sur 512\u00a0Mo",
-      "140\u00a0ms sur 250\u00a0ms",
+      "40\u00a0ms sur 100\u00a0ms",
       "410 sur 1\u202f750",
       "9\u00a0Mbit/s sur 200\u00a0Mbit/s",
       "40\u00a0%",
@@ -117,6 +129,8 @@ describe("the value of a resource, in its unit (JOURNAL 2026-10-07)", () => {
       "55\u202f000 sur 1\u00a0M",
       "0,35\u00a0Go sur 1\u00a0Go",
       "17,8\u00a0Go-heures sur 20\u00a0Go-heures",
+      "312\u00a0Mo sur 1\u00a0Go",
+      "4\u00a0min\u00a030\u00a0s sur 15\u00a0min",
     ]);
   });
 
@@ -219,7 +233,7 @@ describe("the saturation at the head of the section (JOURNAL 2026-10-07)", () =>
 describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
   const resources: Resource[] = [
     measured("redisMemory", "bytes", 333_447_168, 536_870_912, 62.1),
-    measured("gatewayDelay", "milliseconds", 140, 250, 56),
+    measured("gatewayDelay", "milliseconds", 40, 100, 40),
     without("webUtilization", "withoutNews", "web"),
     measured("machineDisk", "bytes", 1_743_074_131_968, 1_999_540_056_064, 87.2),
     measured("convexCalls", "calls", 930_000, 1_000_000, 93, {
@@ -238,7 +252,7 @@ describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
     expect(groups.map(({ title }) => title)).toEqual(["Redis", "Gateway", "Web", "VPS", "Convex"]);
     expect(groups.map(({ rows }) => rows.map(({ name }) => name))).toEqual([
       ["Mémoire"],
-      ["Délai de diffusion"],
+      ["Retard de diffusion"],
       ["Occupation"],
       ["Disque"],
       ["Appels de fonctions", "Données sortantes"],
@@ -267,11 +281,47 @@ describe("the groups of resources, by link (JOURNAL 2026-10-07)", () => {
     expect(egress?.note).toBe("projection fin octobre");
   });
 
-  // Le délai de diffusion dit pour combien de poses il compte
-  it("tells the broadcast delay for how many poses it counts", () => {
+  // Les deux lignes de la sauvegarde (JOURNAL 2026-10-08) : leur nom, ce qu'elles comptent, et pas de projection de fin de mois
+  it("names the file stock and the snapshot delay in the Convex group, with what they count and no projection", () => {
+    const [files, delay] =
+      toCapacityLinks(
+        [
+          measured("convexFiles", "bytes", 327_155_712, 1_073_741_824, 30.5, {
+            deployments: ["dev-deployment"],
+          }),
+          measured("snapshotDelay", "seconds", 270, 900, 30),
+        ],
+        nowMs,
+      ).at(-1)?.rows ?? [];
+
+    expect(files).toMatchObject({
+      id: "convexFiles",
+      name: "Stockage des fichiers",
+      note: "sauvegardes et historique",
+    });
+    expect(delay).toMatchObject({
+      id: "snapshotDelay",
+      name: "Sauvegarde",
+      note: "âge de la plus ancienne modification non sauvegardée",
+    });
+  });
+
+  // La saturation les nomme avec leur maillon : « Convex, stockage des fichiers », « Convex, sauvegarde »
+  it("names them with their link in the saturation: Convex, file stock and Convex, snapshot", () => {
+    const view = (resource: Resource["id"], percent: number) =>
+      toSaturationView({ percent, resource, isIncomplete: false }, [
+        measured(resource, "bytes", 1, 1, percent),
+      ]).caption;
+
+    expect(view("convexFiles", 90)).toBe("Convex, stockage des fichiers · proche");
+    expect(view("snapshotDelay", 60)).toBe("Convex, sauvegarde · à surveiller");
+  });
+
+  // Le retard de diffusion dit au-delà de quoi il compte, et pour combien de poses
+  it("tells the broadcast lateness beyond what it counts, and for how many poses", () => {
     const [delay] = toCapacityLinks(resources, nowMs)[1]?.rows ?? [];
 
-    expect(delay?.note).toBe("pour 99 % des poses");
+    expect(delay?.note).toBe("au-delà du tick, pour 99 % des poses");
   });
 
   // Laisse sans légende une ressource sans nouvelles, et ne montre aucun groupe sans ressource

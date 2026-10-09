@@ -24,6 +24,7 @@ import type {
   PlacementRange,
   ReportedPlacement,
   Transport,
+  TwitchLive,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import {
@@ -93,6 +94,9 @@ export type CanvasView = {
   login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
   avatarUrl?: string; // absente pour un invité, ou d'une session d'avant la photo (JOURNAL 2026-09-24)
+  // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, et celui de la personne connectée. Absent : hors live.
+  ownerTwitchLive?: TwitchLive | undefined;
+  twitchLive?: TwitchLive | undefined;
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
@@ -192,6 +196,15 @@ const toModeratorList = (reply: ReplyFrame): ModeratorList | undefined =>
 // Écart §15 (JOURNAL 2026-10-06) : ce que dit la frame `canvasStatus` du canvas ouvert.
 const toStatusView = (status: CanvasStatus): Partial<CanvasView> =>
   status === "discarded" ? { isDiscarded: true } : { isArchived: status === "archived", isDiscarded: false };
+
+// Écart §4 (JOURNAL 2026-10-07) : le gateway n'envoie que le live du streamer et celui de cette personne ; la frame sans live l'efface.
+const toTwitchLiveView = (
+  { ownerId, userId }: Pick<CanvasView, "ownerId" | "userId">,
+  frame: Extract<ServerFrame, { t: "twitchLive" }>,
+): Partial<CanvasView> => ({
+  ...(frame.userId === ownerId ? { ownerTwitchLive: frame.twitchLive } : {}),
+  ...(frame.userId === userId ? { twitchLive: frame.twitchLive } : {}),
+});
 
 export function createCanvasStore(
   canvasId: string,
@@ -343,6 +356,8 @@ export function createCanvasStore(
       version: frame.version,
       role,
       isArchived: frame.canvas.archivedAt !== undefined,
+      ownerTwitchLive: frame.canvas.ownerTwitchLive,
+      twitchLive: frame.you.twitchLive,
       params: frame.params,
       gauge: frame.gauge ?? null,
       ...(userId ? { userId } : {}),
@@ -356,8 +371,9 @@ export function createCanvasStore(
 
   const welcome = (frame: WelcomeFrame): void => {
     heldRecent = frame.recent ?? null;
-    // Le canvas existe : un `welcome` démentit `canvas_not_found`, les autres refus restent.
-    publish({ ...welcomeView(frame), ...(view.lastError === "canvas_not_found" ? { lastError: null } : {}) });
+    // Le canvas existe : un `welcome` démentit `canvas_not_found` et `canvas_recovering`, les autres refus restent.
+    const isDisproved = view.lastError === "canvas_not_found" || view.lastError === "canvas_recovering";
+    publish({ ...welcomeView(frame), ...(isDisproved ? { lastError: null } : {}) });
     if (hasWelcomed) {
       resendPending();
       // Pendant la coupure, rien n'a dit ce qui a bougé.
@@ -394,8 +410,15 @@ export function createCanvasStore(
     publish({ isArchived: true });
   };
 
-  // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle.
+  // §4.3 : une `error` qui nomme sa requête ne concerne qu'elle. Un lot refusé (§6.3 : dix poses par seconde) rend ses
+  // pixels, comme sans ack : la page se redessine.
   const refuseRequest = (requestId: string, code: ErrorCode): void => {
+    const batch = pending.get(requestId);
+    if (batch) {
+      settle(requestId, batch, { ok: false, error: code });
+      publish({});
+      return;
+    }
     if (requestId === inspectRequestId) {
       inspectRequestId = null;
       publish({ inspection: previousInspection });
@@ -412,6 +435,13 @@ export function createCanvasStore(
     ...change
   }: Extract<ServerFrame, { t: "obsDelay" | "obsBackground" | "gaugeLimits" }>): void => {
     if (view.params) publish({ params: { ...view.params, ...change } });
+  };
+
+  // Écart §8.1 (JOURNAL 2026-10-07) : sans `theme`, le canvas n'en a plus ; le reste de `params` ne bouge pas.
+  const takeTheme = ({ theme }: Extract<ServerFrame, { t: "theme" }>): void => {
+    if (!view.params) return;
+    const { theme: previous, ...rest } = view.params;
+    publish({ params: theme === undefined ? rest : { ...rest, theme } });
   };
 
   const onInspected = (frame: Extract<ServerFrame, { t: "inspected" }>): void => {
@@ -481,8 +511,14 @@ export function createCanvasStore(
       case "gaugeLimits":
         takeSetting(frame);
         break;
+      case "theme":
+        takeTheme(frame);
+        break;
       case "canvasStatus":
         publish(toStatusView(frame.status));
+        break;
+      case "twitchLive":
+        publish(toTwitchLiveView(view, frame));
         break;
       case "error":
         if (frame.code === "canvas_archived") archive();

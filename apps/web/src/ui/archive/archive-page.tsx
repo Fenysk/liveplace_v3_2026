@@ -12,7 +12,9 @@ import { AccountWindow } from "../account/account-window";
 import { useAccountPillProps } from "../account/use-account-pill";
 import { useSigningIn } from "../account/use-signing-in";
 import { useIsCanvasMissing } from "../canvas/canvas-missing";
+import { CanvasRecovering, useIsCanvasRecovering } from "../canvas/canvas-recovering";
 import { useIsCanvasDiscarded, useIsCanvasReopened } from "../canvas/canvas-status";
+import { useOwnerProfile } from "../canvas/owner-profile";
 import { PixelCanvas } from "../canvas/pixel-canvas";
 import { ToastProvider, useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
@@ -59,8 +61,8 @@ const ArchiveAccount = ({
           onClose={() => setIsOpen(false)}
           user={account.identity.user}
           signOutHref={signOutHref}
-          themeChoice={account.themeChoice}
-          onPickTheme={account.onPickTheme}
+          appearanceChoice={account.appearanceChoice}
+          onPickAppearance={account.onPickAppearance}
         />
       )}
       <InspectionPill {...inspection} />
@@ -78,7 +80,8 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   const [isDownloading, setIsDownloading] = useState(false);
   const [isChoosing, setIsChoosing] = useState(false);
   const [background, setBackground] = useState<PngBackground | null>(null);
-  const { owner, createdAt, archivedAt, name } = archive;
+  const { owner, createdAt, archivedAt, theme } = archive;
+  const ownerProfile = useOwnerProfile(stores?.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
 
   // Le dessin visible, case par case : le même que celui de la page, agrandi sans lissage, sur le fond choisi.
   const download = async (choice: PngBackground): Promise<void> => {
@@ -113,9 +116,9 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   return (
     <>
       <ArchiveBanner
-        owner={owner}
-        title={bannerTitle({ displayName: owner.displayName, name }, locale)}
-        caption={bannerCaption({ displayName: owner.displayName, name, createdAt, archivedAt }, locale)}
+        owner={ownerProfile}
+        title={bannerTitle({ displayName: owner.displayName, theme }, locale)}
+        caption={bannerCaption({ displayName: owner.displayName, theme, createdAt, archivedAt }, locale)}
         isDownloading={isDownloading || !stores}
         onCopyLink={() => copyLink(window.location.pathname)}
         onDownload={openChoice}
@@ -143,6 +146,7 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const navigate = useNavigate();
   const isMissing = useIsCanvasMissing(stores?.canvas);
+  const isRecovering = useIsCanvasRecovering(stores?.canvas);
   const isDiscarded = useIsCanvasDiscarded(stores?.canvas);
   const isReopened = useIsCanvasReopened(stores?.canvas);
 
@@ -162,6 +166,8 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
     if (isReopened) void navigate({ to: "/$login", params: { login: owner.login } });
   }, [isReopened, navigate, owner.login]);
 
+  // Redis remet cette archive en place (Écart §4.2, JOURNAL 2026-10-08) : le même message, la page reprend seule.
+  if (isRecovering) return <CanvasRecovering />;
   if (isMissing || isDiscarded)
     return <ArchiveNotFound login={owner.login} displayName={owner.displayName} />;
 

@@ -1,14 +1,15 @@
-// La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas), le thème et
-// la langue, puis sa photo (Mon compte) ou Se connecter. Avec Développeur ou Réglages, le thème et la langue passent à
-// droite de la photo (Écart §14, JOURNAL 2026-10-07). Sur son canvas, c'est la seule pill du streamer.
+// La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas) ou
+// Modération (qui modère sans être le streamer), l'apparence et la langue, puis sa photo (Mon compte) ou Se connecter.
+// Avec Développeur, Réglages ou Modération, l'apparence et la langue passent à droite de la photo (Écart §14,
+// JOURNAL 2026-10-07). Sur son canvas, c'est la seule pill du streamer.
 
-import { Activity, Settings } from "lucide-react";
+import { Activity, Settings, Shield } from "lucide-react";
+import type { AppearanceChoice } from "../design/appearance";
+import { AppearanceButton } from "../design/appearance-controls";
 import { Button } from "../design/button";
 import { LocaleButton } from "../design/locale-controls";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
-import type { ThemeChoice } from "../design/theme";
-import { ThemeButton } from "../design/theme-controls";
 import { SignInButton } from "../design/twitch";
 import { useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -25,12 +26,13 @@ export type AccountIdentity =
 export type AccountPillProps = {
   identity: AccountIdentity;
   signInHref: string;
-  themeChoice: ThemeChoice;
-  onPickTheme: (choice: ThemeChoice) => void;
-  onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent
+  appearanceChoice: AppearanceChoice;
+  onPickAppearance: (choice: AppearanceChoice) => void;
+  onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent (sauf au modérateur)
   onOpenSettings?: (() => void) | undefined; // la fenêtre, sur Canvas ; absent : pas le streamer sur son canvas
+  onOpenModeration?: (() => void) | undefined; // la fenêtre, sur Modération ; absent : pas modérateur sans être le streamer
   onOpenDeveloper?: (() => void) | undefined; // écart §10.3 (JOURNAL 2026-10-06) : la fenêtre Développeur, pour lui seul
-  pendingReports?: number; // pour qui modère : un point sur sa photo tant qu'il y en a (JOURNAL 2026-09-28)
+  pendingReports?: number; // pour qui modère : un point tant qu'il y en a, sur Modération s'il l'a, sinon sur sa photo (JOURNAL 2026-09-28)
   onSignIn?: () => void; // la page part chez Twitch
   isCompact?: boolean;
   isDocked?: boolean;
@@ -40,10 +42,11 @@ export type AccountPillProps = {
 export const AccountPill = ({
   identity,
   signInHref,
-  themeChoice,
-  onPickTheme,
+  appearanceChoice,
+  onPickAppearance,
   onOpenAccount,
   onOpenSettings,
+  onOpenModeration,
   onOpenDeveloper,
   pendingReports = 0,
   onSignIn,
@@ -53,13 +56,18 @@ export const AccountPill = ({
 }: AccountPillProps) => {
   const preferences = (
     <>
-      <ThemeButton choice={themeChoice} onPick={onPickTheme} />
+      <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />
       <LocaleButton />
     </>
   );
   const t = useTexts(ACCOUNT_TEXTS);
   const moderation = useTexts(MODERATION_TEXTS);
-  const hasLeftIcons = Boolean(onOpenDeveloper || onOpenSettings);
+  const titleWithReports = (title: string, reports: number): string =>
+    reports > 0 ? t.withPending(title, moderation.reportCount(reports)) : title;
+  const hasLeftIcons = Boolean(onOpenDeveloper || onOpenSettings || onOpenModeration);
+  // Le point suit le bouton qui mène aux signalements : Modération pour le modérateur, sinon la photo (une seule pastille).
+  const moderationReports = onOpenModeration ? pendingReports : 0;
+  const avatarReports = onOpenModeration ? 0 : pendingReports;
   return (
     <Pill dock={isDocked ? DOCK : undefined} isVisible={isVisible}>
       {onOpenDeveloper && (
@@ -67,6 +75,15 @@ export const AccountPill = ({
       )}
       {onOpenSettings && (
         <Button icon={Settings} variant="ghost" title={t.settings} onPress={onOpenSettings} />
+      )}
+      {onOpenModeration && (
+        <Button
+          icon={Shield}
+          variant="ghost"
+          title={titleWithReports(t.moderation, moderationReports)}
+          hasDot={moderationReports > 0}
+          onPress={onOpenModeration}
+        />
       )}
       {!hasLeftIcons && preferences}
       {identity.kind === "guest" &&
@@ -79,10 +96,8 @@ export const AccountPill = ({
       {identity.kind === "signedIn" && (
         <AvatarButton
           user={identity.user}
-          title={
-            pendingReports > 0 ? t.myAccountPending(moderation.reportCount(pendingReports)) : t.myAccount
-          }
-          hasDot={pendingReports > 0}
+          title={titleWithReports(t.myAccount, avatarReports)}
+          hasDot={avatarReports > 0}
           onPress={onOpenAccount}
         />
       )}

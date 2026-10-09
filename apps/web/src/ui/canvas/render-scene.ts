@@ -8,7 +8,7 @@ import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "../../state/canvas-store";
 import type { Cell, Size, Viewport } from "./viewport";
 
-// Les teintes du canvas, lues dans les tokens du thème (tokens.css) : aucune n'est écrite ici.
+// Les teintes du canvas, lues dans les tokens de l'apparence (tokens.css) : aucune n'est écrite ici.
 export type SceneShades = {
   void: string; // le fond sous une case gommée du brouillon : pas de damier (CDC 2026)
   border: string;

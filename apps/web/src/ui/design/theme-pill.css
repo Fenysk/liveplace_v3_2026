@@ -1,0 +1,68 @@
+/* La pill Thème (Écart §8.1, JOURNAL 2026-10-07) : un petit texte discret, le thème dessous, gros, au centre. Le thème
+   se coupe par « … » plutôt que d'élargir la pill (pill.css : `.lp-pill--title`). */
+
+.lp-theme {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+}
+
+.lp-theme-narrow {
+  display: none;
+}
+
+.lp-theme-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Au PC, le petit texte et le thème restent les deux rangées de la grille */
+.lp-theme-line {
+  display: contents;
+}
+
+/* Écran étroit ou tactile : la bande (pill.css). « Thème » en petit juste devant le premier mot du thème, dans le même
+   flux de texte, l'ensemble centré, à la taille « title » et sur deux lignes au plus, coupé par « … » au-delà (Écart §8.1,
+   JOURNAL 2026-10-08). Le `line-clamp` tient au seul bloc que contient la boîte : un petit texte et un thème frères dans
+   elle seraient deux lignes de la boîte, pas un flux. */
+@media (max-width: 640px), (pointer: coarse) {
+  .lp-theme {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: var(--type-title-size);
+    line-height: var(--type-title-line);
+  }
+
+  .lp-theme-line {
+    display: block;
+  }
+
+  .lp-theme-wide {
+    display: none;
+  }
+
+  .lp-theme-narrow {
+    display: inline;
+  }
+
+  .lp-theme-caption {
+    margin-inline-end: var(--space-2);
+  }
+
+  .lp-theme .lp-theme-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    font-size: var(--type-title-size);
+    line-height: var(--type-title-line);
+    font-weight: var(--type-title-weight);
+  }
+}

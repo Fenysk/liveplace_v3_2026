@@ -15,7 +15,14 @@ import type { LiveMessage, Placement, TwitchCommand } from "@liveplace/domain/po
 import type { Event } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
 import { createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
-import { buildCanvasKeys, HIST_DEPTH, TWITCH_COMMANDS_KEY, userKey } from "./keys";
+import {
+  buildCanvasKeys,
+  HIST_DEPTH,
+  TWITCH_COMMANDS_KEY,
+  TWITCH_MESSAGE_TTL_SECONDS,
+  twitchMessageKey,
+  userKey,
+} from "./keys";
 import { createRedisHarness } from "./test-harness";
 
 const harness = createRedisHarness();
@@ -58,6 +65,59 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
     reader.disconnect();
     await redis.del(TWITCH_COMMANDS_KEY);
   });
+
+  // Une action gardée sans acquit (canvas en récupération) est relue au redémarrage, une fois : elle ne bloque pas les nouvelles
+  it("hands back an unacknowledged command once at start-up, then goes on to the new ones", async () => {
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const reader = redis.duplicate();
+    const waiting: TwitchCommand = { kind: "ban", canvasId: "canvas-1", userId: "troll" };
+    const fresh: TwitchCommand = { kind: "unban", canvasId: "canvas-1", userId: "troll" };
+    await createTwitchWrites(redis).queueTwitchCommands([waiting]);
+    await createTwitchCommandQueue(reader).listTwitchCommands(100);
+    const restarted = createTwitchCommandQueue(reader);
+
+    const again = await restarted.listTwitchCommands(100);
+    await createTwitchWrites(redis).queueTwitchCommands([fresh]);
+    const next = await restarted.listTwitchCommands(100);
+
+    expect(again.map((entry) => entry.command)).toEqual([waiting]);
+    expect(next.map((entry) => entry.command)).toEqual([fresh]);
+    reader.disconnect();
+    await redis.del(TWITCH_COMMANDS_KEY);
+  });
+
+  // Le flux disparaît pendant que le gateway l'attend : la lecture qui bloquait n'échoue pas, elle reprend sur un groupe neuf
+  it("goes on when the stream is deleted while the gateway is waiting on it", async () => {
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const reader = redis.duplicate();
+    const queue = createTwitchCommandQueue(reader);
+    await queue.listTwitchCommands(50);
+
+    const waiting = queue.listTwitchCommands(600);
+    await delay(100);
+    await redis.del(TWITCH_COMMANDS_KEY);
+
+    await expect(waiting).resolves.toEqual([]);
+    reader.disconnect();
+    await redis.del(TWITCH_COMMANDS_KEY);
+  });
+
+  // Une perte totale de Redis emporte le flux et son groupe : la file refait le groupe et rend les actions suivantes, sans lever
+  it("makes its group again after a total loss of Redis, and hands the next commands", async () => {
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const reader = redis.duplicate();
+    const queue = createTwitchCommandQueue(reader);
+    await queue.listTwitchCommands(50);
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const command: TwitchCommand = { kind: "ban", canvasId: "canvas-1", userId: "troll" };
+    await createTwitchWrites(redis).queueTwitchCommands([command]);
+
+    const handed = await queue.listTwitchCommands(100);
+
+    expect(handed.map((entry) => entry.command)).toEqual([command]);
+    reader.disconnect();
+    await redis.del(TWITCH_COMMANDS_KEY);
+  });
 });
 
 describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
@@ -83,6 +143,32 @@ describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
 
     expect(await core.getTwitchSync(synced)).toEqual({ status: "ok", syncedAt: 5678 });
     expect(await core.getTwitchSync(never)).toBeNull();
+  });
+});
+
+describe("the Twitch message ids (JOURNAL 2026-10-08)", () => {
+  // Retient un identifiant 11 minutes, et refuse de le réserver une seconde fois
+  it("keeps a message id for 11 minutes, and refuses to reserve it a second time", async () => {
+    const writes = createTwitchWrites(redis);
+    const messageId = `${runId}-first`;
+
+    expect(await writes.reserveTwitchMessage(messageId)).toBe(true);
+    expect(await writes.reserveTwitchMessage(messageId)).toBe(false);
+
+    expect(await redis.ttl(twitchMessageKey(messageId))).toBeGreaterThan(TWITCH_MESSAGE_TTL_SECONDS - 5);
+    expect(await redis.ttl(twitchMessageKey(messageId))).toBeLessThanOrEqual(TWITCH_MESSAGE_TTL_SECONDS);
+  });
+
+  // Réserve un autre identifiant sans gêne, et rend le sien quand on le relâche
+  it("reserves another id freely, and hands its own back when released", async () => {
+    const writes = createTwitchWrites(redis);
+    const [kept, other] = [`${runId}-kept`, `${runId}-other`];
+    await writes.reserveTwitchMessage(kept);
+
+    expect(await writes.reserveTwitchMessage(other)).toBe(true);
+    await writes.releaseTwitchMessage(kept);
+
+    expect(await writes.reserveTwitchMessage(kept)).toBe(true);
   });
 });
 
@@ -468,6 +554,20 @@ describe("isModerator (§6.1)", () => {
 
     await redis.sadd(buildCanvasKeys(canvasId).mods, "moderator-1");
 
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
+  });
+
+  // Ne voit plus un modérateur banni, même resté dans mods, et le revoit une fois débanni (Écart §10.3, JOURNAL 2026-10-08)
+  it("does not see a banned moderator, still in mods, and sees him again once unbanned", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const keys = buildCanvasKeys(canvasId);
+    await redis.sadd(keys.mods, "moderator-1");
+
+    await redis.sadd(keys.bans, "moderator-1");
+    expect(await core.isModerator(canvasId, "moderator-1")).toBe(false);
+
+    await redis.srem(keys.bans, "moderator-1");
     expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
   });
 });

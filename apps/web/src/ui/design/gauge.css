@@ -98,8 +98,8 @@
   transition: height var(--lp-dur) var(--lp-ease);
 }
 
-/* JOURNAL 2026-09-30 : le +1 à réclamer, à la place de Dessiner. Doré dans les deux thèmes : jamais la couleur de
-   l'action principale, qui s'inverse avec le thème. Un halo, et un reflet qui le traverse une fois à son arrivée, puis
+/* JOURNAL 2026-09-30 : le +1 à réclamer, à la place de Dessiner. Doré dans les deux apparences : jamais la couleur de
+   l'action principale, qui s'inverse avec l'apparence. Un halo, et un reflet qui le traverse une fois à son arrivée, puis
    au survol. Pas de boucle : la seule de l'interface reste « Reconnexion… ». */
 .lp-claim {
   position: relative;

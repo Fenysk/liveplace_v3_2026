@@ -2,7 +2,7 @@
    La palette du canvas n'est pas ici : elle vit dans `domain` et arrive par le `welcome`. */
 
 :root,
-[data-theme="light"] {
+[data-appearance="light"] {
   --void: #c9c7cc;
   --void-dot: #b6b3ba;
   --canvas-border: var(--ink); /* presque noir en clair, presque blanc en sombre */
@@ -34,6 +34,11 @@
   --scrim: rgba(16, 18, 28, 0.4);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
+  /* Le live Twitch (Écart §4, JOURNAL 2026-10-07) : le bouton de la chaîne, teinté du violet de Twitch sur la pill.
+     L'encre fonce par rapport au violet de marque : AA (4,5:1) sur le fond teinté, au survol compris. */
+  --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
+  --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
+  --twitch-live-ink: #6d28d9;
   /* Les anneaux du classement : un dégradé discret par place, plus soutenu sur le fond clair */
   --rank-gold-from: #c8901a;
   --rank-gold-to: #f2cf6b;
@@ -43,7 +48,7 @@
   --rank-bronze-to: #dba57a;
 }
 
-[data-theme="dark"] {
+[data-appearance="dark"] {
   --void: #10121c;
   --void-dot: #1c1e2a;
   --canvas-border: var(--ink); /* presque noir en clair, presque blanc en sombre */
@@ -75,6 +80,9 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --focus-ring: var(--accent);
   --pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
+  --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
+  --twitch-live-ink: #bf94ff;
   --rank-gold-from: #e8b84a;
   --rank-gold-to: #f7e08a;
   --rank-silver-from: #b8bfcc;
@@ -94,20 +102,25 @@
   --control-size-touch: 44px;
   --font-sans: "Nunito Variable", system-ui, sans-serif;
 
+  /* La taille « title », en jetons : la pill Thème la prend sur écran étroit ou tactile (theme-pill.css) */
+  --type-title-size: 16px;
+  --type-title-line: 20px;
+  --type-title-weight: 800;
+
   /* Les pills laissent deviner ce qui passe derrière elles : très légèrement transparentes, et floutées */
   --pill-opacity: 92%;
   --pill-blur: 16px;
 
-  /* Le fond noir et le fond blanc de la vue OBS, les mêmes dans les deux thèmes : ce sont ceux du stream (JOURNAL 2026-09-29) */
+  /* Le fond noir et le fond blanc de la vue OBS, les mêmes dans les deux apparences : ce sont ceux du stream (JOURNAL 2026-09-29) */
   --obs-black: #000000;
   --obs-white: #ffffff;
 
-  /* Les fonds du PNG qu'on télécharge : du vrai noir et du vrai blanc, les mêmes dans les deux thèmes
+  /* Les fonds du PNG qu'on télécharge : du vrai noir et du vrai blanc, les mêmes dans les deux apparences
      (Écart §15, JOURNAL 2026-10-06) */
   --png-black: #000000;
   --png-white: #ffffff;
 
-  /* Les couleurs de marque de Twitch, les mêmes dans les deux thèmes : Se connecter seulement */
+  /* Les couleurs de marque de Twitch, les mêmes dans les deux apparences : Se connecter seulement */
   --twitch: #9146ff;
   --twitch-hover: #772ce8;
   --on-twitch: #ffffff;
@@ -153,9 +166,9 @@
 
 .lp-type-title {
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 20px;
-  font-weight: 800;
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+  font-weight: var(--type-title-weight);
 }
 
 .lp-type-body {

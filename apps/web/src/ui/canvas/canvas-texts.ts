@@ -13,6 +13,11 @@ export const CANVAS_TEXTS = defineTexts({
     fr: "Ce pseudo n'a pas encore de canvas sur LivePlace.",
     en: "This username doesn't have a canvas on LivePlace yet.",
   },
+  // Redis remet le canvas en place (`canvas_recovering`) : la page le dit à la place du canvas.
+  recovering: {
+    fr: "On remet chaque pixel à sa place. Le canvas revient dans un instant !",
+    en: "We're putting every pixel back in place. The canvas will be back in a moment!",
+  },
   pageTitle: localized({
     fr: (ownerName: string) => `Canvas de ${ownerName}`,
     en: (ownerName) => `${ownerName}'s canvas`,

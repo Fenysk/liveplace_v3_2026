@@ -40,12 +40,9 @@ export const streamedCanvasesLabel = (streamed: number): string =>
 
 export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pixel posé", "pixels posés");
 
-export const obsViewsLabel = (obsViews: number): string =>
-  counted(obsViews, "vue OBS ouverte", "vues OBS ouvertes");
-
-// La pastille OBS d'un canvas n'existe que s'il est streamé ; ses vues OBS se lisent en infobulle.
-export const toObsTitle = (obsViews: number): string | null =>
-  obsViews === 0 ? null : obsViewsLabel(obsViews);
+// Écart §5.1 (JOURNAL 2026-10-08) : les minutes streamées sont celles d'un canvas.
+export const streamedMinutesLabel = (minutes: number): string =>
+  counted(minutes, "minute streamée", "minutes streamées");
 
 // L'audience (JOURNAL 2026-10-07) : les mêmes accords, pour l'infobulle des courbes.
 export const visitsLabel = (visits: number): string => counted(visits, "visite", "visites");
@@ -205,10 +202,9 @@ export function toCanvasActivityCard(
   canvas: ActivityCanvas,
   nowMs: Timestamp,
 ): Omit<CanvasActivityCardProps, "isOpen" | "onToggle"> {
-  const { owner, obsViews, people, guests, heat, signups, accounts } = canvas;
+  const { owner, people, guests, heat, signups, accounts } = canvas;
   return {
     owner,
-    obsTitle: toObsTitle(obsViews),
     facts: [peopleLabel(people, guests), heatLabel(heat), signupsLabel(signups)],
     accounts: toActivityAccounts(accounts, nowMs),
     guestsLine: toGuestsLine(guests),

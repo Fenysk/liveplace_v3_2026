@@ -1,6 +1,8 @@
 import { PALETTE, toCellKey } from "@liveplace/domain";
+import type { Transport, TransportListeners } from "@liveplace/domain/ports";
+import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
-import type { CanvasView, Pixel, PlaceResult } from "./canvas-store";
+import { type CanvasView, createCanvasStore, type Pixel, type PlaceResult } from "./canvas-store";
 import { createDraftStore, type DraftCanvas, type DraftClock } from "./draft-store";
 import type { DraftStorage } from "./saved-draft";
 
@@ -479,6 +481,73 @@ describe("createDraftStore — a banned user (§10.2, JOURNAL 2026-09-25)", () =
     expect(sentBatches).toHaveLength(1);
     expect(cells()).toHaveLength(130);
     expect(store.getView()).toMatchObject({ mode: "view", isSending: false });
+  });
+});
+
+// Sur un vrai store du canvas : le gateway refuse un lot par son requestId (§6.3, dix poses par seconde au plus).
+describe("createDraftStore — a lot the gateway refuses as rate_limited (§6.3)", () => {
+  const gauge = { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0 };
+  const welcome: ServerFrame = {
+    t: "welcome",
+    canvas: { canvasId: "canvas-1", width: 256, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 200,
+      gaugeMaxCeiling: 200,
+      refillMs,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: [...PALETTE],
+    version: 1,
+    you: { userId: "user-1", login: "user1", displayName: "User 1", role: "viewer" },
+    gauge,
+  };
+
+  // Garde tout le brouillon, rend leurs pixels, rouvre le brouillon, et n'envoie pas les lots suivants
+  it("keeps the whole draft, gives the pixels back, unlocks the draft and sends no further lot", async () => {
+    const sent: ClientFrame[] = [];
+    const feed: { listeners?: TransportListeners } = {};
+    const transport: Transport = {
+      send: (frame) => {
+        sent.push(frame);
+      },
+      listen: (listeners) => {
+        feed.listeners = listeners;
+      },
+      close: () => undefined,
+    };
+    const canvas = createCanvasStore("canvas-1", transport, {
+      mode: "ui",
+      now: () => now,
+      reload: () => undefined,
+    });
+    feed.listeners?.onOpen();
+    feed.listeners?.onFrame(welcome);
+    const store = createDraftStore(
+      "canvas-1",
+      canvas,
+      () => ({ getItem: () => null, setItem: () => undefined }),
+      { now: () => now, wait: async () => undefined },
+    );
+    store.enterDraftMode();
+    store.startTrace();
+    store.traceCells(Array.from({ length: 70 }, (_, x) => ({ x, y: 0 })));
+    store.endTrace();
+
+    const submitting = store.submit();
+    const placed = sent.at(-1);
+    if (placed?.t !== "place") throw new Error("aucune frame place envoyée");
+    const optimistic = canvas.getView().pixels.slice(0, 64);
+    expect(optimistic.every((colorIndex) => colorIndex !== 0)).toBe(true);
+    feed.listeners?.onFrame({ t: "error", code: "rate_limited", requestId: placed.requestId });
+    await submitting;
+
+    expect(store.getView()).toMatchObject({ mode: "draft", isSending: false });
+    expect(store.getView().draft.size).toBe(70);
+    expect(canvas.getView().pixels.every((colorIndex) => colorIndex === 0)).toBe(true);
+    expect(canvas.getView().gauge).toEqual(gauge);
+    expect(sent.filter((frame) => frame.t === "place")).toHaveLength(1);
   });
 });
 

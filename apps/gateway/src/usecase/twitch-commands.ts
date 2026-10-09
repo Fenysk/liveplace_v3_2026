@@ -2,7 +2,14 @@
 // scripts, au nom du streamer et avec l'origine Twitch.
 
 import type { CanvasMeta, Timestamp } from "@liveplace/domain";
-import type { CanvasCore, Moderation, TwitchCommand, TwitchCommandQueue } from "@liveplace/domain/ports";
+import type {
+  CanvasCore,
+  CanvasTwitchCommand,
+  Moderation,
+  TwitchCommand,
+  TwitchCommandQueue,
+} from "@liveplace/domain/ports";
+import type { Broadcast } from "./broadcast";
 
 // Une attente bornée : à l'arrêt, la boucle ne retient pas le process plus longtemps.
 const WAIT_MS = 5000;
@@ -14,14 +21,22 @@ const FOLLOW_MAX_ATTEMPTS = 20;
 export type TwitchCommandsDeps = {
   core: Pick<
     CanvasCore,
-    "getCanvas" | "moderate" | "setModerator" | "listModerators" | "listBans" | "copyTwitchUsers"
+    | "getCanvas"
+    | "isRecovering"
+    | "moderate"
+    | "setModerator"
+    | "listModerators"
+    | "listBans"
+    | "copyTwitchUsers"
   >;
+  broadcast: Pick<Broadcast, "announce">; // Écart §4 (JOURNAL 2026-10-07) : le live d'un compte, à toutes les pages
   now: () => Timestamp;
   wait: (ms: number) => Promise<void>;
 };
 
 // `lost` : aucun canvas prêt n'a pu la recevoir. On ne l'acquitte pas : elle n'est pas appliquée, pas oubliée.
-export type CommandOutcome = "done" | "lost";
+// `recovering` (Écart §4.2, JOURNAL 2026-10-08) : le canvas est perdu et Redis le remet en place ; l'action attend, non acquittée.
+export type CommandOutcome = "done" | "lost" | "recovering";
 
 // Un script a refusé parce que le canvas vient d'être archivé : l'action repart sur son successeur.
 class CanvasArchivedError extends Error {}
@@ -42,11 +57,12 @@ const clearAll = async (
     result = orRestartIfArchived(await deps.core.moderate(canvasId, { ...moderation, slice: "next" }));
 };
 
-type OwnedCommand<Kind extends TwitchCommand["kind"]> = Extract<TwitchCommand, { kind: Kind }> & {
+type OwnedCommand<Kind extends CanvasTwitchCommand["kind"]> = Extract<CanvasTwitchCommand, { kind: Kind }> & {
   ownerId: string;
 };
 
-// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels.
+// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels. Écart §5.4 (JOURNAL 2026-10-08) :
+// un ban que le script refuse (modérateur nommé ici) est ignoré, sans retrait ; la synchro suivante le retentera.
 const applyBan = async (deps: TwitchCommandsDeps, command: OwnedCommand<"ban" | "unban">) => {
   const { canvasId, userId, ownerId } = command;
   const origin = { by: ownerId, nowMs: deps.now(), source: "twitch" } as const;
@@ -96,17 +112,32 @@ const applyBanList = async (deps: TwitchCommandsDeps, command: OwnedCommand<"ban
 
 // Le canvas qui sert aujourd'hui une action : le canvas visé, ou celui qui l'a remplacé, de proche en proche.
 // `missing` : le canvas visé n'existe pas (ou plus). `lost` : on a suivi, mais aucun canvas prêt ne s'est posé à temps.
+// `recovering` : le canvas, ou son successeur, vient d'être perdu et revient.
 type Followed =
   | { status: "found"; canvasId: string; meta: CanvasMeta }
   | { status: "missing" }
+  | { status: "recovering" }
   | { status: "lost" };
+
+// Un canvas que Redis n'a pas : en récupération, supprimé (celui qu'on visait), ou un successeur pas encore prêt (`null`).
+const getAbsence = async (
+  deps: TwitchCommandsDeps,
+  canvasId: string,
+  isFollowing: boolean,
+): Promise<Followed | null> => {
+  if (await deps.core.isRecovering(canvasId)) return { status: "recovering" };
+  return isFollowing ? null : { status: "missing" };
+};
 
 const followToLiveCanvas = async (deps: TwitchCommandsDeps, from: string): Promise<Followed> => {
   let canvasId = from;
   let isFollowing = false; // un successeur absent n'est pas « supprimé » : il n'est pas encore prêt
   for (let attempt = 0; attempt < FOLLOW_MAX_ATTEMPTS; attempt++) {
     const meta = await deps.core.getCanvas(canvasId);
-    if (!meta && !isFollowing) return { status: "missing" };
+    if (!meta) {
+      const absence = await getAbsence(deps, canvasId, isFollowing);
+      if (absence) return absence;
+    }
     if (meta && meta.archivedAt === undefined) return { status: "found", canvasId, meta };
     // Archivé sans successeur : une archive qu'on rouvre, elle redevient le canvas actif dans un instant.
     if (meta?.successorId) {
@@ -117,10 +148,14 @@ const followToLiveCanvas = async (deps: TwitchCommandsDeps, from: string): Promi
   return { status: "lost" };
 };
 
-const userIdsOf = (command: TwitchCommand): readonly string[] =>
+const userIdsOf = (command: CanvasTwitchCommand): readonly string[] =>
   "userIds" in command ? command.userIds : [command.userId];
 
-const applyOn = async (deps: TwitchCommandsDeps, command: TwitchCommand, ownerId: string): Promise<void> => {
+const applyOn = async (
+  deps: TwitchCommandsDeps,
+  command: CanvasTwitchCommand,
+  ownerId: string,
+): Promise<void> => {
   switch (command.kind) {
     case "ban":
     case "unban":
@@ -135,16 +170,18 @@ const applyOn = async (deps: TwitchCommandsDeps, command: TwitchCommand, ownerId
   }
 };
 
-export async function applyTwitchCommand(
+// Supprimé : la prochaine synchro rattrapera. Perdu ou en récupération : l'action reste, non acquittée.
+const OUTCOME_OF = { missing: "done", recovering: "recovering", lost: "lost" } as const;
+
+const applyOnCanvas = async (
   deps: TwitchCommandsDeps,
-  command: TwitchCommand,
-): Promise<CommandOutcome> {
+  command: CanvasTwitchCommand,
+): Promise<CommandOutcome> => {
   let canvasId = command.canvasId;
   // Une course avec l'archivage (un script refuse) redemande le canvas : il a maintenant son successeur.
   for (let round = 0; round < FOLLOW_MAX_ATTEMPTS; round++) {
     const followed = await followToLiveCanvas(deps, canvasId);
-    if (followed.status === "missing") return "done"; // supprimé ou en cours de restore : la prochaine synchro rattrapera
-    if (followed.status === "lost") return "lost";
+    if (followed.status !== "found") return OUTCOME_OF[followed.status];
     // Le web a écrit les noms sur le canvas visé : le successeur ne les a que s'ils y étaient avant sa copie.
     if (followed.canvasId !== command.canvasId)
       await deps.core.copyTwitchUsers(command.canvasId, followed.canvasId, userIdsOf(command));
@@ -157,24 +194,44 @@ export async function applyTwitchCommand(
     }
   }
   return "lost";
+};
+
+export async function applyTwitchCommand(
+  deps: TwitchCommandsDeps,
+  command: TwitchCommand,
+): Promise<CommandOutcome> {
+  // Écart §4 (JOURNAL 2026-10-07) : un live n'a pas de canvas. Les pages du streamer et les connexions du compte le prennent.
+  if (command.kind === "twitchLive") {
+    const { userId, twitchLive } = command;
+    deps.broadcast.announce({ t: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) });
+    return "done";
+  }
+  return applyOnCanvas(deps, command);
 }
 
 // Une action qui échoue est journalisée puis acquittée : la file continue, et la synchro suivante la rattrape.
-// Une action perdue ne l'est pas : elle reste à lire au prochain démarrage.
+// Une action perdue ne l'est pas : elle reste à lire au prochain démarrage. Écart §4.2 (JOURNAL 2026-10-08) : une action sur un
+// canvas en récupération attend en mémoire, non acquittée (un redémarrage la relit), et se rejoue à chaque tour de la file,
+// sans retenir les autres.
 export async function consumeTwitchCommands(
   deps: TwitchCommandsDeps,
   queue: TwitchCommandQueue,
   isRunning: () => boolean,
 ): Promise<void> {
+  const waiting = new Map<string, TwitchCommand>();
+  const settle = async (id: string, command: TwitchCommand): Promise<void> => {
+    const outcome = await applyTwitchCommand(deps, command).catch((error: unknown) => {
+      console.error("gateway: action Twitch non appliquée", command, error);
+      return "done" as const;
+    });
+    if (outcome === "recovering") return void waiting.set(id, command);
+    waiting.delete(id);
+    if (outcome === "lost")
+      console.error("gateway: action Twitch sans canvas prêt, gardée sans acquit", command);
+    else await queue.ackTwitchCommand(id);
+  };
   while (isRunning()) {
-    for (const { id, command } of await queue.listTwitchCommands(WAIT_MS)) {
-      const outcome = await applyTwitchCommand(deps, command).catch((error: unknown) => {
-        console.error("gateway: action Twitch non appliquée", command, error);
-        return "done" as const;
-      });
-      if (outcome === "lost")
-        console.error("gateway: action Twitch sans canvas prêt, gardée sans acquit", command);
-      else await queue.ackTwitchCommand(id);
-    }
+    for (const [id, command] of waiting) await settle(id, command);
+    for (const { id, command } of await queue.listTwitchCommands(WAIT_MS)) await settle(id, command);
   }
 }

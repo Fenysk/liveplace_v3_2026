@@ -25,6 +25,7 @@ import {
   toInstantResource,
   toMonthlyResource,
   toSaturation,
+  toStockResource,
   toThousandth,
   toUnmeasured,
   toWithoutNews,
@@ -68,18 +69,26 @@ export interface Capacity {
 type ConvexField = keyof Omit<ConvexUsage, "at">;
 
 // L'usage d'un déploiement que somme chaque ressource Convex ; l'absence d'une ressource ici dit qu'elle est instantanée.
-const CONVEX_FIELDS = new Map<CapacityResourceId, ConvexField>([
-  ["convexCalls", "calls"],
-  ["convexDatabaseIo", "databaseIoGb"],
-  ["convexEgress", "egressGb"],
-  ["convexCompute", "computeGbHours"],
+// Un quota du mois se projette en fin de mois ; un stock (les fichiers) se lit tel qu'il est.
+type ConvexSource = { metric: ConvexField; toResource: typeof toMonthlyResource };
+const CONVEX_FIELDS = new Map<CapacityResourceId, ConvexSource>([
+  ["convexCalls", { metric: "calls", toResource: toMonthlyResource }],
+  ["convexDatabaseIo", { metric: "databaseIoGb", toResource: toMonthlyResource }],
+  ["convexEgress", { metric: "egressGb", toResource: toMonthlyResource }],
+  ["convexCompute", { metric: "computeGbHours", toResource: toMonthlyResource }],
+  ["convexFiles", { metric: "filesBytes", toResource: toStockResource }],
 ]);
 
-// Le quota du mois est celui de l'équipe : la somme des déploiements, lue à l'instant du plus ancien.
-const toConvexReading = (usages: readonly ConvexUsage[], metric: ConvexField) => ({
-  used: usages.reduce((sum, usage) => sum + usage[metric], 0),
-  at: Math.min(...usages.map(({ at }) => at)),
-});
+// Le quota du mois est celui de l'équipe : la somme des déploiements, lue à l'instant du plus ancien. Un déploiement qui ne dit
+// pas une métrique (le stock de fichiers, tant que son compteur n'est pas là) la rend inconnue pour tous.
+const toConvexReading = (usages: readonly ConvexUsage[], metric: ConvexField) => {
+  const values = usages.map((usage) => usage[metric]);
+  if (values.some((value) => value === undefined)) return undefined;
+  return {
+    used: values.reduce<number>((sum, value) => sum + (value ?? 0), 0),
+    at: Math.min(...usages.map(({ at }) => at)),
+  };
+};
 
 export function createCapacity(deps: CapacityDeps): Capacity {
   const samples = new Map<CapacityResourceId, CapacitySample[]>();
@@ -90,6 +99,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
   let convex: ConvexDeposit | null = null;
   let previousRedis: { at: Timestamp; cpuSeconds: number; refusals: number } | undefined;
   let lastWebAt = Number.NEGATIVE_INFINITY;
+  let lastSnapshotAt = Number.NEGATIVE_INFINITY; // infini tant que le worker n'a jamais rien déposé
   let sentBytes = 0;
   let lastBytes = 0;
   let lastSampledAt = deps.now();
@@ -166,21 +176,29 @@ export function createCapacity(deps: CapacityDeps): Capacity {
     lastWebAt = measure.at;
   };
 
+  // Le retard de la sauvegarde arrive avec l'instant de sa mesure, déposé par le worker : une mesure déjà vue ne se compte pas deux fois.
+  const sampleSnapshot = async (): Promise<void> => {
+    const measure = await deps.store.getSnapshotMeasure();
+    if (!measure || measure.at <= lastSnapshotAt) return;
+    record("snapshotDelay", measure.at, measure.delayMs / 1000);
+    lastSnapshotAt = measure.at;
+  };
+
   // Le quota d'un mois est atteint quand l'usage, pas sa projection, le dépasse (écart §2 et §9, JOURNAL 2026-10-07).
   const sampleConvex = async (at: Timestamp): Promise<void> => {
     convex = await deps.store.getConvexDeposit();
     if (convex?.status !== "configured") return;
     const usages = [...convex.deployments.values()];
-    for (const [id, metric] of CONVEX_FIELDS) {
+    for (const [id, { metric }] of CONVEX_FIELDS) {
       const { ceiling, cadenceMs } = getCapacitySpec(id);
       const reading = toConvexReading(usages, metric);
-      if (ceiling !== null && !isWithoutNews(reading.at, cadenceMs, at) && reading.used >= ceiling)
+      if (ceiling !== null && reading && !isWithoutNews(reading.at, cadenceMs, at) && reading.used >= ceiling)
         await markReached(id, at);
     }
   };
 
   // L'occupation et le débit sur le temps écoulé depuis le dernier échantillon, jamais sur moins d'une seconde : le premier
-  // échantillon, pris au démarrage, ne mesurerait que le démarrage. Le délai de diffusion et les connexions, tels qu'ils sont.
+  // échantillon, pris au démarrage, ne mesurerait que le démarrage. Le retard de diffusion et les connexions, tels qu'ils sont.
   const sampleGateway = (at: Timestamp): void => {
     const utilization = deps.host.getUtilizationPercent(); // lu même écarté : le temps suivant repart d'ici
     const elapsedSeconds = (at - lastSampledAt) / 1000;
@@ -198,7 +216,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
 
   const toConvexResource = (
     id: CapacityResourceId,
-    metric: ConvexField,
+    { metric, toResource }: ConvexSource,
     nowMs: Timestamp,
   ): CapacityResource => {
     const spec = getCapacitySpec(id);
@@ -206,13 +224,21 @@ export function createCapacity(deps: CapacityDeps): Capacity {
       return deps.isProduction ? toWithoutNews(spec) : toUnmeasured(spec);
     if (convex?.status !== "configured") return toWithoutNews(spec);
     const reading = toConvexReading([...convex.deployments.values()], metric);
-    return { ...toMonthlyResource(spec, reading, nowMs), deployments: [...convex.deployments.keys()].sort() };
+    return { ...toResource(spec, reading, nowMs), deployments: [...convex.deployments.keys()].sort() };
+  };
+
+  // Le retard de la sauvegarde : un worker qui n'a jamais rien déposé n'est une panne qu'en production ; ailleurs, personne ne le lance.
+  const toSnapshotResource = (nowMs: Timestamp): CapacityResource => {
+    const spec = getCapacitySpec("snapshotDelay");
+    if (lastSnapshotAt === Number.NEGATIVE_INFINITY && !deps.isProduction) return toUnmeasured(spec);
+    return toInstantResource(spec, samples.get("snapshotDelay") ?? [], undefined, nowMs);
   };
 
   const buildResources = (nowMs: Timestamp): CapacityResource[] =>
     CAPACITY_RESOURCE_IDS.map((id) => {
-      const metric = CONVEX_FIELDS.get(id);
-      if (metric) return toConvexResource(id, metric, nowMs);
+      const convexField = CONVEX_FIELDS.get(id);
+      if (convexField) return toConvexResource(id, convexField, nowMs);
+      if (id === "snapshotDelay") return toSnapshotResource(nowMs);
       return toInstantResource(getCapacitySpec(id), samples.get(id) ?? [], ceilings.get(id), nowMs);
     });
 
@@ -275,6 +301,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
         attempt("la machine", () => sampleMachine(nowMs)),
         attempt("le disque", () => sampleDisk(nowMs)),
         attempt("le web", sampleWeb),
+        attempt("le worker", sampleSnapshot),
         attempt("Convex", () => sampleConvex(nowMs)),
       ]);
       sampleGateway(nowMs);

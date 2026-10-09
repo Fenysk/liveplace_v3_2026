@@ -13,11 +13,11 @@ import {
   Palette,
 } from "lucide-react";
 import { useId, useState } from "react";
+import { AppearancePicker } from "../design/appearance-controls";
 import { blurAfterClick } from "../design/button";
 import { classNames } from "../design/class-names";
 import { Segmented } from "../design/segmented";
-import { ThemePicker } from "../design/theme-controls";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import {
   DESIGN_CHAPTERS,
   DESIGN_ENTRIES,
@@ -92,7 +92,7 @@ const ChapterNav = ({ chapter, isOpen, currentSlug, onToggle, onShow }: ChapterN
 };
 
 export const DesignPage = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   const [pointer, setPointer] = useState<Pointer>("mouse");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const treeId = useId();
@@ -137,7 +137,7 @@ export const DesignPage = () => {
               ))}
             </ul>
             <div className="design-nav-controls">
-              <ThemePicker choice={themeChoice} onPick={pickTheme} />
+              <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
               <Segmented label="Pointeur" options={POINTER_OPTIONS} value={pointer} onSelect={setPointer} />
             </div>
           </div>

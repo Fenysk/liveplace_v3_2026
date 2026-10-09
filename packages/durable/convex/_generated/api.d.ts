@@ -9,6 +9,10 @@
  */
 
 import type * as canvases from "../canvases.js";
+import type * as chunks from "../chunks.js";
+import type * as purge from "../purge.js";
+import type * as snapshots from "../snapshots.js";
+import type * as usage from "../usage.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,6 +23,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   canvases: typeof canvases;
+  chunks: typeof chunks;
+  purge: typeof purge;
+  snapshots: typeof snapshots;
+  usage: typeof usage;
   users: typeof users;
 }>;
 

@@ -215,6 +215,54 @@ describe("createBroadcast (§6.2, §6.3)", () => {
   });
 });
 
+describe("announcing a control to every page (Écart §4, JOURNAL 2026-10-07)", () => {
+  // Remet un message à chaque page de chaque canvas joint, tout de suite, sans attendre le tick, et rien après le départ
+  it("hands a message at once to every page of every joined canvas, and to nobody after they leave", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const heard: string[] = [];
+    const listenerOf = (name: string): [CellsListener, ControlListener] => [
+      () => undefined,
+      (control) => heard.push(`${name}:${control.t}`),
+    ];
+    const [firstCells, firstControl] = listenerOf("first");
+    const [secondCells, secondControl] = listenerOf("second");
+    const [thirdCells, thirdControl] = listenerOf("third");
+    await broadcast.join("canvas-1", firstCells, firstControl);
+    await broadcast.join("canvas-1", secondCells, secondControl);
+    await broadcast.join("canvas-2", thirdCells, thirdControl);
+    const message = { t: "twitchLive" as const, userId: "owner-1", twitchLive: { category: "Art" } };
+
+    broadcast.announce(message);
+    await broadcast.leave("canvas-2", thirdCells);
+    broadcast.announce({ t: "twitchLive", userId: "owner-1" });
+
+    expect(heard).toEqual([
+      "first:twitchLive",
+      "second:twitchLive",
+      "third:twitchLive",
+      "first:twitchLive",
+      "second:twitchLive",
+    ]);
+  });
+
+  // Rend le message tel quel : la page lit le compte et le live qu'il porte
+  it("hands the message as it is", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const controls: ControlMessage[] = [];
+    await broadcast.join(
+      "canvas-1",
+      () => undefined,
+      (control) => controls.push(control),
+    );
+
+    broadcast.announce({ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } });
+
+    expect(controls).toEqual([{ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } }]);
+  });
+});
+
 const entry = (login: string, pixels: number): ScoreboardEntry => ({ login, displayName: login, pixels });
 
 // Une action de modération telle que moderate.lua la publie : un événement `clear`, sans case.
@@ -436,59 +484,115 @@ describe("the scoreboard window of a canvas (JOURNAL 2026-10-06)", () => {
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-07) : la capacité lit le délai de diffusion et les connexions, sans rien coûter par pose.
+// Écart §5.1 et §6 (JOURNAL 2026-10-07) : la capacité lit le retard de diffusion et les connexions, sans rien coûter par pose.
+// Le retard d'une pose : l'envoi de sa frame − `occurredAt` − l'attente voulue, de son arrivée à l'heure prévue du tick qui
+// l'envoie (le tick précédent + l'intervalle, un tick sauté par la diffusion adaptative compris).
 describe("what the broadcast tells the capacity (JOURNAL 2026-10-07)", () => {
-  // Compte, à l'envoi de la frame, le délai de chaque pose : de son `occurredAt` à l'instant du tick
-  it("counts, when the frame is sent, the delay of each pose: from its `occurredAt` to the instant of the tick", async () => {
+  const TICK_MS = 100;
+
+  // Un canvas, une horloge que le test règle, et les retards que la capacité en lit. `clients` : au-delà de 500, un tick sur deux.
+  const setupDelays = async (clients = 1) => {
     const { core, publish } = fakeCore();
+    const clock = { nowMs: occurredAt };
     const delays: number[] = [];
     const broadcast = createBroadcast(core, {
-      now: () => occurredAt + 180,
+      now: () => clock.nowMs,
       record: (delay) => delays.push(delay),
+      tickMs: TICK_MS,
     });
-    await broadcast.join("canvas-1", () => undefined, ignoreControl);
+    for (let index = 0; index < clients; index++)
+      await broadcast.join("canvas-1", () => undefined, ignoreControl);
+    // Une pose posée à `placedAt`, qui arrive dans le tampon du canvas à `arrivesAt`.
+    const publishAt = (arrivesAt: number, placedAt: number, pose: Event) => {
+      clock.nowMs = arrivesAt;
+      publish("canvas-1", { ...pose, occurredAt: placedAt });
+    };
+    const tickAt = (at: number) => {
+      clock.nowMs = at;
+      broadcast.tick();
+    };
+    return { delays, publishAt, tickAt };
+  };
 
-    publish("canvas-1", event(1, 3, 5));
-    publish("canvas-1", { ...event(2, 4, 5), occurredAt: occurredAt + 100 });
-    broadcast.tick();
+  // Compte, à l'envoi de la frame, le retard de chaque pose : de son `occurredAt` à l'envoi, moins l'attente jusqu'au tick
+  it("counts, when the frame is sent, the lateness of each pose: from its `occurredAt` to the sending, minus the wait until the tick", async () => {
+    const { delays, publishAt, tickAt } = await setupDelays();
 
-    expect(delays).toEqual([180, 80]); // les deux poses, même conflatées dans une seule frame
+    publishAt(occurredAt + 10, occurredAt, event(1, 3, 5));
+    publishAt(occurredAt + 110, occurredAt + 100, event(2, 4, 5));
+    tickAt(occurredAt + 180); // le premier tick : son heure prévue est son heure réelle
+
+    expect(delays).toEqual([10, 10]); // le transit de chacune, même conflatées dans une seule frame
+  });
+
+  // Une pose arrivée juste avant un tick à l'heure ne compte que son transit par Redis
+  it("counts only the Redis transit of a pose that arrived just before a tick on time", async () => {
+    const { delays, publishAt, tickAt } = await setupDelays();
+    tickAt(occurredAt);
+
+    publishAt(occurredAt + 97, occurredAt + 90, event(1, 3, 5));
+    tickAt(occurredAt + TICK_MS);
+
+    expect(delays).toEqual([7]);
+  });
+
+  // Un tick en retard sur son heure ajoute son retard : 40 ms de plus
+  it("adds the lateness of a tick behind its time: 40 ms more", async () => {
+    const { delays, publishAt, tickAt } = await setupDelays();
+    tickAt(occurredAt);
+
+    publishAt(occurredAt + 97, occurredAt + 90, event(1, 3, 5));
+    tickAt(occurredAt + TICK_MS + 40);
+
+    expect(delays).toEqual([47]);
+  });
+
+  // Un tick sauté par la diffusion adaptative compte dans l'attente voulue : le tick qui envoie donne l'heure prévue
+  it("counts the skipped tick in the wait that was wanted: the tick that sends gives the expected time", async () => {
+    const { delays, publishAt, tickAt } = await setupDelays(501);
+    tickAt(occurredAt); // saute
+    tickAt(occurredAt + TICK_MS); // envoie, sans rien
+    publishAt(occurredAt + 130, occurredAt + 125, event(1, 3, 5));
+    tickAt(occurredAt + 2 * TICK_MS); // saute : la pose reste dans le tampon
+    expect(delays).toEqual([]);
+
+    tickAt(occurredAt + 3 * TICK_MS); // envoie
+
+    expect(delays).toEqual([5]); // 175 ms depuis `occurredAt`, 170 ms d'attente voulue
+  });
+
+  // Une pose arrivée après l'heure prévue d'un tick en retard est comptée depuis son arrivée
+  it("counts from its arrival a pose that arrived after the expected time of a late tick", async () => {
+    const { delays, publishAt, tickAt } = await setupDelays();
+    tickAt(occurredAt);
+
+    publishAt(occurredAt + 120, occurredAt + 115, event(1, 3, 5));
+    tickAt(occurredAt + 140); // attendu à +100 : la pose n'avait rien à attendre
+
+    expect(delays).toEqual([25]);
   });
 
   // Ne compte que les poses : un retrait ou une modération n'est pas une pose reçue
   it("counts only poses: a clear or a hide is not a pose received", async () => {
-    const { core, publish } = fakeCore();
-    const delays: number[] = [];
-    const broadcast = createBroadcast(core, {
-      now: () => occurredAt + 50,
-      record: (delay) => delays.push(delay),
-    });
-    await broadcast.join("canvas-1", () => undefined, ignoreControl);
+    const { delays, publishAt, tickAt } = await setupDelays();
 
-    publish("canvas-1", { ...event(1, 3, 5), kind: "clear" });
-    publish("canvas-1", { ...event(2, 4, 5), kind: "hide" });
-    broadcast.tick();
+    publishAt(occurredAt, occurredAt, { ...event(1, 3, 5), kind: "clear" });
+    publishAt(occurredAt, occurredAt, { ...event(2, 4, 5), kind: "hide" });
+    tickAt(occurredAt + 50);
 
     expect(delays).toEqual([]);
   });
 
   // Ne compte rien tant que la frame n'est pas partie : le canvas attend son tour (plus de 500 clients)
   it("counts nothing until the frame has gone: the canvas waits for its turn", async () => {
-    const { core, publish } = fakeCore();
-    const delays: number[] = [];
-    const broadcast = createBroadcast(core, {
-      now: () => occurredAt + 200,
-      record: (delay) => delays.push(delay),
-    });
-    for (let index = 0; index < 501; index++)
-      await broadcast.join("canvas-1", () => undefined, ignoreControl);
-    publish("canvas-1", event(1, 3, 5));
+    const { delays, publishAt, tickAt } = await setupDelays(501);
 
-    broadcast.tick();
+    publishAt(occurredAt + 10, occurredAt, event(1, 3, 5));
+    tickAt(occurredAt + TICK_MS);
     expect(delays).toEqual([]);
 
-    broadcast.tick();
-    expect(delays).toEqual([200]);
+    tickAt(occurredAt + 2 * TICK_MS);
+    expect(delays).toEqual([10]); // 200 ms depuis `occurredAt`, 190 ms d'attente voulue : le transit seul
   });
 
   // Dit les connexions en tout et celles du plus gros canvas

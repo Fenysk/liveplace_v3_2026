@@ -33,7 +33,7 @@ const RESOURCE_NAMES: Record<CapacityResourceId, { name: string; inline: string 
   redisMemory: { name: "Mémoire", inline: "mémoire" },
   redisCpu: { name: "Processeur", inline: "processeur" },
   gatewayUtilization: { name: "Occupation", inline: "occupation" },
-  gatewayDelay: { name: "Délai de diffusion", inline: "délai de diffusion" },
+  gatewayDelay: { name: "Retard de diffusion", inline: "retard de diffusion" },
   gatewayOutbound: { name: "Débit sortant", inline: "débit sortant" },
   gatewayCanvasConnections: {
     name: "Connexions au plus gros canvas",
@@ -48,6 +48,8 @@ const RESOURCE_NAMES: Record<CapacityResourceId, { name: string; inline: string 
   convexDatabaseIo: { name: "E/S de la base", inline: "E/S de la base" },
   convexEgress: { name: "Données sortantes", inline: "données sortantes" },
   convexCompute: { name: "Calcul des actions", inline: "calcul des actions" },
+  convexFiles: { name: "Stockage des fichiers", inline: "stockage des fichiers" },
+  snapshotDelay: { name: "Sauvegarde", inline: "sauvegarde" },
 };
 
 // « Redis, mémoire » : le maillon et la ressource, comme la saturation les nomme.
@@ -89,6 +91,17 @@ export function formatBitRate(bitsPerSecond: number): string {
 export const formatMilliseconds = (milliseconds: number): string =>
   withUnit(formatCount(Math.round(milliseconds)), "ms");
 
+// Un retard se dit en minutes et secondes entières : « 4 min 30 s », « 45 s », « 15 min ».
+export function formatDuration(seconds: number): string {
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
+  if (minutes === 0) return withUnit(String(rest), "s");
+  return rest === 0
+    ? withUnit(String(minutes), "min")
+    : `${withUnit(String(minutes), "min")}${NBSP}${withUnit(String(rest), "s")}`;
+}
+
 // Au dixième sous 10 %, entier au-dessus, et jamais arrondi vers le haut : 49,9 % se lit « 49 % » et reste vert, comme
 // 79,9 % reste orange. L'affichage et la teinte s'accordent toujours.
 export function formatRate(ratio: number): string {
@@ -109,6 +122,7 @@ export function toResourceText({ unit, value, ceiling, ratio }: MeasuredResource
   const against = (format: (amount: number) => string): string => `${format(value)} sur ${format(ceiling)}`;
   if (unit === "bytes") return against(formatBytes);
   if (unit === "milliseconds") return against(formatMilliseconds);
+  if (unit === "seconds") return against(formatDuration);
   if (unit === "bitsPerSecond") return against(formatBitRate);
   if (unit === "connections") return against(formatCount);
   if (unit === "calls") return `${formatCount(Math.round(value))} sur ${formatCompact(ceiling)}`;
@@ -141,9 +155,12 @@ const toMonthName = (nowMs: number): string =>
 const toDayOfMonth = (at: number): string =>
   new Date(at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", timeZone: "Europe/Paris" });
 
-// Une légende discrète sous le nom : un quota mensuel dit sa projection, et son jour plein ; le délai, ses poses.
+// Une légende discrète sous le nom : un quota mensuel dit sa projection, et son jour plein ; le retard, au-delà du tick et pour combien
+// de poses ; le stock de fichiers, ce qu'il compte ; la sauvegarde, ce que son retard mesure.
 export function toRowNote(resource: FrameResource, nowMs: number): string | undefined {
-  if (resource.id === "gatewayDelay") return "pour 99 % des poses";
+  if (resource.id === "gatewayDelay") return "au-delà du tick, pour 99 % des poses";
+  if (resource.id === "convexFiles") return "sauvegardes et historique";
+  if (resource.id === "snapshotDelay") return "âge de la plus ancienne modification non sauvegardée";
   if (resource.link !== "convex" || resource.state !== "measured") return undefined;
   const projection = `projection fin ${toMonthName(nowMs)}`;
   return resource.fullAt === undefined

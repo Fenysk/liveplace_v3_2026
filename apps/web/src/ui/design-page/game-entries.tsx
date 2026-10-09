@@ -1,20 +1,60 @@
 // Le chapitre L'écran de jeu : les pills, les vraies, avec des props d'exemple, chacune dans chacun de ses états.
 
 import { PALETTE } from "@liveplace/domain";
+import { useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { CanvasPill } from "../canvas/canvas-pill";
+import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
+import { Button } from "../design/button";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
+import type { ProfileUser } from "../design/profile";
+import { ThemePill } from "../design/theme-pill";
+import { Toast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
-import { pickTheme, useThemeChoice } from "../design/use-theme";
+import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
-import { noop, SAMPLE_OWNER } from "./design-fixtures";
-import { Block, Entry, InNotice, InPhone, StateRow, useNowMs } from "./entry-layout";
+import { noop, SAMPLE_LIVE_OWNER, SAMPLE_OWNER } from "./design-fixtures";
+import { Block, Entry, InNotice, InPhone, InPhoneTop, InTopRoom, StateRow, useNowMs } from "./entry-layout";
 
 const REFILL_MS = 10_000;
+
+type PhoneHeaderProps = {
+  owner: ProfileUser;
+  theme?: string | undefined;
+  isNarrow?: boolean;
+  isDrafting?: boolean;
+};
+
+// Le haut d'un téléphone en Vue : la rangée des pills Canvas et Compte, la bande Thème dessous. En Dessin (Écart §8.1, JOURNAL
+// 2026-10-08), les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut.
+const PhoneHeader = ({ owner, theme, isNarrow = false, isDrafting = false }: PhoneHeaderProps) => {
+  const appearanceChoice = useAppearanceChoice();
+  return (
+    <InPhoneTop isNarrow={isNarrow}>
+      {!isDrafting && (
+        <div className="design-phone-row">
+          <div className="design-phone-row-start">
+            <CanvasPill owner={owner} isCompact isDocked={false} />
+          </div>
+          <AccountPill
+            identity={{ kind: "guest" }}
+            signInHref="#"
+            appearanceChoice={appearanceChoice}
+            onPickAppearance={pickAppearance}
+            onOpenAccount={noop}
+            isCompact
+            isDocked={false}
+          />
+        </div>
+      )}
+      <ThemePill theme={theme} isDocked={false} />
+    </InPhoneTop>
+  );
+};
 
 export const CanvasPillEntry = () => (
   <Entry
@@ -32,6 +72,94 @@ export const CanvasPillEntry = () => (
       <StateRow name="Version compacte">
         <CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />
       </StateRow>
+      <StateRow
+        name="En live, catégorie longue"
+        detail="Elle ne dépasse jamais la place que la pill Compte lui laisse : la catégorie prend ce qui reste et se coupe par « … »."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} />
+      </StateRow>
+      <StateRow
+        name="En live, presque plus de place"
+        detail="La catégorie disparaît, le logo et le rond restent ; le nom ne se coupe qu'en dernier."
+      >
+        <PhoneHeader owner={SAMPLE_LIVE_OWNER} isNarrow />
+      </StateRow>
+    </Block>
+  </Entry>
+);
+
+const SHORT_THEME = "Halloween";
+const LONG_THEME = "Grande pixel war de la rentrée des lives"; // 40 caractères, le maximum
+const TWO_LINES_THEME = "Festival international des pixels fous";
+
+// Le thème qui paraît, change de largeur puis part : la pill, comme dans le jeu quand le streamer règle son thème.
+const THEME_STEPS = [undefined, SHORT_THEME, "Pixel war de la rentrée", undefined] as const;
+
+const ThemeDemo = () => {
+  const [step, setStep] = useState(0);
+  return (
+    <>
+      <InTopRoom>
+        <ThemePill theme={THEME_STEPS[step]} isDocked={false} />
+      </InTopRoom>
+      <Button label="Changer le thème" onPress={() => setStep((step + 1) % THEME_STEPS.length)} />
+    </>
+  );
+};
+
+export const ThemePillEntry = () => (
+  <Entry
+    slug="pill-theme"
+    components={["ThemePill"]}
+    file="ui/design/theme-pill.tsx"
+    note="Le thème du canvas, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
+    where="En haut au centre, entre les pills Canvas et Compte · sur mobile, une bande sous la rangée des pills du haut, qui monte à leur place en Dessin"
+  >
+    <Block title="États">
+      <StateRow name="Un thème court" detail="Un petit texte discret au-dessus, le thème dessous, gros.">
+        <ThemePill theme={SHORT_THEME} isDocked={false} />
+      </StateRow>
+      <StateRow
+        name="Un thème de 40 caractères, le maximum"
+        detail="Entre les deux pills, la place manque : il se coupe par « … » plutôt que de passer dessous."
+      >
+        <InTopRoom>
+          <ThemePill theme={LONG_THEME} isDocked={false} />
+        </InTopRoom>
+      </StateRow>
+      <StateRow
+        name="Elle paraît, change de largeur et part"
+        detail="Quand le streamer règle son thème, partout en direct."
+        isDemo
+      >
+        <ThemeDemo />
+      </StateRow>
+    </Block>
+    <Block title="Sur mobile">
+      <StateRow
+        name="Un thème court"
+        detail="Une bande sous la rangée des pills du haut, sur la même largeur : « Thème » en petit devant le thème, sur la même ligne."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} />
+      </StateRow>
+      <StateRow name="Un thème sur deux lignes" detail="Deux lignes au plus, coupé par « … » au-delà.">
+        <PhoneHeader owner={SAMPLE_OWNER} theme={LONG_THEME} />
+      </StateRow>
+      <StateRow
+        name="En Dessin"
+        detail="Les pills Canvas et Compte s'effacent en fondu, la bande monte à leur place : seul le thème reste en haut. Sans thème, le haut est vide."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} isDrafting />
+      </StateRow>
+      <StateRow
+        name="Un toast sous la bande"
+        detail="Il se pose dessous et ne la recouvre jamais, quelle que soit sa hauteur ; en Dessin, sous la bande montée."
+      >
+        <InPhoneTop>
+          <ThemePill theme={TWO_LINES_THEME} isDocked={false} />
+          <Toast message={{ id: 1, tone: "success", text: "Thème enregistré" }} isDocked={false} />
+        </InPhoneTop>
+      </StateRow>
     </Block>
   </Entry>
 );
@@ -43,6 +171,7 @@ type AccountScene = {
   isCompact?: boolean;
   pendingReports?: number;
   hasSettings?: boolean;
+  hasModeration?: boolean;
   isDeveloper?: boolean; // écart §10.3 (JOURNAL 2026-10-06) : le bouton Développeur
 };
 
@@ -58,13 +187,23 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
   },
   {
     title: "Connecté",
+    scenes: [{ name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN }],
+  },
+  {
+    title: "Qui modère sur le canvas d'un autre",
     scenes: [
-      { name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN },
       {
-        name: "Qui modère, un signalement attend",
-        detail: "Sa photo ouvre Modération.",
+        name: "Qui modère",
+        detail: "Modération ouvre la fenêtre sur Modération.",
+        identity: SIGNED_IN,
+        hasModeration: true,
+      },
+      {
+        name: "Qui modère, des signalements attendent",
+        detail: "Le point sur Modération, pas sur sa photo.",
         identity: SIGNED_IN,
         pendingReports: 2,
+        hasModeration: true,
       },
     ],
   },
@@ -98,38 +237,57 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
     scenes: [
       { name: "Invité", identity: { kind: "guest" }, isCompact: true },
       { name: "Le streamer sur son canvas", identity: SIGNED_IN, isCompact: true, hasSettings: true },
+      {
+        name: "Qui modère, des signalements attendent",
+        identity: SIGNED_IN,
+        isCompact: true,
+        pendingReports: 2,
+        hasModeration: true,
+      },
     ],
   },
 ];
 
 export const AccountPillEntry = () => {
-  const themeChoice = useThemeChoice();
+  const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="pill-compte"
       components={["AccountPill"]}
       file="ui/account/account-pill.tsx"
-      note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur ou Réglages, le thème et la langue passent à droite de la photo."
+      note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence et la langue passent à droite de la photo."
       where="En haut à droite"
     >
       {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
         <Block key={title} title={title}>
-          {scenes.map(({ name, detail, identity, isCompact, pendingReports, hasSettings, isDeveloper }) => (
-            <StateRow key={name} name={name} detail={detail}>
-              <AccountPill
-                identity={identity}
-                signInHref="#"
-                themeChoice={themeChoice}
-                onPickTheme={pickTheme}
-                onOpenAccount={noop}
-                onOpenSettings={hasSettings ? noop : undefined}
-                onOpenDeveloper={isDeveloper ? noop : undefined}
-                pendingReports={pendingReports ?? 0}
-                isCompact={isCompact ?? false}
-                isDocked={false}
-              />
-            </StateRow>
-          ))}
+          {scenes.map(
+            ({
+              name,
+              detail,
+              identity,
+              isCompact,
+              pendingReports,
+              hasSettings,
+              hasModeration,
+              isDeveloper,
+            }) => (
+              <StateRow key={name} name={name} detail={detail}>
+                <AccountPill
+                  identity={identity}
+                  signInHref="#"
+                  appearanceChoice={appearanceChoice}
+                  onPickAppearance={pickAppearance}
+                  onOpenAccount={noop}
+                  onOpenSettings={hasSettings ? noop : undefined}
+                  onOpenModeration={hasModeration ? noop : undefined}
+                  onOpenDeveloper={isDeveloper ? noop : undefined}
+                  pendingReports={pendingReports ?? 0}
+                  isCompact={isCompact ?? false}
+                  isDocked={false}
+                />
+              </StateRow>
+            ),
+          )}
         </Block>
       ))}
     </Entry>
@@ -335,9 +493,9 @@ export const ViewportPillEntry = () => (
 export const NoticeEntry = () => (
   <Entry
     slug="message-seul"
-    components={["NoticePill", "ArchiveNotFound"]}
-    file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx"
-    note="La page d'accueil, un canvas introuvable."
+    components={["NoticePill", "ArchiveNotFound", "CanvasRecovering"]}
+    file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx, ui/canvas/canvas-recovering.tsx"
+    note="La page d'accueil, un canvas introuvable, un canvas que Redis remet en place."
     where="Au centre"
   >
     <Block title="États">
@@ -347,6 +505,14 @@ export const NoticeEntry = () => (
             <SignInButton href="#" label="Se connecter avec Twitch" />
             <SignInNote />
           </NoticePill>
+        </InNotice>
+      </StateRow>
+      <StateRow
+        name="Canvas en récupération"
+        detail="Pour tous, à la place du canvas ; la page reprend seule. Rien en vue OBS."
+      >
+        <InNotice>
+          <NoticePill title={CANVAS_TEXTS.fr.recovering} />
         </InNotice>
       </StateRow>
       <StateRow name="Une archive supprimée, ou un lien inconnu" detail="Le bouton dit le nom affiché.">

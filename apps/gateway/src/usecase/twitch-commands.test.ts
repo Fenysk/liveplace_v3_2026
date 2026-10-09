@@ -9,6 +9,7 @@ import type {
   TwitchCommandQueue,
 } from "@liveplace/domain/ports";
 import { describe, expect, it, vi } from "vitest";
+import type { ControlMessage } from "./broadcast";
 import { applyTwitchCommand, consumeTwitchCommands } from "./twitch-commands";
 
 const now = 1_700_000_000_000;
@@ -41,7 +42,8 @@ const bannedOf = (userId: string, isFromTwitch: boolean): BannedUser => ({
   hasAccount: true,
 });
 
-type Current = { moderators?: Moderator[]; bans?: BannedUser[] };
+// `unbannable` : ceux que le script refuse de bannir (les modérateurs nommés ici, Écart §5.4, JOURNAL 2026-10-08).
+type Current = { moderators?: Moderator[]; bans?: BannedUser[]; unbannable?: string[] };
 
 // Un noyau qui note ce qu'on lui demande. `slices` : ce que rend chaque appel à `moderate`, dans l'ordre.
 const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
@@ -57,8 +59,14 @@ const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
     async getCanvas(asked: string) {
       return asked === canvasId ? meta : null;
     },
+    async isRecovering() {
+      return false;
+    },
     async moderate(_asked: string, moderation: Moderation) {
       moderations.push(moderation);
+      const { action } = moderation;
+      if (action.action === "ban" && current.unbannable?.includes(action.target))
+        return { ok: false as const, error: "forbidden" as const };
       return {
         ok: true as const,
         value: slices[moderations.length - 1] ?? { version: 1, cells: 0, isDone: true },
@@ -72,7 +80,18 @@ const setup = (slices: ModerationSlice[] = [], current: Current = {}) => {
       return undefined;
     },
   };
-  return { deps: { core, now: () => now, wait: async () => undefined }, moderations, roles };
+  const announced: ControlMessage[] = [];
+  const broadcast = {
+    announce: (control: ControlMessage) => {
+      announced.push(control);
+    },
+  };
+  return {
+    deps: { core, broadcast, now: () => now, wait: async () => undefined },
+    moderations,
+    roles,
+    announced,
+  };
 };
 
 describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
@@ -92,6 +111,16 @@ describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
       { ...base, action: { action: "clearUser", target: "troll" }, slice: "first" },
       { ...base, action: { action: "clearUser", target: "troll" }, slice: "next" },
     ]);
+  });
+
+  // Un ban Twitch que le noyau refuse (un modérateur nommé ici) est ignoré : aucun retrait ne le suit (Écart §5.4, JOURNAL 2026-10-08)
+  it("ignores a Twitch ban that the core refuses, a moderator named here: no clear follows", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+
+    const outcome = await applyTwitchCommand(deps, { kind: "ban", canvasId, userId: "mod-here" });
+
+    expect(outcome).toBe("done");
+    expect(moderations.map(({ action }) => action.action)).toEqual(["ban"]);
   });
 
   // Un déban Twitch ne fait qu'un unban Twitch : c'est le noyau qui le refuse s'il ne vient pas de Twitch
@@ -152,6 +181,67 @@ describe("a full Twitch list (JOURNAL 2026-09-27)", () => {
       "unban:lifted:first",
     ]);
   });
+
+  // Dans la liste, un ban refusé (un modérateur nommé ici) ne retient pas les suivants et ne retire rien ; la synchro suivante le retentera
+  it("keeps going past a ban the core refuses in the list, and clears nothing of the refused one", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+
+    await applyTwitchCommand(deps, { kind: "bans", canvasId, userIds: ["mod-here", "troll"] });
+
+    expect(moderations.map(({ action, slice }) => `${action.action}:${action.target}:${slice}`)).toEqual([
+      "ban:mod-here:first",
+      "ban:troll:first",
+      "clearUser:troll:first",
+    ]);
+  });
+});
+
+describe("a Twitch live told to the pages (Écart §4, JOURNAL 2026-10-07)", () => {
+  // Annonce le live d'un compte à toutes les pages jointes, avec sa catégorie, sans toucher à aucun canvas
+  it("announces the live of an account to the joined pages, with its category, touching no canvas", async () => {
+    const { deps, announced, moderations } = setup();
+
+    const outcome = await applyTwitchCommand(deps, {
+      kind: "twitchLive",
+      userId: "owner-1",
+      twitchLive: { category: "Art" },
+    });
+
+    expect(outcome).toBe("done");
+    expect(announced).toEqual([{ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } }]);
+    expect(moderations).toEqual([]);
+  });
+
+  // La fin d'un live s'annonce sans live, sans clé vide
+  it("announces the end of a live without a live, not with an empty key", async () => {
+    const { deps, announced } = setup();
+
+    await applyTwitchCommand(deps, { kind: "twitchLive", userId: "owner-1" });
+
+    expect(announced).toEqual([{ t: "twitchLive", userId: "owner-1" }]);
+    expect(announced[0]).not.toHaveProperty("twitchLive");
+  });
+
+  // Acquitte un live comme les autres actions de la file, sans qu'un canvas prêt soit nécessaire
+  it("acknowledges a live like the other commands of the queue, with no ready canvas needed", async () => {
+    const { deps, announced } = setup();
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [{ id: "id-0", command: { kind: "twitchLive", userId: "unknown-owner" } }];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(deps, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["id-0"]);
+    expect(announced).toHaveLength(1);
+  });
 });
 
 describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
@@ -187,6 +277,37 @@ describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
   });
+
+  // Acquitte un ban que le noyau refuse sans le retenter ni le journaliser comme une panne (Écart §5.4, JOURNAL 2026-10-08)
+  it("acknowledges a ban the core refuses, without retrying it nor logging it as a failure", async () => {
+    const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [
+          { id: "id-0", command: { kind: "ban", canvasId, userId: "mod-here" } },
+          { id: "id-1", command: { kind: "ban", canvasId, userId: "troll" } },
+        ];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await consumeTwitchCommands(deps, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["id-0", "id-1"]);
+    expect(moderations.map(({ action }) => `${action.action}:${action.target}`)).toEqual([
+      "ban:mod-here",
+      "ban:troll",
+      "clearUser:troll",
+    ]);
+    expect(logged).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
 });
 
 // Écart §15 (JOURNAL 2026-10-06) : une action visait le canvas actif d'hier ; elle suit `successorId` jusqu'à celui d'aujourd'hui.
@@ -208,6 +329,9 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
       async getCanvas(asked: string) {
         const next = answers[asked];
         return next && next.length > 1 ? (next.shift() ?? null) : (next?.[0] ?? null);
+      },
+      async isRecovering() {
+        return false;
       },
       async listModerators() {
         return [];
@@ -231,6 +355,7 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
     };
     const deps = {
       core,
+      broadcast: { announce: () => undefined },
       now: () => now,
       wait: async (ms: number) => {
         waits.push(ms);
@@ -407,5 +532,130 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
     expect(acknowledged).toEqual(["id-1"]);
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
+  });
+});
+
+// Écart §4.2 (JOURNAL 2026-10-08) : le canvas est perdu et Redis le remet en place ; une action Twitch ne s'oublie pas.
+describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+  const ban: TwitchCommand = { kind: "ban", canvasId, userId: "troll" };
+
+  // Un noyau dont le canvas manque `missingFor` lectures, en récupération pendant ce temps, puis prêt
+  const recovering = (missingFor: number, isRecoveringWhileMissing = true) => {
+    let reads = 0;
+    const moderations: Moderation[] = [];
+    const core = {
+      async getCanvas(asked: string) {
+        if (asked !== canvasId) return null;
+        reads += 1;
+        return reads > missingFor ? meta : null;
+      },
+      async isRecovering() {
+        return isRecoveringWhileMissing && reads <= missingFor;
+      },
+      async listModerators() {
+        return [];
+      },
+      async listBans() {
+        return [];
+      },
+      async moderate(_asked: string, moderation: Moderation) {
+        moderations.push(moderation);
+        return { ok: true as const, value: { version: 1, cells: 0, isDone: true } };
+      },
+      async setModerator() {
+        return { ok: true as const, value: undefined };
+      },
+      async copyTwitchUsers() {
+        return undefined;
+      },
+    };
+    const deps = {
+      core,
+      broadcast: { announce: () => undefined },
+      now: () => now,
+      wait: async () => undefined,
+    };
+    return { deps, moderations };
+  };
+
+  // L'action d'un canvas en récupération n'est ni appliquée ni oubliée : elle attend
+  it("neither applies nor forgets the action of a canvas being recovered: it waits", async () => {
+    const { deps, moderations } = recovering(5);
+
+    expect(await applyTwitchCommand(deps, ban)).toBe("recovering");
+
+    expect(moderations).toEqual([]);
+  });
+
+  // Un canvas absent qui n'est pas en récupération reste oublié, comme avant
+  it("still forgets the action of a canvas that is missing and not being recovered", async () => {
+    const { deps, moderations } = recovering(5, false);
+
+    expect(await applyTwitchCommand(deps, ban)).toBe("done");
+
+    expect(moderations).toEqual([]);
+  });
+
+  // La file garde l'action sans l'acquitter, la rejoue à chaque tour, l'applique quand le canvas revient, puis l'acquitte
+  it("keeps the action unacknowledged, replays it each turn, applies it when the canvas is back, then acknowledges it", async () => {
+    const { deps, moderations } = recovering(2);
+    const batches: TwitchCommand[][] = [[ban], [], [], [], []];
+    const acknowledged: string[] = [];
+    const turns: number[] = [];
+    let turn = 0;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        turns.push(acknowledged.length);
+        const batch = batches[turn] ?? [];
+        turn += 1;
+        return batch.map((command) => ({ id: `id-${turn}`, command }));
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(deps, queue, () => turn < batches.length);
+
+    expect(turns.slice(0, 2)).toEqual([0, 0]);
+    expect(acknowledged).toEqual(["id-1"]);
+    expect(moderations.map(({ action }) => action)).toEqual([
+      { action: "ban", target: "troll" },
+      { action: "clearUser", target: "troll" },
+    ]);
+  });
+
+  // Une action en attente ne retient pas celles des autres canvas
+  it("does not hold back the actions of the other canvases while one waits", async () => {
+    const { deps, moderations } = recovering(100);
+    const elsewhere = {
+      ...deps,
+      core: {
+        ...deps.core,
+        getCanvas: async (asked: string) => (asked === "canvas-2" ? meta : deps.core.getCanvas(asked)),
+      },
+    };
+    const acknowledged: string[] = [];
+    let isRunning = true;
+    const queue: TwitchCommandQueue = {
+      async listTwitchCommands() {
+        isRunning = false;
+        return [
+          { id: "waiting", command: ban },
+          {
+            id: "other",
+            command: { kind: "moderator", canvasId: "canvas-2", userId: "mod-1", isModerator: true },
+          },
+        ];
+      },
+      async ackTwitchCommand(id) {
+        acknowledged.push(id);
+      },
+    };
+
+    await consumeTwitchCommands(elsewhere, queue, () => isRunning);
+
+    expect(acknowledged).toEqual(["other"]);
+    expect(moderations).toEqual([]);
   });
 });

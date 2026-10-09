@@ -4,9 +4,11 @@ import {
   pickLinkedCanvas,
   planArchive,
   planDiscard,
-  planRename,
+  planNameToTheme,
   planReopen,
+  planSetTheme,
   type StoredCanvas,
+  toActiveCanvas,
   toOwnerCanvases,
 } from "./canvas-plan";
 
@@ -45,9 +47,9 @@ const archiving = {
 };
 
 describe("planArchive (Écart §15, JOURNAL 2026-10-06)", () => {
-  // Archive l'actif avec sa date, son code et son nom, et insère le nouveau canvas actif, né à cet instant
-  it("archives the active canvas with its date, code and name, and inserts the new one, born at that instant", () => {
-    const plan = planArchive([active], { ...archiving, name: "Printemps" });
+  // Archive l'actif avec sa date, son code et son thème, et insère le nouveau canvas actif, né à cet instant, sans thème
+  it("archives the active canvas with its date, code and theme, and inserts the new one, born at that instant, with no theme", () => {
+    const plan = planArchive([active], { ...archiving, theme: "Printemps" });
 
     expect(plan).toEqual({
       ok: true,
@@ -55,7 +57,7 @@ describe("planArchive (Écart §15, JOURNAL 2026-10-06)", () => {
         {
           kind: "patch",
           canvasId: active.canvasId,
-          fields: { isActive: false, archivedAt: 5000, linkCode: "freshcode1", name: "Printemps" },
+          fields: { isActive: false, archivedAt: 5000, linkCode: "freshcode1", theme: "Printemps" },
         },
         {
           kind: "insert",
@@ -74,22 +76,56 @@ describe("planArchive (Écart §15, JOURNAL 2026-10-06)", () => {
     });
   });
 
-  // Garde le code d'un canvas qui en avait un (rouvert, puis archivé de nouveau), et retire son ancien nom sans nom donné
-  it("keeps the code of a canvas that had one, and drops its old name when none is given", () => {
-    const reopened = { ...active, linkCode: "oldcode123", name: "Avant" };
+  // Garde le code d'un canvas qui en avait un (rouvert, puis archivé de nouveau), et retire son ancien thème sans thème donné
+  it("keeps the code of a canvas that had one, and drops its old theme when none is given", () => {
+    const reopened = { ...active, linkCode: "oldcode123", theme: "Avant" };
 
-    // Strict : `name` est là, à `undefined`, car c'est ce qui le retire du document.
+    // Strict : `theme` et `name` sont là, à `undefined`, car c'est ce qui les retire du document.
     expect(planArchive([reopened], archiving)).toStrictEqual({
       ok: true,
       writes: [
         {
           kind: "patch",
           canvasId: active.canvasId,
-          fields: { isActive: false, archivedAt: 5000, linkCode: "oldcode123", name: undefined },
+          fields: {
+            isActive: false,
+            archivedAt: 5000,
+            linkCode: "oldcode123",
+            theme: undefined,
+            name: undefined,
+          },
         },
         expect.objectContaining({ kind: "insert" }),
       ],
     });
+  });
+
+  // Ancien appel (le code d'avant envoie `name`) : pris comme thème quand `theme` est absent, jamais écrit sous `name`
+  it("takes the old `name` argument as the theme when `theme` is absent, and never writes it under `name`", () => {
+    const named = planArchive([active], { ...archiving, name: "Printemps" });
+
+    expect(named).toEqual(planArchive([active], { ...archiving, theme: "Printemps" }));
+    expect(named).toMatchObject({
+      ok: true,
+      writes: [{ kind: "patch", fields: { theme: "Printemps" } }, { kind: "insert" }],
+    });
+    expect(named.ok && named.writes[0]).not.toHaveProperty("fields.name");
+  });
+
+  // Quand `theme` et `name` arrivent ensemble, le thème l'emporte
+  it("lets `theme` win when it comes with the old `name`", () => {
+    const plan = planArchive([active], { ...archiving, theme: "Neuf", name: "Ancien" });
+
+    expect(plan).toMatchObject({ ok: true, writes: [{ fields: { theme: "Neuf" } }, { kind: "insert" }] });
+  });
+
+  // Un `theme` ou un `name` vide ne donne pas de thème : le champ part, comme sans argument
+  it("gives no theme for an empty `theme` or old `name`, like without an argument", () => {
+    const without = planArchive([active], archiving);
+
+    expect(planArchive([active], { ...archiving, name: "" })).toEqual(without);
+    expect(planArchive([active], { ...archiving, theme: "", name: "" })).toEqual(without);
+    expect(without).toMatchObject({ writes: [{ fields: { theme: undefined, name: undefined } }, {}] });
   });
 
   // Refuse le sixième archivage : le plafond se vérifie dans la transaction
@@ -123,9 +159,9 @@ describe("planReopen (Écart §15, JOURNAL 2026-10-06)", () => {
     linkCode: "freshcode1",
   };
 
-  // Échange l'actif et l'archive : l'actif prend sa place, l'archive revient sans date, avec son code et son nom
+  // Échange l'actif et l'archive : l'actif prend sa place, l'archive revient sans date, avec son code et son thème
   it("swaps the active canvas and the archive: the active one takes its place, the archive comes back without a date", () => {
-    // Strict : l'archive qui revient ne porte ni `linkCode` ni `name` dans ses champs, donc les garde.
+    // Strict : l'archive qui revient ne porte ni `linkCode` ni `theme` dans ses champs, donc les garde.
     expect(planReopen([active, ...archives(MAX_ARCHIVES)], reopening)).toStrictEqual({
       ok: true,
       writes: [
@@ -195,40 +231,143 @@ describe("planDiscard (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("planRename (Écart §15, JOURNAL 2026-10-06)", () => {
-  // Pose le nom sur le canvas actif de ce propriétaire, rien d'autre
-  it("sets the name on the active canvas of this owner, and writes nothing else", () => {
-    expect(planRename([active, ...archives(2)], ownerId, active.canvasId, "Printemps")).toEqual({
+describe("planSetTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  // Pose le thème sur le canvas actif de ce propriétaire, rien d'autre
+  it("sets the theme on the active canvas of this owner, and writes nothing else", () => {
+    expect(planSetTheme([active, ...archives(2)], ownerId, active.canvasId, "Printemps")).toEqual({
       ok: true,
-      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { name: "Printemps" } }],
+      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { theme: "Printemps" } }],
     });
   });
 
-  // Sans nom, le patch porte un `name` à `undefined` : c'est ce qui retire le champ du document
-  it("removes the name without one: the patch carries an undefined name, which drops the field", () => {
-    const plan = planRename([{ ...active, name: "Printemps" }], ownerId, active.canvasId, undefined);
+  // Sans thème, le patch porte un `theme` et un `name` à `undefined` : c'est ce qui retire les champs du document
+  it("removes the theme without one: the patch carries an undefined theme and name, which drops the fields", () => {
+    const plan = planSetTheme([{ ...active, theme: "Printemps" }], ownerId, active.canvasId, undefined);
 
     expect(plan).toStrictEqual({
       ok: true,
-      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { name: undefined } }],
+      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { theme: undefined, name: undefined } }],
+    });
+  });
+
+  // Ancien appel `rename` (le code d'avant envoie `name`) : la mutation passe `name` à ce plan, qui le pose comme thème,
+  // sans jamais écrire `name`, et le retire avec le thème quand il est vide
+  it("serves the old `rename` call: the name becomes the theme, `name` is never written, an empty one removes both", () => {
+    const withName = [{ ...active, name: "Avant" }, ...archives(2)];
+
+    expect(planSetTheme(withName, ownerId, active.canvasId, "Après")).toStrictEqual({
+      ok: true,
+      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { theme: "Après" } }],
+    });
+    expect(planSetTheme(withName, ownerId, active.canvasId, "")).toStrictEqual({
+      ok: true,
+      writes: [{ kind: "patch", canvasId: active.canvasId, fields: { theme: undefined, name: undefined } }],
+    });
+    expect(planSetTheme(withName, ownerId, "canvas-archive-2", "Après")).toEqual({
+      ok: false,
+      error: "not_active",
     });
   });
 
   // Jamais une archive, ni le canvas d'un autre propriétaire, ni un inconnu : `not_active`
-  it("never renames an archive, another owner's canvas or an unknown one", () => {
+  it("never sets the theme of an archive, another owner's canvas or an unknown one", () => {
     const canvases = [active, ...archives(2)];
 
-    expect(planRename(canvases, ownerId, "canvas-archive-2", "Autre")).toEqual({
+    expect(planSetTheme(canvases, ownerId, "canvas-archive-2", "Autre")).toEqual({
       ok: false,
       error: "not_active",
     });
-    expect(planRename(canvases, "owner-2", active.canvasId, "Autre")).toEqual({
+    expect(planSetTheme(canvases, "owner-2", active.canvasId, "Autre")).toEqual({
       ok: false,
       error: "not_active",
     });
-    expect(planRename(canvases, ownerId, "canvas-elsewhere", "Autre")).toEqual({
+    expect(planSetTheme(canvases, ownerId, "canvas-elsewhere", "Autre")).toEqual({
       ok: false,
       error: "not_active",
+    });
+  });
+});
+
+describe("planNameToTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  // Ce que les documents deviennent une fois les écritures appliquées, comme `db.patch`
+  const applied = (canvases: readonly StoredCanvas[]): StoredCanvas[] => {
+    const plan = planNameToTheme(canvases);
+    return canvases.map((canvas) => {
+      const write = plan.find((each) => each.kind === "patch" && each.canvasId === canvas.canvasId);
+      if (write?.kind !== "patch") return canvas;
+      return { ...canvas, ...write.fields } as StoredCanvas;
+    });
+  };
+
+  // Recopie l'ancien nom dans le thème vide, sur l'actif comme sur les archives, sans toucher aux autres, et ne retire
+  // jamais `name` : le code d'avant l'affiche encore
+  it("copies the old name into an empty theme, on the active canvas and the archives, leaving the others alone and never removing `name`", () => {
+    const canvases = [{ ...active, name: "Printemps" }, archiveOf(1, { name: "Hiver" }), archiveOf(2)];
+
+    // Strict : les champs ne portent que `theme`, aucun `name` à `undefined`, qui le retirerait.
+    expect(planNameToTheme(canvases)).toStrictEqual([
+      { kind: "patch", canvasId: active.canvasId, fields: { theme: "Printemps" } },
+      { kind: "patch", canvasId: "canvas-archive-1", fields: { theme: "Hiver" } },
+    ]);
+    expect(applied(canvases)).toEqual([
+      { ...active, name: "Printemps", theme: "Printemps" },
+      archiveOf(1, { name: "Hiver", theme: "Hiver" }),
+      archiveOf(2),
+    ]);
+  });
+
+  // Un thème déjà posé l'emporte et rien n'est écrit ; un nom vide ne donne aucun thème
+  it("lets a theme already set win, writing nothing; an empty name gives no theme", () => {
+    const canvases = [{ ...active, name: "Ancien", theme: "Neuf" }, archiveOf(1, { name: "" })];
+
+    expect(planNameToTheme(canvases)).toEqual([]);
+    expect(applied(canvases)).toEqual(canvases);
+  });
+
+  // Un thème vide (la chaîne vide) est un thème absent : le nom y est recopié
+  it("treats an empty theme as an absent one: the name is copied into it", () => {
+    expect(planNameToTheme([{ ...active, name: "Printemps", theme: "" }])).toEqual([
+      { kind: "patch", canvasId: active.canvasId, fields: { theme: "Printemps" } },
+    ]);
+  });
+
+  // Idempotente : une fois passée, elle n'a plus rien à faire, et sur rien elle ne fait rien
+  it("is idempotent: once run it has nothing left to do, and on nothing it does nothing", () => {
+    const canvases = [{ ...active, name: "Printemps" }, archiveOf(1, { name: "Hiver" }), archiveOf(2)];
+
+    expect(planNameToTheme(applied(canvases))).toEqual([]);
+    expect(planNameToTheme(applied(applied(canvases)))).toEqual([]);
+    expect(planNameToTheme([])).toEqual([]);
+  });
+
+  // Après elle, retirer le thème retire aussi l'ancien nom : relancée, elle ne ressortirait pas un thème qu'on a retiré
+  it("cannot bring back a theme that was removed after it ran: removing the theme removes the old name too", () => {
+    const migrated = applied([{ ...active, name: "Printemps" }]);
+    const removal = planSetTheme(migrated, ownerId, active.canvasId, undefined);
+    const afterRemoval = migrated.map((canvas) =>
+      removal.ok && removal.writes[0]?.kind === "patch"
+        ? ({ ...canvas, ...removal.writes[0].fields } as StoredCanvas)
+        : canvas,
+    );
+
+    expect(planNameToTheme(afterRemoval)).toEqual([]);
+  });
+});
+
+describe("toActiveCanvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+  // Donne le canvas actif de la page avec son thème s'il en a un, sans champ vide ni champ interne
+  it("gives the canvas of the page with its theme when it has one, with no empty or internal field", () => {
+    expect(toActiveCanvas({ ...active, theme: "Printemps", linkCode: "kept123456" })).toEqual({
+      canvasId: active.canvasId,
+      width: 50,
+      height: 50,
+      theme: "Printemps",
+    });
+    expect(toActiveCanvas(active)).toStrictEqual({ canvasId: active.canvasId, width: 50, height: 50 });
+    expect(toActiveCanvas({ ...active, theme: "" })).toStrictEqual({
+      canvasId: active.canvasId,
+      width: 50,
+      height: 50,
     });
   });
 });
@@ -236,7 +375,7 @@ describe("planRename (Écart §15, JOURNAL 2026-10-06)", () => {
 describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)", () => {
   // Sépare l'actif des archives, sans champ vide ni champ interne
   it("splits the active canvas from the archives, with no empty or internal field", () => {
-    const listed = toOwnerCanvases([archiveOf(1, { name: "Hiver" }), active, archiveOf(2)]);
+    const listed = toOwnerCanvases([archiveOf(1, { theme: "Hiver" }), active, archiveOf(2)]);
 
     expect(listed.active).toEqual({ canvasId: active.canvasId, width: 50, height: 50, createdAt: 1000 });
     expect(listed.archives).toEqual([
@@ -247,7 +386,8 @@ describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)
         createdAt: 100,
         archivedAt: 150,
         linkCode: "code1xxxxx",
-        name: "Hiver",
+        theme: "Hiver",
+        name: "Hiver", // ancien alias du thème, pour le code d'avant
       },
       {
         canvasId: "canvas-archive-2",
@@ -258,6 +398,32 @@ describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)
         linkCode: "code2xxxxx",
       },
     ]);
+  });
+
+  // Le canvas actif porte son thème, celui qu'il a reçu du streamer ou qu'une archive rouverte a gardé
+  it("lets the active canvas carry its theme, the one the streamer gave it or a reopened archive kept", () => {
+    expect(toOwnerCanvases([{ ...active, theme: "Printemps" }, archiveOf(1)]).active).toEqual({
+      canvasId: active.canvasId,
+      width: 50,
+      height: 50,
+      createdAt: 1000,
+      theme: "Printemps",
+      name: "Printemps",
+    });
+  });
+
+  // Le code d'avant lit `name` pour ses titres : les listes le rendent aussi, comme alias du thème et jamais comme le champ
+  // stocké, que seule la migration lit ; un canvas sans thème n'a ni l'un ni l'autre
+  it("gives the old code the `name` it reads for its titles, as an alias of the theme and never the stored field", () => {
+    const stored = { name: "Ancien", theme: "Neuf" };
+    const listed = toOwnerCanvases([{ ...active, ...stored }, archiveOf(1, stored), archiveOf(2)]);
+    const linked = pickLinkedCanvas([archiveOf(1, stored)], "code1xxxxx");
+
+    expect(listed.active).toMatchObject({ theme: "Neuf", name: "Neuf" });
+    expect(listed.archives[0]).toMatchObject({ theme: "Neuf", name: "Neuf" });
+    expect(linked).toMatchObject({ status: "archived", archive: { theme: "Neuf", name: "Neuf" } });
+    expect(listed.archives[1]).not.toHaveProperty("name");
+    expect(toOwnerCanvases([{ ...active, name: "Ancien" }]).active).not.toHaveProperty("name");
   });
 
   // Ne liste pas un canvas inactif sans code ni date : ce n'est pas une archive, il n'a pas de lien

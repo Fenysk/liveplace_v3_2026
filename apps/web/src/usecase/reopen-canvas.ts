@@ -62,6 +62,10 @@ const reopen = async (deps: SwitchDeps, ownerId: string, request: ReopenRequest)
       deps.redis.copyProgress(active.canvasId, reopened.canvasId),
     );
   await bestEffort("signalements non classés", () => deps.redis.settleReports(active.canvasId));
+  // La copie de l'archive égale Convex avant qu'elle ne serve : son thème, qui s'affiche alors à tous (Écart §8.1, JOURNAL 2026-10-07).
+  await bestEffort("thème de l'archive rouverte non copié", () =>
+    deps.redis.setTheme(reopened.canvasId, reopened.theme),
+  );
   await bestEffort("archive non rouverte", () => deps.redis.markActive(reopened.canvasId));
   await bestEffort("statut de l'archive quittée non publié", () =>
     deps.redis.publishStatus(active.canvasId, "archived"),

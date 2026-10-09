@@ -1,6 +1,6 @@
 // La vue OBS (§9.1) : OBS Studio et Streamlabs injectent tous deux `window.obsstudio` dans leurs sources Navigateur, et
 // `/{login}/obs` force la vue dans un navigateur normal. §9.1 : la marque est posée avant la
-// première peinture, par un script émis par `ScriptOnce` comme celui du thème. Le CSS cache alors l'interface.
+// première peinture, par un script émis par `ScriptOnce` comme celui de l'apparence. Le CSS cache alors l'interface.
 
 import { useSyncExternalStore } from "react";
 

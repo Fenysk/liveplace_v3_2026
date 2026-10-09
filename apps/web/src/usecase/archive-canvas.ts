@@ -1,7 +1,7 @@
 // Écart §10.3 (JOURNAL 2026-10-06) : archiver le canvas actif, et repartir sur un canvas vide.
 // L'ordre fait l'opération fiable : tant que Convex n'a pas tranché, tout se défait ; après, plus rien ne l'empêche.
 
-import { type CanvasMeta, MAX_ARCHIVES, toArchiveName } from "@liveplace/domain";
+import { type CanvasMeta, MAX_ARCHIVES, toTheme } from "@liveplace/domain";
 import {
   bestEffort,
   commitToDurable,
@@ -13,9 +13,10 @@ import {
   withOwnerLock,
 } from "./canvas-switch";
 
-export type ArchiveRequest = { canvasId: string; name: string; progress: ProgressChoice };
+export type ArchiveRequest = { canvasId: string; theme: string; progress: ProgressChoice };
 
-// Le canvas vide qui prend la place : la même taille, les mêmes jauges de départ et maximale, la même recharge.
+// Le canvas vide qui prend la place : la même taille, les mêmes jauges de départ et maximale, la même recharge. Son
+// thème ne se recopie pas : il part sans (Écart §8.1, JOURNAL 2026-10-07).
 const toIncomingMeta = (meta: CanvasMeta): CanvasMeta => ({
   ownerId: meta.ownerId,
   width: meta.width,
@@ -44,7 +45,7 @@ const archive = async (deps: SwitchDeps, ownerId: string, request: ArchiveReques
 
   const incoming = { canvasId: deps.randomCanvasId(), width: outgoing.width, height: outgoing.height };
   const archivedAt = deps.now();
-  const name = toArchiveName(request.name);
+  const theme = toTheme(request.theme);
   try {
     // Le nouveau canvas sans `ready` : personne ne le sert. Puis le sortant figé d'un seul `HSET` : dès lors, aucun
     // script n'y écrit plus, et personne ne voit un nouveau canvas à moitié copié.
@@ -66,7 +67,7 @@ const archive = async (deps: SwitchDeps, ownerId: string, request: ArchiveReques
       incoming,
       archivedAt,
       linkCode: active.linkCode ?? deps.randomLinkCode(),
-      ...(name ? { name } : {}),
+      ...(theme ? { theme } : {}),
     }),
   );
   if (!committed.ok) {
@@ -75,6 +76,8 @@ const archive = async (deps: SwitchDeps, ownerId: string, request: ArchiveReques
   }
 
   await bestEffort("signalements non classés", () => deps.redis.settleReports(active.canvasId));
+  // La copie de l'archive égale Convex : le thème du dialogue, ou aucun. Rien n'est publié, ses pages changent de canvas.
+  await bestEffort("thème de l'archive non copié", () => deps.redis.setTheme(active.canvasId, theme));
   await bestEffort("statut non publié", () => deps.redis.publishStatus(active.canvasId, "archived"));
   return succeeded;
 };
