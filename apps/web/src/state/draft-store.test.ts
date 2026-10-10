@@ -31,6 +31,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   isBanned: false,
   isArchived: false,
   isDiscarded: false,
+  isImageLoaded: true,
   pixels: new Uint8Array(256 * 4).fill(9),
   ...overrides,
 });

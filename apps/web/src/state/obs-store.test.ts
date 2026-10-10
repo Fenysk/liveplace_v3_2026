@@ -28,6 +28,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   isBanned: false,
   isArchived: false,
   isDiscarded: false,
+  isImageLoaded: true,
   pixels: new Uint8Array(16),
 });
 

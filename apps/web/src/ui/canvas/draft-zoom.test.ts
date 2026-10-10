@@ -6,7 +6,7 @@ import { createCanvasStore } from "../../state/canvas-store";
 import { createDraftStore } from "../../state/draft-store";
 import type { DraftStorage } from "../../state/saved-draft";
 import { COARSE_POINTER_QUERY } from "../design/use-media-query";
-import { createCanvasScene } from "./canvas-scene";
+import { createCanvasScene, createHandoff, type Handoff } from "./canvas-scene";
 import {
   COMFORTABLE_CELL,
   comfortableCell,
@@ -32,10 +32,18 @@ import {
 } from "./viewport";
 
 // La scène tourne ici sans navigateur : seules l'image peinte (on y lit le viewport) et la mesure des pills sont remplacées.
-type Probe = { frames: Scene[]; arrival: { insets: Insets; zone: ArrivalZone }; draftInsets: Insets };
+type Probe = {
+  frames: Scene[];
+  ghosts: unknown[]; // les fresques gardées seules à l'écran, en attendant la nouvelle
+  levelBuilds: number; // les mosaïques construites
+  arrival: { insets: Insets; zone: ArrivalZone };
+  draftInsets: Insets;
+};
 const probe = vi.hoisted(
   (): Probe => ({
     frames: [],
+    ghosts: [],
+    levelBuilds: 0,
     arrival: { insets: { top: 0, right: 0, bottom: 0, left: 0 }, zone: "side" },
     draftInsets: { top: 0, right: 0, bottom: 0, left: 0 },
   }),
@@ -44,8 +52,18 @@ vi.mock("./render-scene", () => ({
   renderScene: (_context: unknown, scene: Scene) => {
     probe.frames.push(scene);
   },
+  renderGhost: (_context: unknown, source: unknown) => {
+    probe.ghosts.push(source);
+  },
 }));
-vi.mock("./canvas-image", () => ({ createCanvasImage: () => ({ source: {}, repaint: () => undefined }) }));
+vi.mock("./canvas-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./canvas-image")>()),
+  createCanvasImage: () => ({ source: {}, repaint: () => undefined }),
+  toLevelCanvases: (levels: readonly object[]) => {
+    probe.levelBuilds += 1;
+    return levels.map(() => ({}));
+  },
+}));
 vi.mock("./arrival-insets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./arrival-insets")>()),
   measureArrivalInsets: () => probe.arrival,
@@ -207,6 +225,7 @@ class FakeMutationObserver {
 const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
   if (name === "--lp-dur-fast") return browser.isReducedMotion ? "0s" : "0.14s";
+  if (name === "--lp-dur-reveal") return browser.isReducedMotion ? "0s" : "0.5s";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
 };
 
@@ -222,6 +241,8 @@ const startBrowser = () => {
   browser.mutations.length = 0;
   browser.attributes.clear();
   probe.frames.length = 0;
+  probe.ghosts.length = 0;
+  probe.levelBuilds = 0;
   const root = {
     toggleAttribute: (name: string, force?: boolean) => {
       if (force) browser.attributes.add(name);
@@ -359,10 +380,20 @@ const BIG_CANVAS = { width: 256, height: 256 };
 
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
-type Options = { canvas?: Size; draft?: readonly Cell[]; isReducedMotion?: boolean };
+// `isLoaded` : le snapshot est déjà là quand la scène naît (une page remontée après une récupération). `handoff` : le passage d'une scène à l'autre.
+type Options = {
+  canvas?: Size;
+  draft?: readonly Cell[];
+  isReducedMotion?: boolean;
+  isLoaded?: boolean;
+  handoff?: Handoff;
+};
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
-const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion = false }: Options = {}) => {
+const openScene = (
+  place: Place,
+  { canvas = CANVAS, draft = [], isReducedMotion = false, isLoaded = false, handoff }: Options = {},
+) => {
   probe.arrival = place.arrival;
   probe.draftInsets = place.draftInsets;
   browser.isCoarse = place.isTouch;
@@ -400,14 +431,18 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
   });
   const hooks = { onViewportMove: vi.fn(), onFraming: vi.fn(), onGesture: vi.fn(), onNavigate: vi.fn() };
   const surface = createSurface();
+  const snapshot = (pixels = new Uint8Array(canvas.width * canvas.height)) =>
+    listening.listeners?.onSnapshot(pixels);
+  if (isLoaded) snapshot();
   const scene = createCanvasScene(surface.element, store, draftStore, {
     initialViewport: null,
     isFramedInFreeArea: true,
     ...hooks,
+    handoff,
     checker: LAYER,
     checkerTiles: LAYER,
   });
-  browser.resizes[0]?.([{ contentRect: place.screen }]);
+  browser.resizes.at(-1)?.([{ contentRect: place.screen }]);
   flush(FRAME_MS);
   const press = (type: string, point: ScreenPoint) =>
     surface.dispatch(type, {
@@ -436,6 +471,8 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
     lastPlace,
     lastInspect,
     receive,
+    snapshot,
+    surface: surface.element,
     // Le serveur répond au dernier lot posé : il en accepte les cases, sauf celles dont on donne la place dans le lot.
     answer: (rejectedIndexes: readonly number[] = []) => {
       const { requestId, pixels } = lastPlace();
@@ -1265,6 +1302,232 @@ describe("le viseur de l'inspection qui glisse", () => {
     const xs = path.map(({ x }) => x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     expect(path.at(-1)).toEqual({ x: 15, y: 5 });
+  });
+});
+
+// Les images peintes avec une ancienne fresque encore à l'écran.
+const framesWithGhost = () => probe.frames.filter(({ ghost }) => ghost !== null).length;
+
+describe("la fresque qui paraît en mosaïque", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Le chemin de l'apparition, image après image : l'étape et sa progression, jusqu'à ce qu'il n'y ait plus de mosaïque.
+  const stepsOf = () => probe.frames.flatMap(({ reveal }) => (reveal ? [reveal] : []));
+
+  // Avant le snapshot, la fresque n'est qu'un décor vide : rien n'apparaît encore, et rien n'est attendu
+  it("reveals nothing before the snapshot comes, and schedules nothing", () => {
+    const world = openScene(LAPTOP_PLACE);
+    flush(SETTLE_MS);
+
+    expect(stepsOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // À l'arrivée de l'image : quatre étapes dans l'ordre, chacune de 0 à 1 sur son quart de `--lp-dur-reveal`, puis plus rien
+  it("goes through four steps in order over --lp-dur-reveal once the snapshot comes, then schedules nothing", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.snapshot();
+    flush(FRAME_MS);
+    expect(lastFrame().reveal).toMatchObject({ step: 0, progress: 0 });
+    flush(SETTLE_MS);
+
+    const steps = stepsOf();
+    const stepNumbers = steps.map(({ step }) => step);
+    expect(new Set(stepNumbers)).toEqual(new Set([0, 1, 2, 3]));
+    expect(stepNumbers).toEqual([...stepNumbers].sort());
+    // Chaque étape repart près de 0 (la courbe démarre fort : une image de 16 ms en fait déjà un tiers) et monte sans redescendre.
+    for (const step of [0, 1, 2, 3]) {
+      const progresses = steps.filter((each) => each.step === step).map(({ progress }) => progress);
+      expect(progresses[0]).toBeLessThan(0.5);
+      expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+      expect(progresses.at(-1)).toBeLessThan(1);
+    }
+    expect(steps.length).toBeGreaterThanOrEqual(28);
+    expect(steps.length).toBeLessThanOrEqual(34);
+    expect(lastFrame().reveal).toBeNull();
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les niveaux se calculent une fois par apparition, pas à chaque image : la même mosaïque sert à toutes
+  it("builds the mosaic once for the whole appearance", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.levelBuilds).toBe(1);
+    expect(new Set(stepsOf().map(({ levels }) => levels)).size).toBe(1);
+    expect(stepsOf()[0]?.levels).toHaveLength(3);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la fresque paraît d'un coup, sans mosaïque ni image attendue
+  it("shows the fresque at once when motion is reduced", () => {
+    const world = openScene(LAPTOP_PLACE, { isReducedMotion: true });
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(stepsOf()).toEqual([]);
+    expect(probe.levelBuilds).toBe(0);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une page remontée quand l'image est déjà là (après une récupération) fait paraître la fresque de la même façon
+  it("reveals a fresque whose image was already there when the scene was made", () => {
+    const world = openScene(LAPTOP_PLACE, { isLoaded: true });
+    flush(SETTLE_MS);
+
+    expect(new Set(stepsOf().map(({ step }) => step))).toEqual(new Set([0, 1, 2, 3]));
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // L'apparition n'a lieu qu'une fois par scène : une nouvelle taille, qui renvoie un snapshot, ne la rejoue pas
+  it("does not play again when another snapshot comes", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(SETTLE_MS);
+    const framesBefore = probe.frames.length;
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.frames.slice(framesBefore).every(({ reveal }) => reveal === null)).toBe(true);
+    expect(probe.levelBuilds).toBe(1);
+  });
+
+  // Les cases arrivées pendant l'apparition ne sont pas perdues : à la fin, l'image du moment est celle qui s'affiche
+  it("keeps the cells that arrive during the appearance: the current image is shown at the end", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(FRAME_MS * 5);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(lastFrame().reveal).toBeNull();
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Déplacer et zoomer marchent pendant l'apparition, qui suit la vue et va jusqu'au bout
+  it("lets the view pan and zoom meanwhile, and goes on to the end", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(FRAME_MS * 3);
+    const view = world.view();
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    flush(FRAME_MS);
+    expect(lastFrame().reveal).not.toBeNull();
+    expect(world.view().offsetX).not.toBe(view.offsetX);
+    flush(SETTLE_MS);
+
+    expect(world.view().scale).toBeGreaterThan(view.scale);
+    expect(lastFrame().reveal).toBeNull();
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("la fresque que la page quitte pour en suivre une autre", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // La scène qui s'en va a peint : son passage garde sa dernière surface
+  const leaveScene = (handoff: Handoff) => {
+    const left = openScene(LAPTOP_PLACE, { handoff });
+    left.scene.dispose();
+    return left;
+  };
+
+  // La nouvelle scène garde l'ancienne fresque seule à l'écran tant que la sienne n'est pas là
+  it("keeps the old fresque alone on screen until the new one comes", () => {
+    const handoff = createHandoff();
+    const left = leaveScene(handoff);
+    const framesBefore = probe.frames.length;
+
+    const next = openScene(LAPTOP_PLACE, { handoff });
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts.length).toBeGreaterThan(0);
+    expect(probe.ghosts.every((ghost) => ghost === left.surface)).toBe(true);
+    expect(probe.frames).toHaveLength(framesBefore);
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // Quand la nouvelle arrive, l'ancienne s'efface pendant la première étape seulement, puis s'en va
+  it("fades the old one out during the first step only", () => {
+    const handoff = createHandoff();
+    const left = leaveScene(handoff);
+    const next = openScene(LAPTOP_PLACE, { handoff });
+
+    next.snapshot();
+    flush(FRAME_MS);
+    expect(lastFrame().ghost).toEqual({ source: left.surface, alpha: 1 });
+    flush(SETTLE_MS);
+
+    const withGhost = probe.frames.filter(({ ghost }) => ghost !== null);
+    expect(withGhost.length).toBeGreaterThanOrEqual(6);
+    expect(withGhost.every(({ reveal }) => reveal?.step === 0)).toBe(true);
+    const alphas = withGhost.map(({ ghost }) => ghost?.alpha ?? 0);
+    expect(alphas).toEqual([...alphas].sort((a, b) => b - a));
+    expect(alphas.at(-1)).toBeLessThan(0.5);
+    expect(lastFrame().ghost).toBeNull();
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // La première fresque d'une page n'a rien à effacer
+  it("has nothing to fade out for the first fresque of a page", () => {
+    const world = openScene(LAPTOP_PLACE, { handoff: createHandoff() });
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts).toEqual([]);
+    expect(framesWithGhost()).toBe(0);
+  });
+
+  // Un passage trop ancien est oublié : une page qui revient plus tard n'a pas de vieille fresque à l'écran
+  it("forgets a handoff that is too old", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    handoff.leftAt -= 10_000;
+
+    openScene(LAPTOP_PLACE, { handoff });
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts).toEqual([]);
+  });
+
+  // Mouvement réduit : la nouvelle fresque paraît d'un coup, l'ancienne s'en va avec elle
+  it("drops the old fresque as soon as the new one is there when motion is reduced", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    const next = openScene(LAPTOP_PLACE, { handoff, isReducedMotion: true });
+
+    next.snapshot();
+    flush(SETTLE_MS);
+
+    expect(lastFrame().ghost).toBeNull();
+    expect(framesWithGhost()).toBe(0);
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // Une scène qui n'a fait que garder l'ancienne fresque n'a rien peint de sienne : elle ne laisse rien derrière elle
+  it("leaves nothing behind when the scene only held the old fresque", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    const held = openScene(LAPTOP_PLACE, { handoff });
+
+    held.scene.dispose();
+
+    expect(handoff.surface).toBeNull();
   });
 });
 

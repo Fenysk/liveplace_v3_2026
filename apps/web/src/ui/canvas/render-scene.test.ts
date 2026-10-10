@@ -1,16 +1,32 @@
 import { toCellKey } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
-import { renderScene, type Scene, type SettlingBatch } from "./render-scene";
+import { renderGhost, renderScene, type Scene, type SettlingBatch } from "./render-scene";
 
 const PALETTE = ["#00000000", "#ec273f", "#36c5f4", "#ffffff"];
 const SHADES = { void: "void", border: "border", grid: "grid", outlineIn: "in", outlineOut: "out" };
 const NO_OP = (): void => undefined;
 
-type Call = { op: "clearRect" | "fillRect" | "stroke"; alpha: number; style: string; rect?: number[] };
+type Call = {
+  op: "clearRect" | "fillRect" | "stroke" | "drawImage";
+  alpha: number;
+  style: string;
+  rect?: number[];
+  source?: string | undefined; // l'étiquette de l'image dessinée
+  args?: number[];
+};
+
+// Des images d'essai, que le faux contexte reconnaît à leur étiquette.
+const TAGS = new WeakMap<object, string>();
+const tagged = (tag: string): HTMLCanvasElement => {
+  const element = {} as HTMLCanvasElement;
+  TAGS.set(element, tag);
+  return element;
+};
+const IMAGE = tagged("image");
 
 type FakeContext = Pick<
   CanvasRenderingContext2D,
-  "globalAlpha" | "fillStyle" | "strokeStyle" | "lineWidth" | "lineCap" | "imageSmoothingEnabled"
+  "canvas" | "globalAlpha" | "fillStyle" | "strokeStyle" | "lineWidth" | "lineCap" | "imageSmoothingEnabled"
 > & {
   setTransform: (...args: never[]) => void;
   clearRect: (...args: never[]) => void;
@@ -27,6 +43,7 @@ type FakeContext = Pick<
 const recordingContext = () => {
   const calls: Call[] = [];
   const fake: FakeContext = {
+    canvas: IMAGE,
     globalAlpha: 1,
     fillStyle: "",
     strokeStyle: "",
@@ -34,7 +51,9 @@ const recordingContext = () => {
     lineCap: "butt",
     imageSmoothingEnabled: true,
     setTransform: NO_OP,
-    drawImage: NO_OP,
+    drawImage: (source: object, ...args: number[]) => {
+      calls.push({ op: "drawImage", alpha: fake.globalAlpha, style: "", source: TAGS.get(source), args });
+    },
     strokeRect: NO_OP,
     beginPath: NO_OP,
     moveTo: NO_OP,
@@ -60,6 +79,8 @@ type SceneParts = {
   draft?: Scene["draft"];
   draftFades?: Scene["draftFades"];
   settling?: readonly SettlingBatch[];
+  reveal?: Scene["reveal"];
+  ghost?: Scene["ghost"];
   shown?: number;
   confirmed?: number;
 };
@@ -69,6 +90,8 @@ const sceneOf = ({
   draft = [],
   draftFades = new Map(),
   settling = [],
+  reveal = null,
+  ghost = null,
   shown = 0,
   confirmed = shown,
 }: SceneParts): Scene => ({
@@ -76,7 +99,9 @@ const sceneOf = ({
   pixelRatio: 1,
   viewport: { scale: 10, offsetX: 0, offsetY: 0 },
   canvas: { width: 10, height: 10 },
-  image: {} as HTMLCanvasElement,
+  image: IMAGE,
+  reveal,
+  ghost,
   shades: SHADES,
   targetCell: null,
   inspectedCell: null,
@@ -328,5 +353,80 @@ describe("le contour du brouillon pendant un fondu", () => {
     expect(strokesAlphas({ draft: [{ ...CELL, colorIndex: 2 }], draftFades: fadeOf(0.25, 1) }, "in")).toEqual(
       [1],
     );
+  });
+});
+
+const LEVELS = [tagged("blocks of 8"), tagged("blocks of 4"), tagged("blocks of 2")];
+const images = (parts: SceneParts) =>
+  render(parts)
+    .filter((call) => call.op === "drawImage")
+    .map(({ source, alpha, args }) => ({ source, alpha, args }));
+
+// Le canvas de 10 × 10 cases de 10 px, à l'origine : l'image remplit [0, 0, 100, 100].
+describe("la fresque qui paraît en mosaïque", () => {
+  // Sans apparition, l'image est dessinée d'un coup, comme avant
+  it("draws the image whole, as before, when nothing is revealing", () => {
+    expect(images({})).toEqual([{ source: "image", alpha: 1, args: [0, 0, 100, 100] }]);
+  });
+
+  // La première étape arrive en fondu depuis le vide : les blocs de 8, seuls, à l'opacité de l'étape
+  it("fades the blocks of 8 in from nothing at the first step", () => {
+    const drawn = images({ reveal: { levels: LEVELS, step: 0, progress: 0.4 } });
+
+    expect(drawn).toEqual([
+      { source: "blocks of 8", alpha: 0.4, args: [0, 0, 10 / 8, 10 / 8, 0, 0, 100, 100] },
+    ]);
+  });
+
+  // Aux étapes suivantes, l'étape d'avant reste entière dessous, la nouvelle paraît dessus : un fondu enchaîné
+  it("keeps the step before whole underneath while the next one fades in", () => {
+    const drawn = images({ reveal: { levels: LEVELS, step: 1, progress: 0.25 } });
+
+    expect(drawn.map(({ source, alpha }) => [source, alpha])).toEqual([
+      ["blocks of 8", 1],
+      ["blocks of 4", 0.25],
+    ]);
+    expect(drawn[1]?.args).toEqual([0, 0, 10 / 4, 10 / 4, 0, 0, 100, 100]);
+  });
+
+  // La dernière étape est l'image nette, celle du moment, qui paraît sur les blocs de 2
+  it("ends with the sharp current image fading in over the blocks of 2", () => {
+    const drawn = images({ reveal: { levels: LEVELS, step: 3, progress: 0.5 } });
+
+    expect(drawn.map(({ source, alpha }) => [source, alpha])).toEqual([
+      ["blocks of 2", 1],
+      ["image", 0.5],
+    ]);
+    expect(drawn[1]?.args).toEqual([0, 0, 10, 10, 0, 0, 100, 100]);
+  });
+
+  // Les blocs s'agrandissent sans lissage, et l'opacité revient à 1 pour le reste de l'image
+  it("scales the blocks up without smoothing, and gives the rest of the scene its full opacity back", () => {
+    const { context, calls } = recordingContext();
+    renderScene(context, sceneOf({ reveal: { levels: LEVELS, step: 0, progress: 0.4 } }));
+
+    expect(context.imageSmoothingEnabled).toBe(false);
+    expect(context.globalAlpha).toBe(1);
+    expect(calls.find((call) => call.op === "drawImage")?.alpha).toBe(0.4);
+  });
+});
+
+describe("la fresque que la page vient de quitter", () => {
+  // Elle se dessine en dernier, tout en haut, à son opacité
+  it("is drawn last, over everything, at its own opacity", () => {
+    const drawn = images({ ghost: { source: tagged("left behind"), alpha: 0.3 } });
+
+    expect(drawn.at(-1)).toEqual({ source: "left behind", alpha: 0.3, args: [0, 0] });
+    expect(drawn).toHaveLength(2);
+  });
+
+  // En attendant la nouvelle, la page la garde seule : l'écran est vidé, puis elle est reposée telle quelle
+  it("is kept alone on screen while the new fresque is awaited", () => {
+    const { context, calls } = recordingContext();
+
+    renderGhost(context, tagged("left behind"));
+
+    expect(calls.map((call) => call.op)).toEqual(["clearRect", "drawImage"]);
+    expect(calls[1]?.source).toBe("left behind");
   });
 });

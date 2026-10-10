@@ -6,7 +6,7 @@ import type { DraftStore } from "../../state/draft-store";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { useDraftKeys } from "../draft/use-draft-keys";
 import { useTexts } from "../locale/use-locale";
-import { type CanvasScene, createCanvasScene } from "./canvas-scene";
+import { type CanvasScene, createCanvasScene, type Handoff } from "./canvas-scene";
 import { CANVAS_TEXTS } from "./canvas-texts";
 import type { NavigationKind } from "./navigation-watch";
 import { createViewportSaver, getSavedViewport } from "./saved-viewport";
@@ -21,6 +21,7 @@ const getBrowserStorage = () => window.localStorage;
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page de jeu, dont l'arrivée se cadre sous ses pills du haut.
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue (déplacer, zoomer, ouvrir une case) ; stable, la scène est recréée sinon.
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `handoff` : la page de jeu, qui suit une autre fresque quand le streamer archive, garde l'ancienne à l'écran le temps que la nouvelle arrive.
 type PixelCanvasProps = {
   store: CanvasStore;
   draftStore: DraftStore;
@@ -29,6 +30,7 @@ type PixelCanvasProps = {
   isFramedInFreeArea?: boolean;
   onGesture?: () => void;
   onNavigate?: (kind: NavigationKind) => void;
+  handoff?: Handoff;
 };
 
 const doNothing = (): void => undefined;
@@ -41,6 +43,7 @@ export const PixelCanvas = ({
   isFramedInFreeArea = false,
   onGesture = doNothing,
   onNavigate,
+  handoff,
 }: PixelCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
   const checker = useRef<HTMLDivElement>(null);
@@ -70,6 +73,7 @@ export const PixelCanvas = ({
       onViewportMove: saver.save,
       onFraming: setFraming,
       onGesture,
+      handoff,
       checker: checker.current,
       checkerTiles: checkerTiles.current,
     });
@@ -78,7 +82,7 @@ export const PixelCanvas = ({
       created.dispose();
       saver.cancel();
     };
-  }, [store, draftStore, canvasId, isFramedInFreeArea, onGesture]);
+  }, [store, draftStore, canvasId, isFramedInFreeArea, onGesture, handoff]);
 
   return (
     <>

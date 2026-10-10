@@ -110,6 +110,7 @@ export type CanvasView = {
   lastError: ErrorCode | null;
   inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
+  isImageLoaded: boolean; // le snapshot est arrivé : `pixels` est la copie du serveur, plus un décor vide
 };
 
 export type CanvasStore = {
@@ -234,6 +235,7 @@ export function createCanvasStore(
     isBanned: false,
     isArchived: false,
     isDiscarded: false,
+    isImageLoaded: false,
     pixels: new Uint8Array(0),
   };
   const listeners = new Set<() => void>();
@@ -584,7 +586,7 @@ export function createCanvasStore(
     onFrame,
     // Le snapshot suit le `welcome` : il remplace la copie entière (§6.1).
     onSnapshot: (state) => {
-      publish({ pixels: state.slice() });
+      publish({ pixels: state.slice(), isImageLoaded: true });
       emit({ kind: "snapshot", pixels: state.slice(), recent: heldRecent });
       heldRecent = null;
     },

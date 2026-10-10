@@ -1,11 +1,13 @@
-// Une image à l'écran (§9.3), dans l'ordre : les pixels, les cases qui se posent, le brouillon, la grille, la bordure,
-// le contour du brouillon, celui des cases qui se posent, la case visée, le viseur de la case inspectée.
+// Une image à l'écran (§9.3), dans l'ordre : les pixels (ou leur mosaïque à l'apparition), les cases qui se posent, le brouillon, la grille, la bordure,
+// le contour du brouillon, celui des cases qui se posent, la case visée, le viseur de la case inspectée,
+// puis la fresque que la page vient de quitter, qui s'efface.
 // Le vide et le damier ne sont pas ici : ce sont deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent
 // pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents.
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
 import type { ConfirmedPixel, Pixel } from "../../state/canvas-store";
+import { REVEAL_BLOCKS } from "./mosaic";
 import type { Cell, Size, Viewport } from "./viewport";
 
 // Les teintes du canvas, lues dans les tokens de l'apparence (tokens.css) : aucune n'est écrite ici.
@@ -23,12 +25,21 @@ export type SettlingBatch = { pixels: readonly ConfirmedPixel[]; progress: numbe
 // Une case qui entre au brouillon (`from` nul) ou y change de couleur : `progress` de 0 à 1, la courbe déjà appliquée.
 export type DraftFade = { progress: number; from: number | null };
 
+// La fresque qui paraît en mosaïque : `levels` aux blocs de REVEAL_BLOCKS, puis l'image nette en dernière étape.
+// À l'étape `step`, l'étape d'avant reste entière dessous et celle-ci paraît dessus, de `progress` 0 à 1 (la courbe est déjà appliquée).
+export type Reveal = { levels: readonly CanvasImageSource[]; step: number; progress: number };
+
+// La fresque que la page vient de quitter : la dernière surface peinte, à l'opacité `alpha`, par-dessus la nouvelle.
+export type Ghost = { source: CanvasImageSource; alpha: number };
+
 export type Scene = {
   screen: Size; // pixels CSS
   pixelRatio: number;
   viewport: Viewport;
   canvas: Size;
   image: CanvasImageSource;
+  reveal: Reveal | null;
+  ghost: Ghost | null;
   shades: SceneShades;
   targetCell: Cell | null;
   inspectedCell: Cell | null; // en cases de la fresque : à virgule pendant que le viseur glisse
@@ -327,6 +338,48 @@ const strokeReticle = (
   context.lineCap = "butt";
 };
 
+// L'image : nette, ou à une étape de la mosaïque. Les blocs s'agrandissent sans lissage, la source rognée au dernier bloc entier.
+const renderImage = (context: CanvasRenderingContext2D, scene: Scene, frame: Rect) => {
+  const { reveal, canvas } = scene;
+  if (!reveal) return context.drawImage(scene.image, frame.left, frame.top, frame.width, frame.height);
+  const stages = [...reveal.levels, scene.image];
+  const blocks = [...REVEAL_BLOCKS, 1];
+  const renderStage = (index: number) => {
+    const source = stages[index];
+    const block = blocks[index] ?? 1;
+    if (source)
+      context.drawImage(
+        source,
+        0,
+        0,
+        canvas.width / block,
+        canvas.height / block,
+        frame.left,
+        frame.top,
+        frame.width,
+        frame.height,
+      );
+  };
+  if (reveal.step > 0) renderStage(reveal.step - 1);
+  context.globalAlpha = reveal.progress;
+  renderStage(reveal.step);
+  context.globalAlpha = 1;
+};
+
+const renderLeftBehind = (context: CanvasRenderingContext2D, { ghost }: Pick<Scene, "ghost">) => {
+  if (!ghost) return;
+  context.globalAlpha = ghost.alpha;
+  context.drawImage(ghost.source, 0, 0);
+  context.globalAlpha = 1;
+};
+
+// En attendant la nouvelle fresque, la page garde l'ancienne telle qu'elle était à l'écran.
+export function renderGhost(context: CanvasRenderingContext2D, source: CanvasImageSource): void {
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+  context.drawImage(source, 0, 0);
+}
+
 export function renderScene(context: CanvasRenderingContext2D, scene: Scene): void {
   const { screen, pixelRatio, viewport, canvas } = scene;
   const cellSize = viewport.scale * pixelRatio;
@@ -352,7 +405,12 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
 
   // Remis à chaque image : redimensionner un <canvas> remet son contexte à zéro.
   context.imageSmoothingEnabled = false;
-  context.drawImage(scene.image, originX, originY, canvas.width * cellSize, canvas.height * cellSize);
+  renderImage(context, scene, {
+    left: originX,
+    top: originY,
+    width: canvas.width * cellSize,
+    height: canvas.height * cellSize,
+  });
   const oneCellRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
   fillSettling(context, scene, oneCellRect, lineWidth);
   fillDraft(context, scene, oneCellRect, lineWidth);
@@ -392,4 +450,6 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
 
   if (scene.inspectedCell)
     strokeReticle(context, oneCellRect(scene.inspectedCell.x, scene.inspectedCell.y), scene, lineWidth);
+
+  renderLeftBehind(context, scene);
 }

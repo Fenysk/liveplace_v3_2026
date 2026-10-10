@@ -14,7 +14,7 @@ import {
   observeZone,
   ZONE_ABOVE_ATTRIBUTE,
 } from "./arrival-insets";
-import { createCanvasImage } from "./canvas-image";
+import { createCanvasImage, toLevelCanvases } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { draftFadeStarts, MAX_DRAFT_FADES } from "./draft-fade";
 import { freeArea, type PointerGrain, tapZoomTarget, zoomFrame } from "./draft-zoom";
@@ -26,8 +26,16 @@ import {
   type PointerInput,
   wheelFactor,
 } from "./gestures";
+import { mosaicLevels, REVEAL_STEPS } from "./mosaic";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
-import { type DraftFade, renderScene, type SettlingBatch } from "./render-scene";
+import {
+  type DraftFade,
+  type Ghost,
+  type Reveal,
+  renderGhost,
+  renderScene,
+  type SettlingBatch,
+} from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
@@ -65,6 +73,7 @@ export type CanvasScene = {
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `handoff` : le passage d'une scène à la suivante, quand la page suit une autre fresque.
 type SceneOptions = {
   initialViewport: Viewport | null;
   isFramedInFreeArea: boolean;
@@ -72,6 +81,7 @@ type SceneOptions = {
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
   onGesture(): void;
+  handoff?: Handoff | undefined;
   checker: HTMLElement;
   checkerTiles: HTMLElement;
 };
@@ -119,6 +129,27 @@ type Settle = {
 type DraftFadeRun = {
   from: number | null;
   duration: number;
+  ease: (progress: number) => number;
+  startedAt: number | null;
+};
+
+// Le passage d'une scène à la suivante quand la page suit une autre fresque (use-follow-active-canvas.ts) : la dernière surface
+// peinte de celle qui s'en va, que la nouvelle garde à l'écran jusqu'à l'arrivée de la sienne. Périmée au bout de 2 s.
+export type Handoff = { surface: HTMLCanvasElement | null; leftAt: number };
+export const createHandoff = (): Handoff => ({ surface: null, leftAt: 0 });
+const HANDOFF_MAX_AGE_MS = 2000;
+
+const takeLeftBehind = (handoff: Handoff | undefined): HTMLCanvasElement | null => {
+  if (!handoff) return null;
+  const { surface, leftAt } = handoff;
+  handoff.surface = null;
+  return performance.now() - leftAt <= HANDOFF_MAX_AGE_MS ? surface : null;
+};
+
+// L'apparition en mosaïque, sur `--lp-dur-reveal` partagée en REVEAL_STEPS étapes égales, chacune sur `--lp-ease`.
+type RevealRun = {
+  levels: HTMLCanvasElement[];
+  stepMs: number;
   ease: (progress: number) => number;
   startedAt: number | null;
 };
@@ -218,6 +249,55 @@ export function createCanvasScene(
     options.checker.style.setProperty("--lp-checker-clip", `inset(${inset.join(" ")})`);
   };
 
+  // La fresque paraît en mosaïque la première fois que son image est là, dans cette scène. Mouvement réduit : la durée vaut 0,
+  // elle paraît d'un coup. Les cases arrivées pendant l'apparition ne sont pas perdues : la dernière étape est l'image du moment.
+  let hasRevealed = false;
+  let reveal: RevealRun | null = null;
+  const advanceReveal = (now: number, view: CanvasView): Reveal | null => {
+    if (!hasRevealed && view.isImageLoaded) {
+      hasRevealed = true;
+      const duration = motionMs(root, "--lp-dur-reveal");
+      if (duration > 0)
+        reveal = {
+          levels: toLevelCanvases(mosaicLevels(view.pixels, view.palette, view)),
+          stepMs: duration / REVEAL_STEPS,
+          ease: easingCurve(motionEasing(root)),
+          startedAt: null,
+        };
+    }
+    if (!reveal) return null;
+    reveal.startedAt ??= now;
+    const elapsed = now - reveal.startedAt;
+    if (elapsed >= reveal.stepMs * REVEAL_STEPS) {
+      reveal = null;
+      return null;
+    }
+    requestRender();
+    const step = Math.floor(elapsed / reveal.stepMs);
+    return {
+      levels: reveal.levels,
+      step,
+      progress: reveal.ease((elapsed - step * reveal.stepMs) / reveal.stepMs),
+    };
+  };
+
+  // La fresque que la page vient de quitter reste à l'écran jusqu'à l'arrivée de celle-ci, puis s'efface pendant la première étape.
+  let ghostSurface = takeLeftBehind(options.handoff);
+  let hasPainted = false;
+  const holdsGhost = (view: CanvasView): boolean => {
+    if (!ghostSurface || view.isImageLoaded) return false;
+    renderGhost(context, ghostSurface);
+    return true;
+  };
+  const advanceGhost = (current: Reveal | null): Ghost | null => {
+    if (!ghostSurface) return null;
+    if (!current || current.step > 0) {
+      ghostSurface = null;
+      return null;
+    }
+    return { source: ghostSurface, alpha: 1 - current.progress };
+  };
+
   let settles: Settle[] = [];
   // Une pose qui arrive au bout s'en va : l'image porte déjà son but. Une case que le canvas a quittée (un autre joueur la
   // reprend, une nouvelle taille) ne se pose plus.
@@ -285,7 +365,7 @@ export function createCanvasScene(
   const render = (now: number) => {
     frameRequest = 0;
     const view = store.getView();
-    if (view.width === 0 || screen.width === 0) return;
+    if (holdsGhost(view) || view.width === 0 || screen.width === 0) return;
     const canvas = { width: view.width, height: view.height };
     if (!viewport) {
       // Les pills ont eu le temps de se mesurer depuis la création de la scène : la première arrivée les relit.
@@ -302,12 +382,15 @@ export function createCanvasScene(
     // Le brouillon ne se voit qu'en Dessin, le viseur qu'en Vue (CDC 2026).
     const draftView = draftStore.getView();
     const isDrafting = draftView.mode === "draft";
+    const revealing = advanceReveal(now, view);
     renderScene(context, {
       screen,
       pixelRatio,
       viewport,
       canvas,
       image: image.source,
+      reveal: revealing,
+      ghost: advanceGhost(revealing),
       shades,
       targetCell,
       inspectedCell: advanceReticle(now, isDrafting ? null : view.inspection),
@@ -318,6 +401,7 @@ export function createCanvasScene(
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
       confirmedColorIndexAt: (x, y) => store.confirmedColorIndexAt(x, y),
     });
+    hasPainted = true;
   };
 
   // Au plus un dessin par rafraîchissement de l'écran, et aucun si rien n'a bougé.
@@ -707,6 +791,10 @@ export function createCanvasScene(
       unobserveZone();
       setPanning(false);
       root.removeAttribute(ZONE_ABOVE_ATTRIBUTE);
+      if (hasPainted && options.handoff) {
+        options.handoff.surface = surface;
+        options.handoff.leftAt = performance.now();
+      }
       unsubscribe();
       unsubscribeConfirmed();
       unsubscribeDraft();

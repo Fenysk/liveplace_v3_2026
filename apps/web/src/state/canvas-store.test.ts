@@ -642,6 +642,30 @@ describe("la pose confirmée par l'ack", () => {
   });
 });
 
+describe("l'image de la fresque (la mosaïque d'apparition)", () => {
+  // Le welcome donne la taille, mais pas l'image : seul le snapshot dit que les pixels sont ceux du serveur
+  it("says the image is loaded only once the snapshot has come, not at the welcome", () => {
+    const { store, snapshot } = setup();
+    expect(store.getView().isImageLoaded).toBe(false);
+
+    snapshot(new Uint8Array(width * 4).fill(3));
+
+    expect(store.getView().isImageLoaded).toBe(true);
+  });
+
+  // Un resync n'a pas de snapshot : la copie de la page reste la bonne, et ne se redit pas non chargée
+  it("keeps the image loaded across a reconnection", () => {
+    const { store, snapshot, close, open, receive } = setup();
+    snapshot(new Uint8Array(width * 4));
+
+    close();
+    open();
+    receive(welcome);
+
+    expect(store.getView().isImageLoaded).toBe(true);
+  });
+});
+
 describe("inspect (CDC 2026, la pill Inspection)", () => {
   const entry = {
     userId: "user-2",
