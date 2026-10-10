@@ -32,6 +32,18 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-10 — Écart §9.1 (retire le raster écrit à la main du même jour) : l'image d'aperçu est la mise en page « F · Ambiance » choisie par Alexis
+
+**Contexte.** Alexis a choisi, sur des croquis, la mise en page F : le canvas en cover flou sous un voile, le canvas net à gauche, un panneau à droite (le thème, l'invitation, la photo et le pseudo, l'adresse). Le raster à la main (`renderPreviewRaster`, `previewScale`, le vide à points, la bordure, la marge) ne sert plus à rien.
+**Décision.** L'image est dessinée par Satori sur la géométrie d'`ui/link-preview/preview-geometry.ts` : un facteur qui n'est pas entier, le canvas net posé à sa taille exacte, le fond calculé par nous (le canvas en cover agrandi de 4 %, au quart de la carte, deux passes de flou en boîte pour environ `blur(4px)`), le voile et le panneau par Satori. Les phrases passent par les textes localisés (français pour les robots) ; un pseudo hors de Nunito latin y devient le `login`, un thème y perd ses emoji. `preview-image.ts` et son fichier de test restent (test-integrity refuse qu'un fichier de test disparaisse ou perde des cas) : ils portent maintenant le canvas net et le fond, avec plus de cas (15 pour 12) et d'assertions (51 pour 49) que ceux du raster retiré.
+**Renoncement.** Un facteur entier (le canvas remplit sa place, des pixels de 1 px d'écart entre les cases) ; l'image dans la langue de celui qui regarde (le robot n'en a pas) ; un fond au pixel près (un flou à 4 px n'en a pas besoin).
+
+## 2026-10-10 — Écart §9.1 : l'image de la carte d'aperçu d'un lien est dessinée par Satori et rastérisée par resvg, pour porter le canvas, la photo du streamer et l'invitation
+
+**Contexte.** Instagram ne montre que l'image d'une carte : Alexis (note du 25/09) veut que l'image elle-même porte l'aperçu du canvas, la photo de profil et un texte d'invitation, dans le design system. Le raster écrit à la main (`/{login}/preview.png`, 10/10) ne sait ni écrire du texte ni poser une photo.
+**Décision.** Trois dépendances pour le web : `satori` (arbre d'éléments → SVG, texte converti en tracés), `@resvg/resvg-js` (SVG → PNG ; un binaire natif par plateforme, celui de musl dans l'image `node:22-alpine`) et `@fontsource/nunito` en devDependency (woff statiques 700, 800 et 900, incrustés au build : Satori ne lit pas le woff2). `infra/` rastérise et récupère la photo (hôte `static-cdn.jtvnw.net` seul, cache mémoire, l'initiale à défaut) ; `ui/` écrit la mise en page ; `app/` assemble. Le canvas entre en PNG indexé au pixel près, jamais mis à l'échelle par resvg. `architecture.json` et `lexique.json` ne changent pas.
+**Renoncement.** Nunito latin seul, ni emoji ni autre alphabet : un nom que la police ne couvre pas est remplacé par le `login` sur l'image. Pas de Chromium ni de `sharp` (des centaines de Mo, ou une dépendance native de plus pour moins).
+
 ## 2026-10-10 — L'interface française dit « fresque », le code et l'anglais gardent `canvas`
 
 **Contexte.** « Canvas » se confond avec le logiciel Canva, et beaucoup de viewers français ne connaissent pas le mot.

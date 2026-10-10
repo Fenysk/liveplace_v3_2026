@@ -94,6 +94,7 @@ describe("le fichier robots.txt", () => {
     expect(isAllowed(text, "Googlebot", "/")).toBe(true);
     expect(isAllowed(text, "Googlebot", "/fenysk")).toBe(false);
     expect(isAllowed(text, "Googlebot", "/fenysk/obs")).toBe(false);
+    expect(isAllowed(text, "Googlebot", "/fenysk/preview.png")).toBe(false);
     expect(isAllowed(text, "Googlebot", "/confidentialite")).toBe(false);
     expect(isAllowed(text, "Bingbot", "/fenysk")).toBe(false);
   });
@@ -105,6 +106,7 @@ describe("le fichier robots.txt", () => {
     for (const robot of ["Mediapartners-Google", ...PREVIEW_ROBOTS]) {
       expect(isAllowed(text, robot, "/fenysk")).toBe(true);
       expect(isAllowed(text, robot, "/fenysk/obs")).toBe(true);
+      expect(isAllowed(text, robot, "/fenysk/preview.png")).toBe(true);
     }
   });
 

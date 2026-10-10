@@ -13,6 +13,7 @@ import {
   createTwitchWrites,
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
+import { createAvatarPhotos } from "../infra/avatar-photos";
 import { createSessionSigner, createSessionVerifier } from "../infra/session";
 import {
   createTwitchAuth,
@@ -20,14 +21,18 @@ import {
   createTwitchLiveSource,
   createTwitchWebhook,
 } from "../infra/twitch";
+import { createCanvasPreviews } from "../usecase/canvas-preview";
 import { createTwitchLiveTracker } from "../usecase/twitch-live";
 import { parseWebConfig } from "./config";
+import { createPreviewRenderer } from "./render-preview-png";
 
 const buildServerDeps = () => {
   // Fail-closed (§11.5) : une variable manquante lève ici, en la nommant.
   const config = parseWebConfig(process.env);
   const redis = new Redis(config.redisUrl);
   const twitchWrites = createTwitchWrites(redis); // JOURNAL 2026-09-27
+  const durable = createDurableStore(config.convexUrl, config.convexServiceKey);
+  const archiveWrites = createArchiveWrites(redis); // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
   const eventSub = createTwitchEventSub({
     clientId: config.twitchClientId,
     clientSecret: config.twitchClientSecret,
@@ -41,7 +46,7 @@ const buildServerDeps = () => {
       clientSecret: config.twitchClientSecret,
       redirectUri: `${config.publicUrl}/auth/twitch/callback`,
     }),
-    durable: createDurableStore(config.convexUrl, config.convexServiceKey),
+    durable,
     redis: createSignInWrites(redis),
     // Écart §7.2 (JOURNAL 2026-10-08) : sans `DURABLE_SCOPE`, rien n'est demandé à Convex et aucune page n'est marquée.
     recovery:
@@ -50,7 +55,17 @@ const buildServerDeps = () => {
         : createRecoveryStore(config.convexUrl, config.convexServiceKey, config.durableScope),
     recoveryMarks: createRecoveryMarks(redis),
     twitchWrites,
-    archiveWrites: createArchiveWrites(redis), // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
+    archiveWrites,
+    // Écart §9.1 (JOURNAL 2026-10-10) : l'image de la carte d'aperçu d'un lien, un rendu par canvas et par minute, avec la
+    // photo Twitch du streamer que le serveur récupère lui-même
+    canvasPreviews: createCanvasPreviews({
+      durable,
+      redis: archiveWrites,
+      render: createPreviewRenderer({
+        photos: createAvatarPhotos({ fetchPhoto: fetch, now: Date.now }),
+      }),
+      now: Date.now,
+    }),
     capacityWrites: createCapacityWrites(redis), // Écart §2 et §9 (JOURNAL 2026-10-07) : l'occupation du web, l'usage de Convex
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub,

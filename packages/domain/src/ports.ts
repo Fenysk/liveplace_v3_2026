@@ -444,7 +444,7 @@ export interface HostProbe {
 // Le verrou d'un propriétaire, pris pour la durée d'un changement de canvas actif : `holderId` ne se rend qu'à qui l'a pris.
 export type OwnerLock = { ownerId: string; holderId: string };
 
-// L'image d'un canvas, pour sa miniature : un octet par case, l'index de palette.
+// L'image d'un canvas, pour sa miniature et l'aperçu de son lien : un octet par case, l'index de palette.
 export type CanvasImage = { width: number; height: number; state: Uint8Array };
 
 // Écart §15 (JOURNAL 2026-10-06) : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas. Jamais un

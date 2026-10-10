@@ -2,7 +2,7 @@
 
 import type { DurableStore } from "@liveplace/domain/ports";
 import { type CanvasOwner, resolveCanvas } from "../../usecase/resolve-canvas";
-import tokensCss from "../design/tokens.css?raw";
+import { darkShade } from "../design/dark-shade";
 
 export type WebManifestIcon = {
   src: string;
@@ -33,20 +33,12 @@ const ICONS: readonly WebManifestIcon[] = [
   { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
 ];
 
-// Le fond du jeu en sombre, lu dans les jetons plutôt que recopié : un manifest n'a qu'une couleur, celle de l'icône.
-const DARK_VOID = /\[data-appearance="dark"\]\s*\{[^}]*?--void:\s*(#[0-9a-f]{6})\s*;/i;
-
-function darkVoid(): string {
-  const color = DARK_VOID.exec(tokensCss)?.[1];
-  if (!color) throw new Error("web-manifest : --void introuvable dans l'apparence sombre de tokens.css");
-  return color;
-}
-
 export function buildWebManifest({
   login,
   displayName,
 }: Pick<CanvasOwner, "login" | "displayName">): WebManifest {
-  const color = darkVoid();
+  // Le fond du jeu en sombre, lu dans les teintes plutôt que recopié : un manifest n'a qu'une couleur, celle de l'icône.
+  const color = darkShade("--void");
   return {
     id: `/${login}`,
     name: `${displayName} · LivePlace`,

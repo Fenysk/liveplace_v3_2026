@@ -8,6 +8,7 @@ import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
 import { DESIGN_TEXTS } from "../ui/design/design-texts";
 import { NoticePill } from "../ui/design/pill";
 import { SignInButton, SignInNote } from "../ui/design/twitch";
+import { previewImageVersion } from "../ui/link-preview/link-preview";
 import { useTexts } from "../ui/locale/use-locale";
 import { markRecoveringIfLost } from "../usecase/mark-recovering";
 import { type ResolvedCanvas, resolveCanvas } from "../usecase/resolve-canvas";
@@ -41,8 +42,13 @@ const getGameCanvasPage = createServerFn({ method: "GET" })
       { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
       page.canvasId,
     );
-    // `publicUrl` : l'adresse que la carte d'aperçu du lien (`head`) donne à la page, que seul le serveur connaît.
-    return { ...page, publicUrl: context.deps.publicUrl };
+    // `publicUrl` : l'adresse que la carte d'aperçu du lien (`head`) donne à la page, que seul le serveur connaît ;
+    // `imageVersion` : celle de l'adresse de son image, tirée de l'heure du serveur pour que la page et son hydratation s'accordent.
+    return {
+      ...page,
+      publicUrl: context.deps.publicUrl,
+      imageVersion: previewImageVersion(context.deps.now()),
+    };
   });
 
 const toPage = <Page extends ResolvedCanvas>(page: Page | null): Page => {

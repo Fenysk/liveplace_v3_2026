@@ -3,7 +3,7 @@
 import type { CanvasView } from "../../state/canvas-store";
 
 // "#rrggbb" ou "#rrggbbaa" : la palette arrive en hexadécimal dans le `welcome` (§4.3).
-const toRgba = (hex: string): number[] => {
+export const toRgba = (hex: string): number[] => {
   const channel = (start: number) => Number.parseInt(hex.slice(start, start + 2), 16);
   return [channel(1), channel(3), channel(5), hex.length > 7 ? channel(7) : 255];
 };

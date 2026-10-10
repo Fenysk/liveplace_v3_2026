@@ -2,15 +2,13 @@
 // Jamais importé par le navigateur : voir `start.ts`.
 
 import { randomBytes } from "node:crypto";
+import { TWITCH_AVATAR_ORIGIN } from "../shared/twitch-avatar-origin";
 
 export type SecurityHeadersInput = {
   nonce: string; // tiré à chaque requête : le routeur le pose sur chacun de ses scripts
   publicUrl: string; // en https, HTTPS forcé ; son hôte est celui du WebSocket
   isProduction: boolean;
 };
-
-// Les avatars des profils (CDC 2026, Profils) : la seule image qui ne vient pas du site.
-const TWITCH_AVATARS = "https://static-cdn.jtvnw.net";
 
 // Pas de `preload` : il ne se défait pas. Pas d'`includeSubDomains` : les sous-domaines ne sont pas inventoriés.
 const ONE_YEAR_OF_HTTPS = "max-age=31536000";
@@ -20,7 +18,7 @@ const contentSecurityPolicy = (nonce: string, publicUrl: URL): string => {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
-    `img-src 'self' data: ${TWITCH_AVATARS}`,
+    `img-src 'self' data: ${TWITCH_AVATAR_ORIGIN}`,
     `connect-src 'self' ${socketOrigin}`,
     "object-src 'none'",
     "base-uri 'none'",
