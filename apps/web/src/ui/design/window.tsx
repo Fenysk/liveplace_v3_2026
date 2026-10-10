@@ -12,6 +12,7 @@ import { DESIGN_TEXTS } from "./design-texts";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
 import { ToastAnnouncement } from "./toast-announcement";
+import { useSelectionGlide } from "./use-selection-glide";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
 
@@ -42,14 +43,15 @@ export const WindowNav = <Id extends string>({
   wrapTab,
 }: WindowNavProps<Id>) => {
   const t = useTexts(DESIGN_TEXTS);
+  const selection = useSelectionGlide<HTMLElement>();
   return (
-    <nav className="lp-window-nav" aria-label={t.sections}>
+    <nav ref={selection} className="lp-window-nav lp-selection" aria-label={t.sections}>
       <ul>
         {sections.map(({ id, label, icon: Icon }) => {
           const tab = (
             <button
               type="button"
-              className="lp-btn lp-type-body"
+              className={classNames("lp-btn lp-type-body", id === currentId && "is-selected")}
               aria-current={id === currentId ? "page" : undefined}
               onClick={blurAfterClick(() => onSelect(id))}
             >

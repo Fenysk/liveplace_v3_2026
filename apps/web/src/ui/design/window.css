@@ -75,9 +75,9 @@
   }
 }
 
-.lp-window-nav .lp-btn[aria-current="page"] {
-  background: var(--pill-surface);
-  box-shadow: var(--pill-shadow);
+/* Le fond de l'onglet choisi est son `::before` (selection-glide.css) : le survol ne le recouvre pas */
+.lp-window-nav .lp-btn.is-selected {
+  background: transparent;
 }
 
 .lp-window-grabber {

@@ -3,6 +3,8 @@
 
 import type { LucideIcon } from "lucide-react";
 import { useId } from "react";
+import { classNames } from "./class-names";
+import { useSelectionGlide } from "./use-selection-glide";
 
 export type SegmentedOption<Value extends string> = { value: Value; label: string; icon?: LucideIcon };
 
@@ -20,10 +22,14 @@ export const Segmented = <Value extends string>({
   onSelect,
 }: SegmentedProps<Value>) => {
   const name = useId();
+  const selection = useSelectionGlide<HTMLDivElement>();
   return (
-    <div className="lp-segmented" role="radiogroup" aria-label={label}>
+    <div ref={selection} className="lp-segmented lp-selection" role="radiogroup" aria-label={label}>
       {options.map(({ value: optionValue, label: optionLabel, icon: Icon }) => (
-        <label key={optionValue} className="lp-segmented-option lp-type-body">
+        <label
+          key={optionValue}
+          className={classNames("lp-segmented-option lp-type-body", optionValue === value && "is-selected")}
+        >
           <input
             type="radio"
             name={name}

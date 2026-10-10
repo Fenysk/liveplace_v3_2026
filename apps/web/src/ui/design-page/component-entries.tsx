@@ -786,7 +786,10 @@ export const ChoicesEntry = () => {
         </StateRow>
       </Block>
       <Block title="Apparence">
-        <StateRow name="Apparence, comme dans Mon compte">
+        <StateRow
+          name="Apparence, comme dans Mon compte"
+          detail="Le fond de l'option choisie glisse de l'ancienne à la nouvelle."
+        >
           <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
         <StateRow
