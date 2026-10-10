@@ -618,6 +618,14 @@
   padding: 0;
 }
 
+/* Le bouton et le contenu qu'il fait charger : l'un sous l'autre quand la scène manque de place */
+.design-delay-scene {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 /* Les fondations : des lignes sous filet sur le fond de la page */
 .design-lines {
   display: grid;
