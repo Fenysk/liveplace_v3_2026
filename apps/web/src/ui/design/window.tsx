@@ -12,6 +12,7 @@ import { DESIGN_TEXTS } from "./design-texts";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
 import { ToastAnnouncement } from "./toast-announcement";
+import { useSectionMorph } from "./use-section-morph";
 import { useSelectionGlide } from "./use-selection-glide";
 
 export type WindowSection<Id extends string> = { id: Id; label: string; icon: LucideIcon };
@@ -188,12 +189,15 @@ export const Window = <Id extends string>({
   // Un identifiant par fenêtre : une petite fenêtre peut exister à côté (JOURNAL 2026-09-25).
   const titleId = useId();
   const current = sections.find(({ id }) => id === sectionId) ?? sections[0];
+  const body = useSectionMorph<HTMLDivElement>(current?.id);
   return (
     <WindowShell isOpen={isOpen} onClose={onClose} titleId={titleId} isLarge={isLarge}>
       <WindowNav sections={sections} currentId={current?.id} onSelect={onSelect} wrapTab={wrapTab} />
       <section className="lp-window-main">
         <WindowHead titleId={titleId} title={current?.label} onClose={onClose} />
-        <div className="lp-window-body">{children}</div>
+        <div ref={body} className="lp-window-body">
+          {children}
+        </div>
       </section>
     </WindowShell>
   );
