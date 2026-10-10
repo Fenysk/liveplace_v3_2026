@@ -2,6 +2,7 @@
 
 import { createRootRouteWithContext, HeadContent, ScriptOnce, Scripts } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import type { ReactNode } from "react";
 import type { CanvasOpener } from "../state/canvas-store";
 import { ADSENSE_CLIENT } from "../ui/ads/adsense";
@@ -9,18 +10,28 @@ import { BetaBadge } from "../ui/beta/beta-badge";
 import betaBadgeCss from "../ui/beta/beta-badge.css?url";
 import { APPEARANCE_SCRIPT } from "../ui/design/appearance";
 import designSystemCss from "../ui/design/design-system.css?url";
+import { resolveLocale } from "../ui/locale/locale";
+import { LocaleProvider, useLocale } from "../ui/locale/use-locale";
 import { OBS_VIEW_SCRIPT } from "../ui/obs/obs-view";
 
 export type RouterContext = { openCanvas: CanvasOpener };
 
 // Écart §11.1 (JOURNAL 2026-10-04) : l'étiquette d'un emplacement de bêta, `null` en production.
-const getBetaLabel = createServerFn({ method: "GET" }).handler(({ context }) => context.deps.betaLabel);
+// Écart §14 (JOURNAL 2026-10-07) : et la langue de la page, d'après le cookie, sinon `Accept-Language`.
+const getRootPage = createServerFn({ method: "GET" }).handler(({ context }) => ({
+  betaLabel: context.deps.betaLabel,
+  locale: resolveLocale({
+    cookieHeader: getRequestHeader("cookie"),
+    preferenceHeader: getRequestHeader("accept-language"),
+  }),
+}));
 
 const RootDocument = ({ children }: { children: ReactNode }) => {
-  const betaLabel = Route.useLoaderData();
+  const { betaLabel } = Route.useLoaderData();
+  const locale = useLocale();
   return (
     // `data-appearance` et `data-view` sont posés par script avant que React hydrate : un écart voulu, sur `<html>` seul.
-    <html lang="fr" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Avant tout le reste : l'apparence est posée avant la première peinture (JOURNAL 2026-09-24). */}
         <ScriptOnce>{APPEARANCE_SCRIPT}</ScriptOnce>
@@ -37,8 +48,15 @@ const RootDocument = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// La langue vit dans `LocaleProvider` : le serveur la rend, puis le visiteur la change sans recharger.
+const RootShell = ({ children }: { children: ReactNode }) => (
+  <LocaleProvider initial={Route.useLoaderData().locale}>
+    <RootDocument>{children}</RootDocument>
+  </LocaleProvider>
+);
+
 export const Route = createRootRouteWithContext<RouterContext>()({
-  loader: () => getBetaLabel(),
+  loader: () => getRootPage(),
   staleTime: Number.POSITIVE_INFINITY, // lue une fois : elle ne change qu'au déploiement
   head: () => ({
     meta: [
@@ -57,5 +75,5 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: "icon", type: "image/png", href: "/icon-192.png", sizes: "192x192" },
     ],
   }),
-  shellComponent: RootDocument,
+  shellComponent: RootShell,
 });

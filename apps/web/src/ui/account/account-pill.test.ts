@@ -22,15 +22,16 @@ const render = (props: Partial<AccountPillProps> = {}): string =>
 const positionOf = (markup: string, title: string): number => markup.indexOf(`title="${title}"`);
 
 describe("pill Compte", () => {
-  // Quand le streamer est sur son canvas, la pill Compte montre Réglages, puis l'apparence, puis sa photo
-  it("porte Réglages avant l'apparence et la photo pour le streamer sur son canvas", () => {
+  // Quand le streamer est sur son canvas, la pill Compte montre Réglages, puis sa photo, puis l'apparence
+  it("porte Réglages avant la photo, et l'apparence après, sans bouton de langue, pour le streamer sur son canvas", () => {
     const markup = render({ onOpenSettings: doNothing });
     const settings = positionOf(markup, "Réglages");
     const appearance = positionOf(markup, "Apparence : Auto");
     const account = positionOf(markup, "Mon compte");
     expect(settings).toBeGreaterThanOrEqual(0);
-    expect(appearance).toBeGreaterThan(settings);
-    expect(account).toBeGreaterThan(appearance);
+    expect(account).toBeGreaterThan(settings);
+    expect(appearance).toBeGreaterThan(account);
+    expect(markup).not.toContain("Passer en anglais");
   });
 
   // Si ce n'est pas le streamer sur son canvas, alors la pill Compte n'a pas de Réglages
@@ -83,10 +84,10 @@ describe("pill Compte", () => {
   // Tant que des signalements attendent, le streamer garde le point sur sa photo, qui le dit
   it("keeps the streamer's dot on the photo, with no Modération button", () => {
     const markup = render({ onOpenSettings: doNothing, pendingReports: 2 });
-    expect(positionOf(markup, "Mon compte · 2 signalements en attente")).toBeGreaterThan(
-      positionOf(markup, "Apparence : Auto"),
+    expect(positionOf(markup, "Apparence : Auto")).toBeGreaterThan(
+      positionOf(markup, "Mon compte · 2 signalements en attente"),
     );
-    expect(markup.indexOf("lp-avatar-dot")).toBeGreaterThan(positionOf(markup, "Apparence : Auto"));
+    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Apparence : Auto"));
     expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
     expect(markup).not.toContain("Modération");
   });
@@ -186,5 +187,77 @@ describe("pill Compte", () => {
     expect(positionOf(markup, "Développeur")).toBeGreaterThanOrEqual(0);
     expect(positionOf(markup, "Réglages")).toBeGreaterThan(positionOf(markup, "Développeur"));
     expect(render()).not.toContain("Développeur");
+  });
+});
+
+// L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (Écart §14, JOURNAL 2026-10-07).
+const SIGN_IN = "Se connecter avec Twitch";
+const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence : Auto", "Mon compte", SIGN_IN];
+
+const orderOf = (markup: string): string[] =>
+  ALL_TITLES.map((title) => ({ title, at: positionOf(markup, title) }))
+    .filter(({ at }) => at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map(({ title }) => title);
+
+describe("la disposition de la pill Compte (Écart §14, JOURNAL 2026-10-07)", () => {
+  // Avec Développeur, Réglages ou Modération à gauche de la photo, l'apparence passe à droite de la photo
+  it("puts the appearance right of the photo when icons stand left of it", () => {
+    expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenSettings: doNothing }))).toEqual([
+      "Développeur",
+      "Réglages",
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(orderOf(render({ onOpenSettings: doNothing }))).toEqual([
+      "Réglages",
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(orderOf(render({ onOpenDeveloper: doNothing }))).toEqual([
+      "Développeur",
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(orderOf(render({ onOpenModeration: doNothing }))).toEqual([
+      "Modération",
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenModeration: doNothing }))).toEqual([
+      "Développeur",
+      "Modération",
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+  });
+
+  // Un joueur connecté sans ces icônes : l'apparence, puis la photo
+  it("puts the appearance, then the photo for a signed-in player without those icons", () => {
+    expect(orderOf(render())).toEqual(["Apparence : Auto", "Mon compte"]);
+  });
+
+  // Un invité : l'apparence, puis Se connecter sur PC ; sur mobile, Se connecter seul sans barre du bas, rien avec elle
+  it("puts the appearance, then Se connecter for a guest on a PC, and Se connecter alone on mobile", () => {
+    const guest = { identity: { kind: "guest" } } as const;
+
+    expect(orderOf(render(guest))).toEqual(["Apparence : Auto", SIGN_IN]);
+    expect(orderOf(render({ ...guest, isCompact: true }))).toEqual([]);
+    expect(orderOf(render({ ...guest, isCompact: true, hasBottomBar: false }))).toEqual([SIGN_IN]);
+  });
+
+  // Tant que le gateway n'a pas répondu : l'apparence seule
+  it("shows the appearance alone while the identity is unknown", () => {
+    expect(orderOf(render({ identity: { kind: "unknown" } }))).toEqual(["Apparence : Auto"]);
+  });
+
+  // La langue se choisit dans Mon compte : aucun bouton de langue dans la pill, quel que soit le compte
+  it("has no language button, whoever the account is", () => {
+    const markup = render();
+
+    expect(markup).not.toContain(">FR</span>");
+    expect(markup).not.toContain('aria-label="Passer en anglais"');
+    expect(render({ identity: { kind: "guest" } })).not.toContain("Passer en anglais");
+    expect(render({ onOpenSettings: doNothing, onOpenDeveloper: doNothing })).not.toContain(">FR</span>");
   });
 });

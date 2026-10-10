@@ -6,7 +6,9 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import type { ReportControl } from "../inspection/inspection-pill";
+import { useTexts } from "../locale/use-locale";
 import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toPlacementRange } from "./cleared-pixels";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import type { ModerationStatus, ModerationWindowProps, ReportTarget } from "./moderation-window";
 import { usePixelListing } from "./pixel-listing";
 
@@ -18,6 +20,7 @@ export function useReport(canvas: CanvasStore): {
 } {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const toast = useToast();
+  const t = useTexts(MODERATION_TEXTS);
   const [sent, setSent] = useState<ReadonlyMap<string, SentReport>>(new Map());
   const [target, setTarget] = useState<ReportTarget | null>(null);
   const { pixels, list, drop } = usePixelListing();
@@ -61,9 +64,9 @@ export function useReport(canvas: CanvasStore): {
     const result = await canvas.report(active.x, active.y, active.placementId, rangeOf(active));
     mark(active.placementId, result.ok ? "reported" : null);
     if (current.current !== active) return;
-    if (result.ok) toast("success", "Signalement envoyé");
+    if (result.ok) toast("success", t.reportSent);
     else if (result.error === "closed") return setStatus("failed");
-    else toast("error", "Signalement refusé : la case a changé, ou la pose ne se signale plus.");
+    else toast("error", t.reportRefused);
     close();
   };
 

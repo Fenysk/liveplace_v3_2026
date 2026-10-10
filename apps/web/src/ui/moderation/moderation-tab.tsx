@@ -10,9 +10,10 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { CanvasStore, StaleList } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import { type BannedList, BannedUsers } from "./banned-users";
 import { moderateInOrder } from "./moderate-in-order";
-import { approvedToast } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
 import { oneAtATime } from "./one-at-a-time";
 import { type PendingReport, pendingReportKey, toPendingReports } from "./pending-reports";
@@ -56,6 +57,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
   });
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const toast = useToast();
+  const t = useTexts(MODERATION_TEXTS);
 
   const relist = useMemo(
     () =>
@@ -73,7 +75,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
     void canvas.setModerator(userId, false).then((result) => {
       setRemovingUserId(null);
       setViews(viewsOf(result));
-      if (result.ok) toast("success", "Modérateur·rice retiré·e");
+      if (result.ok) toast("success", t.moderatorRemoved);
     });
   };
 
@@ -100,6 +102,7 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
   const [list, setList] = useState<ReportList>({ status: "loading" });
   const [approvingReportKey, setApprovingReportKey] = useState<string | null>(null);
   const toast = useToast();
+  const t = useTexts(MODERATION_TEXTS);
 
   const relist = useCallback(() => {
     void canvas.listReports().then((result) => {
@@ -123,7 +126,7 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
     );
     setApprovingReportKey(null);
     if (!result.ok) return setList({ status: "failed" });
-    toast("success", approvedToast(report.placementIds.length));
+    toast("success", t.approvedToast(report.placementIds.length));
   };
 
   return {
@@ -144,6 +147,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   const listing = usePixelListing();
   const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
   const toast = useToast();
+  const t = useTexts(MODERATION_TEXTS);
 
   const relist = useMemo(
     () =>
@@ -169,7 +173,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
     void canvas.moderate({ action: "unban", target: userId }).then((result) => {
       setUnbanningUserId(null);
       if (!result.ok) return setList({ status: "failed" });
-      toast("success", "Débanni·e : ce compte peut de nouveau poser");
+      toast("success", t.unbanned);
       setList((shown) =>
         shown.status === "ready"
           ? { status: "ready", users: shown.users.filter((user) => user.userId !== userId) }

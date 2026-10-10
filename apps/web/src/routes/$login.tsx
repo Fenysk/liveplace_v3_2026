@@ -15,6 +15,7 @@ import { useIsCanvasMissing } from "../ui/canvas/canvas-missing";
 import { CanvasPill, type CanvasPillFold } from "../ui/canvas/canvas-pill";
 import { CanvasRecovering, useIsCanvasRecovering } from "../ui/canvas/canvas-recovering";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
+import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
 import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
@@ -40,6 +41,8 @@ import { recordFirstHintStep, useFirstHintProps } from "../ui/hint/use-first-hin
 import { InspectionPill } from "../ui/inspection/inspection-pill";
 import { useInspectionPillProps } from "../ui/inspection/use-inspection-pill";
 import { type LinkPreviewPage, linkPreviewMeta } from "../ui/link-preview/link-preview";
+import { type Locale, localeOfMatches } from "../ui/locale/locale";
+import { FixedLocale, useTexts } from "../ui/locale/use-locale";
 import { BannedWindow } from "../ui/moderation/banned-window";
 import { ModerationTab } from "../ui/moderation/moderation-tab";
 import { ModerationWindow } from "../ui/moderation/moderation-window";
@@ -138,22 +141,25 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
         onSignIn={signingIn.onSignIn}
       />
       {developer.onOpen && (
-        <DeveloperWindow
-          isOpen={developer.isOpen}
-          sectionId={developer.sectionId}
-          onSelect={developer.onSelect}
-          onClose={developer.onClose}
-        >
-          {developer.sectionId === "capacity" ? (
-            <LiveCapacitySection canvas={stores.canvas} isOpen={developer.isOpen} />
-          ) : (
-            <LiveActivitySection
-              canvas={stores.canvas}
-              isOpen={developer.isOpen}
-              sectionId={developer.sectionId}
-            />
-          )}
-        </DeveloperWindow>
+        // Écart §14 (JOURNAL 2026-10-07) : la fenêtre Développeur reste en français, quelle que soit la langue de la page.
+        <FixedLocale locale="fr">
+          <DeveloperWindow
+            isOpen={developer.isOpen}
+            sectionId={developer.sectionId}
+            onSelect={developer.onSelect}
+            onClose={developer.onClose}
+          >
+            {developer.sectionId === "capacity" ? (
+              <LiveCapacitySection canvas={stores.canvas} isOpen={developer.isOpen} />
+            ) : (
+              <LiveActivitySection
+                canvas={stores.canvas}
+                isOpen={developer.isOpen}
+                sectionId={developer.sectionId}
+              />
+            )}
+          </DeveloperWindow>
+        </FixedLocale>
       )}
       {account.identity.kind === "signedIn" && (
         <AccountWindow
@@ -225,6 +231,7 @@ const GamePage = () => {
   const { canvasId, owner, theme, isOwnerSession = false } = Route.useLoaderData();
   const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
+  const t = useTexts(CANVAS_TEXTS);
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
@@ -260,7 +267,7 @@ const GamePage = () => {
   // `lp-game` : caché dès la première image en vue OBS (JOURNAL 2026-09-25).
   return (
     <main className="lp-game">
-      <h1 className="lp-visually-hidden">Canvas de {owner.displayName}</h1>
+      <h1 className="lp-visually-hidden">{t.pageTitle(owner.displayName)}</h1>
       {stores?.canvasId === canvasId && (
         <PixelCanvas
           store={stores.canvas}
@@ -307,14 +314,14 @@ const CanvasPage = () => {
 };
 
 // L'application web de ce canvas (Écart §9.1, JOURNAL 2026-10-08, sans la vue OBS forcée `$login_.obs`), puis la carte d'aperçu du lien.
-const canvasHead = (page: LinkPreviewPage) => {
+const canvasHead = (page: LinkPreviewPage, locale: Locale) => {
   const pwa = pwaHead(page.owner);
-  return { ...pwa, meta: [...pwa.meta, ...linkPreviewMeta(page)] };
+  return { ...pwa, meta: [...pwa.meta, ...linkPreviewMeta(page, locale)] };
 };
 
 export const Route = createFileRoute("/$login")({
   loader: resolveGameCanvasPage,
-  head: ({ loaderData }) => (loaderData ? canvasHead(loaderData) : {}),
+  head: ({ loaderData, matches }) => (loaderData ? canvasHead(loaderData, localeOfMatches(matches)) : {}),
   headers: noStoreHeaders,
   component: CanvasPage,
   notFoundComponent: CanvasNotFound,

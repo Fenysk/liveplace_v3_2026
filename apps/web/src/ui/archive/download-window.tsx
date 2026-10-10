@@ -2,16 +2,21 @@
 // Aucun fond n'est présélectionné : Télécharger reste inactif tant que le choix n'est pas fait, et il ferme la fenêtre.
 
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { SwatchChoice, type SwatchOption } from "../design/palette";
 import { SmallWindow } from "../design/window";
+import { useTexts } from "../locale/use-locale";
+import { ARCHIVE_TEXTS } from "./archive-texts";
 import type { PngBackground } from "./png-export";
 
 // Le noir et le blanc sont des teintes de la palette (des classes, qui lisent les tokens du vrai noir et du vrai blanc).
 // Sans teinte, la pastille est le damier du transparent.
-export const PNG_BACKGROUND_OPTIONS: readonly SwatchOption<PngBackground>[] = [
-  { value: "transparent", label: "Transparent" },
-  { value: "black", label: "Noir", tone: "png-black" },
-  { value: "white", label: "Blanc", tone: "png-white" },
+export const pngBackgroundOptions = (
+  names: Record<PngBackground, string>,
+): readonly SwatchOption<PngBackground>[] => [
+  { value: "transparent", label: names.transparent },
+  { value: "black", label: names.black, tone: "png-black" },
+  { value: "white", label: names.white, tone: "png-white" },
 ];
 
 type DownloadWindowProps = {
@@ -30,27 +35,29 @@ export const DownloadWindow = ({
   isCompact,
   onConfirm,
   onClose,
-}: DownloadWindowProps) => (
-  <SmallWindow
-    isOpen={isOpen}
-    title="Télécharger en PNG"
-    onClose={onClose}
-    actions={
-      <>
-        <Button label="Annuler" kbd="Échap" onPress={onClose} />
-        <Button label="Télécharger" variant="primary" isDisabled={background === null} onPress={onConfirm} />
-      </>
-    }
-  >
-    <p className="lp-type-body lp-prompt">
-      Seules les cases vides du dessin prennent le fond ; les cases colorées ne changent pas.
-    </p>
-    <SwatchChoice
-      label="Fond de l'image"
-      options={PNG_BACKGROUND_OPTIONS}
-      value={background}
-      onSelect={onBackground}
-      isTouch={isCompact}
-    />
-  </SmallWindow>
-);
+}: DownloadWindowProps) => {
+  const t = useTexts(ARCHIVE_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  return (
+    <SmallWindow
+      isOpen={isOpen}
+      title={t.downloadAsPng}
+      onClose={onClose}
+      actions={
+        <>
+          <Button label={design.cancel} kbd={design.escapeKey} onPress={onClose} />
+          <Button label={t.download} variant="primary" isDisabled={background === null} onPress={onConfirm} />
+        </>
+      }
+    >
+      <p className="lp-type-body lp-prompt">{t.pngBackgroundSentence}</p>
+      <SwatchChoice
+        label={t.pngBackgroundLabel}
+        options={pngBackgroundOptions(design.backgroundNames)}
+        value={background}
+        onSelect={onBackground}
+        isTouch={isCompact}
+      />
+    </SmallWindow>
+  );
+};

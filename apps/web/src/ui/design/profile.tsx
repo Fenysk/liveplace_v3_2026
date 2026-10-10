@@ -6,8 +6,10 @@
 
 import type { TwitchLive } from "@liveplace/domain/ports";
 import { useState } from "react";
+import { useTexts } from "../locale/use-locale";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
+import { DESIGN_TEXTS } from "./design-texts";
 import { TwitchGlyph, TwitchLiveGlyph } from "./twitch";
 import { SmallWindow } from "./window";
 
@@ -48,12 +50,11 @@ export const Avatar = ({ displayName, avatarUrl, hasAccount = true }: AvatarProp
   );
 };
 
-const LIVE_LABEL = "En live"; // sans catégorie
-
 // Le bouton de la chaîne d'un compte en live : le logo, puis la catégorie du stream. L'infobulle dit tout.
 const TwitchLiveLink = ({ user, twitchLive }: { user: ProfileUser; twitchLive: TwitchLive }) => {
+  const t = useTexts(DESIGN_TEXTS);
   const { category } = twitchLive;
-  const title = `${user.displayName} est en live sur Twitch${category ? ` : ${category}` : ""}`;
+  const title = t.liveOnTwitch(user.displayName, category);
   return (
     <a
       className="lp-btn lp-btn--live lp-type-caption"
@@ -64,7 +65,7 @@ const TwitchLiveLink = ({ user, twitchLive }: { user: ProfileUser; twitchLive: T
       rel="noopener noreferrer"
     >
       <TwitchLiveGlyph />
-      <span className="lp-live-category">{category || LIVE_LABEL}</span>
+      <span className="lp-live-category">{category || t.liveLabel}</span>
     </a>
   );
 };
@@ -72,6 +73,7 @@ const TwitchLiveLink = ({ user, twitchLive }: { user: ProfileUser; twitchLive: T
 type ProfileProps = { user: ProfileUser; variant?: ProfileVariant; hasAccount?: boolean };
 
 export const Profile = ({ user, variant = "name", hasAccount = true }: ProfileProps) => {
+  const t = useTexts(DESIGN_TEXTS);
   const [isErrorOpen, setIsErrorOpen] = useState(false);
   const closeError = () => setIsErrorOpen(false);
 
@@ -88,8 +90,8 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
         <a
           className="lp-profile-main"
           href={`/${encodeURIComponent(user.login)}`}
-          title={`Voir le canvas de ${user.displayName}`}
-          aria-label={`Voir le canvas de ${user.displayName}`}
+          title={t.viewCanvasOf(user.displayName)}
+          aria-label={t.viewCanvasOf(user.displayName)}
         >
           {inner}
         </a>
@@ -110,7 +112,7 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
           <Button
             icon={TwitchGlyph}
             variant="ghost"
-            title={`Chaîne Twitch de ${user.displayName}`}
+            title={t.twitchChannelOf(user.displayName)}
             href={`https://www.twitch.tv/${encodeURIComponent(user.login)}`}
             isNewTab
           />
@@ -121,9 +123,9 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
           isOpen={isErrorOpen}
           title={user.displayName}
           onClose={closeError}
-          actions={<Button label="Fermer" kbd="Échap" onPress={closeError} />}
+          actions={<Button label={t.close} kbd={t.escapeKey} onPress={closeError} />}
         >
-          <p className="lp-type-body lp-prompt">Cette personne n'a pas de compte LivePlace.</p>
+          <p className="lp-type-body lp-prompt">{t.noAccount}</p>
         </SmallWindow>
       )}
     </span>

@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { OBS_BACKGROUNDS } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
-import { backgroundSavedToast, obsFillStyle } from "./obs-background";
+import { DESIGN_TEXTS } from "../design/design-texts";
+import { obsFillStyle } from "./obs-background";
+import { OBS_TEXTS } from "./obs-texts";
 
 const tokens = readFileSync(join(import.meta.dirname, "..", "design", "tokens.css"), "utf8");
 
@@ -33,11 +35,16 @@ describe("the fill of the OBS view (CDC 2026 §1)", () => {
   });
 });
 
-describe("backgroundSavedToast (CDC 2026, Toasts)", () => {
+describe("the toast of the saved background (CDC 2026, Toasts)", () => {
   // Dit le fond enregistré par son nom, en minuscules après les deux-points
   it("says the saved background by its name", () => {
-    expect(backgroundSavedToast("transparent")).toBe("Fond enregistré : transparent");
-    expect(backgroundSavedToast("black")).toBe("Fond enregistré : noir");
-    expect(backgroundSavedToast("white")).toBe("Fond enregistré : blanc");
+    const saved = (background: "transparent" | "black" | "white", locale: "fr" | "en") =>
+      OBS_TEXTS[locale].backgroundSaved(DESIGN_TEXTS[locale].backgroundNames[background]);
+
+    expect(saved("transparent", "fr")).toBe("Fond enregistré : transparent");
+    expect(saved("black", "fr")).toBe("Fond enregistré : noir");
+    expect(saved("white", "fr")).toBe("Fond enregistré : blanc");
+    expect(saved("black", "en")).toBe("Background saved: black");
+    expect(saved("white", "en")).toBe("Background saved: white");
   });
 });

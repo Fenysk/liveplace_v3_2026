@@ -4,8 +4,8 @@ import { type GuardTotals, toRatio } from "@liveplace/domain/capacity";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { Brush, Eraser, LogOut, Shield, Trash, X } from "lucide-react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
-import { PROGRESS_LABEL, progressOptions, THEME_LABEL, THEME_PLACEHOLDER } from "../archive/archive-texts";
-import { PNG_BACKGROUND_OPTIONS } from "../archive/download-window";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
+import { pngBackgroundOptions } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
 import { AppearanceButton, AppearancePicker } from "../design/appearance-controls";
 import { Badge } from "../design/badge";
@@ -15,6 +15,8 @@ import { CapacityLinkRows, CapacityRow } from "../design/capacity-row";
 import { Checkbox } from "../design/checkbox";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
+import { DESIGN_TEXTS } from "../design/design-texts";
+import { LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
@@ -44,7 +46,8 @@ import {
 } from "../developer/activity-slots";
 import { formatRate, toGuardsRow, toRowState } from "../developer/capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
-import { ENTER_LABEL, submitLabel } from "../draft/draft-labels";
+import { submitLabel } from "../draft/draft-labels";
+import { DRAFT_TEXTS } from "../draft/draft-texts";
 import {
   NO_AUDIENCE,
   sampleCanvases,
@@ -271,7 +274,12 @@ const ICON_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
 ];
 
 // Les libellés du bouton Dessiner puis Valider de la pill Dessin, dans l'ordre où un joueur les voit.
-const MORPHING_LABELS = [ENTER_LABEL, submitLabel(3, undefined), submitLabel(0, 12), submitLabel(0, 65)];
+const MORPHING_LABELS = [
+  DRAFT_TEXTS.fr.draw,
+  submitLabel(3, undefined, "fr"),
+  submitLabel(0, 12, "fr"),
+  submitLabel(0, 65, "fr"),
+];
 
 // Le libellé change : la largeur glisse de l'ancienne à la nouvelle, le texte passe en fondu quand ses mots changent,
 // les chiffres gardent leur largeur. Le contrôle qui paraît s'ouvre en largeur et en opacité.
@@ -359,6 +367,14 @@ const ActivityCardScene = ({
 );
 
 const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
+
+// Écart §14 (JOURNAL 2026-10-07) : les exemples de /design gardent le français de la page.
+const {
+  themeLabel: THEME_LABEL,
+  themePlaceholder: THEME_PLACEHOLDER,
+  progressLabel: PROGRESS_LABEL,
+} = ARCHIVE_TEXTS.fr;
+const PNG_BACKGROUND_OPTIONS = pngBackgroundOptions(DESIGN_TEXTS.fr.backgroundNames);
 
 export const ActivityCardEntry = () => {
   const nowMs = useNowMs();
@@ -738,9 +754,9 @@ export const ChoicesEntry = () => {
   return (
     <Entry
       slug="choix"
-      components={["ChoiceList", "AppearancePicker", "AppearanceButton", "SwatchChoice"]}
-      file="ui/design/{choice-list,appearance-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre."
+      components={["ChoiceList", "AppearancePicker", "AppearanceButton", "LocalePicker", "SwatchChoice"]}
+      file="ui/design/{choice-list,appearance-controls,locale-controls,palette}.tsx"
+      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; la langue se choisit dans Mon compte."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -749,7 +765,7 @@ export const ChoicesEntry = () => {
               {(progress, setProgress) => (
                 <ChoiceList
                   label={PROGRESS_LABEL}
-                  options={progressOptions("archive")}
+                  options={ARCHIVE_TEXTS.fr.progressOptions.archive}
                   value={progress}
                   onSelect={setProgress}
                 />
@@ -761,7 +777,7 @@ export const ChoicesEntry = () => {
           <InSmallWindow>
             <ChoiceList
               label={PROGRESS_LABEL}
-              options={progressOptions("archive")}
+              options={ARCHIVE_TEXTS.fr.progressOptions.archive}
               value="keep"
               onSelect={noop}
               isDisabled
@@ -778,6 +794,11 @@ export const ChoicesEntry = () => {
           detail="Au PC seulement : sur mobile, elle vit dans Mon compte."
         >
           <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
+        </StateRow>
+      </Block>
+      <Block title="Langue">
+        <StateRow name="Langue, comme dans Mon compte" detail="Elle ne se choisit qu'ici.">
+          <LocalePicker />
         </StateRow>
       </Block>
       <Block title="Choix de couleur">

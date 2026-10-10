@@ -5,8 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ToastAnnouncementContext } from "../design/toast-announcement";
 import { PLACEMENT_ONLY } from "./cleared-pixels";
-import { CONNECTION_LOST } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import { ModerationWindow, type ModerationWindowProps } from "./moderation-window";
+
+const CONNECTION_LOST = MODERATION_TEXTS.fr.connectionLost;
 
 const noop = () => undefined;
 

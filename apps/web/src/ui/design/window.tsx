@@ -5,8 +5,10 @@
 import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { useTexts } from "../locale/use-locale";
 import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
+import { DESIGN_TEXTS } from "./design-texts";
 import { Grabber } from "./grabber";
 import { motionMs } from "./motion";
 import { ToastAnnouncement } from "./toast-announcement";
@@ -38,26 +40,29 @@ export const WindowNav = <Id extends string>({
   currentId,
   onSelect,
   wrapTab,
-}: WindowNavProps<Id>) => (
-  <nav className="lp-window-nav" aria-label="Sections">
-    <ul>
-      {sections.map(({ id, label, icon: Icon }) => {
-        const tab = (
-          <button
-            type="button"
-            className="lp-btn lp-type-body"
-            aria-current={id === currentId ? "page" : undefined}
-            onClick={blurAfterClick(() => onSelect(id))}
-          >
-            <Icon aria-hidden="true" />
-            {label}
-          </button>
-        );
-        return <li key={id}>{wrapTab ? wrapTab(id, tab) : tab}</li>;
-      })}
-    </ul>
-  </nav>
-);
+}: WindowNavProps<Id>) => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <nav className="lp-window-nav" aria-label={t.sections}>
+      <ul>
+        {sections.map(({ id, label, icon: Icon }) => {
+          const tab = (
+            <button
+              type="button"
+              className="lp-btn lp-type-body"
+              aria-current={id === currentId ? "page" : undefined}
+              onClick={blurAfterClick(() => onSelect(id))}
+            >
+              <Icon aria-hidden="true" />
+              {label}
+            </button>
+          );
+          return <li key={id}>{wrapTab ? wrapTab(id, tab) : tab}</li>;
+        })}
+      </ul>
+    </nav>
+  );
+};
 
 type WindowProps<Id extends string> = {
   isOpen: boolean;
@@ -119,6 +124,7 @@ const WindowShell = ({
   children,
 }: WindowShellProps) => {
   const { dialog, isShown } = useWindowMotion(isOpen);
+  const t = useTexts(DESIGN_TEXTS);
   return (
     <dialog
       ref={dialog}
@@ -144,7 +150,7 @@ const WindowShell = ({
     >
       {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
       <div className="lp-window-grabber">
-        <Grabber label="Fermer" onUp={doNothing} onDown={onClose} onTap={doNothing} />
+        <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
       </div>
       {children}
       {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}
@@ -155,14 +161,17 @@ const WindowShell = ({
 
 type WindowHeadProps = { titleId: string; title: ReactNode; onClose: () => void };
 
-const WindowHead = ({ titleId, title, onClose }: WindowHeadProps) => (
-  <header className="lp-window-head">
-    <h2 id={titleId} className="lp-type-heading">
-      {title}
-    </h2>
-    <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
-  </header>
-);
+const WindowHead = ({ titleId, title, onClose }: WindowHeadProps) => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <header className="lp-window-head">
+      <h2 id={titleId} className="lp-type-heading">
+        {title}
+      </h2>
+      <Button icon={X} variant="ghost" title={t.closeTip} onPress={onClose} />
+    </header>
+  );
+};
 
 export const Window = <Id extends string>({
   isOpen,

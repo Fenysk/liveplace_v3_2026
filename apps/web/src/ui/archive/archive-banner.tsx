@@ -6,6 +6,8 @@ import { Download, Link2 } from "lucide-react";
 import { Button, type ButtonIcon } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile, type ProfileUser } from "../design/profile";
+import { useTexts } from "../locale/use-locale";
+import { ARCHIVE_TEXTS } from "./archive-texts";
 
 const DOCK: PillDock = "tl";
 
@@ -41,22 +43,25 @@ export const ArchiveBanner = ({
   onDownload,
   isCompact = false,
   isDocked = true,
-}: ArchiveBannerProps) => (
-  <Pill dock={isDocked ? DOCK : undefined} layout="stack">
-    <div className="lp-archive-banner">
-      <Profile user={owner} variant={isCompact ? "name" : "full"} />
-      <p className="lp-type-title lp-prompt">{title}</p>
-      <p className="lp-type-caption lp-muted lp-prompt">{caption}</p>
-      <div className="lp-row lp-row--ruled">
-        <BannerAction icon={Link2} label="Copier le lien" isCompact={isCompact} onPress={onCopyLink} />
-        <BannerAction
-          icon={Download}
-          label="Télécharger en PNG"
-          isCompact={isCompact}
-          isDisabled={isDownloading}
-          onPress={onDownload}
-        />
+}: ArchiveBannerProps) => {
+  const t = useTexts(ARCHIVE_TEXTS);
+  return (
+    <Pill dock={isDocked ? DOCK : undefined} layout="stack">
+      <div className="lp-archive-banner">
+        <Profile user={owner} variant={isCompact ? "name" : "full"} />
+        <p className="lp-type-title lp-prompt">{title}</p>
+        <p className="lp-type-caption lp-muted lp-prompt">{caption}</p>
+        <div className="lp-row lp-row--ruled">
+          <BannerAction icon={Link2} label={t.copyLink} isCompact={isCompact} onPress={onCopyLink} />
+          <BannerAction
+            icon={Download}
+            label={t.downloadAsPng}
+            isCompact={isCompact}
+            isDisabled={isDownloading}
+            onPress={onDownload}
+          />
+        </div>
       </div>
-    </div>
-  </Pill>
-);
+    </Pill>
+  );
+};

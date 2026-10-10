@@ -4,11 +4,13 @@
 import { OBS_BACKGROUND, OBS_DELAY_MS, type ObsBackground } from "@liveplace/domain";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
-import { backgroundSavedToast } from "./obs-background";
+import { useLocale, useTexts } from "../locale/use-locale";
 import { obsDelayLabel } from "./obs-delay-label";
 import { ObsSettings } from "./obs-settings";
+import { OBS_TEXTS } from "./obs-texts";
 
 type ObsTabProps = { canvas: CanvasStore; login: string; onCopy: () => void };
 
@@ -18,11 +20,13 @@ const useObsBackground = (canvas: CanvasStore) => {
   const confirmed = useSyncExternalStore(canvas.subscribe, getConfirmed, getConfirmed);
   const [requested, setRequested] = useState<ObsBackground | null>(null);
   const toast = useToast();
+  const t = useTexts(OBS_TEXTS);
+  const { backgroundNames } = useTexts(DESIGN_TEXTS);
   useEffect(() => {
     if (requested !== confirmed) return;
     setRequested(null);
-    toast("success", backgroundSavedToast(confirmed));
-  }, [requested, confirmed, toast]);
+    toast("success", t.backgroundSaved(backgroundNames[confirmed]));
+  }, [requested, confirmed, toast, t, backgroundNames]);
   return {
     obsBackground: requested ?? confirmed,
     onPickBackground: (obsBackground: ObsBackground) => {
@@ -37,12 +41,14 @@ export const ObsTab = ({ canvas, login, onCopy }: ObsTabProps) => {
   const confirmed = useSyncExternalStore(canvas.subscribe, getConfirmed, getConfirmed);
   const [requested, setRequested] = useState<number | null>(null);
   const toast = useToast();
+  const locale = useLocale();
+  const t = useTexts(OBS_TEXTS);
   // La frame `obsDelay` confirme le cran demandé : le toast le dit (CDC 2026, Toasts).
   useEffect(() => {
     if (requested !== confirmed) return;
     setRequested(null);
-    toast("success", `Délai enregistré : ${obsDelayLabel(confirmed)}`);
-  }, [requested, confirmed, toast]);
+    toast("success", t.delaySaved(obsDelayLabel(confirmed, locale)));
+  }, [requested, confirmed, toast, t, locale]);
   // Montée seulement quand la fenêtre s'ouvre sur cette section : toujours dans le navigateur.
   const url = `${window.location.origin}/${login}`;
   const background = useObsBackground(canvas);

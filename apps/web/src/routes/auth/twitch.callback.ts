@@ -4,6 +4,8 @@ import { SESSION_COOKIE, SESSION_TTL_SECONDS } from "@liveplace/domain";
 import { cookieValue, serializeCookie } from "@liveplace/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { redirectWithCookies } from "../../shared/redirect";
+import { ACCOUNT_TEXTS } from "../../ui/account/account-texts";
+import { resolveRequestLocale } from "../../ui/locale/locale";
 import { OAUTH_COOKIE, parseOAuthCookie } from "../../usecase/oauth";
 import { completeSignIn } from "../../usecase/sign-in";
 import { completeTwitchSync } from "../../usecase/sync-twitch";
@@ -13,6 +15,8 @@ export const Route = createFileRoute("/auth/twitch/callback")({
     handlers: {
       GET: async ({ request, context }) => {
         const { deps } = context;
+        // Écart §14 (JOURNAL 2026-10-07) : le visiteur lit ces deux phrases brutes dans sa langue.
+        const texts = ACCOUNT_TEXTS[resolveRequestLocale(request)];
         const url = new URL(request.url);
         const pending = parseOAuthCookie(
           cookieValue(request.headers.get("cookie") ?? undefined, OAUTH_COOKIE),
@@ -22,7 +26,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
 
         // Sans le bon `state`, ce retour ne vient pas du navigateur qui est parti chez Twitch.
         if (!pending || url.searchParams.get("state") !== pending.state) {
-          return new Response("Connexion refusée : state invalide.", {
+          return new Response(texts.signInRefused, {
             status: 400,
             headers: { "set-cookie": clearOAuth },
           });
@@ -41,7 +45,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
           return redirectWithCookies(pending.returnPath ?? `/${login}`, [clearOAuth, session]);
         } catch (error) {
           console.error("Connexion Twitch en échec :", error instanceof Error ? error.message : error);
-          return new Response("La connexion Twitch a échoué. Réessaie dans un instant.", {
+          return new Response(texts.signInFailed, {
             status: 502,
             headers: { "set-cookie": clearOAuth },
           });

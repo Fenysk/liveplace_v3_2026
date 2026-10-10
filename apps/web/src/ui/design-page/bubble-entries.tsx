@@ -8,7 +8,7 @@ import { Bubble, BubbleLine } from "../design/bubble";
 import { Button } from "../design/button";
 import { Pill } from "../design/pill";
 import { DraftPill } from "../draft/draft-pill";
-import { TRACE_TEXT } from "../help/help-texts";
+import { HELP_TEXTS } from "../help/help-texts";
 import { FirstHint } from "../hint/first-hint";
 import { HINT_CLOSE_BEAT_MS } from "../hint/first-hint-props";
 import { noop } from "./design-fixtures";
@@ -38,7 +38,7 @@ const AimedTool = ({ aimed }: { aimed: ToolName }) => {
   return (
     <Stack isAimed>
       <Bubble isVisible isDocked={false} target={target}>
-        <BubbleLine icon={Brush}>{TRACE_TEXT}</BubbleLine>
+        <BubbleLine icon={Brush}>{HELP_TEXTS.fr.trace}</BubbleLine>
       </Bubble>
       <Pill>
         {TOOLS.map(({ name, icon, title }) => (

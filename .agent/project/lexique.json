@@ -35,6 +35,7 @@
     { "canonical": "still",        "definition": "RÉSERVÉ, n'existe pas encore : une image d'un timelapse. Ne jamais appeler ça une `frame`.", "banned": [] },
     { "canonical": "obsDelay",     "definition": "Le délai de la vue OBS, appliqué par le client (D-08). L'instant d'affichage d'une case est `showAt`.", "banned": ["buffer", "lag"] },
     { "canonical": "session",      "definition": "Le jeton du navigateur, cookie `lp_session` signé HS256. Le mot `token` est réservé au token Twitch, qu'on ne garde pas.", "banned": ["token"] },
+    { "canonical": "locale",       "definition": "La langue de l'interface, `fr` ou `en`, gardée dans le cookie `lp_locale`. Jamais un pays ni un format de date.", "banned": ["lang", "language"] },
     { "canonical": "developer",    "definition": "Le compte qui voit le suivi d'activité, `DEVELOPER_USER_ID`. Jamais un rôle de canvas (JOURNAL 2026-10-06).", "banned": ["superuser", "staff"] },
     { "canonical": "activity",     "definition": "Les chiffres du suivi et leur historique : connectés, canvas streamés, pixels, nouveaux comptes (JOURNAL 2026-10-06).", "banned": ["stats", "metrics", "analytics", "telemetry"] },
     { "canonical": "heat",         "definition": "Les pixels posés sur un canvas dans la dernière heure (JOURNAL 2026-10-06).", "banned": ["temperature"] },

@@ -5,6 +5,8 @@
 import { useSyncExternalStore } from "react";
 import type { CanvasStore, CanvasView } from "../../state/canvas-store";
 import { NoticePill } from "../design/pill";
+import { useTexts } from "../locale/use-locale";
+import { CANVAS_TEXTS } from "./canvas-texts";
 
 export const isCanvasRecovering = ({ lastError }: Pick<CanvasView, "lastError">): boolean =>
   lastError === "canvas_recovering";
@@ -17,10 +19,8 @@ export const useIsCanvasRecovering = (canvas: CanvasStore | undefined): boolean 
   return useSyncExternalStore(canvas?.subscribe ?? noSubscription, getIsRecovering, getIsRecovering);
 };
 
-export const RECOVERING_TITLE = "On remet chaque pixel à sa place. Le canvas revient dans un instant !";
-
 export const CanvasRecovering = () => (
   <main className="lp-game">
-    <NoticePill title={RECOVERING_TITLE} />
+    <NoticePill title={useTexts(CANVAS_TEXTS).recovering} />
   </main>
 );

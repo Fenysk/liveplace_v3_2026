@@ -100,33 +100,33 @@ describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09)", () => {
 describe("submitLabel (Écart §9.3, JOURNAL 2026-10-08)", () => {
   // Brouillon vide avec des charges : Valider, comme avant
   it("says Valider alone for an empty draft", () => {
-    expect(submitLabel(0, undefined)).toBe("Valider");
+    expect(submitLabel(0, undefined, "fr")).toBe("Valider");
   });
 
   // Un brouillon, sa taille dans le bouton
   it("adds the draft size", () => {
-    expect(submitLabel(3, undefined)).toBe("Valider · 3");
-    expect(submitLabel(12, undefined)).toBe("Valider · 12");
+    expect(submitLabel(3, undefined, "fr")).toBe("Valider · 3");
+    expect(submitLabel(12, undefined, "fr")).toBe("Valider · 12");
   });
 
   // Plus aucune charge et rien à poser : le bouton compte jusqu'à la prochaine
   it("counts down to the next charge when there is nothing to place and no charge", () => {
-    expect(submitLabel(0, 12)).toBe("Attendre 12 s");
-    expect(submitLabel(0, 65)).toBe("Attendre 1 min 05");
+    expect(submitLabel(0, 12, "fr")).toBe("Attendre 12 s");
+    expect(submitLabel(0, 65, "fr")).toBe("Attendre 1 min 05");
   });
 });
 
 describe("submitWords", () => {
   // Le mot de devant « Attendre » est à part : sur un écran étroit, le bouton garde « 12 s » seul
   it("splits the leading word from the wait so a narrow screen can drop it", () => {
-    expect(submitWords(0, 12)).toEqual({ lead: "Attendre ", label: "12 s" });
-    expect(submitWords(0, 65)).toEqual({ lead: "Attendre ", label: "1 min 05" });
+    expect(submitWords(0, 12, "fr")).toEqual({ lead: "Attendre ", label: "12 s" });
+    expect(submitWords(0, 65, "fr")).toEqual({ lead: "Attendre ", label: "1 min 05" });
   });
 
   // Hors attente, aucun mot à retirer
   it("has no leading word outside the wait", () => {
-    expect(submitWords(0, undefined)).toEqual({ lead: "", label: "Valider" });
-    expect(submitWords(3, undefined)).toEqual({ lead: "", label: "Valider · 3" });
+    expect(submitWords(0, undefined, "fr")).toEqual({ lead: "", label: "Valider" });
+    expect(submitWords(3, undefined, "fr")).toEqual({ lead: "", label: "Valider · 3" });
   });
 });
 
@@ -185,5 +185,16 @@ describe("msToNextSecond", () => {
   // Sans compte à rebours (jauge pleine), une seconde
   it("ticks every second without a deadline", () => {
     expect(msToNextSecond(undefined, NOW)).toBe(1000);
+  });
+});
+
+describe("the Draw pill buttons in English (Écart §14, JOURNAL 2026-10-07)", () => {
+  // Confirm, sa taille dans le bouton, puis l'attente : « Wait 12 s »
+  it("says Confirm with the draft size, then counts down with Wait", () => {
+    expect(submitLabel(0, undefined, "en")).toBe("Confirm");
+    expect(submitLabel(3, undefined, "en")).toBe("Confirm · 3");
+    expect(submitLabel(0, 12, "en")).toBe("Wait 12 s");
+    expect(submitLabel(0, 65, "en")).toBe("Wait 1 min 05");
+    expect(submitWords(0, 12, "en")).toEqual({ lead: "Wait ", label: "12 s" });
   });
 });

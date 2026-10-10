@@ -8,8 +8,11 @@ import { signInHref } from "../account/auth-links";
 import type { useSigningIn } from "../account/use-signing-in";
 import type { GaugeProps } from "../design/gauge";
 import { TOUCH_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import type { Locale } from "../locale/locale";
+import { useLocale } from "../locale/use-locale";
 import { msToNextSecond, waitSecondsOf } from "./draft-labels";
 import type { DraftPillActions, DraftPillState } from "./draft-pill";
+import { DRAFT_TEXTS } from "./draft-texts";
 
 const formatCountdown = (ms: number): string => {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -42,26 +45,31 @@ const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) 
 };
 
 // Le client prédit, le serveur tranche : la jauge affichée entre deux réponses (§9.4).
-// JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà.
-const rewardsText = (claimable: number): string =>
-  claimable === 0 ? "" : `, ${claimable} récompense${claimable > 1 ? "s" : ""} à réclamer`;
-
-const toGaugeProps = (canvas: CanvasView, draft: DraftView, nowMs: number): GaugeProps | null => {
+const toGaugeProps = (
+  canvas: CanvasView,
+  draft: DraftView,
+  nowMs: number,
+  locale: Locale,
+): GaugeProps | null => {
   const { gauge, params } = canvas;
   if (!gauge || !params) return null;
   const { charges, max, nextRefillAt, claimable } = predictGauge(gauge, params, nowMs);
   const reserved = draft.mode === "draft" ? draft.draft.size : 0;
   const refill = charges < max ? { endsAt: nextRefillAt, durationMs: params.refillMs } : null;
-  const afterPlacement = reserved > 0 ? `${Math.max(0, charges - reserved)} après la pose, ` : "";
-  const nextCharge = refill
-    ? `, +${params.refillCharges} dans ${formatCountdown(nextRefillAt - nowMs)}`
-    : ", jauge pleine";
   return {
     charges,
     max,
     draft: reserved,
     refill,
-    label: `${afterPlacement}${charges} / ${max} charges${nextCharge}${rewardsText(claimable)}`,
+    label: DRAFT_TEXTS[locale].gaugeLabel({
+      charges,
+      max,
+      afterPlacement: reserved > 0 ? Math.max(0, charges - reserved) : undefined,
+      nextRefill: refill
+        ? { charges: params.refillCharges, countdown: formatCountdown(nextRefillAt - nowMs) }
+        : undefined,
+      claimable,
+    }),
     shakeCount: draft.shakeCount,
   };
 };
@@ -144,8 +152,9 @@ export function useDraftPillProps(
   const canvasView = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const draftView = useSyncExternalStore(draft.subscribe, draft.getView, draft.getView);
   const isTouchScreen = useMediaQuery(TOUCH_SCREEN_QUERY);
+  const locale = useLocale();
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const gauge = toGaugeProps(canvasView, draftView, nowMs);
+  const gauge = toGaugeProps(canvasView, draftView, nowMs, locale);
   useCountdownTick(gauge?.refill?.endsAt, setNowMs);
   const waitSeconds = toWaitSeconds(gauge, draftView.draft.size, nowMs);
   return {

@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ListedArchive, ListedCanvas } from "../../usecase/list-canvases";
-import { NO_ARCHIVE_SENTENCE } from "./archive-texts";
+import { ARCHIVE_TEXTS } from "./archive-texts";
 import { ArchivesSection } from "./canvas-cards";
 
 const doNothing = (): void => undefined;
@@ -61,7 +61,7 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
     const html = sectionHtml(active, []);
 
     expect(html).toContain("Archives · 0 sur 5");
-    expect(html).toContain(NO_ARCHIVE_SENTENCE.replace("'", "&#x27;"));
+    expect(html).toContain(ARCHIVE_TEXTS.fr.noArchive.replace("'", "&#x27;"));
     expect(html).not.toContain("<ul");
   });
 

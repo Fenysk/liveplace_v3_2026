@@ -5,7 +5,7 @@ import { type ReactNode, useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { CanvasPill, type CanvasPillFold } from "../canvas/canvas-pill";
-import { RECOVERING_TITLE } from "../canvas/canvas-recovering";
+import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
 import { Button } from "../design/button";
@@ -385,7 +385,7 @@ export const AccountPillEntry = () => (
     slug="pill-compte"
     components={["AccountPill"]}
     file="ui/account/account-pill.tsx"
-    note="Le streamer sur son canvas n'a que la pill Compte. Sur mobile, elle n'a ni l'apparence ni Se connecter."
+    note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
     where="En haut à droite"
   >
     {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
@@ -839,7 +839,7 @@ export const NoticeEntry = () => (
         detail="Pour tous, à la place du canvas ; la page reprend seule. Rien en vue OBS."
       >
         <InNotice>
-          <NoticePill title={RECOVERING_TITLE} />
+          <NoticePill title={CANVAS_TEXTS.fr.recovering} />
         </InNotice>
       </StateRow>
       <StateRow name="Une archive supprimée, ou un lien inconnu" detail="Le bouton dit le nom affiché.">

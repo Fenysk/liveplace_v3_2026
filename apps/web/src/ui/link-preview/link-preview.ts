@@ -2,6 +2,8 @@
 // Les textes sont posés tels quels : l'échappement est celui de React, qui rend chaque `meta` en attributs.
 
 import type { CanvasOwner } from "../../usecase/resolve-canvas";
+import type { Locale } from "../locale/locale";
+import { LINK_PREVIEW_TEXTS } from "./link-preview-texts";
 
 // Ce que la carte lit : l'adresse publique du site, le streamer, et le thème du canvas s'il en a un.
 export type LinkPreviewPage = { publicUrl: string; owner: CanvasOwner; theme?: string };
@@ -9,12 +11,14 @@ export type LinkPreviewPage = { publicUrl: string; owner: CanvasOwner; theme?: s
 export type PreviewMeta = { name: string; content: string } | { property: string; content: string };
 
 const SITE_NAME = "LivePlace";
-const previewTitle = (displayName: string): string => `Viens dessiner sur le canvas de ${displayName}`;
-const DEFAULT_DESCRIPTION = "Un canvas collaboratif, en direct sur Twitch.";
 
-export const linkPreviewMeta = ({ publicUrl, owner, theme }: LinkPreviewPage): PreviewMeta[] => {
-  const title = previewTitle(owner.displayName);
-  const description = theme ?? DEFAULT_DESCRIPTION;
+export const linkPreviewMeta = (
+  { publicUrl, owner, theme }: LinkPreviewPage,
+  locale: Locale,
+): PreviewMeta[] => {
+  const texts = LINK_PREVIEW_TEXTS[locale];
+  const title = texts.title(owner.displayName);
+  const description = theme ?? texts.description;
   const image = owner.avatarUrl;
   return [
     { property: "og:type", content: "website" },

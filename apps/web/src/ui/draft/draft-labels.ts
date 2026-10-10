@@ -1,5 +1,8 @@
 // Les mots des boutons de la pill Dessin selon le brouillon et la jauge (Écart §9.3, JOURNAL 2026-10-08).
 
+import type { Locale } from "../locale/locale";
+import { DRAFT_TEXTS } from "./draft-texts";
+
 const SECONDS_PER_MINUTE = 60;
 const TICK_MS = 1000;
 
@@ -10,22 +13,22 @@ export function formatWait(seconds: number): string {
   return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min ${rest}`;
 }
 
-// Écart §9.3 (JOURNAL 2026-10-09) : Dessiner tout court, avec ou sans brouillon gardé.
-export const ENTER_LABEL = "Dessiner";
-
-// Le mot de devant d'« Attendre 12 s » : sur un écran étroit, le bouton garde « 12 s » seul (button.css).
-const WAIT_LEAD = "Attendre ";
-
 export type SubmitWords = { lead: string; label: string };
 
-// `waitSeconds` : plus aucune charge et rien à poser, la seconde où la jauge en redonne une.
-export const submitWords = (draftSize: number, waitSeconds: number | undefined): SubmitWords => {
-  if (waitSeconds !== undefined) return { lead: WAIT_LEAD, label: formatWait(waitSeconds) };
-  return { lead: "", label: draftSize > 0 ? `Valider · ${draftSize}` : "Valider" };
+// `waitSeconds` : plus aucune charge et rien à poser, la seconde où la jauge en redonne une. Le mot de devant d'« Attendre
+// 12 s » est à part : sur un écran étroit, le bouton garde « 12 s » seul (button.css).
+export const submitWords = (
+  draftSize: number,
+  waitSeconds: number | undefined,
+  locale: Locale,
+): SubmitWords => {
+  const t = DRAFT_TEXTS[locale];
+  if (waitSeconds !== undefined) return { lead: t.waitLead, label: formatWait(waitSeconds) };
+  return { lead: "", label: draftSize > 0 ? `${t.confirm} · ${draftSize}` : t.confirm };
 };
 
-export const submitLabel = (draftSize: number, waitSeconds: number | undefined): string => {
-  const { lead, label } = submitWords(draftSize, waitSeconds);
+export const submitLabel = (draftSize: number, waitSeconds: number | undefined, locale: Locale): string => {
+  const { lead, label } = submitWords(draftSize, waitSeconds, locale);
   return `${lead}${label}`;
 };
 

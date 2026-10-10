@@ -3,6 +3,8 @@
 // leur largeur : « Thème » devant le thème, qui tient sur deux lignes ; en Dessin, elle monte à leur place (Écart §8.1, JOURNAL
 // 2026-10-08, pill.css, theme-pill.css). Jamais cliquable.
 
+import { useTexts } from "../locale/use-locale";
+import { DESIGN_TEXTS } from "./design-texts";
 import { Pill, type PillDock } from "./pill";
 import { useShownWhileClosing } from "./window";
 
@@ -14,6 +16,7 @@ type ThemePillProps = {
 };
 
 export const ThemePill = ({ theme, isDocked = true }: ThemePillProps) => {
+  const t = useTexts(DESIGN_TEXTS);
   const shown = useShownWhileClosing(theme || null);
   if (shown === null) return null;
   return (
@@ -23,8 +26,8 @@ export const ThemePill = ({ theme, isDocked = true }: ThemePillProps) => {
         <span className="lp-theme-line">
           <span className="lp-theme-caption lp-type-caption lp-muted">
             {/* Les deux phrases sont dans la page : le CSS garde celle de l'écran, sans attendre React sur un téléphone. */}
-            <span className="lp-theme-wide">Dessine sur le thème</span>
-            <span className="lp-theme-narrow">Thème</span>
+            <span className="lp-theme-wide">{t.themeDraw}</span>
+            <span className="lp-theme-narrow">{t.theme}</span>
           </span>
           <span className="lp-theme-text lp-type-heading">{shown}</span>
         </span>

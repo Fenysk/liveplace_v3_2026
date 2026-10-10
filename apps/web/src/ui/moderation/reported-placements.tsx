@@ -6,12 +6,14 @@
 import { EyeOff } from "lucide-react";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { formatPlacedAgo } from "../inspection/placed-ago";
+import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "./can-ban";
 import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
-import { reportCountLabel } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 import { type PendingReport, pendingReportKey } from "./pending-reports";
 
@@ -41,6 +43,8 @@ const ReportRow = ({
   onBan,
   onApprove,
 }: ReportRowProps) => {
+  const locale = useLocale();
+  const t = useTexts(MODERATION_TEXTS);
   const hasSeveralPlacements = report.placementIds.length > 1;
   return (
     <div className="lp-report">
@@ -48,23 +52,23 @@ const ReportRow = ({
         <PixelPreview
           {...canvas}
           pixels={report.pixels}
-          label={`${hasSeveralPlacements ? "Les poses signalées" : "La pose signalée"} de ${report.displayName}`}
+          label={t.reportedPlacementPreview({ hasSeveral: hasSeveralPlacements, name: report.displayName })}
         />
       </div>
       <div className="lp-report-body">
         <MarkedProfile user={report} hasAccount={report.hasAccount} />
         <span className="lp-row lp-type-caption lp-muted">
-          {reportCountLabel(report.reportCount)} · {formatPlacedAgo(report.reportedAt, nowMs)}
-          {report.isOffStream && <Badge label="Cachée du stream" icon={EyeOff} />}
+          {t.reportCount(report.reportCount)} · {formatPlacedAgo(report.reportedAt, nowMs, locale)}
+          {report.isOffStream && <Badge label={t.hiddenFromStream} icon={EyeOff} />}
         </span>
         <div className="lp-row lp-report-actions">
           <Button
-            label={hasSeveralPlacements ? "Retirer les poses" : "Retirer la pose"}
+            label={t.clearPlacements[hasSeveralPlacements ? "several" : "one"]}
             onPress={() => onClear(report)}
           />
-          {canBan(report) && <Button label="Bannir" variant="danger" onPress={() => onBan(report)} />}
+          {canBan(report) && <Button label={t.ban} variant="danger" onPress={() => onBan(report)} />}
           <Button
-            label="Rétablir"
+            label={t.restore}
             variant="ghost"
             isDisabled={approvingReportKey === pendingReportKey(report)}
             onPress={() => onApprove(report)}
@@ -75,20 +79,24 @@ const ReportRow = ({
   );
 };
 
-const listContent = ({ list, ...rowProps }: ReportedPlacementsProps) => {
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
+const ReportRows = ({ list, ...rowProps }: ReportedPlacementsProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
   if (list.status === "failed") return null; // `ConnectionLost`, juste après
-  if (list.reports.length === 0)
-    return <span className="lp-type-caption lp-muted">Aucun signalement en attente.</span>;
+  if (list.reports.length === 0) return <span className="lp-type-caption lp-muted">{t.noReports}</span>;
   return list.reports.map((report) => (
     <ReportRow key={pendingReportKey(report)} report={report} {...rowProps} />
   ));
 };
 
-export const ReportedPlacements = (props: ReportedPlacementsProps) => (
-  <>
-    <span className="lp-type-body">Signalements</span>
-    {listContent(props)}
-    <ConnectionLost isFailed={props.list.status === "failed"} />
-  </>
-);
+export const ReportedPlacements = (props: ReportedPlacementsProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  return (
+    <>
+      <span className="lp-type-body">{t.reports}</span>
+      <ReportRows {...props} />
+      <ConnectionLost isFailed={props.list.status === "failed"} />
+    </>
+  );
+};

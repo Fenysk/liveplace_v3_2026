@@ -3,9 +3,11 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { type BannedList, BannedUsers } from "./banned-users";
-import { CONNECTION_LOST } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 import { type ModeratorListView, ModeratorUsers } from "./moderator-users";
 import { ReportedPlacements, type ReportList } from "./reported-placements";
+
+const CONNECTION_LOST = MODERATION_TEXTS.fr.connectionLost;
 
 const noop = () => undefined;
 const canvas = { width: 4, height: 4, palette: PALETTE };

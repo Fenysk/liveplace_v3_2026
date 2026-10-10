@@ -2,6 +2,8 @@
 // canvas actif, sans recharger, et un toast court le dit. Celui qui l'a demandé a son propre toast (« Canvas archivé »).
 
 import type { CanvasView } from "../../state/canvas-store";
+import type { Locale } from "../locale/locale";
+import { CANVAS_TEXTS } from "./canvas-texts";
 
 type Seen = Pick<CanvasView, "status" | "isArchived">;
 
@@ -22,8 +24,8 @@ export function switchToast(
   before: Seen,
   after: Seen,
   { hasAskedHere, ownerName, draftSize }: SwitchContext,
+  locale: Locale,
 ): string | null {
   if (!shouldAnnounceSwitch(before, after, hasAskedHere)) return null;
-  const changed = `${ownerName} a changé de canvas`;
-  return draftSize > 0 ? `${changed} : ton brouillon reste sur l'ancien.` : `${changed}.`;
+  return CANVAS_TEXTS[locale].switched({ ownerName, hasDraft: draftSize > 0 });
 }

@@ -6,6 +6,8 @@ import { useState } from "react";
 import { HINT_STEPS } from "../../state/first-hint";
 import { Bubble, BubbleLine } from "../design/bubble";
 import { classNames } from "../design/class-names";
+import { useTexts } from "../locale/use-locale";
+import { HINT_TEXTS } from "./hint-texts";
 
 export type FirstHintProps = {
   doneCount: number; // 0 à 3 : les points remplis
@@ -14,27 +16,31 @@ export type FirstHintProps = {
 };
 
 const HINT_LINES = [
-  { icon: Minimize2, text: "Pince pour zoomer" },
-  { icon: Pointer, text: "Touche un pixel pour voir qui l'a posé" },
+  { icon: Minimize2, key: "pinch" },
+  { icon: Pointer, key: "tapPixel" },
 ] as const;
 
-const HintDots = ({ count }: { count: number }) => (
-  <span className="lp-hint-dots" role="img" aria-label={`${count} sur ${HINT_STEPS.length}`}>
-    {HINT_STEPS.map((step, index) => (
-      <span key={step} className={classNames("lp-hint-dot", index < count && "is-filled")} />
-    ))}
-  </span>
-);
+const HintDots = ({ count }: { count: number }) => {
+  const t = useTexts(HINT_TEXTS);
+  return (
+    <span className="lp-hint-dots" role="img" aria-label={t.progress(count, HINT_STEPS.length)}>
+      {HINT_STEPS.map((step, index) => (
+        <span key={step} className={classNames("lp-hint-dot", index < count && "is-filled")} />
+      ))}
+    </span>
+  );
+};
 
 export const FirstHint = ({ doneCount, isVisible, isDocked = true }: FirstHintProps) => {
   // Un point gagné pendant que la bulle est cachée (la feuille d'inspection) se remplit à son retour, sous les yeux.
+  const t = useTexts(HINT_TEXTS);
   const [shownCount, setShownCount] = useState(doneCount);
   if (isVisible && shownCount !== doneCount) setShownCount(doneCount);
   return (
     <Bubble isVisible={isVisible} isDocked={isDocked}>
-      {HINT_LINES.map(({ icon, text }) => (
-        <BubbleLine key={text} icon={icon}>
-          {text}
+      {HINT_LINES.map(({ icon, key }) => (
+        <BubbleLine key={key} icon={icon}>
+          {t[key]}
         </BubbleLine>
       ))}
       <HintDots count={shownCount} />

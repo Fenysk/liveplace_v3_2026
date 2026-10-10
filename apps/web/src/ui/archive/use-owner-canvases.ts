@@ -14,9 +14,10 @@ import type { CanvasStore } from "../../state/canvas-store";
 import type { ProgressChoice, SwitchError } from "../../usecase/canvas-switch";
 import type { ListedArchive } from "../../usecase/list-canvases";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import {
+  ARCHIVE_TEXTS,
   archiveHref,
-  ownerToast,
   type SwitchFailure,
   shouldReloadAfter,
   startingTheme,
@@ -31,6 +32,7 @@ type SwitchResult = Result<void, SwitchError | "unauthenticated">;
 export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: OwnSwitchTracker) {
   const { reportCount } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const toast = useToast();
+  const t = useTexts(ARCHIVE_TEXTS);
   const copyLink = useCopyLink();
   const [list, setList] = useState<ArchivesList>({ status: "loading" });
   const [request, setRequest] = useState<SwitchRequest | null>(null);
@@ -93,17 +95,17 @@ export function useOwnerCanvases(canvas: CanvasStore, login: string, tracker: Ow
     if (!request || !progress) return;
     if (request.kind === "archive") {
       const { canvasId } = request.canvas;
-      void run(() => archiveCanvasFn({ data: { canvasId, theme, progress } }), ownerToast("archive"), true);
+      void run(() => archiveCanvasFn({ data: { canvasId, theme, progress } }), t.ownerToast.archive, true);
     } else {
       const { canvasId } = request.archive;
-      void run(() => reopenCanvasFn({ data: { canvasId, progress } }), ownerToast("reopen"), true);
+      void run(() => reopenCanvasFn({ data: { canvasId, progress } }), t.ownerToast.reopen, true);
     }
   };
 
   const confirmDiscard = () => {
     if (!discarding) return;
     const { canvasId } = discarding;
-    void run(() => discardArchiveFn({ data: { canvasId } }), ownerToast("discard"), false);
+    void run(() => discardArchiveFn({ data: { canvasId } }), t.ownerToast.discard, false);
   };
 
   return {

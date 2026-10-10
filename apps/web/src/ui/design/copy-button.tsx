@@ -2,7 +2,9 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTexts } from "../locale/use-locale";
 import { blurAfterClick } from "./button";
+import { DESIGN_TEXTS } from "./design-texts";
 
 const COPIED_MS = 1500;
 
@@ -13,6 +15,7 @@ type CopyButtonProps = {
 };
 
 export const CopyButton = ({ value, copyText = value, onCopy }: CopyButtonProps) => {
+  const t = useTexts(DESIGN_TEXTS);
   const [isCopied, setIsCopied] = useState(false);
   useEffect(() => {
     if (!isCopied) return;
@@ -32,13 +35,13 @@ export const CopyButton = ({ value, copyText = value, onCopy }: CopyButtonProps)
     <button
       type="button"
       className="lp-btn lp-copy lp-type-body"
-      aria-label={`Copier ${value}`}
+      aria-label={t.copy(value)}
       onClick={blurAfterClick(copy)}
     >
       <span className="lp-copy-value">{value}</span>
       <span className="lp-copy-action" aria-live="polite">
         {isCopied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        {isCopied ? "Copié" : "Copier"}
+        {isCopied ? t.copied : t.copyAction}
       </span>
     </button>
   );

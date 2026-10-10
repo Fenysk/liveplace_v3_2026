@@ -9,17 +9,20 @@ import { useEffect, useRef, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile } from "../design/profile";
 import { TwitchGlyph } from "../design/twitch";
+import { formatDateTime } from "../locale/locale";
+import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "../moderation/can-ban";
 import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
+import { INSPECTION_TEXTS } from "./inspection-texts";
 import { formatPlacedAgo } from "./placed-ago";
 
 const DOCK: PillDock = "cr";
-const PLACED_AT_FORMAT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
 
 // Signaler la pose inspectée (JOURNAL 2026-09-28). `reported` : c'est fait, le bouton le dit et se désactive.
 export type ReportControl = { status: "available" | "sending" | "reported"; onReport: () => void };
@@ -34,24 +37,28 @@ export type InspectionPillProps = {
   isDocked?: boolean;
 };
 
-const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => (
-  <Button icon={X} variant="ghost" title="Fermer (Échap)" onPress={onClose} />
-);
+const CloseButton = ({ onClose }: Pick<InspectionPillProps, "onClose">) => {
+  const design = useTexts(DESIGN_TEXTS);
+  return <Button icon={X} variant="ghost" title={design.closeTip} onPress={onClose} />;
+};
 
-const ReportRow = ({ report }: { report: ReportControl }) => (
-  <div className="lp-row lp-row--ruled">
-    {report.status === "reported" ? (
-      <Button icon={Check} label="Signalé" isDisabled onPress={report.onReport} />
-    ) : (
-      <Button
-        icon={Flag}
-        label="Signaler"
-        isDisabled={report.status === "sending"}
-        onPress={report.onReport}
-      />
-    )}
-  </div>
-);
+const ReportRow = ({ report }: { report: ReportControl }) => {
+  const t = useTexts(INSPECTION_TEXTS);
+  return (
+    <div className="lp-row lp-row--ruled">
+      {report.status === "reported" ? (
+        <Button icon={Check} label={t.reported} isDisabled onPress={report.onReport} />
+      ) : (
+        <Button
+          icon={Flag}
+          label={t.report}
+          isDisabled={report.status === "sending"}
+          onPress={report.onReport}
+        />
+      )}
+    </div>
+  );
+};
 
 type ModerationRowProps = { moderation: ModerationControls; author: InspectEntry };
 
@@ -62,22 +69,23 @@ type RoleRowProps = {
 
 // JOURNAL 2026-09-27 : pour le streamer. Nommé ici, il se retire ici ; venu de Twitch seul, il se retire sur Twitch.
 const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
+  const t = useTexts(INSPECTION_TEXTS);
   const origin = author.moderatorOrigin;
   if (origin?.isNamedHere)
     return (
       <div className="lp-row">
-        <Button label="Retirer modérateur" onPress={() => onSetModerator(author, false)} />
+        <Button label={t.removeModerator} onPress={() => onSetModerator(author, false)} />
       </div>
     );
   if (origin?.isFromTwitch)
     return (
       <div className="lp-row">
-        <Badge label="Modérateur Twitch" icon={TwitchGlyph} title="Il se retire depuis ta chaîne Twitch" />
+        <Badge label={t.twitchModerator} icon={TwitchGlyph} title={t.twitchModeratorTip} />
       </div>
     );
   return (
     <div className="lp-row">
-      <Button label="Nommer modérateur" onPress={() => onSetModerator(author, true)} />
+      <Button label={t.makeModerator} onPress={() => onSetModerator(author, true)} />
     </div>
   );
 };
@@ -85,15 +93,16 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
 // Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant. Écart §5.4 (JOURNAL
 // 2026-10-08) : pas de Bannir sur un modérateur nommé ici.
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
+  const t = useTexts(INSPECTION_TEXTS);
   const { userId } = author;
   if (!userId || moderation.isProtected(userId)) return null;
   const moderated = { ...author, userId };
   return (
     <>
       <div className="lp-row lp-row--ruled">
-        <Button label="Retirer ses pixels" onPress={() => moderation.onModerate("clear", moderated)} />
+        <Button label={t.clearTheirPixels} onPress={() => moderation.onModerate("clear", moderated)} />
         {canBan(moderated) && (
-          <Button label="Bannir" variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
+          <Button label={t.ban} variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
         )}
       </div>
       {moderation.onSetModerator && <RoleRow author={moderated} onSetModerator={moderation.onSetModerator} />}
@@ -109,12 +118,14 @@ type InspectedCellProps = Pick<
 };
 
 const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation }: InspectedCellProps) => {
+  const locale = useLocale();
+  const t = useTexts(INSPECTION_TEXTS);
   const coordinates = `(${inspection.x}, ${inspection.y})`;
   if (inspection.status === "empty")
     return (
       <>
         <div className="lp-row">
-          <span className="lp-type-body lp-prompt">Personne n'a encore posé ici</span>
+          <span className="lp-type-body lp-prompt">{t.nobodyYet}</span>
           <span className="lp-spacer" />
           <CloseButton onClose={onClose} />
         </div>
@@ -132,15 +143,12 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation
       </div>
       <div className="lp-row lp-prompt">
         <ColorChip {...(color ? { color } : {})}>
-          <span className="lp-type-numeric" title={color ?? "Transparent (gomme)"}>
+          <span className="lp-type-numeric" title={color ?? t.transparentEraser}>
             {coordinates}
           </span>
         </ColorChip>
-        <span
-          className="lp-type-caption lp-muted"
-          title={`Posé le ${PLACED_AT_FORMAT.format(entry.placedAt)}`}
-        >
-          {formatPlacedAgo(entry.placedAt, nowMs)}
+        <span className="lp-type-caption lp-muted" title={t.placedOn(formatDateTime(entry.placedAt, locale))}>
+          {formatPlacedAgo(entry.placedAt, nowMs, locale)}
         </span>
       </div>
       {report && <ReportRow report={report} />}

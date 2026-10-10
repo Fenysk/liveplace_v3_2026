@@ -4,7 +4,9 @@
 import { useEffect, useRef } from "react";
 import type { ObsStore, ObsView } from "../../state/obs-store";
 import { createCanvasImage } from "../canvas/canvas-image";
+import { useTexts } from "../locale/use-locale";
 import { obsFillStyle } from "./obs-background";
+import { OBS_TEXTS } from "./obs-texts";
 
 type ObsCanvasProps = { store: ObsStore };
 
@@ -28,6 +30,7 @@ const fitRect = (surface: { width: number; height: number }, view: ObsView): Rec
 
 export const ObsCanvas = ({ store }: ObsCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
+  const t = useTexts(OBS_TEXTS);
 
   useEffect(() => {
     const element = surface.current;
@@ -70,7 +73,5 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
     };
   }, [store]);
 
-  return (
-    <canvas ref={surface} className="lp-obs-surface" aria-label="Le canvas, tel que le stream le montre" />
-  );
+  return <canvas ref={surface} className="lp-obs-surface" aria-label={t.surfaceLabel} />;
 };

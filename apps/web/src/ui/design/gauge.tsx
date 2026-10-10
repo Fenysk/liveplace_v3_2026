@@ -3,8 +3,10 @@
 // Pas d'ondulation au repos : la seule boucle de l'interface est celle de « Reconnexion… » (design system).
 
 import { useEffect, useRef } from "react";
+import { useTexts } from "../locale/use-locale";
 import { blurAfterClick } from "./button";
 import { type CssVariables, classNames } from "./class-names";
+import { DESIGN_TEXTS } from "./design-texts";
 import { type GaugeRefill, gaugeLevels, refillProgress, tiltDirection } from "./gauge-levels";
 import { motionEasing, motionMs } from "./motion";
 
@@ -107,17 +109,20 @@ const useGrowth = (max: number) => {
 };
 
 // JOURNAL 2026-09-30 : le +1 à réclamer, à la place de Dessiner en Vue. Un reflet le traverse à son arrivée.
-export const ClaimButton = ({ onClaim }: { onClaim: () => void }) => (
-  <button
-    type="button"
-    className="lp-btn lp-claim lp-type-body"
-    aria-label="Augmenter la jauge de +1 pixel"
-    title="Augmenter la jauge de +1 pixel"
-    onClick={blurAfterClick(onClaim)}
-  >
-    <span className="lp-type-numeric">+1</span>
-  </button>
-);
+export const ClaimButton = ({ onClaim }: { onClaim: () => void }) => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <button
+      type="button"
+      className="lp-btn lp-claim lp-type-body"
+      aria-label={t.claimGauge}
+      title={t.claimGauge}
+      onClick={blurAfterClick(onClaim)}
+    >
+      <span className="lp-type-numeric">+1</span>
+    </button>
+  );
+};
 
 const useShake = (shakeCount: number) => {
   const meter = useRef<HTMLSpanElement>(null);
@@ -139,6 +144,7 @@ export const Gauge = ({
   orientation = "horizontal",
   isFill = false,
 }: GaugeProps) => {
+  const t = useTexts(DESIGN_TEXTS);
   const ring = useRingAnimation(refill);
   const countRing = useGrowth(max);
   const meter = useShake(shakeCount);
@@ -163,7 +169,7 @@ export const Gauge = ({
         min={0}
         max={max}
         value={charges}
-        aria-label="Charges"
+        aria-label={t.charges}
         aria-valuetext={label}
       />
       <span ref={countRing} className="lp-gauge-count" aria-hidden="true">

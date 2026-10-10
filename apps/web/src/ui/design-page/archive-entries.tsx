@@ -69,8 +69,8 @@ const BannerScene = ({ archive, isDownloading = false, isCompact = false }: Bann
   return (
     <ArchiveBanner
       owner={SAMPLE_OWNER}
-      title={bannerTitle(text)}
-      caption={bannerCaption(text)}
+      title={bannerTitle(text, "fr")}
+      caption={bannerCaption(text, "fr")}
       isDownloading={isDownloading}
       onCopyLink={noop}
       onDownload={noop}

@@ -3,10 +3,12 @@
 
 import type { Moderator } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { WindowRow } from "../design/window";
+import { useTexts } from "../locale/use-locale";
 import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
-import { moderatorMention } from "./moderation-texts";
+import { MODERATION_TEXTS } from "./moderation-texts";
 
 export type ModeratorListView =
   | { status: "loading" }
@@ -20,19 +22,21 @@ type ModeratorUsersProps = {
   onRemove?: ((userId: string) => void) | undefined;
 };
 
-const listContent = ({ list, removingUserId, onRemove }: ModeratorUsersProps) => {
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">Chargement…</span>;
+const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
   if (list.status === "failed") return null; // `ConnectionLost`, juste après
-  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">Aucun modérateur.</span>;
+  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">{t.noModerators}</span>;
   return list.users.map((user) => (
     <WindowRow
       key={user.userId}
-      label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={moderatorMention(user)} />}
+      label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.moderatorMention(user)} />}
       hasProfile
     >
       {onRemove && user.isNamedHere && (
         <Button
-          label="Retirer"
+          label={t.removeModerator}
           isDisabled={removingUserId === user.userId}
           onPress={() => onRemove(user.userId)}
         />
@@ -41,10 +45,13 @@ const listContent = ({ list, removingUserId, onRemove }: ModeratorUsersProps) =>
   ));
 };
 
-export const ModeratorUsers = (props: ModeratorUsersProps) => (
-  <>
-    <span className="lp-type-body">Modérateurs</span>
-    {listContent(props)}
-    <ConnectionLost isFailed={props.list.status === "failed"} />
-  </>
-);
+export const ModeratorUsers = (props: ModeratorUsersProps) => {
+  const t = useTexts(MODERATION_TEXTS);
+  return (
+    <>
+      <span className="lp-type-body">{t.moderators}</span>
+      <ModeratorRows {...props} />
+      <ConnectionLost isFailed={props.list.status === "failed"} />
+    </>
+  );
+};

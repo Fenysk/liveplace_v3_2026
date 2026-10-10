@@ -9,6 +9,7 @@ import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Trash } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
@@ -16,7 +17,9 @@ import { Pill, type PillDock, type PillLayout, type PillState } from "../design/
 import { Reveal } from "../design/reveal";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { BubbleTarget } from "../help/bubble-target";
-import { ENTER_LABEL, submitWords } from "./draft-labels";
+import { useLocale, useTexts } from "../locale/use-locale";
+import { submitWords } from "./draft-labels";
+import { DRAFT_TEXTS, type DraftTexts, type RefusalCode } from "./draft-texts";
 
 export type DraftPillState =
   | { kind: "connecting" }
@@ -25,7 +28,7 @@ export type DraftPillState =
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
-  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: string }
+  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: RefusalCode }
   | {
       kind: "draft";
       gauge: GaugeProps;
@@ -40,7 +43,7 @@ export type DraftPillState =
       isTouchScreen: boolean;
       isTouchTracing: boolean;
       isPicking: boolean;
-      refusal?: string;
+      refusal?: RefusalCode;
     };
 
 export type DraftPillActions = {
@@ -76,26 +79,27 @@ type DraftPillContent = {
 
 const DOCK: PillDock = "bc";
 
-const Refusal = ({ code }: { code: string | undefined }) =>
-  code ? <span className="lp-type-caption lp-danger">Refusé : {code}</span> : null;
+const Refusal = ({ code }: { code: RefusalCode | undefined }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return code ? <span className="lp-type-caption lp-danger">{t.refusal(code)}</span> : null;
+};
 
-const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => (
-  <Button label={ENTER_LABEL} kbd="D" variant="primary" title="Passer en mode Dessin" onPress={onEnter} />
-);
+const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return <Button label={t.draw} kbd="D" variant="primary" title={t.drawTip} onPress={onEnter} />;
+};
 
-const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => (
-  <Button
-    label="Annuler"
-    kbd="Échap"
-    title="Sortir du mode Dessin (le brouillon est gardé)"
-    onPress={onExit}
-  />
-);
+const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
+  const t = useTexts(DRAFT_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
+  return <Button label={design.cancel} kbd={design.escapeKey} title={t.cancelTip} onPress={onExit} />;
+};
 
 // Dans l'attente, plus de raccourci : Entrée ne poserait rien.
 const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: () => void }) => {
+  const t = useTexts(DRAFT_TEXTS);
   const isWaiting = state.waitSeconds !== undefined;
-  const { lead, label } = submitWords(state.draftSize, state.waitSeconds);
+  const { lead, label } = submitWords(state.draftSize, state.waitSeconds, useLocale());
   return (
     <BubbleTarget name="submit">
       <Button
@@ -103,7 +107,7 @@ const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: ()
         labelLead={lead}
         {...(isWaiting ? {} : { kbd: "⏎" })}
         variant="primary"
-        title={isWaiting ? "Attendre la prochaine charge" : "Poser le brouillon"}
+        title={isWaiting ? t.waitTip : t.confirmTip}
         isDisabled={!state.canSubmit}
         hasMorphingLabel
         onPress={onSubmit}
@@ -126,7 +130,7 @@ const DiscardButton = ({
     <Button
       icon={Trash}
       variant="ghost"
-      title="Vider le brouillon"
+      title={useTexts(DRAFT_TEXTS).clearDraftTip}
       isDisabled={!state.canDiscard}
       onPress={onDiscard}
     />
@@ -138,22 +142,25 @@ const TraceButton = ({ state, actions }: { state: DraftModeState; actions: Draft
     <Button
       icon={Brush}
       variant="ghost"
-      title="Tracé : un doigt dessine, deux doigts déplacent"
+      title={useTexts(DRAFT_TEXTS).traceTip}
       isPressed={state.isTouchTracing}
       onPress={actions.onToggleTouchTracing}
     />
   </BubbleTarget>
 );
 
-const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => (
-  <Button
-    icon={Pipette}
-    variant="ghost"
-    title="Pipette (I) : prend la couleur d'un pixel posé"
-    isPressed={state.isPicking}
-    onPress={actions.onTogglePicker}
-  />
-);
+const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
+  const t = useTexts(DRAFT_TEXTS);
+  return (
+    <Button
+      icon={Pipette}
+      variant="ghost"
+      title={t.eyedropperTip}
+      isPressed={state.isPicking}
+      onPress={actions.onTogglePicker}
+    />
+  );
+};
 
 // La jauge, que la bulle de la jauge vide vise (Écart §8.1, JOURNAL 2026-10-08).
 const PillGauge = ({ gauge, isFill = false }: { gauge: GaugeProps; isFill?: boolean }) => (
@@ -167,6 +174,8 @@ const PillGauge = ({ gauge, isFill = false }: { gauge: GaugeProps; isFill?: bool
 type DraftSheetProps = { state: DraftModeState; actions: DraftPillActions; isPanel: boolean };
 
 const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
+  const t = useTexts(DRAFT_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   const [isExpanded, setIsExpanded] = useState(false);
   const isOpen = isPanel || isExpanded;
   const isEraser = state.colorIndex === TRANSPARENT_COLOR_INDEX;
@@ -175,7 +184,7 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
     <>
       {!isPanel && (
         <Grabber
-          label={isExpanded ? "Réduire la feuille" : "Déplier la palette"}
+          label={isExpanded ? t.collapseSheet : t.expandPalette}
           onUp={() => setIsExpanded(true)}
           onDown={() => setIsExpanded(false)}
           onTap={toggle}
@@ -206,7 +215,7 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
         <Button
           icon={Eraser}
           variant="ghost"
-          title="Gomme"
+          title={design.eraser}
           isPressed={isEraser}
           onPress={actions.onToggleEraser}
         />
@@ -233,11 +242,11 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
 };
 
 // Un seul bouton, qui dit tout. Empilée : au téléphone, la barre prend toute la largeur, et le bouton aussi.
-const guestContent = (signInHref: string, onSignIn: () => void): DraftPillContent => ({
+const guestContent = (signInHref: string, onSignIn: () => void, t: DraftTexts): DraftPillContent => ({
   layout: "stack",
   content: (
     <div className="lp-invitation">
-      <SignInButton href={signInHref} label="Se connecter pour dessiner" onPress={onSignIn} />
+      <SignInButton href={signInHref} label={t.signInToDraw} onPress={onSignIn} />
       <SignInNote />
     </div>
   ),
@@ -275,35 +284,36 @@ const contentOf = (
   actions: DraftPillActions,
   isCompact: boolean,
   isSidePanel: boolean,
+  t: DraftTexts,
 ): DraftPillContent => {
   switch (state.kind) {
     case "connecting":
       return {
         content: <EnterButton onEnter={actions.onEnter} />,
-        pillState: { kind: "reconnecting", label: "Connexion" },
+        pillState: { kind: "reconnecting", label: t.connecting },
       };
     case "reconnecting":
       return {
-        ...contentOf(state.shown, actions, isCompact, isSidePanel),
-        pillState: { kind: "reconnecting", label: "Reconnexion" },
+        ...contentOf(state.shown, actions, isCompact, isSidePanel, t),
+        pillState: { kind: "reconnecting", label: t.reconnecting },
       };
     case "closed":
       return {
         content: (
           <>
-            <span className="lp-type-body lp-prompt">Connexion perdue</span>
-            <Button label="Recharger" onPress={actions.onReload} />
+            <span className="lp-type-body lp-prompt">{t.connectionLost}</span>
+            <Button label={t.reload} onPress={actions.onReload} />
           </>
         ),
       };
     case "banned":
-      return { content: <span className="lp-type-body lp-prompt">Tu es banni·e de ce canvas</span> };
+      return { content: <span className="lp-type-body lp-prompt">{t.banned}</span> };
     case "guest":
-      return guestContent(state.signInHref, actions.onSignIn);
+      return guestContent(state.signInHref, actions.onSignIn, t);
     case "signingIn":
       return {
-        ...guestContent(state.signInHref, actions.onSignIn),
-        pillState: { kind: "reconnecting", label: "Connexion à Twitch" },
+        ...guestContent(state.signInHref, actions.onSignIn, t),
+        pillState: { kind: "reconnecting", label: t.connectingToTwitch },
       };
     case "view":
       return {
@@ -333,7 +343,8 @@ export const DraftPill = ({
   isSidePanel = false,
   isDocked = true,
 }: DraftPillProps) => {
-  const { content, layout, pillState } = contentOf(state, actions, isCompact, isSidePanel);
+  const t = useTexts(DRAFT_TEXTS);
+  const { content, layout, pillState } = contentOf(state, actions, isCompact, isSidePanel, t);
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout={layout} state={pillState}>
       {content}

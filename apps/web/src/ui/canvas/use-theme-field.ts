@@ -3,8 +3,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCanvasesFn, setCanvasThemeFn } from "../../routes/-owner-canvases";
-import { THEME_SAVED, themeFailureLabel } from "../archive/archive-texts";
+import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { useToast } from "../design/toast";
+import { useTexts } from "../locale/use-locale";
 import type { ThemeField } from "./canvas-settings";
 import { toThemeToSave } from "./canvas-theme";
 
@@ -17,6 +18,7 @@ type Loaded =
 
 export function useThemeField(): ThemeField {
   const toast = useToast();
+  const t = useTexts(ARCHIVE_TEXTS);
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
   const [value, setValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -55,17 +57,17 @@ export function useThemeField(): ThemeField {
       if (result.ok) {
         setLoaded({ status: "ready", canvasId, saved: theme });
         setValue(theme);
-        toast("success", THEME_SAVED);
+        toast("success", t.themeSaved);
         return;
       }
       setValue(saved);
-      toast("error", themeFailureLabel(result.error));
+      toast("error", t.themeFailure(result.error));
       // Le canvas en cours a changé depuis l'ouverture : son thème, et celui qu'on vise, sont à relire.
       if (result.error === "not_active") load();
     } catch (error) {
       console.error("thème du canvas : enregistrement sans réponse", error);
       setValue(saved);
-      toast("error", themeFailureLabel("network"));
+      toast("error", t.themeFailure("network"));
     } finally {
       setIsSaving(false);
     }
