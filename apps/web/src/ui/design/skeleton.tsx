@@ -50,7 +50,7 @@ export const SkeletonBlock = ({ shape }: { shape: SkeletonShape }) => (
 export const SkeletonProfile = () => (
   <span className="lp-skeleton-profile">
     <SkeletonBlock shape="avatar" />
-    <SkeletonBar text="title" width="short" />
+    <SkeletonBar text="title" width="medium" />
   </span>
 );
 

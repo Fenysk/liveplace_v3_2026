@@ -3,8 +3,9 @@
 
 import { HOUR_MS, MINUTE_MS, PALETTE } from "@liveplace/domain";
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
+import { Button } from "../design/button";
 import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
 import { BannedUsers, type BannedUsersProps, type BanPreview } from "../moderation/banned-users";
 import { BannedWindow } from "../moderation/banned-window";
@@ -71,6 +72,11 @@ type InspectionScene = {
 };
 
 const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
+  {
+    name: "En attente de la réponse",
+    detail: "La pill s'ouvre sur un squelette si la réponse tarde plus de 200 ms.",
+    inspection: { status: "loading", x: 122, y: 82 },
+  },
   {
     name: "Un pixel et son auteur",
     inspection: {
@@ -197,6 +203,32 @@ const InspectionBlock = ({
   </Block>
 );
 
+// Toucher une case : la réponse arrive après `replyMs`. Sous 200 ms, la pill s'ouvre directement sur la case ; au-delà, sur un
+// squelette que la case remplace.
+const InspectionReplyScene = ({ replyMs, nowMs }: { replyMs: number; nowMs: number }) => {
+  const [inspection, setInspection] = useState<Inspection | null>(null);
+  useEffect(() => {
+    if (inspection?.status !== "loading") return;
+    const timer = setTimeout(() => setInspection(inspectionOf(nowMs, TROLL)), replyMs);
+    return () => clearTimeout(timer);
+  }, [inspection, replyMs, nowMs]);
+  return (
+    <div className="design-delay-scene">
+      <Button
+        label={`Réponse en ${replyMs} ms`}
+        onPress={() => setInspection({ status: "loading", x: 122, y: 82 })}
+      />
+      <InspectionPill
+        inspection={inspection}
+        palette={PALETTE}
+        nowMs={nowMs}
+        onClose={() => setInspection(null)}
+        isDocked={false}
+      />
+    </div>
+  );
+};
+
 export const InspectionEntry = () => {
   const nowMs = useNowMs();
   return (
@@ -207,6 +239,17 @@ export const InspectionEntry = () => {
       note="Seulement pendant une inspection, en mode Vue."
       where="Au centre à droite · sur mobile, au-dessus de la barre du bas · en paysage, en bas à gauche"
     >
+      <Block
+        title="Au toucher"
+        note="Touche : la pill s'ouvre sans attendre le serveur, sur un squelette si la réponse dépasse 200 ms."
+      >
+        <StateRow name="Réponse rapide" detail="Elle s'ouvre directement sur la case." isDemo>
+          <InspectionReplyScene replyMs={100} nowMs={nowMs} />
+        </StateRow>
+        <StateRow name="Réponse lente" detail="Le squelette paraît à 200 ms, la case le remplace." isDemo>
+          <InspectionReplyScene replyMs={2000} nowMs={nowMs} />
+        </StateRow>
+      </Block>
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock
         title="Pour qui modère"
