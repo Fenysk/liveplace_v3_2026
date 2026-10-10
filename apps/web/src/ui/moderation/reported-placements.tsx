@@ -47,7 +47,7 @@ const ReportRow = ({
   const t = useTexts(MODERATION_TEXTS);
   const hasSeveralPlacements = report.placementIds.length > 1;
   return (
-    <div className="lp-report">
+    <div className="lp-report lp-arrives">
       <div className="lp-report-preview">
         <PixelPreview
           {...canvas}

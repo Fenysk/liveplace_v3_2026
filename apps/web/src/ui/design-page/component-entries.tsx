@@ -387,7 +387,7 @@ export const ActivityCardEntry = () => {
       slug="carte-d-activite"
       components={["CanvasActivityCard", "CanvasActivityOwner", "ConnectedAccounts"]}
       file="ui/design/canvas-activity-card.tsx"
-      note="Une ligne par fresque, une carte sur mobile. Le chevron déplie qui est dessus."
+      note="Une ligne par fresque, une carte sur mobile. Le chevron déplie qui est dessus. Les lignes arrivent en fondu, toutes ensemble (hors mouvement réduit)."
     >
       <Block title="Carte">
         {kalyss && (

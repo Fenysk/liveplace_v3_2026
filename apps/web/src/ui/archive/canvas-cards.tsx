@@ -80,6 +80,7 @@ export const ActiveCanvasRow = ({ canvas, isArchiveFull, onArchive }: ActiveCanv
     <>
       <WindowRow
         hasProfile
+        isListed
         label={
           <span className="lp-canvas-id">
             <CanvasThumbnail canvas={canvas} label={t.currentThumbnail} />
@@ -121,6 +122,7 @@ export const ArchiveRow = ({ archive, login, onCopyLink, onReopen, onDiscard }: 
     <li>
       <WindowRow
         hasProfile
+        isListed
         label={
           <a
             className="lp-canvas-id lp-canvas-link"

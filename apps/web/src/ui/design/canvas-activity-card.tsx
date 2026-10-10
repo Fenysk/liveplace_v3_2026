@@ -59,7 +59,7 @@ type ConnectedAccountsProps = Pick<CanvasActivityCardProps, "accounts" | "guests
 export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: ConnectedAccountsProps) => (
   <ul className="lp-connected-accounts">
     {accounts.map(({ user, mention, devices }) => (
-      <li key={user.userId} className="lp-canvas-activity-account">
+      <li key={user.userId} className="lp-canvas-activity-account lp-arrives">
         <span className="lp-marked">
           <Profile user={user} />
           <span className="lp-marked-mention lp-type-caption lp-muted">
@@ -90,7 +90,7 @@ export const CanvasActivityCard = ({
   isOpen,
   onToggle,
 }: CanvasActivityCardProps) => (
-  <article className={classNames("lp-canvas-activity", isOpen && "is-open")}>
+  <article className={classNames("lp-canvas-activity lp-arrives", isOpen && "is-open")}>
     <div className="lp-canvas-activity-head">
       <span className="lp-canvas-activity-summary">
         <CanvasActivityOwner owner={owner} />
