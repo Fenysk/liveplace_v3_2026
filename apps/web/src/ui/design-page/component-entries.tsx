@@ -488,7 +488,10 @@ export const FieldsEntry = () => (
       </StateRow>
     </Block>
     <Block title="Case à cocher">
-      <StateRow name="Une case à cocher" detail="Le libellé la coche aussi.">
+      <StateRow
+        name="Une case à cocher"
+        detail="Le libellé la coche aussi. La coche paraît en fondu et disparaît de même."
+      >
         <InSmallWindow>
           <WithValue initial={false}>
             {(isChecked, setIsChecked) => (
@@ -520,7 +523,10 @@ export const FieldsEntry = () => (
       </StateRow>
     </Block>
     <Block title="Valeur à copier">
-      <StateRow name="Copier, puis « Copié » un instant">
+      <StateRow
+        name="Copier, puis « Copié » un instant"
+        detail="Les deux icônes se croisent en fondu, à l'aller comme au retour."
+      >
         <InWindow>
           <CopyButton value="liveplace.tv/kalyss" copyText="https://liveplace.tv/kalyss" />
         </InWindow>
