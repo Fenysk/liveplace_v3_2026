@@ -133,7 +133,7 @@ const HELP_SCENES: readonly HelpScene[] = [
     content: () => <Account hasSettings pendingReports={1} />,
   },
   {
-    name: "Le streamer sur son canvas",
+    name: "Le streamer sur sa fresque",
     detail: "Flèche sur Réglages. Elle s'efface quand il ouvre Réglages.",
     bubble: "obs-settings",
     side: "below",
@@ -148,7 +148,7 @@ const HELP_SCENES: readonly HelpScene[] = [
   },
   {
     name: "Jauge vide, la première fois",
-    detail: "Les chiffres viennent du canvas : sa recharge, au singulier.",
+    detail: "Les chiffres viennent de la fresque : sa recharge, au singulier.",
     bubble: "empty-gauge",
     align: "start",
     content: viewBar(0, false),
@@ -192,7 +192,7 @@ const HELP_SCENES: readonly HelpScene[] = [
 
 // Trois sections de la barre latérale : Vue OBS, celle que la bulle désigne, est au milieu, où la bulle se centre sur elle.
 const OBS_SECTIONS = [
-  { id: "canvas", label: "Canvas", icon: Scaling },
+  { id: "canvas", label: "Fresque", icon: Scaling },
   { id: "obs", label: "Vue OBS", icon: MonitorPlay },
   { id: "account", label: "Mon compte", icon: User },
 ] as const;

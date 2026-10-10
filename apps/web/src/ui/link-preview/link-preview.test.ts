@@ -45,11 +45,11 @@ describe("la carte d'aperçu du lien d'un canvas", () => {
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "LivePlace" },
       { property: "og:url", content: "https://liveplace.example/fenysk" },
-      { property: "og:title", content: "Viens dessiner sur le canvas de Fenysk" },
+      { property: "og:title", content: "Viens dessiner sur la fresque de Fenysk" },
       { property: "og:description", content: "Un chat dans l'espace" },
       { property: "og:image", content: "https://cdn.example/fenysk.png" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Viens dessiner sur le canvas de Fenysk" },
+      { name: "twitter:title", content: "Viens dessiner sur la fresque de Fenysk" },
       { name: "twitter:description", content: "Un chat dans l'espace" },
       { name: "twitter:image", content: "https://cdn.example/fenysk.png" },
     ]);
@@ -63,11 +63,11 @@ describe("la carte d'aperçu du lien d'un canvas", () => {
 
     expect(meta).toContainEqual({
       property: "og:description",
-      content: "Un canvas collaboratif, en direct sur Twitch.",
+      content: "Une fresque collaborative, en direct sur Twitch.",
     });
     expect(meta).toContainEqual({
       name: "twitter:description",
-      content: "Un canvas collaboratif, en direct sur Twitch.",
+      content: "Une fresque collaborative, en direct sur Twitch.",
     });
   });
 
@@ -105,7 +105,7 @@ describe("la carte d'aperçu du lien d'un canvas", () => {
       `content="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;&quot;gras&quot;&lt;/b&gt;"`,
     );
     expect(html).toContain(
-      `content="Viens dessiner sur le canvas de &lt;img src=x onerror=alert(2)&gt; &amp; &quot;Bob&quot;"`,
+      `content="Viens dessiner sur la fresque de &lt;img src=x onerror=alert(2)&gt; &amp; &quot;Bob&quot;"`,
     );
   });
 
@@ -155,7 +155,7 @@ describe("la carte d'aperçu du lien d'un canvas", () => {
 
     expect(french?.meta).toContainEqual({
       property: "og:title",
-      content: "Viens dessiner sur le canvas de Fenysk",
+      content: "Viens dessiner sur la fresque de Fenysk",
     });
     expect(english?.meta).toContainEqual({ property: "og:title", content: "Come draw on Fenysk's canvas" });
   });

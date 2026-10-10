@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-10 — L'interface française dit « fresque », le code et l'anglais gardent `canvas`
+
+**Contexte.** « Canvas » se confond avec le logiciel Canva, et beaucoup de viewers français ne connaissent pas le mot.
+**Décision.** Tout texte français visible dit « fresque », au féminin (« cette fresque », « banni·e de cette fresque », « Archive de la fresque de X »), y compris la fenêtre Développeur et `/design`. L'anglais garde « canvas ». Les identifiants, routes, classes, champs du protocole, clés de stockage, journaux et erreurs du développeur gardent `canvas`, mot canonique du lexique.
+**Renoncement.** Renommer le code ou les URL. Les commentaires et la documentation en français seront alignés plus tard, dans un chantier à part.
+
 ## 2026-10-10 — Écart §15 (amende celui du 06/10 sur le choix de couleur) : les pastilles n'ont plus de nom dessous, le fond choisi se nomme à droite du titre comme le Délai
 
 **Contexte.** Le choix de couleur (« Fond de la vue OBS », « Fond de l'image ») montrait chaque pastille sous son nom. Chaque colonne prenant la largeur de son texte (« Transparent », « Noir », « Blanc »), les écarts entre pastilles étaient inégaux.

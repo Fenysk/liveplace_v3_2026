@@ -23,7 +23,7 @@ export const DESIGN_CHAPTERS: readonly DesignChapter[] = [
 // Une entrée par slug : la clé est l'adresse (`/design#dessin`), l'ordre est celui du sommaire.
 const ENTRIES_BY_SLUG = {
   couleurs: { title: "Couleurs", chapterId: "foundations" },
-  "palette-du-canvas": { title: "Palette du canvas", chapterId: "foundations" },
+  "palette-du-canvas": { title: "Palette de la fresque", chapterId: "foundations" },
   typographie: { title: "Typographie", chapterId: "foundations" },
   mesures: { title: "Mesures", chapterId: "foundations" },
   mouvement: { title: "Mouvement", chapterId: "foundations" },
@@ -46,7 +46,7 @@ const ENTRIES_BY_SLUG = {
   "se-connecter": { title: "Se connecter avec Twitch", chapterId: "components" },
   toast: { title: "Toast", chapterId: "components" },
 
-  "pill-canvas": { title: "Canvas", chapterId: "game", place: "haut gauche" },
+  "pill-canvas": { title: "Fresque", chapterId: "game", place: "haut gauche" },
   "bandeau-d-archive": { title: "Bandeau d'archive", chapterId: "game", place: "haut gauche" },
   "pill-theme": { title: "Thème", chapterId: "game", place: "haut centre" },
   "pill-compte": { title: "Compte", chapterId: "game", place: "haut droite" },
@@ -56,7 +56,7 @@ const ENTRIES_BY_SLUG = {
   pratique: { title: "Pratique", chapterId: "game", place: "bas droite" },
   "message-seul": { title: "Message seul", chapterId: "game", place: "centre" },
 
-  "fenetre-canvas": { title: "Canvas", chapterId: "window" },
+  "fenetre-canvas": { title: "Fresque", chapterId: "window" },
   archives: { title: "Archives", chapterId: "window" },
   "vue-obs": { title: "Vue OBS", chapterId: "window" },
   moderation: { title: "Modération", chapterId: "window" },
@@ -64,7 +64,7 @@ const ENTRIES_BY_SLUG = {
   "mon-compte": { title: "Mon compte", chapterId: "window" },
   developpeur: { title: "Développeur", chapterId: "window" },
 
-  "taille-du-canvas": { title: "Taille du canvas", chapterId: "dialogs" },
+  "taille-du-canvas": { title: "Taille de la fresque", chapterId: "dialogs" },
   "jauge-maximale": { title: "Jauge maximale", chapterId: "dialogs" },
   "retirer-bannir-signaler": { title: "Retirer, bannir, signaler", chapterId: "dialogs" },
   banni: { title: "Banni", chapterId: "dialogs" },

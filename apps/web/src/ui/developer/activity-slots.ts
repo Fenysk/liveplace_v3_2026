@@ -41,7 +41,7 @@ export const CHART_LINES: readonly TimeChartLine[] = [
   PEOPLE_LINE,
   VISITS_LINE,
   TIME_SPENT_LINE,
-  { title: "Canvas streamés", countLabel: streamedCanvasesLabel },
+  { title: "Fresques streamées", countLabel: streamedCanvasesLabel },
   PIXELS_LINE,
   { title: "Nouveaux comptes", countLabel: signupsLabel },
 ];

@@ -14,7 +14,7 @@ export const ACCOUNT_TEXTS = defineTexts({
   }),
 
   // Les sections de la fenêtre.
-  canvas: { fr: "Canvas", en: "Canvas" },
+  canvas: { fr: "Fresque", en: "Canvas" },
   archives: { fr: "Archives", en: "Archives" },
   obsView: { fr: "Vue OBS", en: "OBS view" },
   moderation: { fr: "Modération", en: "Moderation" },

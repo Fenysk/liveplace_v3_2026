@@ -105,24 +105,24 @@ export const DeveloperEntry = () => {
       slug="developpeur"
       components={["DeveloperWindow", "CanvasSection", "ActivitySection", "CapacitySection"]}
       file="ui/developer/{developer-window,canvas-section,activity-section,capacity-section}.tsx"
-      note="Ses trois sections à lui : Ce canvas, où elle s'ouvre, Tout LivePlace et Capacité. Les chiffres bougent toutes les 2 s dans le jeu."
+      note="Ses trois sections à lui : Cette fresque, où elle s'ouvre, Tout LivePlace et Capacité. Les chiffres bougent toutes les 2 s dans le jeu."
     >
       <Block title="La fenêtre">
         <StateRow
-          name="Ouverte par le bouton Développeur de la pill Compte, sur Ce canvas"
+          name="Ouverte par le bouton Développeur de la pill Compte, sur Cette fresque"
           detail="Sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur ; sur mobile, une feuille et des onglets."
         >
           <WindowScene nowMs={nowMs} here={here} />
         </StateRow>
       </Block>
-      <Block title="Ce canvas">
-        <StateRow name="La section Ce canvas, hors de la fenêtre">
+      <Block title="Cette fresque">
+        <StateRow name="La section Cette fresque, hors de la fenêtre">
           <InWindow>
             <SectionScene nowMs={nowMs} sectionId="here" here={here} />
           </InWindow>
         </StateRow>
         <StateRow
-          name="Ce canvas, à la largeur de la grande fenêtre"
+          name="Cette fresque, à la largeur de la grande fenêtre"
           detail="L'audience et qui est là côte à côte."
         >
           <InLargeWindow>
@@ -130,22 +130,22 @@ export const DeveloperEntry = () => {
           </InLargeWindow>
         </StateRow>
         <StateRow
-          name="Ce canvas ni streamé ni personne dessus"
-          detail="« Personne sur ce canvas en ce moment »."
+          name="Cette fresque ni streamée ni personne dessus"
+          detail="« Personne sur cette fresque en ce moment »."
         >
           <InWindow>
             <SectionScene nowMs={nowMs} sectionId="here" here={quiet} />
           </InWindow>
         </StateRow>
         <StateRow
-          name="Ce canvas quand la socket n'en a pas de prêt, ou que le gateway est d'avant"
+          name="Cette fresque quand la socket n'en a pas de prête, ou que le gateway est d'avant"
           detail="La section le dit simplement."
         >
           <InWindow>
             <CanvasSection view={noCanvas} nowMs={nowMs} onSelectPeriod={noop} />
           </InWindow>
         </StateRow>
-        <StateRow name="Ce canvas avant la première frame et le premier historique">
+        <StateRow name="Cette fresque avant la première frame et le premier historique">
           <InWindow>
             <CanvasSection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} />
           </InWindow>
@@ -159,7 +159,7 @@ export const DeveloperEntry = () => {
         </StateRow>
         <StateRow
           name="Tout LivePlace, à la largeur de la grande fenêtre"
-          detail="L'audience et les canvas côte à côte."
+          detail="L'audience et les fresques côte à côte."
         >
           <InLargeWindow>
             <SectionScene nowMs={nowMs} sectionId="all" here={here} />

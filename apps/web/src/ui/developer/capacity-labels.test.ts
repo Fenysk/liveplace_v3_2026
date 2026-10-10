@@ -177,13 +177,13 @@ describe("the saturation at the head of the section (JOURNAL 2026-10-07)", () =>
     });
   });
 
-  // Dit la ressource d'un maillon par son nom court : « VPS, disque », « Gateway, connexions au plus gros canvas »
+  // Dit la ressource d'un maillon par son nom court : « VPS, disque », « Gateway, connexions à la plus grosse fresque »
   it("names the resource of a link by its short name", () => {
     const disk: Saturation = { percent: 20, resource: "machineDisk", isIncomplete: false };
     const canvas: Saturation = { percent: 20, resource: "gatewayCanvasConnections", isIncomplete: false };
 
     expect(toSaturationView(disk, []).caption).toBe("VPS, disque · large");
-    expect(toSaturationView(canvas, []).caption).toBe("Gateway, connexions au plus gros canvas · large");
+    expect(toSaturationView(canvas, []).caption).toBe("Gateway, connexions à la plus grosse fresque · large");
   });
 
   // Incomplète : jamais verte, elle le dit et nomme ce qui est sans nouvelles ; orange ou rouge, elle garde sa teinte

@@ -164,7 +164,7 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
       "12 minutes streamées",
     ]);
     expect(streamedMinutesLabel(1500)).toBe(`${(1500).toLocaleString("fr-FR")} minutes streamées`);
-    expect(streamedCanvasesLabel(1)).toBe("1 canvas streamé");
+    expect(streamedCanvasesLabel(1)).toBe("1 fresque streamée");
   });
 
   // Dans l'infobulle des courbes, accorde chaque valeur en minuscules, comme les lignes des canvas
@@ -174,8 +174,8 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
       "2 personnes connectées",
     ]);
     expect([streamedCanvasesLabel(0), streamedCanvasesLabel(2)]).toEqual([
-      "0 canvas streamé",
-      "2 canvas streamés",
+      "0 fresque streamée",
+      "2 fresques streamées",
     ]);
     expect([placedPixelsLabel(1), placedPixelsLabel(3)]).toEqual(["1 pixel posé", "3 pixels posés"]);
     expect([signupsLabel(0), signupsLabel(2)]).toEqual(["0 nouveau compte", "2 nouveaux comptes"]);

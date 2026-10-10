@@ -30,7 +30,7 @@ const NowBlock = ({ view }: { view: ActivityWatchView }) => {
   return (
     <StatTiles>
       <StatTile label="Personnes connectées" value={formatCount(people)} note={guestsNote(guests)} />
-      <StatTile label="Canvas streamés" value={formatCount(streamed)} />
+      <StatTile label="Fresques streamées" value={formatCount(streamed)} />
       <StatTile label="Pixels de la dernière minute" value={formatCount(pixels)} />
       <StatTile label="Nouveaux comptes aujourd'hui" value={formatCount(signups)} />
     </StatTiles>
@@ -91,7 +91,7 @@ export const ActivitySection = ({ view, nowMs, onSelectPeriod }: ActivitySection
         <AudienceBlock view={view} />
       </section>
       <section className="lp-setting">
-        <h3 className="lp-type-title lp-window-subhead">Les canvas</h3>
+        <h3 className="lp-type-title lp-window-subhead">Les fresques</h3>
         <CanvasesBlock view={view} nowMs={nowMs} />
       </section>
     </div>

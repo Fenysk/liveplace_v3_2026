@@ -51,7 +51,7 @@ const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & 
       <section className="lp-setting">
         <h3 className="lp-type-title lp-window-subhead">L'audience</h3>
         <StatTable
-          caption="L'audience de ce canvas, aujourd'hui et sur les 30 derniers jours"
+          caption="L'audience de cette fresque, aujourd'hui et sur les 30 derniers jours"
           columns={AUDIENCE_COLUMNS}
           rows={toCanvasAudienceRows(here.audience)}
         />
@@ -61,7 +61,7 @@ const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & 
         <ConnectedAccounts
           accounts={toActivityAccounts(here.accounts, nowMs)}
           guestsLine={toGuestsLine(here.guests)}
-          emptyText="Personne sur ce canvas en ce moment."
+          emptyText="Personne sur cette fresque en ce moment."
         />
       </section>
     </div>
@@ -71,8 +71,8 @@ const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & 
         view={view}
         onSelectPeriod={onSelectPeriod}
         toChart={toChart}
-        emptyText="Aucune activité sur ce canvas sur cette période."
-        unavailableText="L'historique de ce canvas n'est pas disponible."
+        emptyText="Aucune activité sur cette fresque sur cette période."
+        unavailableText="L'historique de cette fresque n'est pas disponible."
       />
     </section>
   </>
@@ -83,7 +83,7 @@ export const CanvasSection = ({ view, nowMs, onSelectPeriod }: CanvasSectionProp
     {!view.activity && LOADING}
     {view.activity && !view.activity.here && (
       <span className="lp-type-body lp-muted">
-        Les chiffres de ce canvas ne sont pas disponibles pour l'instant.
+        Les chiffres de cette fresque ne sont pas disponibles pour l'instant.
       </span>
     )}
     {view.activity?.here && (

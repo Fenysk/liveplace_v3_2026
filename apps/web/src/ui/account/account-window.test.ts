@@ -27,7 +27,7 @@ const renderWindow = (props: Partial<WindowProps> = {}): string =>
   renderToStaticMarkup(createElement(AccountWindow, windowProps(props)));
 
 const OWNER_TABS = {
-  canvasTab: tab("contenu de la section Canvas"),
+  canvasTab: tab("contenu de la section Fresque"),
   obsTab: tab("contenu de la section Vue OBS"),
   moderationTab: tab("contenu de la section Modération"),
 };
@@ -43,8 +43,8 @@ describe("la fenêtre ouverte par Réglages (CDC 2026, Fenêtre)", () => {
   it("opens on the Canvas section", () => {
     const markup = renderWindow({ sectionId: SETTINGS_SECTION, ...OWNER_TABS });
 
-    expect(markup).toContain("contenu de la section Canvas");
-    expect(markup).toMatch(/<h2[^>]*>Canvas<\/h2>/);
+    expect(markup).toContain("contenu de la section Fresque");
+    expect(markup).toMatch(/<h2[^>]*>Fresque<\/h2>/);
     expect(markup).not.toContain("contenu de la section Vue OBS");
   });
 
@@ -57,7 +57,7 @@ describe("la fenêtre ouverte par Réglages (CDC 2026, Fenêtre)", () => {
 describe("les sections de la fenêtre (CDC 2026, Fenêtre)", () => {
   // Le streamer : Canvas, Vue OBS, Modération, Mon compte ; plus de Préférences
   it("lists Canvas, Vue OBS, Modération and Mon compte for the owner", () => {
-    expect(sectionsOf(renderWindow(OWNER_TABS))).toEqual(["Canvas", "Vue OBS", "Modération", "Mon compte"]);
+    expect(sectionsOf(renderWindow(OWNER_TABS))).toEqual(["Fresque", "Vue OBS", "Modération", "Mon compte"]);
   });
 
   // Le streamer a aussi Archives, juste après Canvas (Écart §15, JOURNAL 2026-10-06) ; lui seul
@@ -65,7 +65,7 @@ describe("les sections de la fenêtre (CDC 2026, Fenêtre)", () => {
     const withCanvases = { ...OWNER_TABS, canvasesTab: tab("contenu de la section Archives") };
 
     expect(sectionsOf(renderWindow(withCanvases))).toEqual([
-      "Canvas",
+      "Fresque",
       "Archives",
       "Vue OBS",
       "Modération",
@@ -136,7 +136,7 @@ describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)"
   it("puts Classement before Mon compte when the phone gives it, and nowhere otherwise", () => {
     expect(sectionsOf(renderWindow({ scoreboardTab: list }))).toEqual(["Classement", "Mon compte"]);
     expect(sectionsOf(renderWindow({ ...OWNER_TABS, scoreboardTab: list }))).toEqual([
-      "Canvas",
+      "Fresque",
       "Vue OBS",
       "Modération",
       "Classement",

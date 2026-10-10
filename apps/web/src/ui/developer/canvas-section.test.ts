@@ -147,7 +147,7 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(openView).not.toContain("lp-badge");
     expect(openView).toContain("Vues OBS ouvertes");
     expect(markup).not.toContain("lp-badge");
-    expect(markup).toContain("Personne sur ce canvas en ce moment.");
+    expect(markup).toContain("Personne sur cette fresque en ce moment.");
     expect(markup).not.toContain("+ 0 invité");
   });
 
@@ -159,14 +159,14 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(charts(render(ready("all", [{ ...canvasPoint, activePlayers: 2 }])))).toBe(7);
     const none = render(ready("day", []));
     expect(charts(none)).toBeUndefined();
-    expect(none).toContain("Aucune activité sur ce canvas sur cette période.");
+    expect(none).toContain("Aucune activité sur cette fresque sur cette période.");
   });
 
   // Dit simplement qu'il n'y a rien à montrer quand la socket n'a pas de canvas, sans tableau ni courbes
   it("simply says there is nothing to show when the socket has no canvas, with no table and no curves", () => {
     const markup = render(ready("day", [canvasPoint], null));
 
-    expect(markup).toContain("Les chiffres de ce canvas ne sont pas disponibles pour l&#x27;instant.");
+    expect(markup).toContain("Les chiffres de cette fresque ne sont pas disponibles pour l&#x27;instant.");
     expect(markup).not.toContain("<table");
     expect(markup).not.toContain("<figure");
   });
@@ -176,7 +176,7 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     const before = render(ready("day", undefined));
     const waiting = render({ activity: null, period: "day", history: { status: "loading" } });
 
-    expect(before).toContain("L&#x27;historique de ce canvas n&#x27;est pas disponible.");
+    expect(before).toContain("L&#x27;historique de cette fresque n&#x27;est pas disponible.");
     expect(before).not.toContain("<figure");
     expect(waiting).toContain("Chargement…");
     expect(waiting).not.toContain("Personnes connectées");

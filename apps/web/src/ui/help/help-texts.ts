@@ -49,7 +49,7 @@ const PIXELS: Localized<(count: number) => string> = {
 
 export const HELP_TEXTS = defineTexts({
   report: { fr: "Un pixel a été signalé", en: "A pixel was reported" },
-  obs: { fr: "Ajoute ton canvas à OBS ici", en: "Add your canvas to OBS here" },
+  obs: { fr: "Ajoute ta fresque à OBS ici", en: "Add your canvas to OBS here" },
   // La suite de la chaîne OBS, dans la fenêtre (Écart §8.1, JOURNAL 2026-10-09) : l'onglet, puis l'adresse.
   obsTab: { fr: "Ton adresse OBS est dans cet onglet", en: "Your OBS address is in this tab" },
   obsAddress: {
@@ -65,7 +65,7 @@ export const HELP_TEXTS = defineTexts({
   // Au doigt on touche, à la souris on clique : la bulle du premier passage en Dessin dit celui des deux qui sert.
   draft: localized({
     fr: (isTouchScreen: boolean) =>
-      `${isTouchScreen ? "Touche le canvas" : "Clique sur le canvas"} pour préparer ton dessin, Valider l'envoie`,
+      `${isTouchScreen ? "Touche la fresque" : "Clique sur la fresque"} pour préparer ton dessin, Valider l'envoie`,
     en: (isTouchScreen) =>
       `${isTouchScreen ? "Tap the canvas" : "Click the canvas"} to prepare your drawing, then Confirm to send it`,
   }),

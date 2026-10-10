@@ -4,7 +4,7 @@ import { defineTexts, localized } from "../locale/texts";
 
 export const OBS_TEXTS = defineTexts({
   // Le nom accessible de la surface, que le stream ne montre jamais.
-  surfaceLabel: { fr: "Le canvas, tel que le stream le montre", en: "The canvas, as the stream shows it" },
+  surfaceLabel: { fr: "La fresque, telle que le stream la montre", en: "The canvas, as the stream shows it" },
 
   // Un cran du délai (JOURNAL 2026-09-25) : « Aucun » est le seul à changer, « 10 s » et « 2 min » se disent pareil.
   delayNone: { fr: "Aucun", en: "None" },
@@ -19,7 +19,7 @@ export const OBS_TEXTS = defineTexts({
 
   address: { fr: "Adresse à coller dans OBS", en: "Address to paste into OBS" },
   howTo: {
-    fr: "Dans OBS Studio ou Streamlabs : Sources, +, Navigateur. Colle l'adresse, choisis une taille aux proportions de ton canvas (1080 × 1080 pour un carré, 1920 × 1080 pour un 16:9). C'est tout.",
+    fr: "Dans OBS Studio ou Streamlabs : Sources, +, Navigateur. Colle l'adresse, choisis une taille aux proportions de ta fresque (1080 × 1080 pour un carré, 1920 × 1080 pour un 16:9). C'est tout.",
     en: "In OBS Studio or Streamlabs: Sources, +, Browser. Paste the address, pick a size that matches your canvas proportions (1080 × 1080 for a square, 1920 × 1080 for 16:9). That's it.",
   },
   delay: { fr: "Délai", en: "Delay" },
@@ -29,7 +29,7 @@ export const OBS_TEXTS = defineTexts({
   },
   background: { fr: "Fond de la vue OBS", en: "OBS view background" },
   backgroundNote: {
-    fr: "Transparent, le stream montre ce qu'il y a derrière les pixels. Noir ou blanc, le canvas se pose sur ce fond.",
+    fr: "Transparent, le stream montre ce qu'il y a derrière les pixels. Noir ou blanc, la fresque se pose sur ce fond.",
     en: "Transparent, the stream shows whatever is behind the pixels. Black or white, the canvas sits on that background.",
   },
 });

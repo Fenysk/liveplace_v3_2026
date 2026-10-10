@@ -4,7 +4,7 @@
   "_matching": "Un nom banni est signalé s'il apparaît dans N'IMPORTE QUEL mot d'un identifiant déclaré. Un verbe banni ne l'est qu'en TÊTE d'un identifiant d'au moins deux mots. D'où les absences volontaires ci-dessous : `color` n'est pas banni (il casserait `colorIndex`), ni `name` (il casserait `displayName`), ni `user` (il casserait `userId`).",
 
   "nouns": [
-    { "canonical": "canvas",       "definition": "Le tableau d'un streamer, identifié par un `canvasId` OPAQUE qui n'est jamais un `userId` (D-14).", "banned": ["board"] },
+    { "canonical": "canvas",       "definition": "Le tableau d'un streamer, identifié par un `canvasId` OPAQUE qui n'est jamais un `userId` (D-14). L'interface française l'affiche « fresque » (JOURNAL 2026-10-10).", "banned": ["board"] },
     { "canonical": "archive",      "definition": "Un canvas figé, en lecture seule, que son streamer peut rouvrir. Jamais l'historique des poses, qui vit dans des `chunk`.", "banned": [] },
     { "canonical": "cell",         "definition": "Une position (x, y) sur le canvas.",                                   "banned": ["coord", "coords"] },
     { "canonical": "cellKey",      "definition": "Le nom d'une case, indépendant de la taille : y × CELL_STRIDE + x. Ne sert JAMAIS à indexer `state` (D-15).", "banned": [] },

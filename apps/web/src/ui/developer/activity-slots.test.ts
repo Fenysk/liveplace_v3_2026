@@ -62,7 +62,7 @@ describe("the time axis of the history (écart §4.3, JOURNAL 2026-10-06)", () =
       "Personnes connectées",
       "Visites",
       "Temps passé (min)",
-      "Canvas streamés",
+      "Fresques streamées",
       "Pixels posés",
       "Nouveaux comptes",
     ]);

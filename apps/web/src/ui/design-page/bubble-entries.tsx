@@ -159,7 +159,7 @@ export const BubbleEntry = () => (
       </StateRow>
       <StateRow
         name="À côté de la colonne"
-        detail="En paysage, la barre du bas est une colonne à droite : la bulle se pose au bas de la zone du canvas, à sa gauche."
+        detail="En paysage, la barre du bas est une colonne à droite : la bulle se pose au bas de la zone de la fresque, à sa gauche."
       >
         <BesideColumnScene />
       </StateRow>

@@ -79,7 +79,7 @@ import {
 
 const PREVIEWS = [
   { name: "Un petit dessin", detail: "Cadré de près, la gomme en croix.", pixels: SAMPLE_DRAWING },
-  { name: "Des pixels dispersés", detail: "Tout le canvas.", pixels: SAMPLE_SPREAD },
+  { name: "Des pixels dispersés", detail: "Toute la fresque.", pixels: SAMPLE_SPREAD },
 ];
 
 export const PixelPreviewEntry = () => (
@@ -87,7 +87,7 @@ export const PixelPreviewEntry = () => (
     slug="apercu-de-pixels"
     components={["PixelPreview"]}
     file="ui/design/pixel-preview.tsx"
-    note="Des pixels seuls, sur le damier du canvas et dans sa bordure. Immobile."
+    note="Des pixels seuls, sur le damier de la fresque et dans sa bordure. Immobile."
   >
     <Block title="États">
       {PREVIEWS.map(({ name, detail, pixels }) => (
@@ -136,7 +136,7 @@ const PROFILE_LIVE_STATES: readonly {
   {
     name: "Catégorie longue",
     detail:
-      "Coupée par « … » à 170 px, 64 px sur mobile ; dans la pill Canvas, elle prend toute la place qui reste.",
+      "Coupée par « … » à 170 px, 64 px sur mobile ; dans la pill Fresque, elle prend toute la place qui reste.",
     user: { ...SAMPLE_OWNER, twitchLive: { category: "Software and Game Development" } },
     variant: "full",
   },
@@ -153,7 +153,7 @@ export const ProfileEntry = () => (
     slug="avatar-et-profil"
     components={["Avatar", "Profile", "AvatarButton"]}
     file="ui/design/profile.tsx"
-    note="L'avatar et le nom mènent au canvas ; seul le bouton Twitch mène à la chaîne, et il dit quand la personne est en live."
+    note="L'avatar et le nom mènent à la fresque ; seul le bouton Twitch mène à la chaîne, et il dit quand la personne est en live."
   >
     <Block title="Avatar">
       {PROFILE_USERS.map(({ name, detail, user }) => (
@@ -190,7 +190,7 @@ export const ProfileEntry = () => (
     </Block>
     <Block
       title="Profil replié"
-      note="La pill Canvas sur mobile, une fois repliée : la photo seule, en bouton qui déplie le profil."
+      note="La pill Fresque sur mobile, une fois repliée : la photo seule, en bouton qui déplie le profil."
     >
       <StateRow name="Hors live">
         <Pill>
@@ -366,7 +366,7 @@ const ActivityCardScene = ({
   </WithValue>
 );
 
-const NO_ONE_HERE = "Personne sur ce canvas en ce moment.";
+const NO_ONE_HERE = "Personne sur cette fresque en ce moment.";
 
 // Écart §14 (JOURNAL 2026-10-07) : les exemples de /design gardent le français de la page.
 const {
@@ -386,7 +386,7 @@ export const ActivityCardEntry = () => {
       slug="carte-d-activite"
       components={["CanvasActivityCard", "CanvasActivityOwner", "ConnectedAccounts"]}
       file="ui/design/canvas-activity-card.tsx"
-      note="Une ligne par canvas, une carte sur mobile. Le chevron déplie qui est dessus."
+      note="Une ligne par fresque, une carte sur mobile. Le chevron déplie qui est dessus."
     >
       <Block title="Carte">
         {kalyss && (
@@ -415,7 +415,7 @@ export const ActivityCardEntry = () => {
       </Block>
       <Block
         title="Streamer"
-        note="Le streamer d'un canvas : en tête de Ce canvas, et dans chaque carte. Le bouton Twitch de son profil dit s'il est en live."
+        note="Le streamer d'une fresque : en tête de Cette fresque, et dans chaque carte. Le bouton Twitch de son profil dit s'il est en live."
       >
         <StateRow name="Streamer">
           <Pill>
@@ -425,7 +425,7 @@ export const ActivityCardEntry = () => {
       </Block>
       <Block
         title="Comptes connectés"
-        note="Les comptes connectés d'un canvas, puis ses invités : « Qui est là » de Ce canvas, et le chevron d'une carte."
+        note="Les comptes connectés d'une fresque, puis ses invités : « Qui est là » de Cette fresque, et le chevron d'une carte."
       >
         <StateRow name="Rôle, depuis quand, PC ou téléphone, puis les invités">
           <InWindow>
@@ -466,7 +466,7 @@ export const FieldsEntry = () => (
     note="Un curseur à crans fixes, une case à cocher, et une valeur à copier : tout le champ est le bouton."
   >
     <Block title="Champ de texte">
-      <StateRow name="Champ de texte" detail="Le thème facultatif d'un canvas.">
+      <StateRow name="Champ de texte" detail="Le thème facultatif d'une fresque.">
         <InSmallWindow>
           <WithValue initial="">
             {(theme, setTheme) => (
@@ -574,7 +574,7 @@ export const StatTilesEntry = () => {
           <InWindow>
             <StatTiles>
               <StatTile label="Personnes connectées" value="6" note="dont 3 invités" />
-              <StatTile label="Canvas streamés" value="1" />
+              <StatTile label="Fresques streamées" value="1" />
               <StatTile label="Pixels de la dernière minute" value="87" />
               <StatTile label="Nouveaux comptes aujourd'hui" value="3" />
             </StatTiles>
@@ -604,12 +604,12 @@ export const StatTilesEntry = () => {
           </InWindow>
         </StateRow>
         <StateRow
-          name="L'audience d'un canvas"
+          name="L'audience d'une fresque"
           detail="Ses joueurs actifs et les nouveaux comptes venus de sa page."
         >
           <InWindow>
             <StatTable
-              caption="L'audience de ce canvas, aujourd'hui et sur les 30 derniers jours"
+              caption="L'audience de cette fresque, aujourd'hui et sur les 30 derniers jours"
               columns={AUDIENCE_COLUMNS}
               rows={toCanvasAudienceRows(sampleHere(nowMs).audience)}
             />
@@ -662,7 +662,7 @@ export const StatTilesEntry = () => {
             <div className="lp-window-layout">
               <CapacityLinkRows title="Gateway">
                 {ratioRow("Connexions en tout", 410, 1750)}
-                {ratioRow("Connexions au plus gros canvas", 640, 1000)}
+                {ratioRow("Connexions à la plus grosse fresque", 640, 1000)}
                 {ratioRow("Connexions de la vue OBS", 910, 1000)}
               </CapacityLinkRows>
             </div>
@@ -734,7 +734,7 @@ export const StatTilesEntry = () => {
             <div className="lp-window-layout">
               <CapacityLinkRows title="Gateway">
                 {ratioRow("Connexions en tout", 410, 1750)}
-                {ratioRow("Connexions au plus gros canvas", 910, 1000)}
+                {ratioRow("Connexions à la plus grosse fresque", 910, 1000)}
                 <CapacityRow name="Occupation" state={{ kind: "withoutNews" }} />
                 {guardsRow({
                   hour: { refusedPlacements: 20, closedConnections: 1 },
@@ -836,7 +836,7 @@ export const ChoicesEntry = () => {
 };
 
 const NO_POINT = "Aucun point sur cette période.";
-const NO_CANVAS_POINT = "Aucune activité sur ce canvas sur cette période.";
+const NO_CANVAS_POINT = "Aucune activité sur cette fresque sur cette période.";
 
 export const TimeChartsEntry = () => {
   const nowMs = useNowMs();
@@ -865,7 +865,7 @@ export const TimeChartsEntry = () => {
           </InWindow>
         </StateRow>
         <StateRow
-          name="Un canvas, 24 h"
+          name="Une fresque, 24 h"
           detail="Un point seulement quand il s'y passe quelque chose, le reste vaut zéro."
         >
           <InWindow>
@@ -876,7 +876,7 @@ export const TimeChartsEntry = () => {
             />
           </InWindow>
         </StateRow>
-        <StateRow name="Un canvas, Tout" detail="Une courbe de plus, ses joueurs actifs de chaque jour.">
+        <StateRow name="Une fresque, Tout" detail="Une courbe de plus, ses joueurs actifs de chaque jour.">
           <InWindow>
             <TimeCharts
               lines={canvasChartLinesFor("all")}

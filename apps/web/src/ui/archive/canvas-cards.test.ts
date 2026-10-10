@@ -50,7 +50,7 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
   it("labels the current canvas, titles it by its date, and offers « Archiver » alone", () => {
     const html = sectionHtml(active, []);
 
-    expect(html).toContain("Canvas en cours");
+    expect(html).toContain("Fresque en cours");
     expect(html).toContain("Depuis le 4 octobre 2026");
     expect(html).toMatch(/<button[^>]*class="lp-btn lp-type-body lp-btn--primary"[^>]*>.*Archiver<\/span>/);
     expect(html).not.toContain("repartir à zéro");

@@ -32,11 +32,11 @@ const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g
 // Les 42 couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
-    title: "Le vide et le canvas",
+    title: "Le vide et la fresque",
     usages: {
-      void: "Le vide, derrière le canvas. Jamais de texte dessus.",
+      void: "Le vide, derrière la fresque. Jamais de texte dessus.",
       voidDot: "Les points du vide, fixes à l'écran et centrés.",
-      canvasBorder: "La bordure du canvas.",
+      canvasBorder: "La bordure de la fresque.",
       canvasGrid: "La grille, dès qu'une case dépasse 8 px.",
       checkerA: "Le damier du pixel transparent, case claire.",
       checkerB: "Le damier du pixel transparent, case foncée.",

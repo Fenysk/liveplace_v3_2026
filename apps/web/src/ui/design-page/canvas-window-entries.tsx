@@ -121,16 +121,16 @@ export const CanvasSettingsEntry = () => (
     slug="fenetre-canvas"
     components={["CanvasSettings", "ThemeSettings", "GaugeSettings"]}
     file="ui/canvas/canvas-settings.tsx"
-    note="Pour le streamer : le thème du canvas, qui s'enregistre quand le champ perd le focus, la taille du canvas, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
+    note="Pour le streamer : le thème de la fresque, qui s'enregistre quand le champ perd le focus, la taille de la fresque, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
   >
     <Block title="États">
       <StateRow
-        name="Le thème du canvas, vide, puis un format, Petit, Moyen ou Grand"
+        name="Le thème de la fresque, vide, puis un format, Petit, Moyen ou Grand"
         detail="La confirmation montre ce qui sort du cadre."
       >
         <CanvasSettingsScene />
       </StateRow>
-      <StateRow name="Le thème du canvas rempli" detail="Enregistré en quittant le champ, sans bouton.">
+      <StateRow name="Le thème de la fresque rempli" detail="Enregistré en quittant le champ, sans bouton.">
         <ThemeScene initial="Halloween" />
       </StateRow>
       <StateRow name="Le thème s'enregistre" detail="Le champ attend la réponse.">

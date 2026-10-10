@@ -6,15 +6,15 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   it("keeps the validated texts word for word", () => {
     expect(HELP_TEXTS.fr.trace).toBe("Active le tracé pour dessiner en glissant");
     expect(HELP_TEXTS.fr.reward).toBe("Une récompense t'attend : +1 sur ta jauge max");
-    expect(HELP_TEXTS.fr.obs).toBe("Ajoute ton canvas à OBS ici");
+    expect(HELP_TEXTS.fr.obs).toBe("Ajoute ta fresque à OBS ici");
     expect(HELP_TEXTS.fr.report).toBe("Un pixel a été signalé");
   });
 
   // Au doigt on touche, à la souris on clique : le verbe suit l'écran
   it("says touch on a touch screen and click with a mouse", () => {
-    expect(HELP_TEXTS.fr.draft(true)).toBe("Touche le canvas pour préparer ton dessin, Valider l'envoie");
+    expect(HELP_TEXTS.fr.draft(true)).toBe("Touche la fresque pour préparer ton dessin, Valider l'envoie");
     expect(HELP_TEXTS.fr.draft(false)).toBe(
-      "Clique sur le canvas pour préparer ton dessin, Valider l'envoie",
+      "Clique sur la fresque pour préparer ton dessin, Valider l'envoie",
     );
   });
 

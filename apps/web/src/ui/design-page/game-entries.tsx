@@ -91,7 +91,7 @@ const FoldDemo = () => {
         theme={SHORT_THEME}
         fold={{ isFolded, onUnfold: () => setIsFolded(false) }}
       />
-      <Button label="Déplacer le canvas" onPress={() => setIsFolded(true)} />
+      <Button label="Déplacer la fresque" onPress={() => setIsFolded(true)} />
     </>
   );
 };
@@ -103,11 +103,11 @@ export const CanvasPillEntry = () => (
     slug="pill-canvas"
     components={["CanvasPill"]}
     file="ui/canvas/canvas-pill.tsx"
-    note="Sur mobile, elle se replie sur la photo quand on déplace, zoome, recentre ou ouvre une case sur le canvas, et la toucher la déplie. Un simple appui ou un trait en Dessin ne la replie pas. Rien n'est retenu : chaque visite commence dépliée."
+    note="Sur mobile, elle se replie sur la photo quand on déplace, zoome, recentre ou ouvre une case sur la fresque, et la toucher la déplie. Un simple appui ou un trait en Dessin ne la replie pas. Rien n'est retenu : chaque visite commence dépliée."
     where="En haut à gauche"
   >
     <Block title="États">
-      <StateRow name="Canvas">
+      <StateRow name="Fresque">
         <CanvasPill owner={SAMPLE_OWNER} isDocked={false} />
       </StateRow>
     </Block>
@@ -129,7 +129,7 @@ export const CanvasPillEntry = () => (
       </StateRow>
       <StateRow
         name="En live, invité"
-        detail="Pas de pill Compte : la pill Canvas prend toute la rangée, la catégorie avec."
+        detail="Pas de pill Compte : la pill Fresque prend toute la rangée, la catégorie avec."
       >
         <PhoneHeader owner={SAMPLE_LIVE_OWNER} identity={{ kind: "guest" }} />
       </StateRow>
@@ -137,7 +137,7 @@ export const CanvasPillEntry = () => (
     <Block title="Repliée sur mobile">
       <StateRow
         name="Repliée"
-        detail="La photo seule, en bouton : la pill Compte et la bande Thème ne bougent pas, le canvas non plus."
+        detail="La photo seule, en bouton : la pill Compte et la bande Thème ne bougent pas, la fresque non plus."
       >
         <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} fold={FOLDED} />
       </StateRow>
@@ -148,7 +148,7 @@ export const CanvasPillEntry = () => (
         <PhoneHeader owner={SAMPLE_LIVE_OWNER} theme={SHORT_THEME} fold={FOLDED} />
       </StateRow>
       <StateRow
-        name="Se replie sur le canvas, se déplie au toucher"
+        name="Se replie sur la fresque, se déplie au toucher"
         detail="Déplacer, zoomer, recentrer ou ouvrir une case la replie ; toucher la photo la déplie."
         isDemo
       >
@@ -182,8 +182,8 @@ export const ThemePillEntry = () => (
     slug="pill-theme"
     components={["ThemePill"]}
     file="ui/design/theme-pill.tsx"
-    note="Le thème du canvas, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
-    where="En haut au centre, entre les pills Canvas et Compte · sur mobile, une bande sous la rangée des pills du haut, qui monte à leur place en Dessin"
+    note="Le thème de la fresque, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
+    where="En haut au centre, entre les pills Fresque et Compte · sur mobile, une bande sous la rangée des pills du haut, qui monte à leur place en Dessin"
   >
     <Block title="États">
       <StateRow name="Un thème court" detail="Un petit texte discret au-dessus, le thème dessous, gros.">
@@ -217,13 +217,13 @@ export const ThemePillEntry = () => (
       </StateRow>
       <StateRow
         name="En Dessin"
-        detail="Les pills Canvas et Compte s'effacent en fondu, la bande monte à leur place : seul le thème reste en haut. Sans thème, le haut est vide."
+        detail="Les pills Fresque et Compte s'effacent en fondu, la bande monte à leur place : seul le thème reste en haut. Sans thème, le haut est vide."
       >
         <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} isDrafting />
       </StateRow>
       <StateRow
-        name="Pendant un déplacement du canvas"
-        detail="Les pills Canvas et Compte et la bande s'effacent en fondu tant que la vue bouge, et reviennent dès que le doigt se lève, par le même fondu, avec la bulle d'aide qui vise l'une d'elles. La barre du bas reste."
+        name="Pendant un déplacement de la fresque"
+        detail="Les pills Fresque et Compte et la bande s'effacent en fondu tant que la vue bouge, et reviennent dès que le doigt se lève, par le même fondu, avec la bulle d'aide qui vise l'une d'elles. La barre du bas reste."
         isDemo
       >
         <PanFadeDemo>
@@ -269,7 +269,7 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
     scenes: [{ name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN }],
   },
   {
-    title: "Qui modère sur le canvas d'un autre",
+    title: "Qui modère sur la fresque d'un autre",
     scenes: [
       {
         name: "Qui modère",
@@ -287,11 +287,11 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
     ],
   },
   {
-    title: "Le streamer sur son canvas",
+    title: "Le streamer sur sa fresque",
     scenes: [
       {
         name: "Sa seule pill",
-        detail: "Réglages ouvre la fenêtre sur Canvas.",
+        detail: "Réglages ouvre la fenêtre sur Fresque.",
         identity: SIGNED_IN,
         hasSettings: true,
       },
@@ -330,7 +330,7 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
         hasBottomBar: false,
       },
       { name: "Connecté", detail: "Sa photo seule.", identity: SIGNED_IN, isCompact: true },
-      { name: "Le streamer sur son canvas", identity: SIGNED_IN, isCompact: true, hasSettings: true },
+      { name: "Le streamer sur sa fresque", identity: SIGNED_IN, isCompact: true, hasSettings: true },
       {
         name: "Qui modère, des signalements attendent",
         identity: SIGNED_IN,
@@ -385,7 +385,7 @@ export const AccountPillEntry = () => (
     slug="pill-compte"
     components={["AccountPill"]}
     file="ui/account/account-pill.tsx"
-    note="Le streamer sur son canvas n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
+    note="Le streamer sur sa fresque n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
     where="En haut à droite"
   >
     {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
@@ -607,7 +607,7 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
   <>
     <Block
       title="En colonne sur le côté"
-      note="Sur un écran bas (un téléphone en paysage) ou un écran tactile large dont les deux côtés font au moins 560 px (un pliable déplié, une tablette) : la barre du bas passe en colonne contre le bord droit. En Vue, le canvas prend la plus grande zone qu'elle lui laisse, à côté d'elle ou au-dessus ; en Dessin, le panneau garde la droite."
+      note="Sur un écran bas (un téléphone en paysage) ou un écran tactile large dont les deux côtés font au moins 560 px (un pliable déplié, une tablette) : la barre du bas passe en colonne contre le bord droit. En Vue, la fresque prend la plus grande zone qu'elle lui laisse, à côté d'elle ou au-dessus ; en Dessin, le panneau garde la droite."
     >
       <StateRow name="Vue" detail="La jauge et Dessiner, l'un sous l'autre.">
         <InLandscape>
@@ -664,7 +664,7 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
     </Block>
     <Block
       title="Écrans à charnière"
-      note="Jamais une pill ni un bouton sur la charnière : le canvas dans le premier écran, les commandes dans le second. Sur deux grands écrans, la colonne est celle du second ; en Flex mode, la barre du bas."
+      note="Jamais une pill ni un bouton sur la charnière : la fresque dans le premier écran, les commandes dans le second. Sur deux grands écrans, la colonne est celle du second ; en Flex mode, la barre du bas."
     >
       <StateRow name="Côte à côte" detail="Surface Duo déployé : la colonne dans le second écran.">
         <InHinge
@@ -684,7 +684,7 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
       </StateRow>
       <StateRow
         name="L'un sur l'autre"
-        detail="Galaxy Z Flip en Flex mode : le canvas en haut, la barre du bas en bas."
+        detail="Galaxy Z Flip en Flex mode : la fresque en haut, la barre du bas en bas."
       >
         <InHinge
           isStacked
@@ -801,14 +801,14 @@ export const ViewportPillEntry = () => {
       </Block>
       <Block
         title="Avec la colonne du bas"
-        note="Sur un écran tactile large, le canvas arrive dans la plus grande des deux zones que la colonne lui laisse, mesurées à sa forme : à côté d'elle, ou au-dessus d'elle. Recentrer se pose au coin de cette zone."
+        note="Sur un écran tactile large, la fresque arrive dans la plus grande des deux zones que la colonne lui laisse, mesurées à sa forme : à côté d'elle, ou au-dessus d'elle. Recentrer se pose au coin de cette zone."
       >
         <StateRow name="À côté de la colonne" detail="Un téléphone en paysage, une tablette en paysage.">
           <WithColumn nowMs={nowMs} isAbove={false} />
         </StateRow>
         <StateRow
           name="Au-dessus de la colonne"
-          detail="Un pliable déplié ou une tablette en portrait : le canvas garde toute la largeur."
+          detail="Un pliable déplié ou une tablette en portrait : la fresque garde toute la largeur."
         >
           <WithColumn nowMs={nowMs} isAbove />
         </StateRow>
@@ -822,21 +822,21 @@ export const NoticeEntry = () => (
     slug="message-seul"
     components={["NoticePill", "ArchiveNotFound", "CanvasRecovering"]}
     file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx, ui/canvas/canvas-recovering.tsx"
-    note="La page d'accueil, un canvas introuvable, un canvas que Redis remet en place."
+    note="La page d'accueil, une fresque introuvable, une fresque que Redis remet en place."
     where="Au centre"
   >
     <Block title="États">
-      <StateRow name="Canvas introuvable">
+      <StateRow name="Fresque introuvable">
         <InNotice>
-          <NoticePill title="Ce pseudo n'a pas encore de canvas sur LivePlace.">
+          <NoticePill title="Ce pseudo n'a pas encore de fresque sur LivePlace.">
             <SignInButton href="#" label="Se connecter avec Twitch" />
             <SignInNote />
           </NoticePill>
         </InNotice>
       </StateRow>
       <StateRow
-        name="Canvas en récupération"
-        detail="Pour tous, à la place du canvas ; la page reprend seule. Rien en vue OBS."
+        name="Fresque en récupération"
+        detail="Pour tous, à la place de la fresque ; la page reprend seule. Rien en vue OBS."
       >
         <InNotice>
           <NoticePill title={CANVAS_TEXTS.fr.recovering} />

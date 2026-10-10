@@ -10,7 +10,7 @@ export type DeveloperSectionId = "here" | "all" | "capacity";
 
 // Dans l'ordre du cahier des charges ; elle s'ouvre sur la première.
 export const DEVELOPER_SECTIONS = [
-  { id: "here", label: "Ce canvas", icon: Frame },
+  { id: "here", label: "Cette fresque", icon: Frame },
   { id: "all", label: "Tout LivePlace", icon: Globe },
   { id: "capacity", label: "Capacité", icon: Gauge },
 ] as const satisfies readonly WindowSection<DeveloperSectionId>[];

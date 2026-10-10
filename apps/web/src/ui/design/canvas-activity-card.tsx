@@ -107,7 +107,7 @@ export const CanvasActivityCard = ({
         <ConnectedAccounts
           accounts={accounts}
           guestsLine={guestsLine}
-          emptyText="Aucune page ouverte sur ce canvas."
+          emptyText="Aucune page ouverte sur cette fresque."
         />
       </div>
     )}

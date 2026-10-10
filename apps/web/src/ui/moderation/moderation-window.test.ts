@@ -54,7 +54,7 @@ describe("what a screen reader hears of the moderation window", () => {
     const markup = render({ request: { kind: "ban", author } });
 
     expect(countOf(markup)).toBe(
-      "2 pixels. Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.",
+      "2 pixels. Ce compte ne pourra plus poser sur cette fresque, et ses pixels seront retirés.",
     );
   });
 
@@ -75,7 +75,7 @@ describe("what a screen reader hears of the moderation window", () => {
 
   // Une fenêtre modale rend la page inerte : le toast que son action lève se redit dans la sienne, qui n'est pas inerte
   it("repeats the toast its own action raises, the page behind it being inert", () => {
-    const toast = { id: 1, tone: "success", text: "Troll42 est banni·e de ce canvas" } as const;
+    const toast = { id: 1, tone: "success", text: "Troll42 est banni·e de cette fresque" } as const;
     const markup = renderToStaticMarkup(
       createElement(
         ToastAnnouncementContext.Provider,

@@ -79,7 +79,7 @@ const listTexts = (source: string): string[] => {
   const strings = [...code.matchAll(STRING_LITERAL)].map(([, double, single, template]) =>
     (double ?? single ?? template ?? "").replace(/\$\{[^}]*\}/g, " "),
   );
-  // Les `{…}` d'une expression JSX coupent le texte : « Canvas de {name} » doit rester un seul texte.
+  // Les `{…}` d'une expression JSX coupent le texte : « Fresque de {name} » doit rester un seul texte.
   let withoutExpressions = code.replace(STRING_LITERAL, '""');
   for (let previous = ""; previous !== withoutExpressions; ) {
     previous = withoutExpressions;
@@ -124,7 +124,7 @@ describe("the French left in the code of the interface (Écart §14, JOURNAL 202
     const source = [
       "// Une phrase dans un commentaire, ignorée.",
       'const title = "Se connecter";',
-      `const label = \`Voir le canvas de $\{name}\`;`,
+      `const label = \`Voir la fresque de $\{name}\`;`,
       'const link = "https://liveplace.tv/kalyss";',
       'console.warn("Une erreur pour le développeur", error);',
       '<a href="/x" title="Fermer">Réessayer</a>;',
@@ -133,10 +133,10 @@ describe("the French left in the code of the interface (Écart §14, JOURNAL 202
     const texts = listTexts(source);
 
     expect(texts).toEqual(
-      expect.arrayContaining(["Se connecter", "Voir le canvas de", "Fermer", "Réessayer"]),
+      expect.arrayContaining(["Se connecter", "Voir la fresque de", "Fermer", "Réessayer"]),
     );
     expect(texts.filter(isFrench)).toEqual(
-      expect.arrayContaining(["Se connecter", "Voir le canvas de", "Fermer", "Réessayer"]),
+      expect.arrayContaining(["Se connecter", "Voir la fresque de", "Fermer", "Réessayer"]),
     );
     expect(texts.some((text) => text.includes("commentaire"))).toBe(false);
     expect(texts.some((text) => text.includes("développeur"))).toBe(false);

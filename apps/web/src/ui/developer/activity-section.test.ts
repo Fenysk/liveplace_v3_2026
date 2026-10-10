@@ -68,7 +68,7 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
       "dont 3 invités",
       "L'audience",
       "Visites",
-      "Les canvas",
+      "Les fresques",
       "Kalyss",
       "120 px/h",
       "L'historique",
@@ -142,17 +142,17 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     const markup = render({ activity: frame, period: "day", history: { status: "ready", points: [point] } });
     const notStreamed = render({ activity: idle, period: "day", history: { status: "loading" } });
 
-    expect(markup).toContain("Canvas streamés");
+    expect(markup).toContain("Fresques streamées");
     expect(markup).not.toContain("en live");
     expect(markup).not.toContain("En live");
-    expect(markup).not.toContain("Canvas en live");
+    expect(markup).not.toContain("Fresques en live");
     expect(markup).not.toContain(">Streamé<");
     expect(markup).not.toContain("lp-badge");
     expect(markup).not.toContain('title="1 vue OBS ouverte"');
     expect(markup.match(/<figure/g)).toHaveLength(6);
     expect(markup).not.toContain(">OBS<");
     expect(notStreamed).not.toContain("lp-badge");
-    expect(notStreamed).toContain("Canvas streamés");
+    expect(notStreamed).toContain("Fresques streamées");
   });
 
   // Dit quand personne n'est sur LivePlace, et attend la première frame sans rien inventer

@@ -29,7 +29,7 @@ export const PanFadeDemo = ({ children }: { children: ReactNode }) => {
         onPointerUp={lift}
         onPointerCancel={lift}
       >
-        Glisse ici, comme sur le canvas
+        Glisse ici, comme sur la fresque
       </div>
     </div>
   );

@@ -63,7 +63,7 @@ describe("the waiting message", () => {
   it("says exactly what the streamer's viewers read, inside lp-game", () => {
     const html = renderToStaticMarkup(createElement(CanvasRecovering));
 
-    expect(html).toContain("On remet chaque pixel à sa place. Le canvas revient dans un instant !");
+    expect(html).toContain("On remet chaque pixel à sa place. La fresque revient dans un instant !");
     expect(html).toContain('class="lp-game"');
   });
 

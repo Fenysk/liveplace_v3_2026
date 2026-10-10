@@ -36,7 +36,7 @@ export const connectedPeopleLabel = (people: number): string =>
   counted(people, "personne connectée", "personnes connectées");
 
 export const streamedCanvasesLabel = (streamed: number): string =>
-  counted(streamed, "canvas streamé", "canvas streamés");
+  counted(streamed, "fresque streamée", "fresques streamées");
 
 export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pixel posé", "pixels posés");
 

@@ -107,7 +107,7 @@ describe("archiveCaption (Écart §15, JOURNAL 2026-10-06)", () => {
 describe("the labels of the Archives section (Écart §15, JOURNAL 2026-10-06)", () => {
   // Le libellé du canvas en cours, et son bouton : un mot, l'icône dit le reste
   it("labels the current canvas, and its button in one word", () => {
-    expect(fr.currentCanvasLabel).toBe("Canvas en cours");
+    expect(fr.currentCanvasLabel).toBe("Fresque en cours");
     expect(fr.archiveAction).toBe("Archiver");
     expect(en.currentCanvasLabel).toBe("Current canvas");
     expect(en.archiveAction).toBe("Archive");
@@ -124,14 +124,14 @@ describe("the theme of the current canvas (Écart §8.1, JOURNAL 2026-10-07)", (
   // Le champ de l'onglet Canvas, sa légende, et ce que dit le toast quand l'enregistrement a réussi
   it("labels the field of the Canvas section, captions it, and confirms the saving", () => {
     expect(fr.themeLabel).toBe("Thème");
-    expect(fr.themeCaption).toBe("Affiché en haut du canvas, pour tout le monde.");
+    expect(fr.themeCaption).toBe("Affiché en haut de la fresque, pour tout le monde.");
     expect(fr.themeSaved).toBe("Thème enregistré");
     expect(en.themeSaved).toBe("Theme saved");
   });
 
   // Chaque échec de l'enregistrement a sa phrase, courte ; la session expirée le dit, les autres invitent à réessayer
   it("gives each failure of the saving its short sentence, asking to try again unless the session expired", () => {
-    expect(fr.themeFailure("not_active")).toBe("Le canvas en cours a changé : son thème est rechargé.");
+    expect(fr.themeFailure("not_active")).toBe("La fresque en cours a changé : son thème est rechargé.");
     expect(fr.themeFailure("failed")).toBe("Le thème n'a pas pu être enregistré. Réessaie dans un instant.");
     expect(fr.themeFailure("network")).toBe(fr.themeFailure("failed"));
     expect(fr.themeFailure("unauthenticated")).toBe("Ta session a expiré. Reconnecte-toi, puis réessaie.");
@@ -153,9 +153,9 @@ describe("archivesCounter and the empty list (Écart §15, JOURNAL 2026-10-06)",
   // L'état vide tient en une phrase, qui dit aussi ce que fait archiver
   it("says in one sentence that there is no archive yet and what archiving does", () => {
     expect(fr.noArchive).toBe(
-      "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur un canvas vide.",
+      "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur une fresque vide.",
     );
-    expect(fr.noCurrentCanvas).toBe("Aucun canvas en cours.");
+    expect(fr.noCurrentCanvas).toBe("Aucune fresque en cours.");
   });
 });
 
@@ -176,7 +176,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
   // Archiver : une phrase, sans aucune dimension
   it("tells what archiving does in one sentence, without a size", () => {
     expect(fr.archiveSentence).toBe(
-      "Ton dessin est figé et garde son lien. Tes viewers passent sur un canvas vide.",
+      "Ton dessin est figé et garde son lien. Tes viewers passent sur une fresque vide.",
     );
     expect(fr.archiveSentence).not.toMatch(/\d|cases/);
     expect(en.archiveSentence).not.toMatch(/\d|cells/);
@@ -185,7 +185,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
   // Rouvrir : le titre de l'archive, et ce que devient le canvas actuel, sans jargon
   it("tells what reopening does, naming the archive by its title", () => {
     expect(fr.reopenSentence("Printemps")).toBe(
-      "« Printemps » remplace ton canvas actuel, qui part dans les archives.",
+      "« Printemps » remplace ta fresque actuelle, qui part dans les archives.",
     );
     expect(en.reopenSentence("Spring")).toBe(
       "“Spring” replaces your current canvas, which moves to the archives.",
@@ -359,7 +359,7 @@ describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () =
 describe("ownerToast (Écart §15, JOURNAL 2026-10-06)", () => {
   // Le streamer qui archive sait où sont ses viewers ; rouvrir et supprimer gardent leurs mots
   it("tells the streamer who archived where the viewers are, and keeps the words of reopening and discarding", () => {
-    expect(fr.ownerToast.archive).toBe("Canvas archivé : tes viewers sont sur le nouveau.");
+    expect(fr.ownerToast.archive).toBe("Fresque archivée : tes viewers sont sur la nouvelle.");
     expect(fr.ownerToast.reopen).toBe("Archive rouverte");
     expect(fr.ownerToast.discard).toBe("Archive supprimée");
     expect(en.ownerToast.archive).toBe("Canvas archived: your viewers are on the new one.");
@@ -376,8 +376,8 @@ describe("archiveHref (Écart §15, JOURNAL 2026-10-06)", () => {
 describe("the button of a missing archive (Écart §15, JOURNAL 2026-10-06)", () => {
   // Le nom affiché, pas le pseudo ; sans nom affiché (le pseudo n'existe pas), le pseudo
   it("says the display name, not the login, and the login when the login does not exist at all", () => {
-    expect(DESIGN_TEXTS.fr.viewCanvasOf("Kalyss")).toBe("Voir le canvas de Kalyss");
-    expect(DESIGN_TEXTS.fr.viewCanvasOf("nobody")).toBe("Voir le canvas de nobody");
+    expect(DESIGN_TEXTS.fr.viewCanvasOf("Kalyss")).toBe("Voir la fresque de Kalyss");
+    expect(DESIGN_TEXTS.fr.viewCanvasOf("nobody")).toBe("Voir la fresque de nobody");
     expect(DESIGN_TEXTS.en.viewCanvasOf("Kalyss")).toBe("View Kalyss's canvas");
   });
 });

@@ -5,11 +5,11 @@ import { defineTexts, localized } from "../locale/texts";
 
 export const LINK_PREVIEW_TEXTS = defineTexts({
   title: localized({
-    fr: (displayName: string) => `Viens dessiner sur le canvas de ${displayName}`,
+    fr: (displayName: string) => `Viens dessiner sur la fresque de ${displayName}`,
     en: (displayName) => `Come draw on ${displayName}'s canvas`,
   }),
   description: {
-    fr: "Un canvas collaboratif, en direct sur Twitch.",
+    fr: "Une fresque collaborative, en direct sur Twitch.",
     en: "A collaborative canvas, live on Twitch.",
   },
 });

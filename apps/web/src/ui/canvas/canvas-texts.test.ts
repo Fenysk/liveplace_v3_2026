@@ -8,9 +8,9 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
   // Le nom accessible de la scène dit le propriétaire, et la taille quand elle est connue
   it("names the canvas surface with its owner, and its size once it is known", () => {
     expect(fr.surfaceLabel({ ownerName: "Kalyss", size: { width: 32, height: 32 } })).toBe(
-      "Canvas de Kalyss, 32 × 32",
+      "Fresque de Kalyss, 32 × 32",
     );
-    expect(fr.surfaceLabel({ ownerName: "Kalyss" })).toBe("Canvas de Kalyss");
+    expect(fr.surfaceLabel({ ownerName: "Kalyss" })).toBe("Fresque de Kalyss");
     expect(en.surfaceLabel({ ownerName: "Kalyss", size: { width: 32, height: 32 } })).toBe(
       "Kalyss's canvas, 32 × 32",
     );
@@ -34,7 +34,7 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
 
   // Le streamer change de canvas : avec un brouillon, la phrase le dit
   it("says the streamer switched canvas, and that a draft stays on the old one", () => {
-    expect(fr.switched({ ownerName: "Kalyss", hasDraft: false })).toBe("Kalyss a changé de canvas.");
+    expect(fr.switched({ ownerName: "Kalyss", hasDraft: false })).toBe("Kalyss a changé de fresque.");
     expect(en.switched({ ownerName: "Kalyss", hasDraft: true })).toBe(
       "Kalyss switched canvas: your draft stays on the old one.",
     );
@@ -45,7 +45,7 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(fr.cellsLabel({ width: 64, height: 36 })).toBe("64 × 36 cases");
     expect(en.cellsLabel({ width: 64, height: 36 })).toBe("64 × 36 cells");
     expect(fr.outsideSentence(1)).toBe(
-      "1 pixel sort du cadre : gardés, invisibles, ils reviennent quand le canvas s'agrandit.",
+      "1 pixel sort du cadre : gardés, invisibles, ils reviennent quand la fresque s'agrandit.",
     );
     expect(fr.outsideSentence(2)).toContain("2 pixels sortent du cadre");
     expect(en.outsideSentence(1)).toBe(

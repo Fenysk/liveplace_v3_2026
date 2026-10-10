@@ -37,8 +37,8 @@ const RESOURCE_NAMES: Record<CapacityResourceId, { name: string; inline: string 
   gatewayDelay: { name: "Retard de diffusion", inline: "retard de diffusion" },
   gatewayOutbound: { name: "Débit sortant", inline: "débit sortant" },
   gatewayCanvasConnections: {
-    name: "Connexions au plus gros canvas",
-    inline: "connexions au plus gros canvas",
+    name: "Connexions à la plus grosse fresque",
+    inline: "connexions à la plus grosse fresque",
   },
   gatewayConnections: { name: "Connexions en tout", inline: "connexions en tout" },
   webUtilization: { name: "Occupation", inline: "occupation" },

@@ -10,21 +10,21 @@ type SizeInCells = { width: number; height: number };
 export const CANVAS_TEXTS = defineTexts({
   // Le canvas introuvable, et la page du canvas pour un lecteur d'écran.
   notFound: {
-    fr: "Ce pseudo n'a pas encore de canvas sur LivePlace.",
+    fr: "Ce pseudo n'a pas encore de fresque sur LivePlace.",
     en: "This username doesn't have a canvas on LivePlace yet.",
   },
   // Redis remet le canvas en place (`canvas_recovering`) : la page le dit à la place du canvas.
   recovering: {
-    fr: "On remet chaque pixel à sa place. Le canvas revient dans un instant !",
+    fr: "On remet chaque pixel à sa place. La fresque revient dans un instant !",
     en: "We're putting every pixel back in place. The canvas will be back in a moment!",
   },
   pageTitle: localized({
-    fr: (ownerName: string) => `Canvas de ${ownerName}`,
+    fr: (ownerName: string) => `Fresque de ${ownerName}`,
     en: (ownerName) => `${ownerName}'s canvas`,
   }),
   surfaceLabel: localized({
     fr: ({ ownerName, size }: { ownerName: string; size?: SizeInCells | undefined }) =>
-      size ? `Canvas de ${ownerName}, ${size.width} × ${size.height}` : `Canvas de ${ownerName}`,
+      size ? `Fresque de ${ownerName}, ${size.width} × ${size.height}` : `Fresque de ${ownerName}`,
     en: ({ ownerName, size }) =>
       size ? `${ownerName}'s canvas, ${size.width} × ${size.height}` : `${ownerName}'s canvas`,
   }),
@@ -60,8 +60,8 @@ export const CANVAS_TEXTS = defineTexts({
   switched: localized({
     fr: ({ ownerName, hasDraft }: { ownerName: string; hasDraft: boolean }) =>
       hasDraft
-        ? `${ownerName} a changé de canvas : ton brouillon reste sur l'ancien.`
-        : `${ownerName} a changé de canvas.`,
+        ? `${ownerName} a changé de fresque : ton brouillon reste sur l'ancienne.`
+        : `${ownerName} a changé de fresque.`,
     en: ({ ownerName, hasDraft }) =>
       hasDraft
         ? `${ownerName} switched canvas: your draft stays on the old one.`
@@ -87,7 +87,7 @@ export const CANVAS_TEXTS = defineTexts({
     fr: ({ width, height }: SizeInCells) => `Taille changée : ${width} × ${height} cases`,
     en: ({ width, height }) => `Size changed: ${width} × ${height} cells`,
   }),
-  canvasSize: { fr: "Taille du canvas", en: "Canvas size" },
+  canvasSize: { fr: "Taille de la fresque", en: "Canvas size" },
   currentSize: localized({
     fr: (size: string) => `Actuellement ${size}.`,
     en: (size) => `Currently ${size}.`,
@@ -117,7 +117,7 @@ export const CANVAS_TEXTS = defineTexts({
   }),
   chosenSize: localized({
     fr: ({ format, size }: { format: string; size: string }) =>
-      `${format}, ${size}. Rien ne se perd : ce qui sort du cadre revient quand le canvas s'agrandit.`,
+      `${format}, ${size}. Rien ne se perd : ce qui sort du cadre revient quand la fresque s'agrandit.`,
     en: ({ format, size }) =>
       `${format}, ${size}. Nothing is lost: whatever falls outside the frame comes back when the canvas grows.`,
   }),
@@ -129,7 +129,7 @@ export const CANVAS_TEXTS = defineTexts({
   outsideLabel: { fr: "Les pixels qui sortent du cadre", en: "The pixels outside the frame" },
   outsideSentence: localized({
     fr: (count: number) =>
-      `${MODERATION_TEXTS.fr.pixelCount(count)} ${isSingular(count, "fr") ? "sort" : "sortent"} du cadre : gardés, invisibles, ils reviennent quand le canvas s'agrandit.`,
+      `${MODERATION_TEXTS.fr.pixelCount(count)} ${isSingular(count, "fr") ? "sort" : "sortent"} du cadre : gardés, invisibles, ils reviennent quand la fresque s'agrandit.`,
     en: (count) =>
       `${MODERATION_TEXTS.en.pixelCount(count)} ${isSingular(count, "en") ? "falls" : "fall"} outside the frame: kept, invisible, ${isSingular(count, "en") ? "it comes" : "they come"} back when the canvas grows.`,
   }),
@@ -141,7 +141,7 @@ export const CANVAS_TEXTS = defineTexts({
   // Les jauges des joueurs (JOURNAL 2026-09-30), montrées dans `/design` pour l'instant.
   playerGauge: { fr: "Jauge des joueurs", en: "Player gauge" },
   playerGaugeNote: {
-    fr: "Chaque joueur part de la jauge de départ et la fait grandir en posant sur ton canvas : un premier +1 à réclamer au 12e pixel, puis de plus en plus espacés, jusqu'à la jauge maximale.",
+    fr: "Chaque joueur part de la jauge de départ et la fait grandir en posant sur ta fresque : un premier +1 à réclamer au 12e pixel, puis de plus en plus espacés, jusqu'à la jauge maximale.",
     en: "Every player starts from the starting gauge and grows it by placing on your canvas: a first +1 to claim at the 12th pixel, then further and further apart, up to the maximum gauge.",
   },
   startingGauge: { fr: "Jauge de départ", en: "Starting gauge" },

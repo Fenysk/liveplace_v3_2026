@@ -124,7 +124,7 @@ export const MODERATION_TEXTS = defineTexts({
     en: ({ name, isModerator }) => `${name} ${isModerator ? "is now" : "is no longer"} a moderator`,
   }),
   bannedToast: localized({
-    fr: (name: string) => `${name} est banni·e de ce canvas`,
+    fr: (name: string) => `${name} est banni·e de cette fresque`,
     en: (name) => `${name} is banned from this canvas`,
   }),
   reportSent: { fr: "Signalement envoyé", en: "Report sent" },
@@ -156,7 +156,7 @@ export const MODERATION_TEXTS = defineTexts({
       isSingle ? `Clear this placement by ${name}?` : `Clear these placements by ${name}?`,
   }),
   banConsequence: {
-    fr: "Ce compte ne pourra plus poser sur ce canvas, et ses pixels seront retirés.",
+    fr: "Ce compte ne pourra plus poser sur cette fresque, et ses pixels seront retirés.",
     en: "This account will no longer be able to place on this canvas, and its pixels will be cleared.",
   },
   clearConsequence: { fr: "Ceux du dessous reviendront.", en: "The ones underneath will come back." },
@@ -174,12 +174,12 @@ export const MODERATION_TEXTS = defineTexts({
   spanReportedPlacements: { fr: "Les poses signalées", en: "The reported placements" },
 
   // La fenêtre du banni.
-  bannedTitle: { fr: "Tu es banni·e de ce canvas", en: "You're banned from this canvas" },
+  bannedTitle: { fr: "Tu es banni·e de cette fresque", en: "You're banned from this canvas" },
   understood: { fr: "Je comprends", en: "Got it" },
   bannedProof: {
     fr: "Les pixels qui t'ont valu ce bannissement ont été retirés :",
     en: "The pixels that got you banned were cleared:",
   },
   yourClearedPixels: { fr: "Tes pixels retirés", en: "Your cleared pixels" },
-  watchOnly: { fr: "Tu peux seulement regarder le canvas.", en: "You can only watch the canvas." },
+  watchOnly: { fr: "Tu peux seulement regarder la fresque.", en: "You can only watch the canvas." },
 });

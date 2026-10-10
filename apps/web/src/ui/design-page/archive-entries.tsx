@@ -89,7 +89,7 @@ export const ArchiveBannerEntry = () => {
       slug="bandeau-d-archive"
       components={["ArchiveBanner"]}
       file="ui/archive/archive-banner.tsx"
-      note="À la place de la pill Canvas : à qui est l'archive (son avatar et son nom mènent à son canvas en cours), son titre et sa légende, le lien à copier, le PNG."
+      note="À la place de la pill Fresque : à qui est l'archive (son avatar et son nom mènent à sa fresque en cours), son titre et sa légende, le lien à copier, le PNG."
       where="En haut à gauche"
     >
       <Block title="États">
@@ -125,7 +125,7 @@ type ListScene = { name: string; detail?: string; list: ArchivesList };
 const LISTS = (nowMs: number): readonly ListScene[] => [
   {
     name: "Sans archive",
-    detail: "« Archives · 0 sur 5 », la ligne du canvas en cours, et une phrase.",
+    detail: "« Archives · 0 sur 5 », la ligne de la fresque en cours, et une phrase.",
     list: { status: "ready", canvases: withArchives(nowMs, 0) },
   },
   {
@@ -139,7 +139,7 @@ const LISTS = (nowMs: number): readonly ListScene[] => [
     list: { status: "ready", canvases: withArchives(nowMs, MAX_ARCHIVES) },
   },
   {
-    name: "Le canvas en cours avec un thème, rouvert d'une archive",
+    name: "La fresque en cours avec un thème, rouverte d'une archive",
     detail: "Le thème en titre, « depuis le … » en légende.",
     list: {
       status: "ready",
@@ -161,7 +161,7 @@ const LISTS = (nowMs: number): readonly ListScene[] => [
     },
   },
   {
-    name: "Redis n'a plus l'image d'un canvas",
+    name: "Redis n'a plus l'image d'une fresque",
     detail: "Le damier à la place de la miniature.",
     list: {
       status: "ready",
@@ -194,7 +194,7 @@ export const ArchivesEntry = () => {
       slug="archives"
       components={["ArchivesSection"]}
       file="ui/archive/canvas-cards.tsx"
-      note="Pour le streamer seul, à côté de Canvas : la ligne du canvas en cours, puis celles de ses archives, sans cadre, un filet fin entre deux. Sur mobile, un onglet de la rangée, et les actions passent sous le titre, à droite."
+      note="Pour le streamer seul, à côté de Fresque : la ligne de la fresque en cours, puis celles de ses archives, sans cadre, un filet fin entre deux. Sur mobile, un onglet de la rangée, et les actions passent sous le titre, à droite."
     >
       <Block title="États">
         {LISTS(nowMs).map(({ name, detail, list }) => (
@@ -313,7 +313,7 @@ export const SwitchWindowEntry = () => {
           pendingReports={0}
         />
         <SwitchRow
-          name="Archiver le canvas en cours avec un thème"
+          name="Archiver la fresque en cours avec un thème"
           detail="Le champ propose son thème."
           request={{ kind: "archive", canvas: sampleActive(nowMs, { theme: "Printemps" }) }}
           progress={null}

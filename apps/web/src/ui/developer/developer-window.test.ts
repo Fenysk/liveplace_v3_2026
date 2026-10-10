@@ -31,21 +31,21 @@ const toNavButtons = (markup: string) =>
     }))
     .filter(
       ({ text }) =>
-        text.includes("Ce canvas") || text.includes("Tout LivePlace") || text.includes("Capacité"),
+        text.includes("Cette fresque") || text.includes("Tout LivePlace") || text.includes("Capacité"),
     );
 
 describe("the developer window (JOURNAL 2026-10-07)", () => {
   // Offre trois sections, Ce canvas, Tout LivePlace puis Capacité, dans la grande fenêtre
-  it("offers three sections, Ce canvas, Tout LivePlace then Capacité, in the large window", () => {
+  it("offers three sections, Cette fresque, Tout LivePlace then Capacité, in the large window", () => {
     const markup = render("here");
 
     expect(DEVELOPER_SECTIONS.map(({ id, label }) => `${id}:${label}`)).toEqual([
-      "here:Ce canvas",
+      "here:Cette fresque",
       "all:Tout LivePlace",
       "capacity:Capacité",
     ]);
     expect(markup).toContain("lp-window--large");
-    expect(markup.indexOf("Ce canvas")).toBeLessThan(markup.indexOf("Tout LivePlace"));
+    expect(markup.indexOf("Cette fresque")).toBeLessThan(markup.indexOf("Tout LivePlace"));
     expect(markup.indexOf("Tout LivePlace")).toBeLessThan(markup.indexOf("Capacité"));
     expect(markup).toContain("contenu");
   });
@@ -53,7 +53,7 @@ describe("the developer window (JOURNAL 2026-10-07)", () => {
   // Marque comme courante la section choisie, et la nomme dans l'en-tête
   it("marks the chosen section as current, and names it in the header", () => {
     for (const [sectionId, label] of [
-      ["here", "Ce canvas"],
+      ["here", "Cette fresque"],
       ["all", "Tout LivePlace"],
       ["capacity", "Capacité"],
     ] as const) {

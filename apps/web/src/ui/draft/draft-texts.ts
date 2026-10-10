@@ -47,7 +47,7 @@ export const DRAFT_TEXTS = defineTexts({
   connectingToTwitch: { fr: "Connexion à Twitch", en: "Connecting to Twitch" },
   connectionLost: { fr: "Connexion perdue", en: "Connection lost" },
   reload: { fr: "Recharger", en: "Reload" },
-  banned: { fr: "Tu es banni·e de ce canvas", en: "You're banned from this canvas" },
+  banned: { fr: "Tu es banni·e de cette fresque", en: "You're banned from this canvas" },
   signInToDraw: { fr: "Se connecter pour dessiner", en: "Sign in to draw" },
 
   // Un refus du gateway : il envoie un code (`ErrorCodeSchema`), jamais une phrase.
@@ -66,11 +66,11 @@ export const DRAFT_TEXTS = defineTexts({
         case "invalid_frame":
           return "Cette demande n'a pas été comprise : recharge la page.";
         case "canvas_not_found":
-          return "Ce canvas n'existe pas.";
+          return "Cette fresque n'existe pas.";
         case "canvas_recovering":
           return "On remet chaque pixel à sa place : réessaie dans un instant.";
         case "canvas_archived":
-          return "Ce canvas est archivé : on n'y pose plus.";
+          return "Cette fresque est archivée : on n'y pose plus.";
         case "server_full":
           return "Le serveur est plein : réessaie dans un instant.";
       }

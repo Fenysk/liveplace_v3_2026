@@ -26,7 +26,7 @@ export const DESIGN_TEXTS = defineTexts({
   themeDraw: { fr: "Dessine sur le thème", en: "Draw the theme" },
 
   viewCanvasOf: localized({
-    fr: (name: string) => `Voir le canvas de ${name}`,
+    fr: (name: string) => `Voir la fresque de ${name}`,
     en: (name) => `View ${name}'s canvas`,
   }),
   twitchChannelOf: localized({

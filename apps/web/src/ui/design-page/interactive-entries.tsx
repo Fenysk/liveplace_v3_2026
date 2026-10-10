@@ -106,7 +106,7 @@ export const PaletteEntry = () => {
       <Block title="États">
         <StateRow
           name="À la souris"
-          detail="La gomme en tête. Au clavier : Tab arrive sur la couleur actuelle, les flèches la changent, Début et Fin vont aux bouts, Échap rend la main au canvas."
+          detail="La gomme en tête. Au clavier : Tab arrive sur la couleur actuelle, les flèches la changent, Début et Fin vont aux bouts, Échap rend la main à la fresque."
           isDemo
         >
           <Pill>
@@ -354,7 +354,7 @@ export const ToastEntry = () => (
     </Block>
     <Block
       title="Dans le jeu"
-      note="Le streamer qui agit sait où sont ses viewers. Ses viewers lisent qu'il a changé de canvas, pour un archivage comme pour une réouverture, et où reste leur brouillon s'ils en avaient un."
+      note="Le streamer qui agit sait où sont ses viewers. Ses viewers lisent qu'il a changé de fresque, pour un archivage comme pour une réouverture, et où reste leur brouillon s'ils en avaient un."
     >
       {GAME_TOASTS.map(({ name, text }) => (
         <StateRow key={name} name={name}>

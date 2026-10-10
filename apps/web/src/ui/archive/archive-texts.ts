@@ -108,10 +108,10 @@ export const ARCHIVE_TEXTS = defineTexts({
   }),
 
   // Le libellé du canvas en cours, et son bouton : l'icône d'archive dit le reste.
-  currentCanvasLabel: { fr: "Canvas en cours", en: "Current canvas" },
+  currentCanvasLabel: { fr: "Fresque en cours", en: "Current canvas" },
   archiveAction: { fr: "Archiver", en: "Archive" },
-  noCurrentCanvas: { fr: "Aucun canvas en cours.", en: "No current canvas." },
-  currentThumbnail: { fr: "Miniature du canvas en cours", en: "Thumbnail of the current canvas" },
+  noCurrentCanvas: { fr: "Aucune fresque en cours.", en: "No current canvas." },
+  currentThumbnail: { fr: "Miniature de la fresque en cours", en: "Thumbnail of the current canvas" },
   archiveThumbnail: localized({
     fr: (title: string) => `Miniature de l'archive ${title}`,
     en: (title) => `Thumbnail of the ${title} archive`,
@@ -144,11 +144,11 @@ export const ARCHIVE_TEXTS = defineTexts({
 
   // Sans archive, une seule phrase : ce qu'il n'y a pas, et ce que fait archiver.
   noArchive: {
-    fr: "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur un canvas vide.",
+    fr: "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur une fresque vide.",
     en: "No archive yet. Archiving freezes your drawing, with its link, and starts over on an empty canvas.",
   },
   canvasesUnavailable: {
-    fr: "Impossible de lire tes canvas pour l'instant. Réessaie dans un instant.",
+    fr: "Impossible de lire tes fresques pour l'instant. Réessaie dans un instant.",
     en: "Can't read your canvases right now. Try again in a moment.",
   },
 
@@ -159,7 +159,7 @@ export const ARCHIVE_TEXTS = defineTexts({
   // quand le champ perd le focus, sans bouton.
   themeLabel: { fr: "Thème", en: "Theme" },
   themeCaption: {
-    fr: "Affiché en haut du canvas, pour tout le monde.",
+    fr: "Affiché en haut de la fresque, pour tout le monde.",
     en: "Shown at the top of the canvas, for everyone.",
   },
   themeSaved: { fr: "Thème enregistré", en: "Theme saved" },
@@ -168,7 +168,7 @@ export const ARCHIVE_TEXTS = defineTexts({
     fr: (failure: ThemeFailure) => {
       switch (failure) {
         case "not_active":
-          return "Le canvas en cours a changé : son thème est rechargé.";
+          return "La fresque en cours a changé : son thème est rechargé.";
         case "failed":
         case "network":
           return "Le thème n'a pas pu être enregistré. Réessaie dans un instant.";
@@ -190,15 +190,15 @@ export const ARCHIVE_TEXTS = defineTexts({
   }),
 
   // Ce que dit la fenêtre : archiver tient en une phrase sans dimension ; rouvrir et supprimer nomment l'archive.
-  archiveTitle: { fr: "Archiver ce canvas ?", en: "Archive this canvas?" },
+  archiveTitle: { fr: "Archiver cette fresque ?", en: "Archive this canvas?" },
   reopenTitle: { fr: "Rouvrir cette archive ?", en: "Reopen this archive?" },
   discardTitle: { fr: "Supprimer cette archive ?", en: "Delete this archive?" },
   archiveSentence: {
-    fr: "Ton dessin est figé et garde son lien. Tes viewers passent sur un canvas vide.",
+    fr: "Ton dessin est figé et garde son lien. Tes viewers passent sur une fresque vide.",
     en: "Your drawing is frozen and keeps its link. Your viewers move to an empty canvas.",
   },
   reopenSentence: localized({
-    fr: (title: string) => `« ${title} » remplace ton canvas actuel, qui part dans les archives.`,
+    fr: (title: string) => `« ${title} » remplace ta fresque actuelle, qui part dans les archives.`,
     en: (title) => `“${title}” replaces your current canvas, which moves to the archives.`,
   }),
   discardSentence: localized({
@@ -284,7 +284,7 @@ export const ARCHIVE_TEXTS = defineTexts({
 
   ownerToast: localized<Record<OwnerAction, string>>({
     fr: {
-      archive: "Canvas archivé : tes viewers sont sur le nouveau.",
+      archive: "Fresque archivée : tes viewers sont sur la nouvelle.",
       reopen: "Archive rouverte",
       discard: "Archive supprimée",
     },
@@ -301,7 +301,7 @@ export const ARCHIVE_TEXTS = defineTexts({
     en: (displayName) => `${displayName}'s archive`,
   }),
   pageTitle: localized({
-    fr: (displayName: string) => `Archive du canvas de ${displayName}`,
+    fr: (displayName: string) => `Archive de la fresque de ${displayName}`,
     en: (displayName) => `${displayName}'s canvas archive`,
   }),
   downloadAsPng: { fr: "Télécharger en PNG", en: "Download as PNG" },
@@ -316,7 +316,7 @@ export const ARCHIVE_TEXTS = defineTexts({
   },
   pngBackgroundLabel: { fr: "Fond de l'image", en: "Image background" },
 
-  // Une archive introuvable (son bouton est « Voir le canvas de … », celui des profils).
+  // Une archive introuvable (son bouton est « Voir la fresque de … », celui des profils).
   archiveNotFound: {
     fr: "Cette archive n'existe pas, ou elle a été supprimée.",
     en: "This archive doesn't exist, or it was deleted.",
