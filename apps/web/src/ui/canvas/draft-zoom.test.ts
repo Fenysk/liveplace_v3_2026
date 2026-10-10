@@ -358,6 +358,7 @@ const LAPTOP_PLACE: Place = {
 const BIG_CANVAS = { width: 256, height: 256 };
 
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
+type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
 type Options = { canvas?: Size; draft?: readonly Cell[]; isReducedMotion?: boolean };
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
@@ -421,6 +422,11 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
     if (!frame) throw new Error("aucune frame place envoyée");
     return frame;
   };
+  const lastInspect = (): InspectFrame => {
+    const frame = sent.filter((sentFrame): sentFrame is InspectFrame => sentFrame.t === "inspect").at(-1);
+    if (!frame) throw new Error("aucune frame inspect envoyée");
+    return frame;
+  };
   const receive = (frame: ServerFrame) => listening.listeners?.onFrame(frame);
   return {
     store,
@@ -428,6 +434,7 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
     scene,
     hooks,
     lastPlace,
+    lastInspect,
     receive,
     // Le serveur répond au dernier lot posé : il en accepte les cases, sauf celles dont on donne la place dans le lot.
     answer: (rejectedIndexes: readonly number[] = []) => {
@@ -1124,6 +1131,140 @@ describe("la case qui entre au brouillon", () => {
 
     expect(fadesOf()).toEqual([]);
     expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("le viseur de l'inspection qui glisse", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const reticleOf = () => lastFrame().inspectedCell;
+  // Le chemin du viseur, image après image, depuis l'instant où on le lit : jusqu'à ce qu'il n'y ait plus d'image.
+  const reticlePath = (world: ReturnType<typeof openScene>, from: number) => {
+    flush(SETTLE_MS);
+    expect(world.pendingFrames()).toBe(0);
+    return probe.frames
+      .slice(from)
+      .map((frame) => frame.inspectedCell)
+      .filter((cell) => cell !== null);
+  };
+
+  // Première apparition : le viseur paraît sur place, sans glisser, et plus rien n'est attendu
+  it("appears in place on the first inspected cell, without gliding", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.store.inspect(5, 5);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual({ x: 5, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une autre case : le viseur part de l'ancienne, glisse sur `--lp-dur`, et arrive exactement sur la nouvelle
+  it("glides from the old cell to the new one over --lp-dur, and ends exactly on it", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    const from = probe.frames.length;
+
+    world.store.inspect(15, 9);
+    flush(FRAME_MS);
+    expect(reticleOf()).toEqual({ x: 5, y: 5 });
+    const path = reticlePath(world, from);
+
+    const xs = path.map(({ x }) => x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(xs.some((x) => x > 5 && x < 15)).toBe(true);
+    expect(path.length).toBeGreaterThanOrEqual(20);
+    expect(path.length).toBeLessThanOrEqual(24);
+    expect(path.at(-1)).toEqual({ x: 15, y: 9 });
+    expect(path.every(({ x, y }) => Math.abs((y - 5) * 10 - (x - 5) * 4) < 1e-9)).toBe(true);
+  });
+
+  // Choisir une nouvelle case pendant le glissement : le viseur repart de sa place du moment, sans saut
+  it("starts again from where it is when another cell is chosen mid-glide", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    world.store.inspect(25, 5);
+    flush(FRAME_MS * 5);
+    const midway = reticleOf();
+    expect(midway?.x).toBeGreaterThan(5);
+    expect(midway?.x).toBeLessThan(25);
+
+    world.store.inspect(5, 25);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual(midway);
+    flush(SETTLE_MS);
+    expect(reticleOf()).toEqual({ x: 5, y: 25 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // La réponse du gateway pour la même case ne relance pas le glissement
+  it("does not glide again when the answer for the same cell comes in", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    world.store.inspect(15, 5);
+    flush(SETTLE_MS);
+
+    world.receive({ t: "inspected", requestId: world.lastInspect().requestId, x: 15, y: 5 });
+    flush(FRAME_MS);
+
+    expect(world.store.getView().inspection?.status).toBe("empty");
+    expect(reticleOf()).toEqual({ x: 15, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Fermer l'inspection fait disparaître le viseur d'un coup, et le suivant paraît de nouveau sur place
+  it("goes away at once when the inspection closes, and shows in place again after", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.store.closeInspection();
+    flush(FRAME_MS);
+    expect(reticleOf()).toBeNull();
+
+    world.store.inspect(20, 20);
+    flush(FRAME_MS);
+    expect(reticleOf()).toEqual({ x: 20, y: 20 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, le viseur saute à la nouvelle case
+  it("jumps to the new cell when motion is reduced", () => {
+    const world = openScene(LAPTOP_PLACE, { isReducedMotion: true });
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.store.inspect(15, 5);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual({ x: 15, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Le chemin se dit en cases de la fresque : un déplacement ou un zoom pendant le glissement ne le dévie pas
+  it("keeps its path in canvas cells through a pan and a zoom", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    const from = probe.frames.length;
+    world.store.inspect(15, 5);
+    flush(FRAME_MS * 3);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    const path = reticlePath(world, from);
+
+    expect(path.every(({ y }) => y === 5)).toBe(true);
+    const xs = path.map(({ x }) => x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(path.at(-1)).toEqual({ x: 15, y: 5 });
   });
 });
 

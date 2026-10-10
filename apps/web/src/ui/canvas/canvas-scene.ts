@@ -123,6 +123,32 @@ type DraftFadeRun = {
   startedAt: number | null;
 };
 
+// Le viseur qui glisse depuis `from`, sur `--lp-dur` et `--lp-ease`.
+type ReticleGlide = {
+  from: Cell;
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number;
+};
+
+// Mouvement réduit : la durée vaut 0, le viseur saute à la nouvelle case.
+const startGlide = (root: Element, from: Cell, startedAt: number): ReticleGlide | null => {
+  const duration = motionMs(root, "--lp-dur");
+  return duration > 0 ? { from, duration, ease: easingCurve(motionEasing(root)), startedAt } : null;
+};
+
+// Où en est le glissement vers `to` à l'instant `now` : sa place entre les deux cases, nul une fois arrivé.
+const glidePosition = (
+  { from, duration, ease, startedAt }: ReticleGlide,
+  to: Cell,
+  now: number,
+): Cell | null => {
+  const progress = (now - startedAt) / duration;
+  if (progress >= 1) return null;
+  const eased = ease(progress);
+  return { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased };
+};
+
 export function createCanvasScene(
   surface: HTMLCanvasElement,
   store: CanvasStore,
@@ -215,6 +241,32 @@ export function createCanvasScene(
     return batches;
   };
 
+  // Le viseur de l'inspection glisse de la case d'avant à la nouvelle, en cases de la fresque : un déplacement ou un zoom
+  // pendant le glissement le laisse juste. Il paraît sur place la première fois, et part d'un coup à la fermeture.
+  let reticleTarget: Cell | null = null;
+  let reticleShown: Cell | null = null; // où il s'est dessiné à la dernière image : un nouveau choix repart de là
+  let reticleGlide: ReticleGlide | null = null;
+  const advanceReticle = (now: number, inspected: Cell | null): Cell | null => {
+    if (!inspected) {
+      reticleTarget = reticleShown = reticleGlide = null;
+      return null;
+    }
+    const target = { x: inspected.x, y: inspected.y };
+    if (!reticleTarget || !reticleShown) {
+      reticleTarget = reticleShown = target;
+      return target;
+    }
+    if (!isSameCell(target, reticleTarget)) {
+      reticleGlide = startGlide(root, reticleShown, now);
+      reticleTarget = target;
+    }
+    const gliding = reticleGlide && glidePosition(reticleGlide, target, now);
+    if (gliding) requestRender();
+    else reticleGlide = null;
+    reticleShown = gliding ?? target;
+    return reticleShown;
+  };
+
   const draftFades = new Map<CellKey, DraftFadeRun>();
   // Hors Dessin, le brouillon ne se voit pas : plus de fondu. Un fondu fini s'en va ; une image de plus tant qu'il en reste.
   const advanceDraftFades = (now: number, isDrafting: boolean): Map<CellKey, DraftFade> => {
@@ -258,7 +310,7 @@ export function createCanvasScene(
       image: image.source,
       shades,
       targetCell,
-      inspectedCell: isDrafting ? null : view.inspection,
+      inspectedCell: advanceReticle(now, isDrafting ? null : view.inspection),
       draft: isDrafting ? [...draftView.draft.values()] : [],
       draftFades: advanceDraftFades(now, isDrafting),
       settling: advanceSettles(now, view),

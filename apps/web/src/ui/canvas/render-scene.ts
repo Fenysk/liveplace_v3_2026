@@ -31,7 +31,7 @@ export type Scene = {
   image: CanvasImageSource;
   shades: SceneShades;
   targetCell: Cell | null;
-  inspectedCell: Cell | null;
+  inspectedCell: Cell | null; // en cases de la fresque : à virgule pendant que le viseur glisse
   draft: readonly Pixel[];
   draftFades: ReadonlyMap<CellKey, DraftFade>; // une case du brouillon absente de la table est entière
   settling: readonly SettlingBatch[];
