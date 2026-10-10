@@ -1,9 +1,10 @@
 // Le canvas vivant (§9.3) : sa taille, son viewport, la case visée, les gestes, le brouillon, et un dessin seulement quand quelque chose a changé.
 // Créé dans un `useEffect` : la taille de l'écran, `window` et `ResizeObserver` n'existent que dans le navigateur.
 
-import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
+import { type CellKey, TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
 import type { CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
-import type { DraftStore } from "../../state/draft-store";
+import type { Draft } from "../../state/draft";
+import type { DraftMode, DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { easingCurve, motionEasing, motionMs } from "../design/motion";
 import { COARSE_POINTER_QUERY, SIDE_COLUMN_QUERY } from "../design/use-media-query";
@@ -15,6 +16,7 @@ import {
 } from "./arrival-insets";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
+import { draftFadeStarts, MAX_DRAFT_FADES } from "./draft-fade";
 import { freeArea, type PointerGrain, tapZoomTarget, zoomFrame } from "./draft-zoom";
 import {
   createGestureTracker,
@@ -25,7 +27,7 @@ import {
   wheelFactor,
 } from "./gestures";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
-import { renderScene, type SettlingBatch } from "./render-scene";
+import { type DraftFade, renderScene, type SettlingBatch } from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
@@ -108,6 +110,14 @@ const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y ===
 // `startedAt` : l'instant de la première image qui les peint, pour qu'une image tardive n'en saute pas le début.
 type Settle = {
   pixels: readonly ConfirmedPixel[];
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number | null;
+};
+
+// Une case qui entre au brouillon, ou y change de couleur (`from`), en fondu sur `--lp-dur-fast` et `--lp-ease`.
+type DraftFadeRun = {
+  from: number | null;
   duration: number;
   ease: (progress: number) => number;
   startedAt: number | null;
@@ -205,6 +215,21 @@ export function createCanvasScene(
     return batches;
   };
 
+  const draftFades = new Map<CellKey, DraftFadeRun>();
+  // Hors Dessin, le brouillon ne se voit pas : plus de fondu. Un fondu fini s'en va ; une image de plus tant qu'il en reste.
+  const advanceDraftFades = (now: number, isDrafting: boolean): Map<CellKey, DraftFade> => {
+    if (!isDrafting) draftFades.clear();
+    const fades = new Map<CellKey, DraftFade>();
+    for (const [key, run] of draftFades) {
+      run.startedAt ??= now;
+      const progress = (now - run.startedAt) / run.duration;
+      if (progress >= 1) draftFades.delete(key);
+      else fades.set(key, { from: run.from, progress: run.ease(progress) });
+    }
+    if (draftFades.size > 0) requestRender();
+    return fades;
+  };
+
   const render = (now: number) => {
     frameRequest = 0;
     const view = store.getView();
@@ -235,6 +260,7 @@ export function createCanvasScene(
       targetCell,
       inspectedCell: isDrafting ? null : view.inspection,
       draft: isDrafting ? [...draftView.draft.values()] : [],
+      draftFades: advanceDraftFades(now, isDrafting),
       settling: advanceSettles(now, view),
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
@@ -500,10 +526,26 @@ export function createCanvasScene(
     requestRender();
   });
 
+  // Une case retirée part d'un coup. Les cases neuves ou repeintes entrent en fondu, sauf au-delà du plafond : un brouillon
+  // gardé (rendu avant d'entrer en Dessin) ou le mouvement réduit les fait paraître d'un coup.
+  const startDraftFades = (previous: Draft, next: Draft, mode: DraftMode) => {
+    for (const key of draftFades.keys()) if (!next.has(key)) draftFades.delete(key);
+    const duration = motionMs(root, "--lp-dur-fast");
+    if (mode !== "draft" || duration === 0) return;
+    const ease = easingCurve(motionEasing(root));
+    for (const { key, from } of draftFadeStarts(previous, next, MAX_DRAFT_FADES - draftFades.size))
+      draftFades.set(key, { from, duration, ease, startedAt: null });
+  };
+
+  let lastDraft = draftStore.getView().draft;
   let wasTracing = false;
   // Écart §9.3 (JOURNAL 2026-10-09) : entrer en Dessin, comme en sortir, ne touche pas à la vue.
   const unsubscribeDraft = draftStore.subscribe(() => {
-    const { isTracing, mode } = draftStore.getView();
+    const { isTracing, mode, draft } = draftStore.getView();
+    if (draft !== lastDraft) {
+      startDraftFades(lastDraft, draft, mode);
+      lastDraft = draft;
+    }
     if (isTracing !== wasTracing) {
       lastTracedCell = null;
       wasTracing = isTracing; // avant traceTo : il republie, et l'abonnement rentre à nouveau

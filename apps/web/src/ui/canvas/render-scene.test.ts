@@ -1,3 +1,4 @@
+import { toCellKey } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
 import { renderScene, type Scene, type SettlingBatch } from "./render-scene";
 
@@ -57,13 +58,20 @@ const CELL = { x: 2, y: 3 };
 
 type SceneParts = {
   draft?: Scene["draft"];
+  draftFades?: Scene["draftFades"];
   settling?: readonly SettlingBatch[];
   shown?: number;
   confirmed?: number;
 };
 
 // `shown` : la couleur de l'image sous la case, pose optimiste comprise ; `confirmed` : celle que le serveur a confirmée.
-const sceneOf = ({ draft = [], settling = [], shown = 0, confirmed = shown }: SceneParts): Scene => ({
+const sceneOf = ({
+  draft = [],
+  draftFades = new Map(),
+  settling = [],
+  shown = 0,
+  confirmed = shown,
+}: SceneParts): Scene => ({
   screen: { width: 100, height: 100 },
   pixelRatio: 1,
   viewport: { scale: 10, offsetX: 0, offsetY: 0 },
@@ -73,6 +81,7 @@ const sceneOf = ({ draft = [], settling = [], shown = 0, confirmed = shown }: Sc
   targetCell: null,
   inspectedCell: null,
   draft,
+  draftFades,
   settling,
   palette: PALETTE,
   colorIndexAt: () => shown,
@@ -204,5 +213,120 @@ describe("une case qui se pose", () => {
     });
 
     expect(outline.map((stroke) => stroke.alpha)).toEqual([0.75, 0.75, 0.25, 0.25]);
+  });
+});
+
+// La case (2, 3) entre au brouillon ; `from` nul : une case neuve, sinon sa couleur d'avant.
+const fadeOf = (progress: number, from: number | null = null): Scene["draftFades"] =>
+  new Map([[toCellKey(CELL.x, CELL.y), { progress, from }]]);
+
+describe("une case qui entre au brouillon", () => {
+  // Au départ elle est invisible, à mi-chemin à moitié de ses 60 %, au bout entière
+  it("fades in from nothing to its 60 % look", () => {
+    const alphas = [0, 0.5, 1].map(
+      (progress) =>
+        paint({ draft: [{ ...CELL, colorIndex: 2 }], draftFades: fadeOf(progress) }).cell.at(-1)?.alpha,
+    );
+
+    expect(alphas).toEqual([0, 0.3, 0.6]);
+  });
+
+  // Une gomme qui entre s'efface en entier, le vide et la croix avec elle, jusqu'à son aspect gommé
+  it("fades an eraser in whole, up to its erased look", () => {
+    const { calls } = paint({ draft: [{ ...CELL, colorIndex: 0 }], draftFades: fadeOf(0.5), confirmed: 1 });
+    const eraser = calls.filter((call) => call.op === "fillRect" && isOnCell(call));
+
+    expect(eraser.map((call) => [call.style, call.alpha])).toEqual([
+      ["void", 0.5],
+      [PALETTE[1], 0.175],
+    ]);
+    expect(calls.filter((call) => call.op === "stroke" && call.style === "in")[0]?.alpha).toBe(0.5);
+  });
+
+  // Une case repeinte passe de l'ancienne couleur à la nouvelle : l'une s'efface, l'autre paraît, sans saut aux deux bouts
+  it("crosses from the old color to the new one when a cell is repainted", () => {
+    const at = (progress: number) =>
+      paint({ draft: [{ ...CELL, colorIndex: 2 }], draftFades: fadeOf(progress, 1) }).cell.map((call) => [
+        call.style,
+        Number(call.alpha.toFixed(3)),
+      ]);
+
+    expect(at(0)).toEqual([
+      [PALETTE[1], 0.6],
+      [PALETTE[2], 0],
+    ]);
+    expect(at(0.25)).toEqual([
+      [PALETTE[1], 0.45],
+      [PALETTE[2], 0.15],
+    ]);
+    expect(at(1)).toEqual([
+      [PALETTE[1], 0],
+      [PALETTE[2], 0.6],
+    ]);
+  });
+
+  // Une case du brouillon que la table ne cite pas reste entière, à côté de celle qui entre
+  it("leaves a draft cell the table does not name whole, beside the one fading in", () => {
+    const { calls } = paint({
+      draft: [
+        { ...CELL, colorIndex: 2 },
+        { x: 5, y: 5, colorIndex: 2 },
+      ],
+      draftFades: fadeOf(0.5),
+    });
+    const alphaAt = (left: number) =>
+      calls.filter((call) => call.op === "fillRect" && call.rect?.[0] === left).at(-1)?.alpha;
+
+    expect(alphaAt(CELL_RECT[0] ?? 0)).toBe(0.3);
+    expect(alphaAt(50)).toBe(0.6);
+  });
+});
+
+describe("le contour du brouillon pendant un fondu", () => {
+  const strokesAlphas = (parts: SceneParts, style: "in" | "out") =>
+    render(parts)
+      .filter((call) => call.op === "stroke" && call.style === style)
+      .map((call) => call.alpha);
+  const NEIGHBOR = { x: 3, y: 3, colorIndex: 2 };
+
+  // Une case seule qui entre : son contour paraît avec elle
+  it("fades the outline of a lone cell in with it", () => {
+    expect(strokesAlphas({ draft: [{ ...CELL, colorIndex: 2 }], draftFades: fadeOf(0.25) }, "in")).toEqual([
+      0.25,
+    ]);
+  });
+
+  // Contre une case déjà là, l'arête commune s'efface à mesure : l'ensemble du contour ne saute ni ne clignote
+  it("fades the shared edge out as the cell beside it fades in, so the outline never jumps", () => {
+    const alphas = strokesAlphas(
+      { draft: [NEIGHBOR, { ...CELL, colorIndex: 2 }], draftFades: fadeOf(0.25) },
+      "in",
+    );
+
+    expect([...alphas].sort()).toEqual([0.25, 0.75, 1]);
+  });
+
+  // À la fin du fondu, l'arête commune n'existe plus, comme pour un brouillon sans fondu
+  it("ends as the outline of a draft without a fade", () => {
+    const draft = [NEIGHBOR, { ...CELL, colorIndex: 2 }];
+
+    expect(strokesAlphas({ draft, draftFades: fadeOf(1) }, "in")).toEqual(strokesAlphas({ draft }, "in"));
+    expect(strokesAlphas({ draft, draftFades: fadeOf(1) }, "in")).toEqual([1]);
+  });
+
+  // Le noir passe sous le blanc, fondu ou pas : tout le noir d'abord, puis tout le blanc
+  it("keeps all the black strokes under all the white ones", () => {
+    const styles = render({ draft: [NEIGHBOR, { ...CELL, colorIndex: 2 }], draftFades: fadeOf(0.25) })
+      .filter(isOutline)
+      .map((call) => call.style);
+
+    expect(styles).toEqual(["out", "out", "out", "in", "in", "in"]);
+  });
+
+  // Une case repeinte y est déjà : son contour ne bouge pas
+  it("keeps the outline of a repainted cell whole", () => {
+    expect(strokesAlphas({ draft: [{ ...CELL, colorIndex: 2 }], draftFades: fadeOf(0.25, 1) }, "in")).toEqual(
+      [1],
+    );
   });
 });

@@ -4,7 +4,7 @@
 // pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents.
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
-import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
+import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
 import type { ConfirmedPixel, Pixel } from "../../state/canvas-store";
 import type { Cell, Size, Viewport } from "./viewport";
 
@@ -20,6 +20,9 @@ export type SceneShades = {
 // Les cases d'un ack : elles passent de l'aspect brouillon à l'aspect posé, `progress` de 0 à 1 (la courbe est déjà appliquée).
 export type SettlingBatch = { pixels: readonly ConfirmedPixel[]; progress: number };
 
+// Une case qui entre au brouillon (`from` nul) ou y change de couleur : `progress` de 0 à 1, la courbe déjà appliquée.
+export type DraftFade = { progress: number; from: number | null };
+
 export type Scene = {
   screen: Size; // pixels CSS
   pixelRatio: number;
@@ -30,6 +33,7 @@ export type Scene = {
   targetCell: Cell | null;
   inspectedCell: Cell | null;
   draft: readonly Pixel[];
+  draftFades: ReadonlyMap<CellKey, DraftFade>; // une case du brouillon absente de la table est entière
   settling: readonly SettlingBatch[];
   palette: readonly string[];
   colorIndexAt(x: number, y: number): number; // la couleur de l'image, pose optimiste comprise
@@ -111,20 +115,39 @@ const restoreCell = (
   context.fillRect(rect.left, rect.top, rect.width, rect.height);
 };
 
-// Une case entre le brouillon (`settled` 0) et la pose (1) : l'opacité va de DRAFT_ALPHA à 1, la gomme s'efface.
+// `settled` : de l'aspect brouillon (0) à la pose (1). `appear` : de rien (0) à l'aspect entier (1).
+type Look = { settled: number; appear: number };
+const DRAFT_LOOK: Look = { settled: 0, appear: 1 };
+
+// L'aspect d'une case : l'opacité va de DRAFT_ALPHA à 1 en se posant, la gomme s'efface ; le tout suit `appear`.
 const fillDraftLook = (
   context: CanvasRenderingContext2D,
   scene: Scene,
   rect: Rect,
-  { colorIndex }: Pixel,
+  colorIndex: number,
   previousColorIndex: number,
-  settled: number,
+  { settled, appear }: Look,
 ) => {
   if (colorIndex === TRANSPARENT_COLOR_INDEX)
-    return fillErased(context, rect, scene.palette[previousColorIndex], scene.shades, 1 - settled);
-  context.globalAlpha = DRAFT_ALPHA + (1 - DRAFT_ALPHA) * settled;
+    return fillErased(context, rect, scene.palette[previousColorIndex], scene.shades, (1 - settled) * appear);
+  context.globalAlpha = (DRAFT_ALPHA + (1 - DRAFT_ALPHA) * settled) * appear;
   context.fillStyle = scene.palette[colorIndex] ?? scene.shades.void;
   context.fillRect(rect.left, rect.top, rect.width, rect.height);
+};
+
+// Une case du brouillon : entière, ou en fondu. Repeinte, l'ancienne couleur s'efface pendant que la nouvelle paraît.
+const fillDraftCell = (
+  context: CanvasRenderingContext2D,
+  scene: Scene,
+  rect: Rect,
+  { x, y, colorIndex }: Pixel,
+  confirmed: number,
+) => {
+  const fade = scene.draftFades.get(toCellKey(x, y));
+  if (!fade) return fillDraftLook(context, scene, rect, colorIndex, confirmed, DRAFT_LOOK);
+  if (fade.from !== null)
+    fillDraftLook(context, scene, rect, fade.from, confirmed, { settled: 0, appear: 1 - fade.progress });
+  fillDraftLook(context, scene, rect, colorIndex, confirmed, { settled: 0, appear: fade.progress });
 };
 
 const fillDraft = (
@@ -140,7 +163,7 @@ const fillDraft = (
     const confirmed = scene.confirmedColorIndexAt(pixel.x, pixel.y);
     if (confirmed !== scene.colorIndexAt(pixel.x, pixel.y))
       restoreCell(context, scene, rect, pixel, confirmed);
-    fillDraftLook(context, scene, rect, pixel, confirmed, 0);
+    fillDraftCell(context, scene, rect, pixel, confirmed);
   }
   context.globalAlpha = 1;
 };
@@ -157,7 +180,10 @@ const fillSettling = (
     for (const pixel of pixels) {
       const rect = cellRect(pixel.x, pixel.y);
       restoreCell(context, scene, rect, pixel, pixel.previousColorIndex);
-      fillDraftLook(context, scene, rect, pixel, pixel.previousColorIndex, progress);
+      fillDraftLook(context, scene, rect, pixel.colorIndex, pixel.previousColorIndex, {
+        settled: progress,
+        appear: 1,
+      });
     }
   context.globalAlpha = 1;
 };
@@ -191,36 +217,69 @@ const edgeLine = (
   }
 };
 
+const NO_DRAFT_FADES: ReadonlyMap<CellKey, DraftFade> = new Map();
+const OUTLINE_ALPHA_STEPS = 16; // les traits en fondu se rangent par paliers d'opacité : peu de tracés par image
+
+// À quel point une case est là pour le contour : une case qui entre au brouillon paraît avec son fondu, une repeinte y est déjà.
+const presenceOf = ({ x, y }: Pixel, draftFades: Scene["draftFades"]): number => {
+  const fade = draftFades.get(toCellKey(x, y));
+  return fade && fade.from === null ? fade.progress : 1;
+};
+
+type OutlineEdge = { rect: Rect; side: Side };
+
+// Chaque arête qui borde une case moins présente que la sienne, rangée par opacité : l'écart des deux présences. Contre une case
+// hors du brouillon, l'arête est pleine ; contre une case qui entre, elle s'efface à mesure : le contour ne saute pas.
+const outlineEdges = (
+  { draft, draftFades }: Pick<Scene, "draft" | "draftFades">,
+  cellRect: CellRect,
+): Map<number, OutlineEdge[]> => {
+  const presences = new Map(draft.map((pixel) => [`${pixel.x}:${pixel.y}`, presenceOf(pixel, draftFades)]));
+  const edgesByAlpha = new Map<number, OutlineEdge[]>();
+  for (const { x, y } of draft) {
+    const own = presences.get(`${x}:${y}`) ?? 1;
+    for (const [side, dx, dy] of NEIGHBORS) {
+      const gap = own - (presences.get(`${x + dx}:${y + dy}`) ?? 0);
+      const alpha = Math.round(gap * OUTLINE_ALPHA_STEPS) / OUTLINE_ALPHA_STEPS;
+      if (alpha <= 0) continue;
+      const edges = edgesByAlpha.get(alpha) ?? [];
+      edges.push({ rect: cellRect(x, y), side });
+      edgesByAlpha.set(alpha, edges);
+    }
+  }
+  return edgesByAlpha;
+};
+
 // Un trait sur chaque arête qui borde une case hors du brouillon : noir dehors, puis blanc dedans (CDC 2026).
+// Les traits en fondu gardent cet ordre : tout le noir, puis tout le blanc. L'opacité du contexte les multiplie.
 const strokeDraftOutline = (
   context: CanvasRenderingContext2D,
-  { draft, shades }: Pick<Scene, "draft" | "shades">,
+  { draft, draftFades, shades }: Pick<Scene, "draft" | "draftFades" | "shades">,
   cellRect: CellRect,
   lineWidth: number,
 ) => {
-  const keys = new Set(draft.map(({ x, y }) => `${x}:${y}`));
-  const edges = draft.flatMap(({ x, y }) =>
-    NEIGHBORS.filter(([, dx, dy]) => !keys.has(`${x + dx}:${y + dy}`)).map(([side]) => ({
-      rect: cellRect(x, y),
-      side,
-    })),
-  );
+  const edgesByAlpha = outlineEdges({ draft, draftFades }, cellRect);
+  const contextAlpha = context.globalAlpha;
   for (const [color, direction] of [
     [shades.outlineOut, -1],
     [shades.outlineIn, 1],
   ] as const) {
     const offset = (direction * lineWidth) / 2;
     const reach = direction < 0 ? lineWidth : 0; // le trait du dehors déborde pour fermer les coins
-    context.beginPath();
-    for (const { rect, side } of edges) {
-      const [fromX, fromY, toX, toY] = edgeLine(rect, side, offset, reach);
-      context.moveTo(fromX, fromY);
-      context.lineTo(toX, toY);
-    }
     context.lineWidth = lineWidth;
     context.strokeStyle = color;
-    context.stroke();
+    for (const [alpha, edges] of edgesByAlpha) {
+      context.beginPath();
+      for (const { rect, side } of edges) {
+        const [fromX, fromY, toX, toY] = edgeLine(rect, side, offset, reach);
+        context.moveTo(fromX, fromY);
+        context.lineTo(toX, toY);
+      }
+      context.globalAlpha = contextAlpha * alpha;
+      context.stroke();
+    }
   }
+  context.globalAlpha = contextAlpha;
 };
 
 // Le contour des cases qui se posent s'efface à mesure : il part de l'opacité du brouillon.
@@ -232,7 +291,7 @@ const strokeSettlingOutline = (
 ) => {
   for (const { pixels, progress } of settling) {
     context.globalAlpha = 1 - progress;
-    strokeDraftOutline(context, { draft: pixels, shades }, cellRect, lineWidth);
+    strokeDraftOutline(context, { draft: pixels, draftFades: NO_DRAFT_FADES, shades }, cellRect, lineWidth);
   }
   context.globalAlpha = 1;
 };

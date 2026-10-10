@@ -206,6 +206,7 @@ class FakeMutationObserver {
 // Les jetons que la scène lit sur <html> : la durée et la courbe de tokens.css, ou 0 en mouvement réduit.
 const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
+  if (name === "--lp-dur-fast") return browser.isReducedMotion ? "0s" : "0.14s";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
 };
 
@@ -949,6 +950,179 @@ describe("la pose qui se confirme", () => {
 
     world.scene.dispose();
 
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("la case qui entre au brouillon", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const openDraft = (options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, options);
+    world.enterDraft();
+    return world;
+  };
+  const fadesOf = () => [...lastFrame().draftFades.values()];
+  const progressesOfFades = () =>
+    probe.frames.flatMap(({ draftFades }) => [...draftFades.values()].map(({ progress }) => progress));
+  // Le nombre de jauge permet de tracer plus de cases que les 10 du `welcome` d'essai.
+  const widenGauge = (world: ReturnType<typeof openScene>, charges: number) => {
+    const welcome = welcomeOf(CANVAS);
+    if (welcome.t !== "welcome") throw new Error("un welcome était attendu");
+    world.receive({ ...welcome, gauge: { charges, max: charges, nextRefillAt: NOW + 10_000, claimable: 0 } });
+  };
+
+  // Une case ajoutée paraît en fondu depuis rien, sur `--lp-dur-fast`, puis plus rien n'est attendu
+  it("fades a cell in from nothing over --lp-dur-fast, then schedules nothing", () => {
+    const world = openDraft();
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+    flush(SETTLE_MS);
+    const progresses = progressesOfFades();
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.length).toBeGreaterThanOrEqual(8);
+    expect(progresses.length).toBeLessThanOrEqual(10);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une gomme ajoutée entre en fondu comme une couleur
+  it("fades an eraser in like a color", () => {
+    const world = openDraft();
+    world.receive(placedByOther(5, 5, 9));
+    world.draftStore.selectColor(0);
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+  });
+
+  // Pendant un tracé, chaque case a son propre fondu : elles ne partent pas toutes ensemble
+  it("gives each cell of a trace its own fade", () => {
+    const world = openDraft();
+
+    world.draftStore.startTrace();
+    world.draftStore.traceCells([{ x: 5, y: 5 }]);
+    flush(FRAME_MS * 4);
+    world.draftStore.traceCells([{ x: 6, y: 5 }]);
+    flush(FRAME_MS);
+
+    const [first, second] = fadesOf();
+    expect(fadesOf()).toHaveLength(2);
+    expect(first?.progress).toBeGreaterThan(second?.progress ?? 1);
+    flush(SETTLE_MS);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une case retirée part d'un coup : annuler ou effacer le brouillon reste immédiat
+  it("removes a cell at once, without a fade, when it leaves the draft", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    world.draftStore.toggleCell(6, 5);
+    flush(FRAME_MS * 3);
+
+    world.draftStore.discardCell(5, 5);
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toHaveLength(1);
+
+    world.draftStore.discardDraft();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Annuler une case ajoutée la retire d'un coup, puis la rétablir la fait paraître en fondu
+  it("removes an undone cell at once, and fades a redone one in", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.draftStore.undo();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+
+    world.draftStore.redo();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+  });
+
+  // Un brouillon gardé paraît d'un coup, à l'entrée en Dessin comme au chargement
+  it("shows a kept draft at once", () => {
+    const world = openDraft({ draft: draftSquare(5, 5, 3) });
+
+    expect(lastFrame().draft).toHaveLength(2);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Au-delà de 200 cases en fondu à la fois, les suivantes paraissent d'un coup
+  it("fades at most 200 cells at once: the following ones appear at once", () => {
+    const world = openDraft();
+    widenGauge(world, 300);
+    const cells = Array.from({ length: 250 }, (_, index) => ({ x: index % 50, y: Math.floor(index / 50) }));
+
+    world.draftStore.startTrace();
+    world.draftStore.traceCells(cells);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(250);
+    expect(fadesOf()).toHaveLength(200);
+    flush(SETTLE_MS);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la case paraît d'un coup
+  it("shows a cell at once when motion is reduced", () => {
+    const world = openDraft({ isReducedMotion: true });
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Quitter le Dessin pendant un fondu l'arrête : le brouillon ne se voit plus, plus rien n'est attendu
+  it("stops a fade when the draft mode is left", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.draftStore.exitDraftMode();
+    flush(SETTLE_MS);
+
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement pendant un fondu ne le casse pas
+  it("goes on through a pan", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    flush(FRAME_MS);
+    expect(fadesOf()).toHaveLength(1);
+    flush(SETTLE_MS);
+
+    expect(fadesOf()).toEqual([]);
     expect(world.pendingFrames()).toBe(0);
   });
 });
