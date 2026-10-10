@@ -6,6 +6,7 @@
 import { Fragment, type ReactNode } from "react";
 import { type CapacityTone, TONE_CLASSES } from "./capacity-tone";
 import { classNames } from "./class-names";
+import { RollingNumber } from "./rolling-number";
 
 // La barre est un `<meter>` natif : sa largeur n'est jamais un `style` que la CSP de production bloquerait dans le HTML du serveur.
 export type CapacityRowState =
@@ -26,7 +27,9 @@ const RowFigures = ({ state }: { state: CapacityRowState }) => {
   if (state.kind === "measured")
     return (
       <>
-        <span className="lp-capacity-value">{state.value}</span>
+        <span className="lp-capacity-value">
+          <RollingNumber value={state.value} />
+        </span>
         <meter
           className="lp-capacity-meter"
           min={0}
@@ -35,7 +38,7 @@ const RowFigures = ({ state }: { state: CapacityRowState }) => {
           aria-hidden="true"
         />
         <span className={classNames("lp-capacity-rate lp-type-title", TONE_CLASSES[state.tone])}>
-          {state.rate}
+          <RollingNumber value={state.rate} />
         </span>
       </>
     );
@@ -45,7 +48,9 @@ const RowFigures = ({ state }: { state: CapacityRowState }) => {
         {state.lines.map(({ period, value }) => (
           <Fragment key={period}>
             <span className="lp-muted">{period}</span>
-            <span>{value}</span>
+            <span>
+              <RollingNumber value={value} />
+            </span>
           </Fragment>
         ))}
       </span>

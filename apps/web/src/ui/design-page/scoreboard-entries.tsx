@@ -91,6 +91,27 @@ const GlideScene = () => {
   );
 };
 
+// Le premier joueur pose des pixels : seuls les chiffres de son score qui diffèrent défilent.
+const TallyScene = () => {
+  const [entries, setEntries] = useState<readonly ScoreboardEntry[]>(top);
+  const place = (pixels: number) =>
+    setEntries((shown) =>
+      shown.map((entry, index) => (index === 0 ? { ...entry, pixels: entry.pixels + pixels } : entry)),
+    );
+  return (
+    <div className="lp-row">
+      <ScoreboardPill
+        rows={toScoreboardRows({ top: [...entries] }, SAMPLE_PLAYER)}
+        isCollapsed={false}
+        onToggle={noop}
+        isDocked={false}
+      />
+      <Button label="+1" onPress={() => place(1)} />
+      <Button label="+250" onPress={() => place(250)} />
+    </div>
+  );
+};
+
 export const ScoreboardPillEntry = () => (
   <Entry
     slug="pill-classement"
@@ -111,6 +132,13 @@ export const ScoreboardPillEntry = () => (
         isDemo
       >
         <GlideScene />
+      </StateRow>
+      <StateRow
+        name="Les pixels défilent"
+        detail="Quand un score change, seuls ses chiffres qui diffèrent défilent, vers le haut (hors mouvement réduit)."
+        isDemo
+      >
+        <TallyScene />
       </StateRow>
     </Block>
     <Block title="Replié">

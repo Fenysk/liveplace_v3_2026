@@ -76,6 +76,7 @@ import {
   useNowMs,
   WithValue,
 } from "./entry-layout";
+import { RollingDurationDemo, RollingPercentDemo, RollingTileDemo } from "./rolling-demo";
 
 const PREVIEWS = [
   { name: "Un petit dessin", detail: "Cadré de près, la gomme en croix.", pixels: SAMPLE_DRAWING },
@@ -568,11 +569,12 @@ export const StatTilesEntry = () => {
         "StatTiles",
         "StatTile",
         "StatTable",
+        "RollingNumber",
         "SaturationFigure",
         "CapacityLinkRows",
         "CapacityRow",
       ]}
-      file="ui/design/{stat-tile,stat-table,saturation-figure,capacity-row}.tsx"
+      file="ui/design/{stat-tile,stat-table,rolling-number,saturation-figure,capacity-row}.tsx"
       note="Un chiffre de l'instant. Quatre sur une ligne, deux sur mobile. La capacité a les siens : la saturation en grand, et les ressources en lignes."
     >
       <Block title="Tuiles">
@@ -584,6 +586,30 @@ export const StatTilesEntry = () => {
               <StatTile label="Pixels de la dernière minute" value="87" />
               <StatTile label="Nouveaux comptes aujourd'hui" value="3" />
             </StatTiles>
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Qui défilent"
+        note="Quand un nombre change pendant qu'on le regarde, seuls ses chiffres qui diffèrent défilent : vers le haut s'il monte, vers le bas s'il descend. Les séparateurs et les unités restent fixes, et la largeur aussi. Au premier affichage, rien ne bouge."
+      >
+        <StateRow name="Un chiffre de l'instant" detail="Touche −1, +1 ou +250." isDemo>
+          <InWindow>
+            <RollingTileDemo />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Un pourcentage" detail="Le symbole % ne bouge pas." isDemo>
+          <InWindow>
+            <RollingPercentDemo />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Une durée dans une phrase"
+          detail="Les mots ne bougent pas, seuls les chiffres défilent."
+          isDemo
+        >
+          <InWindow>
+            <RollingDurationDemo />
           </InWindow>
         </StateRow>
       </Block>

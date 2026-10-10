@@ -31,6 +31,7 @@
 @import "./scoreboard.css";
 @import "./stat-tile.css";
 @import "./stat-table.css";
+@import "./rolling-number.css";
 @import "./time-charts.css";
 @import "./canvas-activity-card.css";
 @import "./saturation-figure.css";

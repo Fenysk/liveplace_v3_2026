@@ -1,0 +1,33 @@
+/* Un nombre dont les chiffres défilent (rolling-number.tsx) : chacun est une fenêtre d'une ligne que l'ancien et le nouveau
+   traversent. Les chiffres tabulaires gardent la largeur : rien ne bouge autour. */
+
+.lp-rolling {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le texte lisible est celui du lecteur d'écran, et ce qu'on copie : les chiffres dessinés ne se sélectionnent pas */
+.lp-rolling-visual {
+  user-select: none;
+}
+
+/* Un nombre ne se coupe jamais à la ligne, ni entre deux chiffres ; les mots autour gardent leurs retours à la ligne */
+.lp-roll-number {
+  white-space: nowrap;
+}
+
+.lp-roll-dial {
+  position: relative;
+  display: inline-block;
+  overflow: clip;
+}
+
+.lp-roll-shown {
+  display: block;
+}
+
+/* Le chiffre qui s'en va, par-dessus celui qui arrive (posé par rolling-number.tsx) */
+.lp-roll-leaving {
+  position: absolute;
+  inset: 0;
+  display: block;
+}

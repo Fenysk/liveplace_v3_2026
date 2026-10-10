@@ -8,6 +8,8 @@ import { ChevronDown, Monitor, Smartphone } from "lucide-react";
 import { Button } from "./button";
 import { classNames } from "./class-names";
 import { Profile, type ProfileUser } from "./profile";
+import { RollingNumber } from "./rolling-number";
+import { wordingOf } from "./use-label-morph";
 
 // `mention` : son rôle et depuis quand, sous son nom.
 export type CanvasActivityAccount = {
@@ -60,7 +62,9 @@ export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: Connected
       <li key={user.userId} className="lp-canvas-activity-account">
         <span className="lp-marked">
           <Profile user={user} />
-          <span className="lp-marked-mention lp-type-caption lp-muted">{mention}</span>
+          <span className="lp-marked-mention lp-type-caption lp-muted">
+            <RollingNumber value={mention} />
+          </span>
         </span>
         <span className="lp-canvas-activity-devices">
           {devices.map((device) => (
@@ -69,7 +73,11 @@ export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: Connected
         </span>
       </li>
     ))}
-    {guestsLine && <li className="lp-type-caption lp-muted">{guestsLine}</li>}
+    {guestsLine && (
+      <li className="lp-type-caption lp-muted">
+        <RollingNumber value={guestsLine} />
+      </li>
+    )}
     {accounts.length === 0 && !guestsLine && <li className="lp-type-caption lp-muted">{emptyText}</li>}
   </ul>
 );
@@ -87,8 +95,11 @@ export const CanvasActivityCard = ({
       <span className="lp-canvas-activity-summary">
         <CanvasActivityOwner owner={owner} />
         <span className="lp-canvas-activity-facts lp-type-caption lp-muted">
+          {/* Les mêmes mots gardent la même clé : le chiffre qui change défile au lieu de se recréer. */}
           {facts.map((fact) => (
-            <span key={fact}>{fact}</span>
+            <span key={wordingOf(fact)}>
+              <RollingNumber value={fact} />
+            </span>
           ))}
         </span>
       </span>
