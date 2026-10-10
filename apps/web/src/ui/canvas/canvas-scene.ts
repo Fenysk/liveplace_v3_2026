@@ -2,7 +2,7 @@
 // Créé dans un `useEffect` : la taille de l'écran, `window` et `ResizeObserver` n'existent que dans le navigateur.
 
 import { TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
-import type { CanvasStore } from "../../state/canvas-store";
+import type { CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { easingCurve, motionEasing, motionMs } from "../design/motion";
@@ -25,7 +25,7 @@ import {
   wheelFactor,
 } from "./gestures";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
-import { renderScene } from "./render-scene";
+import { renderScene, type SettlingBatch } from "./render-scene";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
@@ -104,6 +104,15 @@ const toPointerInput = (event: PointerEvent): PointerInput => ({
 
 const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y === b?.y;
 
+// Les cases d'un ack se posent en douceur, de l'aspect brouillon à l'aspect posé, sur `--lp-dur` et `--lp-ease` lus à l'ack.
+// `startedAt` : l'instant de la première image qui les peint, pour qu'une image tardive n'en saute pas le début.
+type Settle = {
+  pixels: readonly ConfirmedPixel[];
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number | null;
+};
+
 export function createCanvasScene(
   surface: HTMLCanvasElement,
   store: CanvasStore,
@@ -173,7 +182,30 @@ export function createCanvasScene(
     options.checker.style.setProperty("--lp-checker-clip", `inset(${inset.join(" ")})`);
   };
 
-  const render = () => {
+  let settles: Settle[] = [];
+  // Une pose qui arrive au bout s'en va : l'image porte déjà son but. Une case que le canvas a quittée (un autre joueur la
+  // reprend, une nouvelle taille) ne se pose plus.
+  const advanceSettles = (now: number, view: CanvasView): SettlingBatch[] => {
+    const running: Settle[] = [];
+    const batches: SettlingBatch[] = [];
+    for (const settle of settles) {
+      settle.startedAt ??= now;
+      const progress = (now - settle.startedAt) / settle.duration;
+      if (progress >= 1) continue;
+      running.push(settle);
+      const pixels = settle.pixels.filter(
+        ({ x, y, colorIndex }) =>
+          x < view.width && y < view.height && view.pixels[toStateOffset(x, y, view.width)] === colorIndex,
+      );
+      batches.push({ pixels, progress: settle.ease(progress) });
+    }
+    settles = running;
+    // Une image de plus tant qu'une pose se fait ; ensuite, plus rien n'est attendu.
+    if (running.length > 0) requestRender();
+    return batches;
+  };
+
+  const render = (now: number) => {
     frameRequest = 0;
     const view = store.getView();
     if (view.width === 0 || screen.width === 0) return;
@@ -203,8 +235,10 @@ export function createCanvasScene(
       targetCell,
       inspectedCell: isDrafting ? null : view.inspection,
       draft: isDrafting ? [...draftView.draft.values()] : [],
+      settling: advanceSettles(now, view),
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
+      confirmedColorIndexAt: (x, y) => store.confirmedColorIndexAt(x, y),
     });
   };
 
@@ -458,6 +492,14 @@ export function createCanvasScene(
     requestRender();
   });
 
+  // Mouvement réduit : la durée vaut 0, la case passe pleine d'un coup.
+  const unsubscribeConfirmed = store.listenConfirmed((pixels) => {
+    const duration = motionMs(root, "--lp-dur");
+    if (duration === 0) return;
+    settles.push({ pixels, duration, ease: easingCurve(motionEasing(root)), startedAt: null });
+    requestRender();
+  });
+
   let wasTracing = false;
   // Écart §9.3 (JOURNAL 2026-10-09) : entrer en Dessin, comme en sortir, ne touche pas à la vue.
   const unsubscribeDraft = draftStore.subscribe(() => {
@@ -572,6 +614,7 @@ export function createCanvasScene(
       setPanning(false);
       root.removeAttribute(ZONE_ABOVE_ATTRIBUTE);
       unsubscribe();
+      unsubscribeConfirmed();
       unsubscribeDraft();
       listening.abort();
     },

@@ -3,7 +3,12 @@ import { PALETTE, toStateOffset } from "@liveplace/domain";
 import type { AckFrame, Transport, TransportListeners } from "@liveplace/domain/ports";
 import { type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
-import { type Arrival, type CanvasStoreOptions, createCanvasStore } from "./canvas-store";
+import {
+  type Arrival,
+  type CanvasStoreOptions,
+  type ConfirmedPixel,
+  createCanvasStore,
+} from "./canvas-store";
 
 const width = 4;
 const now = 1_700_000_000_000;
@@ -523,6 +528,117 @@ describe("placeBatch (§9.2, §9.3)", () => {
     const ack = ackOf(first);
     receive(ack);
     expect(await placing).toEqual({ ok: true, value: ack });
+  });
+});
+
+describe("la pose confirmée par l'ack", () => {
+  const listenToConfirmed = (store: ReturnType<typeof setup>["store"]) => {
+    const heard: (readonly ConfirmedPixel[])[] = [];
+    const stop = store.listenConfirmed((pixels) => heard.push(pixels));
+    return { heard, stop };
+  };
+
+  // Quand l'ack accepte des cases, l'écouteur les reçoit avec la couleur d'avant, sans les refusées
+  it("tells the accepted cells of an ack with the color they replace, and leaves the rejected ones out", async () => {
+    const { store, receive, lastPlace, ackOf } = setup();
+    receive(cellsFrame(2, 2, 9));
+    const { heard } = listenToConfirmed(store);
+
+    const placing = store.placeBatch(
+      [
+        { x: 1, y: 2, colorIndex: 5 },
+        { x: 2, y: 2, colorIndex: 6 },
+        { x: 3, y: 2, colorIndex: 0 },
+      ],
+      PLACEMENT_ID,
+    );
+    expect(heard).toEqual([]);
+    receive(ackOf(lastPlace(), [1]));
+    await placing;
+
+    expect(heard).toEqual([
+      [
+        { x: 1, y: 2, colorIndex: 5, previousColorIndex: 0 },
+        { x: 3, y: 2, colorIndex: 0, previousColorIndex: 0 },
+      ],
+    ]);
+  });
+
+  // Si le gateway refuse le lot, nommé ou non, aucune case n'est confirmée
+  it("tells nothing of a lot the gateway refuses, whether it names the lot or not", async () => {
+    const { store, receive, lastPlace } = setup();
+    const { heard } = listenToConfirmed(store);
+
+    const refused = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    receive({ t: "error", code: "rate_limited", requestId: lastPlace().requestId });
+    await refused;
+    const unauthenticated = store.placeBatch([{ x: 2, y: 2, colorIndex: 6 }], PLACEMENT_ID);
+    receive({ t: "error", code: "unauthenticated" });
+    await unauthenticated;
+
+    expect(heard).toEqual([]);
+  });
+
+  // Une case posée par un autre joueur arrive par une frame cells : elle ne se pose pas en douceur
+  it("tells nothing of the cells other players place", () => {
+    const { store, receive } = setup();
+    const { heard } = listenToConfirmed(store);
+
+    receive(cellsFrame(1, 2, 5));
+
+    expect(heard).toEqual([]);
+  });
+
+  // Quand l'écouteur se retire, il n'entend plus rien
+  it("stops telling a listener that left", async () => {
+    const { store, receive, lastPlace, ackOf } = setup();
+    const { heard, stop } = listenToConfirmed(store);
+    stop();
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    receive(ackOf(lastPlace()));
+    await placing;
+
+    expect(heard).toEqual([]);
+  });
+
+  // Tant que le lot est en vol, la couleur confirmée est celle d'avant, alors que `pixels` porte la pose optimiste
+  it("keeps the previous color confirmed while the lot is in flight, and takes the placed one on the ack", async () => {
+    const { store, receive, lastPlace, ackOf, pixelAt } = setup();
+    receive(cellsFrame(1, 2, 9));
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    expect(pixelAt(1, 2)).toBe(5);
+    expect(store.confirmedColorIndexAt(1, 2)).toBe(9);
+    expect(store.confirmedColorIndexAt(2, 2)).toBe(0);
+
+    receive(ackOf(lastPlace()));
+    await placing;
+
+    expect(store.confirmedColorIndexAt(1, 2)).toBe(5);
+  });
+
+  // Si le gateway refuse le lot, la couleur confirmée reste celle d'avant, comme `pixels`
+  it("keeps the previous color when the lot is refused", async () => {
+    const { store, receive, lastPlace, pixelAt } = setup();
+    receive(cellsFrame(1, 2, 9));
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    receive({ t: "error", code: "rate_limited", requestId: lastPlace().requestId });
+    await placing;
+
+    expect(store.confirmedColorIndexAt(1, 2)).toBe(9);
+    expect(pixelAt(1, 2)).toBe(9);
+  });
+
+  // Une frame cells passée pendant le vol fait foi, comme pour un refus
+  it("lets a cells frame that came in during the flight have the last word", () => {
+    const { store, receive } = setup();
+
+    void store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    receive(cellsFrame(1, 2, 12));
+
+    expect(store.confirmedColorIndexAt(1, 2)).toBe(12);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   type ObsBackground,
   type Role,
   type Timestamp,
+  TRANSPARENT_COLOR_INDEX,
   toStateOffset,
 } from "@liveplace/domain";
 import type {
@@ -61,6 +62,8 @@ export type Arrival =
   | { kind: "cells"; frame: CellsFrame };
 
 export type Pixel = Placement["pixels"][number];
+// Une case de sa pose que le serveur a acceptée, avec la couleur qu'elle remplace.
+export type ConfirmedPixel = Pixel & { previousColorIndex: number };
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
@@ -115,6 +118,10 @@ export type CanvasStore = {
   // Pose optimiste (§9.3) : les pixels changent tout de suite, et la promesse se résout sur l'ack du même `requestId`.
   // `placementId` : la pose, le brouillon validé dont ce lot fait partie (JOURNAL 2026-09-28).
   placeBatch(pixels: readonly Pixel[], placementId: string): Promise<PlaceResult>;
+  // La couleur d'une case sans les poses en vol : `pixels` porte déjà leur couleur optimiste, jusqu'à l'ack.
+  confirmedColorIndexAt(x: number, y: number): number;
+  // À chaque ack : les cases acceptées du lot. Un refus, une coupure ou une case venue d'un autre joueur n'y passent jamais.
+  listenConfirmed(listener: (pixels: readonly ConfirmedPixel[]) => void): () => void;
   inspect(x: number, y: number): void;
   closeInspection(): void;
   // Réglée à la dernière tranche, avec le total des cases retirées (§4.3).
@@ -235,6 +242,7 @@ export function createCanvasStore(
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
   let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
+  const confirmedListeners = new Set<(pixels: readonly ConfirmedPixel[]) => void>();
   const staleListeners = new Set<(list: StaleList) => void>();
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
@@ -335,15 +343,25 @@ export function createCanvasStore(
     }
   };
 
+  // Les cases acceptées du lot, avec la couleur qu'elles remplacent : l'ack seul les confirme.
+  const emitConfirmed = (batch: PendingBatch, rejectedIndexes: readonly number[]): void => {
+    const confirmed = batch.frame.pixels.flatMap((pixel, index) => {
+      const previousColorIndex = batch.previousColorIndexes[index];
+      return rejectedIndexes.includes(index) || previousColorIndex === undefined
+        ? []
+        : [{ ...pixel, previousColorIndex }];
+    });
+    if (confirmed.length > 0) for (const listener of confirmedListeners) listener(confirmed);
+  };
+
   const acknowledge = (ack: AckFrame): void => {
     const batch = pending.get(ack.requestId);
     if (batch) {
       pending.delete(ack.requestId);
-      restore(
-        batch,
-        ack.rejected.map((rejected) => rejected.index),
-      );
+      const rejectedIndexes = ack.rejected.map((rejected) => rejected.index);
+      restore(batch, rejectedIndexes);
       batch.resolve({ ok: true, value: ack });
+      emitConfirmed(batch, rejectedIndexes);
     }
     publish({ gauge: ack.gauge, lastError: null });
   };
@@ -603,6 +621,19 @@ export function createCanvasStore(
       publish({});
       transport.send(frame);
       return placed;
+    },
+    // Comme `restore` : un lot en vol rend sa couleur d'avant, sauf à une case qu'une frame `cells` a écrite depuis.
+    confirmedColorIndexAt(x, y) {
+      const offset = toStateOffset(x, y, view.width);
+      for (const batch of pending.values()) {
+        const previous = batch.previousColorIndexes[batch.offsets.indexOf(offset)];
+        if (previous !== undefined && !batch.touched.has(offset)) return previous;
+      }
+      return view.pixels[offset] ?? TRANSPARENT_COLOR_INDEX;
+    },
+    listenConfirmed(listener) {
+      confirmedListeners.add(listener);
+      return () => confirmedListeners.delete(listener);
     },
     inspect(x, y) {
       if (view.inspection?.status !== "loading") previousInspection = view.inspection;

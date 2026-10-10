@@ -1,6 +1,6 @@
 import { PALETTE } from "@liveplace/domain";
 import type { Transport, TransportListeners } from "@liveplace/domain/ports";
-import type { ServerFrame } from "@liveplace/protocol";
+import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCanvasStore } from "../../state/canvas-store";
 import { createDraftStore } from "../../state/draft-store";
@@ -356,6 +356,7 @@ const LAPTOP_PLACE: Place = {
 // Sur le PC, 256 cases de côté tiennent à 3 px la case.
 const BIG_CANVAS = { width: 256, height: 256 };
 
+type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 type Options = { canvas?: Size; draft?: readonly Cell[]; isReducedMotion?: boolean };
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
@@ -365,8 +366,11 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
   browser.isCoarse = place.isTouch;
   browser.isReducedMotion = isReducedMotion;
   const listening: { listeners?: TransportListeners } = {};
+  const sent: ClientFrame[] = [];
   const transport: Transport = {
-    send: () => undefined,
+    send: (frame) => {
+      sent.push(frame);
+    },
     listen: (listeners) => {
       listening.listeners = listeners;
     },
@@ -411,11 +415,30 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
       clientX: point.x,
       clientY: point.y,
     });
+  const lastPlace = (): PlaceFrame => {
+    const frame = sent.filter((sentFrame): sentFrame is PlaceFrame => sentFrame.t === "place").at(-1);
+    if (!frame) throw new Error("aucune frame place envoyée");
+    return frame;
+  };
+  const receive = (frame: ServerFrame) => listening.listeners?.onFrame(frame);
   return {
     store,
     draftStore,
     scene,
     hooks,
+    lastPlace,
+    receive,
+    // Le serveur répond au dernier lot posé : il en accepte les cases, sauf celles dont on donne la place dans le lot.
+    answer: (rejectedIndexes: readonly number[] = []) => {
+      const { requestId, pixels } = lastPlace();
+      receive({
+        t: "ack",
+        requestId,
+        accepted: pixels.length - rejectedIndexes.length,
+        rejected: rejectedIndexes.map((index) => ({ index, reason: "gauge" })),
+        gauge: { charges: 9, max: 10, nextRefillAt: NOW + 10_000, claimable: 0 },
+      });
+    },
     view: (): Viewport => lastFrame().viewport,
     shownDraft: () => lastFrame().draft.length,
     moves: () => hooks.onViewportMove.mock.calls.length,
@@ -744,6 +767,189 @@ describe("le toucher d'une case trop petite, Écart §9.3 (JOURNAL 2026-10-09)",
 
     expect(world.view().scale).toBeCloseTo(COMFORTABLE_CELL.fine.target);
     expect(world.store.getView().inspection).toBeNull();
+  });
+});
+
+// Un autre joueur pose une case : elle arrive par une frame cells, jamais par un ack.
+const placedByOther = (x: number, y: number, colorIndex: number): ServerFrame => ({
+  t: "cells",
+  toVersion: 8,
+  cells: [{ x, y, colorIndex, previousColorIndex: 0, placedAt: NOW, version: 8, kind: "place" }],
+});
+
+describe("la pose qui se confirme", () => {
+  const CELL_AT = { x: 5, y: 5 };
+  const POSED = { ...CELL_AT, colorIndex: 3, previousColorIndex: 0 };
+
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Le brouillon `draft` en Dessin, envoyé : le lot est parti, le serveur n'a pas encore répondu
+  const sendDraft = (draft: readonly Cell[], options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, { ...options, draft });
+    world.enterDraft();
+    const sending = world.draftStore.submit();
+    flush(FRAME_MS);
+    return { world, sending };
+  };
+  const progressesOf = () => probe.frames.flatMap(({ settling }) => settling.map(({ progress }) => progress));
+  const settlingPixels = () => lastFrame().settling.flatMap(({ pixels }) => pixels);
+
+  // Tant que le lot est en vol, la case garde son aspect brouillon : elle reste au brouillon, sur la couleur d'avant
+  it("keeps the draft look while the lot is in flight: still in the draft, over its previous color", () => {
+    const { world } = sendDraft([CELL_AT]);
+
+    expect(world.store.getView().pixels[5 * CANVAS.width + 5]).toBe(3);
+    expect(lastFrame().draft).toEqual([{ ...CELL_AT, colorIndex: 3 }]);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(3);
+    expect(lastFrame().confirmedColorIndexAt(5, 5)).toBe(0);
+    expect(lastFrame().settling).toEqual([]);
+  });
+
+  // Quand l'ack arrive, la case part de l'aspect brouillon (progress 0), avance et s'en va au bout de `--lp-dur` : plus rien n'est attendu
+  it("settles from the draft look over --lp-dur once the ack comes, then schedules nothing", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toEqual([]);
+    expect(lastFrame().settling).toEqual([{ pixels: [POSED], progress: 0 }]);
+    flush(SETTLE_MS);
+
+    const progresses = progressesOf();
+    expect(progresses[0]).toBe(0);
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.some((progress) => progress > 0.2 && progress < 0.99)).toBe(true);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases d'un même lot se posent ensemble, au même pas
+  it("settles the cells of one lot together, at the same pace", async () => {
+    const { world, sending } = sendDraft(draftSquare(5, 5, 2));
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 5);
+
+    expect(lastFrame().settling).toHaveLength(1);
+    expect(settlingPixels()).toHaveLength(2);
+  });
+
+  // Si le serveur refuse une case de l'ack, elle ne se pose pas : elle reste au brouillon, les autres se posent
+  it("does not settle a cell the ack rejects: it stays in the draft", async () => {
+    const { world, sending } = sendDraft(draftSquare(5, 5, 2));
+    world.answer([1]);
+    await sending;
+    flush(FRAME_MS * 5);
+
+    expect(settlingPixels().map(({ x, y }) => ({ x, y }))).toEqual([CELL_AT]);
+    expect(world.draftStore.getView().draft.size).toBe(1);
+  });
+
+  // Si le serveur refuse le lot, aucun effet de pose : la case reste au brouillon comme avant, et rien n'est attendu
+  it("does not settle anything when the gateway refuses the lot", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.receive({ t: "error", code: "rate_limited", requestId: world.lastPlace().requestId });
+    await sending;
+    flush(SETTLE_MS);
+
+    expect(progressesOf()).toEqual([]);
+    expect(world.draftStore.getView().draft.size).toBe(1);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(0);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases des autres joueurs apparaissent d'un coup, comme avant
+  it("does not settle a cell another player places", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(progressesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la case passe pleine d'un coup
+  it("passes full at once when motion is reduced", async () => {
+    const { world, sending } = sendDraft([CELL_AT], { isReducedMotion: true });
+    world.answer();
+    await sending;
+    flush(SETTLE_MS);
+
+    expect(progressesOf()).toEqual([]);
+    expect(lastFrame().draft).toEqual([]);
+    expect(lastFrame().confirmedColorIndexAt(5, 5)).toBe(3);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement pendant l'effet ne le casse pas : il continue, avec la nouvelle vue, jusqu'au bout
+  it("goes on through a pan, with the new view", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    const before = progressesOf().at(-1) ?? 0;
+    const view = world.view();
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    flush(FRAME_MS);
+
+    expect(world.view().offsetX).toBeLessThan(view.offsetX);
+    expect(lastFrame().settling).toHaveLength(1);
+    expect(progressesOf().at(-1)).toBeGreaterThan(before);
+    flush(SETTLE_MS);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un zoom pendant l'effet non plus : les deux animations vont chacune à leur bout, puis plus rien n'est attendu
+  it("goes on through a zoom, and both end without anything left scheduled", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    const scale = world.view().scale;
+
+    world.scene.zoomBy(2);
+    flush(FRAME_MS * 4);
+    expect(lastFrame().settling).toHaveLength(1);
+    flush(SETTLE_MS);
+
+    expect(world.view().scale).toBeGreaterThan(scale);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une case qu'un autre joueur reprend pendant l'effet ne se pose plus : l'image dit la vérité
+  it("stops settling a cell another player takes over meanwhile", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    expect(settlingPixels()).toEqual([POSED]);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS);
+
+    expect(settlingPixels()).toEqual([]);
+  });
+
+  // Quand la scène se défait au milieu de l'effet, plus aucune image n'est attendue
+  it("schedules nothing once the scene is disposed mid-effect", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+
+    world.scene.dispose();
+
+    expect(world.pendingFrames()).toBe(0);
   });
 });
 

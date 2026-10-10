@@ -1,11 +1,11 @@
-// Une image à l'écran (§9.3), dans l'ordre : les pixels, le brouillon, la grille, la bordure,
-// le contour du brouillon, la case visée, le viseur de la case inspectée. Le vide et le damier ne sont pas ici : ce sont
-// deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent pas le viewport. Le canvas reste
-// transparent autour de l'image, et sous ses pixels transparents.
+// Une image à l'écran (§9.3), dans l'ordre : les pixels, les cases qui se posent, le brouillon, la grille, la bordure,
+// le contour du brouillon, celui des cases qui se posent, la case visée, le viseur de la case inspectée.
+// Le vide et le damier ne sont pas ici : ce sont deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent
+// pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents.
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import type { Pixel } from "../../state/canvas-store";
+import type { ConfirmedPixel, Pixel } from "../../state/canvas-store";
 import type { Cell, Size, Viewport } from "./viewport";
 
 // Les teintes du canvas, lues dans les tokens de l'apparence (tokens.css) : aucune n'est écrite ici.
@@ -17,6 +17,9 @@ export type SceneShades = {
   outlineOut: string; // … et dehors
 };
 
+// Les cases d'un ack : elles passent de l'aspect brouillon à l'aspect posé, `progress` de 0 à 1 (la courbe est déjà appliquée).
+export type SettlingBatch = { pixels: readonly ConfirmedPixel[]; progress: number };
+
 export type Scene = {
   screen: Size; // pixels CSS
   pixelRatio: number;
@@ -27,8 +30,10 @@ export type Scene = {
   targetCell: Cell | null;
   inspectedCell: Cell | null;
   draft: readonly Pixel[];
+  settling: readonly SettlingBatch[];
   palette: readonly string[];
-  colorIndexAt(x: number, y: number): number; // la couleur posée, sous le brouillon
+  colorIndexAt(x: number, y: number): number; // la couleur de l'image, pose optimiste comprise
+  confirmedColorIndexAt(x: number, y: number): number; // la couleur posée, sous le brouillon : celle d'avant, pour une case en vol
 };
 
 type Rect = { left: number; top: number; width: number; height: number };
@@ -63,29 +68,63 @@ const strokeOutside = (context: CanvasRenderingContext2D, rect: Rect, lineWidth:
 };
 
 // La gomme : la couleur posée, pâlie, et une croix fine. Pas de damier (CDC 2026). L'aperçu de pixels la reprend.
+// `opacity` : le tout s'efface d'autant, quand la case se pose.
 export const fillErased = (
   context: CanvasRenderingContext2D,
   rect: Rect,
   color: string | undefined,
   shades: SceneShades,
+  opacity = 1,
 ) => {
-  context.globalAlpha = 1;
+  context.globalAlpha = opacity;
   context.fillStyle = shades.void;
   context.fillRect(rect.left, rect.top, rect.width, rect.height);
   if (color) {
-    context.globalAlpha = ERASED_ALPHA;
+    context.globalAlpha = opacity * ERASED_ALPHA;
     context.fillStyle = color;
     context.fillRect(rect.left, rect.top, rect.width, rect.height);
   }
   const insetX = rect.width * ERASER_CROSS_INSET;
   const insetY = rect.height * ERASER_CROSS_INSET;
-  context.globalAlpha = 1;
+  context.globalAlpha = opacity;
   context.beginPath();
   context.moveTo(rect.left + insetX, rect.top + insetY);
   context.lineTo(rect.left + rect.width - insetX, rect.top + rect.height - insetY);
   context.moveTo(rect.left + rect.width - insetX, rect.top + insetY);
   context.lineTo(rect.left + insetX, rect.top + rect.height - insetY);
   context.stroke();
+};
+
+// L'image porte déjà la pose optimiste d'une case : on lui rend la couleur d'avant, sous l'aspect brouillon qui la recouvre.
+// Une gomme n'en a pas besoin : son aspect couvre la case.
+const restoreCell = (
+  context: CanvasRenderingContext2D,
+  scene: Scene,
+  rect: Rect,
+  { colorIndex }: Pixel,
+  previousColorIndex: number,
+) => {
+  context.clearRect(rect.left, rect.top, rect.width, rect.height);
+  if (colorIndex === TRANSPARENT_COLOR_INDEX) return;
+  context.globalAlpha = 1;
+  context.fillStyle = scene.palette[previousColorIndex] ?? scene.shades.void;
+  context.fillRect(rect.left, rect.top, rect.width, rect.height);
+};
+
+// Une case entre le brouillon (`settled` 0) et la pose (1) : l'opacité va de DRAFT_ALPHA à 1, la gomme s'efface.
+const fillDraftLook = (
+  context: CanvasRenderingContext2D,
+  scene: Scene,
+  rect: Rect,
+  { colorIndex }: Pixel,
+  previousColorIndex: number,
+  settled: number,
+) => {
+  if (colorIndex === TRANSPARENT_COLOR_INDEX)
+    return fillErased(context, rect, scene.palette[previousColorIndex], scene.shades, 1 - settled);
+  context.globalAlpha = DRAFT_ALPHA + (1 - DRAFT_ALPHA) * settled;
+  context.fillStyle = scene.palette[colorIndex] ?? scene.shades.void;
+  context.fillRect(rect.left, rect.top, rect.width, rect.height);
 };
 
 const fillDraft = (
@@ -96,16 +135,30 @@ const fillDraft = (
 ) => {
   context.lineWidth = lineWidth;
   context.strokeStyle = scene.shades.outlineIn;
-  for (const { x, y, colorIndex } of scene.draft) {
-    const rect = cellRect(x, y);
-    if (colorIndex === TRANSPARENT_COLOR_INDEX) {
-      fillErased(context, rect, scene.palette[scene.colorIndexAt(x, y)], scene.shades);
-      continue;
-    }
-    context.globalAlpha = DRAFT_ALPHA;
-    context.fillStyle = scene.palette[colorIndex] ?? scene.shades.void;
-    context.fillRect(rect.left, rect.top, rect.width, rect.height);
+  for (const pixel of scene.draft) {
+    const rect = cellRect(pixel.x, pixel.y);
+    const confirmed = scene.confirmedColorIndexAt(pixel.x, pixel.y);
+    if (confirmed !== scene.colorIndexAt(pixel.x, pixel.y))
+      restoreCell(context, scene, rect, pixel, confirmed);
+    fillDraftLook(context, scene, rect, pixel, confirmed, 0);
   }
+  context.globalAlpha = 1;
+};
+
+const fillSettling = (
+  context: CanvasRenderingContext2D,
+  scene: Scene,
+  cellRect: CellRect,
+  lineWidth: number,
+) => {
+  context.lineWidth = lineWidth;
+  context.strokeStyle = scene.shades.outlineIn;
+  for (const { pixels, progress } of scene.settling)
+    for (const pixel of pixels) {
+      const rect = cellRect(pixel.x, pixel.y);
+      restoreCell(context, scene, rect, pixel, pixel.previousColorIndex);
+      fillDraftLook(context, scene, rect, pixel, pixel.previousColorIndex, progress);
+    }
   context.globalAlpha = 1;
 };
 
@@ -170,6 +223,20 @@ const strokeDraftOutline = (
   }
 };
 
+// Le contour des cases qui se posent s'efface à mesure : il part de l'opacité du brouillon.
+const strokeSettlingOutline = (
+  context: CanvasRenderingContext2D,
+  { settling, shades }: Pick<Scene, "settling" | "shades">,
+  cellRect: CellRect,
+  lineWidth: number,
+) => {
+  for (const { pixels, progress } of settling) {
+    context.globalAlpha = 1 - progress;
+    strokeDraftOutline(context, { draft: pixels, shades }, cellRect, lineWidth);
+  }
+  context.globalAlpha = 1;
+};
+
 // Le viseur (CDC 2026) : quatre coins en équerre autour de la case, noir sous blanc, d'une taille minimale fixe à l'écran.
 const strokeReticle = (
   context: CanvasRenderingContext2D,
@@ -228,6 +295,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   context.imageSmoothingEnabled = false;
   context.drawImage(scene.image, originX, originY, canvas.width * cellSize, canvas.height * cellSize);
   const oneCellRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
+  fillSettling(context, scene, oneCellRect, lineWidth);
   fillDraft(context, scene, oneCellRect, lineWidth);
 
   if (viewport.scale >= GRID_MIN_SCALE) {
@@ -252,6 +320,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   context.strokeStyle = scene.shades.border;
   strokeOutside(context, canvasRect, lineWidth, 0);
   strokeDraftOutline(context, scene, oneCellRect, lineWidth);
+  strokeSettlingOutline(context, scene, oneCellRect, lineWidth);
 
   if (scene.targetCell) {
     // Blanc contre la case, noir autour : visible sur toutes les couleurs, à tous les zooms.
