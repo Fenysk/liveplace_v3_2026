@@ -39,6 +39,7 @@ const canvasView = (claimable: number): CanvasView => ({
   reportCount: 0,
   lastError: null,
   inspection: null,
+  isImageLoaded: true,
   pixels: new Uint8Array(0),
 });
 

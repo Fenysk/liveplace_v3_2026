@@ -130,6 +130,8 @@
   --lp-dur: 0.34s; /* morphing, feuilles, fenêtre, niveau de la jauge, zooms de la vue */
   --lp-dur-fade: 0.2s; /* apparitions, fondu des pills */
   --lp-dur-fast: 0.14s; /* survols, fondu du contenu */
+  --lp-dur-reveal: 0.5s; /* la fresque qui paraît en mosaïque : quatre étapes d'un quart */
+  --lp-dur-arrival: 0.3s; /* une case posée par un autre joueur : son fondu, de l'ancienne couleur à la nouvelle */
 }
 
 /* Écran étroit ou tactile : cible tactile minimale (Apple 44 pt, WCAG 2.2 AAA) */
@@ -145,6 +147,8 @@
     --lp-dur: 0s;
     --lp-dur-fade: 0s;
     --lp-dur-fast: 0s;
+    --lp-dur-reveal: 0s;
+    --lp-dur-arrival: 0s;
   }
 }
 

@@ -7,6 +7,7 @@ import {
   type ObsBackground,
   type Role,
   type Timestamp,
+  TRANSPARENT_COLOR_INDEX,
   toStateOffset,
 } from "@liveplace/domain";
 import type {
@@ -61,6 +62,10 @@ export type Arrival =
   | { kind: "cells"; frame: CellsFrame };
 
 export type Pixel = Placement["pixels"][number];
+// Une case de sa pose que le serveur a acceptée, avec la couleur qu'elle remplace.
+export type ConfirmedPixel = Pixel & { previousColorIndex: number };
+// Une case venue d'un autre joueur (ou de la modération) qui change ce que la page montre, avec la couleur qu'elle montrait.
+export type ArrivedPixel = Pixel & { previousColorIndex: number };
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
@@ -107,6 +112,7 @@ export type CanvasView = {
   lastError: ErrorCode | null;
   inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
+  isImageLoaded: boolean; // le snapshot est arrivé : `pixels` est la copie du serveur, plus un décor vide
 };
 
 export type CanvasStore = {
@@ -115,6 +121,13 @@ export type CanvasStore = {
   // Pose optimiste (§9.3) : les pixels changent tout de suite, et la promesse se résout sur l'ack du même `requestId`.
   // `placementId` : la pose, le brouillon validé dont ce lot fait partie (JOURNAL 2026-09-28).
   placeBatch(pixels: readonly Pixel[], placementId: string): Promise<PlaceResult>;
+  // La couleur d'une case sans les poses en vol : `pixels` porte déjà leur couleur optimiste, jusqu'à l'ack.
+  confirmedColorIndexAt(x: number, y: number): number;
+  // À chaque ack : les cases acceptées du lot. Un refus, une coupure ou une case venue d'un autre joueur n'y passent jamais.
+  listenConfirmed(listener: (pixels: readonly ConfirmedPixel[]) => void): () => void;
+  // À chaque message `cells` : un lot par événement (la pose d'un joueur, une tranche de modération), dans l'ordre du message.
+  // Seules y sont les cases qui changent ce que la page montre : la pose d'un joueur que la page a déjà montrée n'y est pas.
+  listenArrived(listener: (pixels: readonly ArrivedPixel[]) => void): () => void;
   inspect(x: number, y: number): void;
   closeInspection(): void;
   // Réglée à la dernière tranche, avec le total des cases retirées (§4.3).
@@ -228,6 +241,7 @@ export function createCanvasStore(
     isBanned: false,
     isArchived: false,
     isDiscarded: false,
+    isImageLoaded: false,
     pixels: new Uint8Array(0),
   };
   const listeners = new Set<() => void>();
@@ -236,6 +250,8 @@ export function createCanvasStore(
   let inspectRequestId: string | null = null; // seule la dernière inspection attend sa réponse
   let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
+  const confirmedListeners = new Set<(pixels: readonly ConfirmedPixel[]) => void>();
+  const arrivedListeners = new Set<(pixels: readonly ArrivedPixel[]) => void>();
   const staleListeners = new Set<(list: StaleList) => void>();
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
@@ -263,19 +279,40 @@ export function createCanvasStore(
   };
 
   // §5.3 : une case d'avant une nouvelle taille peut tomber hors du cadre.
-  const writeCell = ({ x, y, colorIndex }: BroadcastCell): void => {
-    if (x >= view.width || y >= view.height) return;
+  // Rend la couleur que la page montrait, ou rien si la case est hors du cadre.
+  const writeCell = ({ x, y, colorIndex }: BroadcastCell): number | undefined => {
+    if (x >= view.width || y >= view.height) return undefined;
     const offset = toStateOffset(x, y, view.width);
+    const shown = view.pixels[offset];
     view.pixels[offset] = colorIndex;
     for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
+    return shown;
+  };
+
+  // Les cases d'un même événement portent la même `version` : c'est un lot, la pose d'un joueur ou une tranche de modération.
+  // Un lot ne garde que les cases qui changent ce que la page montre.
+  const writeCells = ({ cells }: CellsFrame): Map<number, ArrivedPixel[]> => {
+    const lots = new Map<number, ArrivedPixel[]>();
+    for (const cell of cells) {
+      const previousColorIndex = writeCell(cell);
+      if (previousColorIndex === undefined || previousColorIndex === cell.colorIndex) continue;
+      const lot = lots.get(cell.version) ?? [];
+      lot.push({ x: cell.x, y: cell.y, colorIndex: cell.colorIndex, previousColorIndex });
+      lots.set(cell.version, lot);
+    }
+    return lots;
   };
 
   // Le seul chemin d'écriture des cases venues du serveur : flux live, et plus tard resync et vue OBS (§9.2).
   // §4.3 : `hide` et `unhide` ne regardent que le stream, la page garde l'état réel.
   const apply = (frame: CellsFrame): void => {
-    for (const cell of frame.cells) if (cell.kind === "place" || cell.kind === "clear") writeCell(cell);
+    const lots = writeCells({
+      ...frame,
+      cells: frame.cells.filter(({ kind }) => kind === "place" || kind === "clear"),
+    });
     publish({ version: frame.toVersion });
     emit({ kind: "cells", frame: { toVersion: frame.toVersion, cells: frame.cells } });
+    for (const lot of lots.values()) for (const listener of arrivedListeners) listener(lot);
   };
 
   const restore = (batch: PendingBatch, indexes: readonly number[]): void => {
@@ -336,15 +373,25 @@ export function createCanvasStore(
     }
   };
 
+  // Les cases acceptées du lot, avec la couleur qu'elles remplacent : l'ack seul les confirme.
+  const emitConfirmed = (batch: PendingBatch, rejectedIndexes: readonly number[]): void => {
+    const confirmed = batch.frame.pixels.flatMap((pixel, index) => {
+      const previousColorIndex = batch.previousColorIndexes[index];
+      return rejectedIndexes.includes(index) || previousColorIndex === undefined
+        ? []
+        : [{ ...pixel, previousColorIndex }];
+    });
+    if (confirmed.length > 0) for (const listener of confirmedListeners) listener(confirmed);
+  };
+
   const acknowledge = (ack: AckFrame): void => {
     const batch = pending.get(ack.requestId);
     if (batch) {
       pending.delete(ack.requestId);
-      restore(
-        batch,
-        ack.rejected.map((rejected) => rejected.index),
-      );
+      const rejectedIndexes = ack.rejected.map((rejected) => rejected.index);
+      restore(batch, rejectedIndexes);
       batch.resolve({ ok: true, value: ack });
+      emitConfirmed(batch, rejectedIndexes);
     }
     publish({ gauge: ack.gauge, lastError: null });
   };
@@ -581,7 +628,7 @@ export function createCanvasStore(
     onFrame,
     // Le snapshot suit le `welcome` : il remplace la copie entière (§6.1).
     onSnapshot: (state) => {
-      publish({ pixels: state.slice() });
+      publish({ pixels: state.slice(), isImageLoaded: true });
       emit({ kind: "snapshot", pixels: state.slice(), recent: heldRecent });
       heldRecent = null;
     },
@@ -618,6 +665,23 @@ export function createCanvasStore(
       publish({});
       transport.send(frame);
       return placed;
+    },
+    // Comme `restore` : un lot en vol rend sa couleur d'avant, sauf à une case qu'une frame `cells` a écrite depuis.
+    confirmedColorIndexAt(x, y) {
+      const offset = toStateOffset(x, y, view.width);
+      for (const batch of pending.values()) {
+        const previous = batch.previousColorIndexes[batch.offsets.indexOf(offset)];
+        if (previous !== undefined && !batch.touched.has(offset)) return previous;
+      }
+      return view.pixels[offset] ?? TRANSPARENT_COLOR_INDEX;
+    },
+    listenConfirmed(listener) {
+      confirmedListeners.add(listener);
+      return () => confirmedListeners.delete(listener);
+    },
+    listenArrived(listener) {
+      arrivedListeners.add(listener);
+      return () => arrivedListeners.delete(listener);
     },
     inspect(x, y) {
       if (view.inspection?.status !== "loading") previousInspection = view.inspection;

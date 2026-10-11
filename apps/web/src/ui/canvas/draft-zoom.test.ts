@@ -1,12 +1,12 @@
 import { type ObsBackground, PALETTE } from "@liveplace/domain";
 import type { Transport, TransportListeners } from "@liveplace/domain/ports";
-import type { ServerFrame } from "@liveplace/protocol";
+import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCanvasStore } from "../../state/canvas-store";
 import { createDraftStore } from "../../state/draft-store";
 import type { DraftStorage } from "../../state/saved-draft";
 import { COARSE_POINTER_QUERY } from "../design/use-media-query";
-import { createCanvasScene } from "./canvas-scene";
+import { createCanvasScene, createHandoff, type Handoff } from "./canvas-scene";
 import {
   COMFORTABLE_CELL,
   comfortableCell,
@@ -32,10 +32,18 @@ import {
 } from "./viewport";
 
 // La scène tourne ici sans navigateur : seules l'image peinte (on y lit le viewport) et la mesure des pills sont remplacées.
-type Probe = { frames: Scene[]; arrival: { insets: Insets; zone: ArrivalZone }; draftInsets: Insets };
+type Probe = {
+  frames: Scene[];
+  ghosts: unknown[]; // les fresques gardées seules à l'écran, en attendant la nouvelle
+  levelBuilds: number; // les mosaïques construites
+  arrival: { insets: Insets; zone: ArrivalZone };
+  draftInsets: Insets;
+};
 const probe = vi.hoisted(
   (): Probe => ({
     frames: [],
+    ghosts: [],
+    levelBuilds: 0,
     arrival: { insets: { top: 0, right: 0, bottom: 0, left: 0 }, zone: "side" },
     draftInsets: { top: 0, right: 0, bottom: 0, left: 0 },
   }),
@@ -44,8 +52,18 @@ vi.mock("./render-scene", () => ({
   renderScene: (_context: unknown, scene: Scene) => {
     probe.frames.push(scene);
   },
+  renderGhost: (_context: unknown, source: unknown) => {
+    probe.ghosts.push(source);
+  },
 }));
-vi.mock("./canvas-image", () => ({ createCanvasImage: () => ({ source: {}, repaint: () => undefined }) }));
+vi.mock("./canvas-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./canvas-image")>()),
+  createCanvasImage: () => ({ source: {}, repaint: () => undefined }),
+  toLevelCanvases: (levels: readonly object[]) => {
+    probe.levelBuilds += 1;
+    return levels.map(() => ({}));
+  },
+}));
 vi.mock("./arrival-insets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./arrival-insets")>()),
   measureArrivalInsets: () => probe.arrival,
@@ -206,6 +224,9 @@ class FakeMutationObserver {
 // Les jetons que la scène lit sur <html> : la durée et la courbe de tokens.css, ou 0 en mouvement réduit.
 const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
+  if (name === "--lp-dur-fast") return browser.isReducedMotion ? "0s" : "0.14s";
+  if (name === "--lp-dur-reveal") return browser.isReducedMotion ? "0s" : "0.5s";
+  if (name === "--lp-dur-arrival") return browser.isReducedMotion ? "0s" : "0.3s";
   if (name === "--obs-black") return "#000000";
   if (name === "--obs-white") return "#ffffff";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
@@ -223,6 +244,8 @@ const startBrowser = () => {
   browser.mutations.length = 0;
   browser.attributes.clear();
   probe.frames.length = 0;
+  probe.ghosts.length = 0;
+  probe.levelBuilds = 0;
   fakeLayer.hidden = false;
   const root = {
     toggleAttribute: (name: string, force?: boolean) => {
@@ -370,25 +393,40 @@ const LAPTOP_PLACE: Place = {
 // Sur le PC, 256 cases de côté tiennent à 3 px la case.
 const BIG_CANVAS = { width: 256, height: 256 };
 
+type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
+type InspectFrame = Extract<ClientFrame, { t: "inspect" }>;
+// `isLoaded` : le snapshot est déjà là quand la scène naît (une page remontée après une récupération). `handoff` : le passage d'une scène à l'autre.
 type Options = {
   canvas?: Size;
   draft?: readonly Cell[];
   isReducedMotion?: boolean;
+  isLoaded?: boolean;
+  handoff?: Handoff;
   background?: BackgroundParams; // le fond de la fresque que le welcome annonce (Écart §9.1, JOURNAL 2026-10-10)
 };
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
 const openScene = (
   place: Place,
-  { canvas = CANVAS, draft = [], isReducedMotion = false, background }: Options = {},
+  {
+    canvas = CANVAS,
+    draft = [],
+    isReducedMotion = false,
+    isLoaded = false,
+    handoff,
+    background,
+  }: Options = {},
 ) => {
   probe.arrival = place.arrival;
   probe.draftInsets = place.draftInsets;
   browser.isCoarse = place.isTouch;
   browser.isReducedMotion = isReducedMotion;
   const listening: { listeners?: TransportListeners } = {};
+  const sent: ClientFrame[] = [];
   const transport: Transport = {
-    send: () => undefined,
+    send: (frame) => {
+      sent.push(frame);
+    },
     listen: (listeners) => {
       listening.listeners = listeners;
     },
@@ -416,15 +454,19 @@ const openScene = (
   });
   const hooks = { onViewportMove: vi.fn(), onFraming: vi.fn(), onGesture: vi.fn(), onNavigate: vi.fn() };
   const surface = createSurface();
+  const snapshot = (pixels = new Uint8Array(canvas.width * canvas.height)) =>
+    listening.listeners?.onSnapshot(pixels);
+  if (isLoaded) snapshot();
   const scene = createCanvasScene(surface.element, store, draftStore, {
     login: "kalyss",
     initialViewport: null,
     isFramedInFreeArea: true,
     ...hooks,
+    handoff,
     checker: LAYER,
     checkerTiles: LAYER,
   });
-  browser.resizes[0]?.([{ contentRect: place.screen }]);
+  browser.resizes.at(-1)?.([{ contentRect: place.screen }]);
   flush(FRAME_MS);
   const press = (type: string, point: ScreenPoint) =>
     surface.dispatch(type, {
@@ -434,13 +476,40 @@ const openScene = (
       clientX: point.x,
       clientY: point.y,
     });
+  const lastPlace = (): PlaceFrame => {
+    const frame = sent.filter((sentFrame): sentFrame is PlaceFrame => sentFrame.t === "place").at(-1);
+    if (!frame) throw new Error("aucune frame place envoyée");
+    return frame;
+  };
+  const lastInspect = (): InspectFrame => {
+    const frame = sent.filter((sentFrame): sentFrame is InspectFrame => sentFrame.t === "inspect").at(-1);
+    if (!frame) throw new Error("aucune frame inspect envoyée");
+    return frame;
+  };
+  const receive = (frame: ServerFrame) => listening.listeners?.onFrame(frame);
   return {
     store,
     draftStore,
     scene,
     hooks,
-    receive: (frame: ServerFrame) => {
-      listening.listeners?.onFrame(frame);
+    lastPlace,
+    lastInspect,
+    receive,
+    snapshot,
+    surface: surface.element,
+    // Le serveur répond au dernier lot posé : il en accepte les cases, sauf celles dont on donne la place dans le lot.
+    answer: (rejectedIndexes: readonly number[] = []) => {
+      const { requestId, pixels } = lastPlace();
+      receive({
+        t: "ack",
+        requestId,
+        accepted: pixels.length - rejectedIndexes.length,
+        rejected: rejectedIndexes.map((index) => ({ index, reason: "gauge" })),
+        gauge: { charges: 9, max: 10, nextRefillAt: NOW + 10_000, claimable: 0 },
+      });
+    },
+    receiveAndPaint: (frame: ServerFrame) => {
+      receive(frame);
       flush(FRAME_MS);
     },
     view: (): Viewport => lastFrame().viewport,
@@ -774,6 +843,968 @@ describe("le toucher d'une case trop petite, Écart §9.3 (JOURNAL 2026-10-09)",
   });
 });
 
+// Un autre joueur pose une case : elle arrive par une frame cells, jamais par un ack.
+const placedByOther = (x: number, y: number, colorIndex: number): ServerFrame => ({
+  t: "cells",
+  toVersion: 8,
+  cells: [{ x, y, colorIndex, previousColorIndex: 0, placedAt: NOW, version: 8, kind: "place" }],
+});
+
+describe("la pose qui se confirme", () => {
+  const CELL_AT = { x: 5, y: 5 };
+  const POSED = { ...CELL_AT, colorIndex: 3, previousColorIndex: 0 };
+
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Le brouillon `draft` en Dessin, envoyé : le lot est parti, le serveur n'a pas encore répondu
+  const sendDraft = (draft: readonly Cell[], options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, { ...options, draft });
+    world.enterDraft();
+    const sending = world.draftStore.submit();
+    flush(FRAME_MS);
+    return { world, sending };
+  };
+  const progressesOf = () => probe.frames.flatMap(({ settling }) => settling.map(({ progress }) => progress));
+  const settlingPixels = () => lastFrame().settling.flatMap(({ pixels }) => pixels);
+
+  // Tant que le lot est en vol, la case garde son aspect brouillon : elle reste au brouillon, sur la couleur d'avant
+  it("keeps the draft look while the lot is in flight: still in the draft, over its previous color", () => {
+    const { world } = sendDraft([CELL_AT]);
+
+    expect(world.store.getView().pixels[5 * CANVAS.width + 5]).toBe(3);
+    expect(lastFrame().draft).toEqual([{ ...CELL_AT, colorIndex: 3 }]);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(3);
+    expect(lastFrame().confirmedColorIndexAt(5, 5)).toBe(0);
+    expect(lastFrame().settling).toEqual([]);
+  });
+
+  // Quand l'ack arrive, la case part de l'aspect brouillon (progress 0), avance et s'en va au bout de `--lp-dur` : plus rien n'est attendu
+  it("settles from the draft look over --lp-dur once the ack comes, then schedules nothing", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toEqual([]);
+    expect(lastFrame().settling).toEqual([{ pixels: [POSED], progress: 0 }]);
+    flush(SETTLE_MS);
+
+    const progresses = progressesOf();
+    expect(progresses[0]).toBe(0);
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.some((progress) => progress > 0.2 && progress < 0.99)).toBe(true);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases d'un même lot se posent ensemble, au même pas
+  it("settles the cells of one lot together, at the same pace", async () => {
+    const { world, sending } = sendDraft(draftSquare(5, 5, 2));
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 5);
+
+    expect(lastFrame().settling).toHaveLength(1);
+    expect(settlingPixels()).toHaveLength(2);
+  });
+
+  // Si le serveur refuse une case de l'ack, elle ne se pose pas : elle reste au brouillon, les autres se posent
+  it("does not settle a cell the ack rejects: it stays in the draft", async () => {
+    const { world, sending } = sendDraft(draftSquare(5, 5, 2));
+    world.answer([1]);
+    await sending;
+    flush(FRAME_MS * 5);
+
+    expect(settlingPixels().map(({ x, y }) => ({ x, y }))).toEqual([CELL_AT]);
+    expect(world.draftStore.getView().draft.size).toBe(1);
+  });
+
+  // Si le serveur refuse le lot, aucun effet de pose : la case reste au brouillon comme avant, et rien n'est attendu
+  it("does not settle anything when the gateway refuses the lot", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.receive({ t: "error", code: "rate_limited", requestId: world.lastPlace().requestId });
+    await sending;
+    flush(SETTLE_MS);
+
+    expect(progressesOf()).toEqual([]);
+    expect(world.draftStore.getView().draft.size).toBe(1);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(0);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases des autres joueurs apparaissent d'un coup, comme avant
+  it("does not settle a cell another player places", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(progressesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la case passe pleine d'un coup
+  it("passes full at once when motion is reduced", async () => {
+    const { world, sending } = sendDraft([CELL_AT], { isReducedMotion: true });
+    world.answer();
+    await sending;
+    flush(SETTLE_MS);
+
+    expect(progressesOf()).toEqual([]);
+    expect(lastFrame().draft).toEqual([]);
+    expect(lastFrame().confirmedColorIndexAt(5, 5)).toBe(3);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement pendant l'effet ne le casse pas : il continue, avec la nouvelle vue, jusqu'au bout
+  it("goes on through a pan, with the new view", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    const before = progressesOf().at(-1) ?? 0;
+    const view = world.view();
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    flush(FRAME_MS);
+
+    expect(world.view().offsetX).toBeLessThan(view.offsetX);
+    expect(lastFrame().settling).toHaveLength(1);
+    expect(progressesOf().at(-1)).toBeGreaterThan(before);
+    flush(SETTLE_MS);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un zoom pendant l'effet non plus : les deux animations vont chacune à leur bout, puis plus rien n'est attendu
+  it("goes on through a zoom, and both end without anything left scheduled", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    const scale = world.view().scale;
+
+    world.scene.zoomBy(2);
+    flush(FRAME_MS * 4);
+    expect(lastFrame().settling).toHaveLength(1);
+    flush(SETTLE_MS);
+
+    expect(world.view().scale).toBeGreaterThan(scale);
+    expect(lastFrame().settling).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une case qu'un autre joueur reprend pendant l'effet ne se pose plus : l'image dit la vérité
+  it("stops settling a cell another player takes over meanwhile", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+    expect(settlingPixels()).toEqual([POSED]);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS);
+
+    expect(settlingPixels()).toEqual([]);
+  });
+
+  // Quand la scène se défait au milieu de l'effet, plus aucune image n'est attendue
+  it("schedules nothing once the scene is disposed mid-effect", async () => {
+    const { world, sending } = sendDraft([CELL_AT]);
+    world.answer();
+    await sending;
+    flush(FRAME_MS * 4);
+
+    world.scene.dispose();
+
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("la case qui entre au brouillon", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const openDraft = (options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, options);
+    world.enterDraft();
+    return world;
+  };
+  const fadesOf = () => [...lastFrame().draftFades.values()];
+  const progressesOfFades = () =>
+    probe.frames.flatMap(({ draftFades }) => [...draftFades.values()].map(({ progress }) => progress));
+  // Le nombre de jauge permet de tracer plus de cases que les 10 du `welcome` d'essai.
+  const widenGauge = (world: ReturnType<typeof openScene>, charges: number) => {
+    const welcome = welcomeOf(CANVAS);
+    if (welcome.t !== "welcome") throw new Error("un welcome était attendu");
+    world.receive({ ...welcome, gauge: { charges, max: charges, nextRefillAt: NOW + 10_000, claimable: 0 } });
+  };
+
+  // Une case ajoutée paraît en fondu depuis rien, sur `--lp-dur-fast`, puis plus rien n'est attendu
+  it("fades a cell in from nothing over --lp-dur-fast, then schedules nothing", () => {
+    const world = openDraft();
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+    flush(SETTLE_MS);
+    const progresses = progressesOfFades();
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.length).toBeGreaterThanOrEqual(8);
+    expect(progresses.length).toBeLessThanOrEqual(10);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une gomme ajoutée entre en fondu comme une couleur
+  it("fades an eraser in like a color", () => {
+    const world = openDraft();
+    world.receive(placedByOther(5, 5, 9));
+    world.draftStore.selectColor(0);
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+  });
+
+  // Pendant un tracé, chaque case a son propre fondu : elles ne partent pas toutes ensemble
+  it("gives each cell of a trace its own fade", () => {
+    const world = openDraft();
+
+    world.draftStore.startTrace();
+    world.draftStore.traceCells([{ x: 5, y: 5 }]);
+    flush(FRAME_MS * 4);
+    world.draftStore.traceCells([{ x: 6, y: 5 }]);
+    flush(FRAME_MS);
+
+    const [first, second] = fadesOf();
+    expect(fadesOf()).toHaveLength(2);
+    expect(first?.progress).toBeGreaterThan(second?.progress ?? 1);
+    flush(SETTLE_MS);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une case retirée part d'un coup : annuler ou effacer le brouillon reste immédiat
+  it("removes a cell at once, without a fade, when it leaves the draft", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    world.draftStore.toggleCell(6, 5);
+    flush(FRAME_MS * 3);
+
+    world.draftStore.discardCell(5, 5);
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toHaveLength(1);
+
+    world.draftStore.discardDraft();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Annuler une case ajoutée la retire d'un coup, puis la rétablir la fait paraître en fondu
+  it("removes an undone cell at once, and fades a redone one in", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.draftStore.undo();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+
+    world.draftStore.redo();
+    flush(FRAME_MS);
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([{ from: null, progress: 0 }]);
+  });
+
+  // Un brouillon gardé paraît d'un coup, à l'entrée en Dessin comme au chargement
+  it("shows a kept draft at once", () => {
+    const world = openDraft({ draft: draftSquare(5, 5, 3) });
+
+    expect(lastFrame().draft).toHaveLength(2);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Au-delà de 200 cases en fondu à la fois, les suivantes paraissent d'un coup
+  it("fades at most 200 cells at once: the following ones appear at once", () => {
+    const world = openDraft();
+    widenGauge(world, 300);
+    const cells = Array.from({ length: 250 }, (_, index) => ({ x: index % 50, y: Math.floor(index / 50) }));
+
+    world.draftStore.startTrace();
+    world.draftStore.traceCells(cells);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(250);
+    expect(fadesOf()).toHaveLength(200);
+    flush(SETTLE_MS);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la case paraît d'un coup
+  it("shows a cell at once when motion is reduced", () => {
+    const world = openDraft({ isReducedMotion: true });
+
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS);
+
+    expect(lastFrame().draft).toHaveLength(1);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Quitter le Dessin pendant un fondu l'arrête : le brouillon ne se voit plus, plus rien n'est attendu
+  it("stops a fade when the draft mode is left", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.draftStore.exitDraftMode();
+    flush(SETTLE_MS);
+
+    expect(lastFrame().draft).toEqual([]);
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement pendant un fondu ne le casse pas
+  it("goes on through a pan", () => {
+    const world = openDraft();
+    world.draftStore.toggleCell(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    flush(FRAME_MS);
+    expect(fadesOf()).toHaveLength(1);
+    flush(SETTLE_MS);
+
+    expect(fadesOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("le viseur de l'inspection qui glisse", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const reticleOf = () => lastFrame().inspectedCell;
+  // Le chemin du viseur, image après image, depuis l'instant où on le lit : jusqu'à ce qu'il n'y ait plus d'image.
+  const reticlePath = (world: ReturnType<typeof openScene>, from: number) => {
+    flush(SETTLE_MS);
+    expect(world.pendingFrames()).toBe(0);
+    return probe.frames
+      .slice(from)
+      .map((frame) => frame.inspectedCell)
+      .filter((cell) => cell !== null);
+  };
+
+  // Première apparition : le viseur paraît sur place, sans glisser, et plus rien n'est attendu
+  it("appears in place on the first inspected cell, without gliding", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.store.inspect(5, 5);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual({ x: 5, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une autre case : le viseur part de l'ancienne, glisse sur `--lp-dur`, et arrive exactement sur la nouvelle
+  it("glides from the old cell to the new one over --lp-dur, and ends exactly on it", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    const from = probe.frames.length;
+
+    world.store.inspect(15, 9);
+    flush(FRAME_MS);
+    expect(reticleOf()).toEqual({ x: 5, y: 5 });
+    const path = reticlePath(world, from);
+
+    const xs = path.map(({ x }) => x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(xs.some((x) => x > 5 && x < 15)).toBe(true);
+    expect(path.length).toBeGreaterThanOrEqual(20);
+    expect(path.length).toBeLessThanOrEqual(24);
+    expect(path.at(-1)).toEqual({ x: 15, y: 9 });
+    expect(path.every(({ x, y }) => Math.abs((y - 5) * 10 - (x - 5) * 4) < 1e-9)).toBe(true);
+  });
+
+  // Choisir une nouvelle case pendant le glissement : le viseur repart de sa place du moment, sans saut
+  it("starts again from where it is when another cell is chosen mid-glide", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    world.store.inspect(25, 5);
+    flush(FRAME_MS * 5);
+    const midway = reticleOf();
+    expect(midway?.x).toBeGreaterThan(5);
+    expect(midway?.x).toBeLessThan(25);
+
+    world.store.inspect(5, 25);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual(midway);
+    flush(SETTLE_MS);
+    expect(reticleOf()).toEqual({ x: 5, y: 25 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // La réponse du gateway pour la même case ne relance pas le glissement
+  it("does not glide again when the answer for the same cell comes in", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    world.store.inspect(15, 5);
+    flush(SETTLE_MS);
+
+    world.receive({ t: "inspected", requestId: world.lastInspect().requestId, x: 15, y: 5 });
+    flush(FRAME_MS);
+
+    expect(world.store.getView().inspection?.status).toBe("empty");
+    expect(reticleOf()).toEqual({ x: 15, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Fermer l'inspection fait disparaître le viseur d'un coup, et le suivant paraît de nouveau sur place
+  it("goes away at once when the inspection closes, and shows in place again after", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.store.closeInspection();
+    flush(FRAME_MS);
+    expect(reticleOf()).toBeNull();
+
+    world.store.inspect(20, 20);
+    flush(FRAME_MS);
+    expect(reticleOf()).toEqual({ x: 20, y: 20 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, le viseur saute à la nouvelle case
+  it("jumps to the new cell when motion is reduced", () => {
+    const world = openScene(LAPTOP_PLACE, { isReducedMotion: true });
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+
+    world.store.inspect(15, 5);
+    flush(FRAME_MS);
+
+    expect(reticleOf()).toEqual({ x: 15, y: 5 });
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Le chemin se dit en cases de la fresque : un déplacement ou un zoom pendant le glissement ne le dévie pas
+  it("keeps its path in canvas cells through a pan and a zoom", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.store.inspect(5, 5);
+    flush(FRAME_MS * 2);
+    const from = probe.frames.length;
+    world.store.inspect(15, 5);
+    flush(FRAME_MS * 3);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    const path = reticlePath(world, from);
+
+    expect(path.every(({ y }) => y === 5)).toBe(true);
+    const xs = path.map(({ x }) => x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(path.at(-1)).toEqual({ x: 15, y: 5 });
+  });
+});
+
+// Les images peintes avec une ancienne fresque encore à l'écran.
+const framesWithGhost = () => probe.frames.filter(({ ghost }) => ghost !== null).length;
+
+describe("la fresque qui paraît en mosaïque", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Le chemin de l'apparition, image après image : l'étape et sa progression, jusqu'à ce qu'il n'y ait plus de mosaïque.
+  const stepsOf = () => probe.frames.flatMap(({ reveal }) => (reveal ? [reveal] : []));
+
+  // Avant le snapshot, la fresque n'est qu'un décor vide : rien n'apparaît encore, et rien n'est attendu
+  it("reveals nothing before the snapshot comes, and schedules nothing", () => {
+    const world = openScene(LAPTOP_PLACE);
+    flush(SETTLE_MS);
+
+    expect(stepsOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // À l'arrivée de l'image : quatre étapes dans l'ordre, chacune de 0 à 1 sur son quart de `--lp-dur-reveal`, puis plus rien
+  it("goes through four steps in order over --lp-dur-reveal once the snapshot comes, then schedules nothing", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.snapshot();
+    flush(FRAME_MS);
+    expect(lastFrame().reveal).toMatchObject({ step: 0, progress: 0 });
+    flush(SETTLE_MS);
+
+    const steps = stepsOf();
+    const stepNumbers = steps.map(({ step }) => step);
+    expect(new Set(stepNumbers)).toEqual(new Set([0, 1, 2, 3]));
+    expect(stepNumbers).toEqual([...stepNumbers].sort());
+    // Chaque étape repart près de 0 (la courbe démarre fort : une image de 16 ms en fait déjà un tiers) et monte sans redescendre.
+    for (const step of [0, 1, 2, 3]) {
+      const progresses = steps.filter((each) => each.step === step).map(({ progress }) => progress);
+      expect(progresses[0]).toBeLessThan(0.5);
+      expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+      expect(progresses.at(-1)).toBeLessThan(1);
+    }
+    expect(steps.length).toBeGreaterThanOrEqual(28);
+    expect(steps.length).toBeLessThanOrEqual(34);
+    expect(lastFrame().reveal).toBeNull();
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les niveaux se calculent une fois par apparition, pas à chaque image : la même mosaïque sert à toutes
+  it("builds the mosaic once for the whole appearance", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.levelBuilds).toBe(1);
+    expect(new Set(stepsOf().map(({ levels }) => levels)).size).toBe(1);
+    expect(stepsOf()[0]?.levels).toHaveLength(3);
+  });
+
+  // Mouvement réduit : la durée vaut 0, la fresque paraît d'un coup, sans mosaïque ni image attendue
+  it("shows the fresque at once when motion is reduced", () => {
+    const world = openScene(LAPTOP_PLACE, { isReducedMotion: true });
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(stepsOf()).toEqual([]);
+    expect(probe.levelBuilds).toBe(0);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Une page remontée quand l'image est déjà là (après une récupération) fait paraître la fresque de la même façon
+  it("reveals a fresque whose image was already there when the scene was made", () => {
+    const world = openScene(LAPTOP_PLACE, { isLoaded: true });
+    flush(SETTLE_MS);
+
+    expect(new Set(stepsOf().map(({ step }) => step))).toEqual(new Set([0, 1, 2, 3]));
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // L'apparition n'a lieu qu'une fois par scène : une nouvelle taille, qui renvoie un snapshot, ne la rejoue pas
+  it("does not play again when another snapshot comes", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(SETTLE_MS);
+    const framesBefore = probe.frames.length;
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.frames.slice(framesBefore).every(({ reveal }) => reveal === null)).toBe(true);
+    expect(probe.levelBuilds).toBe(1);
+  });
+
+  // Les cases arrivées pendant l'apparition ne sont pas perdues : à la fin, l'image du moment est celle qui s'affiche
+  it("keeps the cells that arrive during the appearance: the current image is shown at the end", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(FRAME_MS * 5);
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(lastFrame().reveal).toBeNull();
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Déplacer et zoomer marchent pendant l'apparition, qui suit la vue et va jusqu'au bout
+  it("lets the view pan and zoom meanwhile, and goes on to the end", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.snapshot();
+    flush(FRAME_MS * 3);
+    const view = world.view();
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    flush(FRAME_MS);
+    expect(lastFrame().reveal).not.toBeNull();
+    expect(world.view().offsetX).not.toBe(view.offsetX);
+    flush(SETTLE_MS);
+
+    expect(world.view().scale).toBeGreaterThan(view.scale);
+    expect(lastFrame().reveal).toBeNull();
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
+describe("la fresque que la page quitte pour en suivre une autre", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // La scène qui s'en va a peint : son passage garde sa dernière surface
+  const leaveScene = (handoff: Handoff) => {
+    const left = openScene(LAPTOP_PLACE, { handoff });
+    left.scene.dispose();
+    return left;
+  };
+
+  // La nouvelle scène garde l'ancienne fresque seule à l'écran tant que la sienne n'est pas là
+  it("keeps the old fresque alone on screen until the new one comes", () => {
+    const handoff = createHandoff();
+    const left = leaveScene(handoff);
+    const framesBefore = probe.frames.length;
+
+    const next = openScene(LAPTOP_PLACE, { handoff });
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts.length).toBeGreaterThan(0);
+    expect(probe.ghosts.every((ghost) => ghost === left.surface)).toBe(true);
+    expect(probe.frames).toHaveLength(framesBefore);
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // Quand la nouvelle arrive, l'ancienne s'efface pendant la première étape seulement, puis s'en va
+  it("fades the old one out during the first step only", () => {
+    const handoff = createHandoff();
+    const left = leaveScene(handoff);
+    const next = openScene(LAPTOP_PLACE, { handoff });
+
+    next.snapshot();
+    flush(FRAME_MS);
+    expect(lastFrame().ghost).toEqual({ source: left.surface, alpha: 1 });
+    flush(SETTLE_MS);
+
+    const withGhost = probe.frames.filter(({ ghost }) => ghost !== null);
+    expect(withGhost.length).toBeGreaterThanOrEqual(6);
+    expect(withGhost.every(({ reveal }) => reveal?.step === 0)).toBe(true);
+    const alphas = withGhost.map(({ ghost }) => ghost?.alpha ?? 0);
+    expect(alphas).toEqual([...alphas].sort((a, b) => b - a));
+    expect(alphas.at(-1)).toBeLessThan(0.5);
+    expect(lastFrame().ghost).toBeNull();
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // La première fresque d'une page n'a rien à effacer
+  it("has nothing to fade out for the first fresque of a page", () => {
+    const world = openScene(LAPTOP_PLACE, { handoff: createHandoff() });
+
+    world.snapshot();
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts).toEqual([]);
+    expect(framesWithGhost()).toBe(0);
+  });
+
+  // Un passage trop ancien est oublié : une page qui revient plus tard n'a pas de vieille fresque à l'écran
+  it("forgets a handoff that is too old", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    handoff.leftAt -= 10_000;
+
+    openScene(LAPTOP_PLACE, { handoff });
+    flush(SETTLE_MS);
+
+    expect(probe.ghosts).toEqual([]);
+  });
+
+  // Mouvement réduit : la nouvelle fresque paraît d'un coup, l'ancienne s'en va avec elle
+  it("drops the old fresque as soon as the new one is there when motion is reduced", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    const next = openScene(LAPTOP_PLACE, { handoff, isReducedMotion: true });
+
+    next.snapshot();
+    flush(SETTLE_MS);
+
+    expect(lastFrame().ghost).toBeNull();
+    expect(framesWithGhost()).toBe(0);
+    expect(next.pendingFrames()).toBe(0);
+  });
+
+  // Une scène qui n'a fait que garder l'ancienne fresque n'a rien peint de sienne : elle ne laisse rien derrière elle
+  it("leaves nothing behind when the scene only held the old fresque", () => {
+    const handoff = createHandoff();
+    leaveScene(handoff);
+    const held = openScene(LAPTOP_PLACE, { handoff });
+
+    held.scene.dispose();
+
+    expect(handoff.surface).toBeNull();
+  });
+});
+
+// Un message cells : des cases de plusieurs événements, chacun sous sa version.
+const cellsOf = (
+  lots: { version: number; cells: { x: number; y: number; colorIndex: number }[] }[],
+): ServerFrame => ({
+  t: "cells",
+  toVersion: Math.max(...lots.map(({ version }) => version)),
+  cells: lots.flatMap(({ version, cells }) =>
+    cells.map(({ x, y, colorIndex }) => ({
+      x,
+      y,
+      colorIndex,
+      previousColorIndex: 0,
+      placedAt: NOW,
+      version,
+      kind: "place" as const,
+    })),
+  ),
+});
+
+// `size` cases d'une rangée, à partir de la case (`from`, `row`), toutes de la même couleur.
+const rowOf = (size: number, row: number, colorIndex: number, from = 0) =>
+  Array.from({ length: size }, (_, index) => ({ x: from + index, y: row, colorIndex }));
+
+describe("les cases des autres joueurs, en fondu décalé", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // La fresque est là, sa mosaïque finie : les cases qui arrivent ensuite sont celles des autres joueurs
+  const openArrived = (options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, { ...options, isLoaded: true });
+    flush(SETTLE_MS);
+    return world;
+  };
+  const arrivingOf = () => lastFrame().arriving;
+  const progressesAt = (index: number) =>
+    probe.frames.flatMap(({ arriving }) => {
+      const cell = arriving[index];
+      return cell ? [cell.progress] : [];
+    });
+
+  // Une case arrive : elle part de la couleur montrée, passe à la nouvelle sur `--lp-dur-arrival`, puis plus rien n'est attendu
+  it("fades a cell from the color shown to the new one over --lp-dur-arrival, then schedules nothing", () => {
+    const world = openArrived();
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toEqual([
+      { x: 5, y: 5, base: [{ colorIndex: 0, alpha: 1 }], colorIndex: 9, progress: 0 },
+    ]);
+    flush(SETTLE_MS);
+    const progresses = progressesAt(0);
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.length).toBeGreaterThanOrEqual(17);
+    expect(progresses.length).toBeLessThanOrEqual(21);
+    expect(arrivingOf()).toEqual([]);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases d'un lot paraissent l'une après l'autre, dans l'ordre du lot : la case i a toujours de l'avance sur la i + 1
+  it("shows the cells of a lot one after the other, in the order of the lot", () => {
+    const world = openArrived();
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 25);
+
+    const progresses = arrivingOf().map(({ progress }) => progress);
+    expect(progresses.length).toBeGreaterThanOrEqual(5);
+    expect(progresses).toEqual([...progresses].sort((a, b) => b - a));
+    expect(progresses.at(-1)).toBe(0);
+    flush(SETTLE_MS * 2);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un lot met 1,2 s au plus à démarrer en entier : les 64 cases d'un lot ont fini avant 1,5 s
+  it("starts a whole lot within 1.2 s, whatever its size", () => {
+    const world = openArrived();
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(64, 5, 9) }]));
+    flush(1200);
+    expect(arrivingOf().length).toBeGreaterThan(0);
+    flush(FRAME_MS * 20);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Deux événements d'un même message sont deux lots : ils démarrent ensemble, chacun avec son propre décalage
+  it("treats two events of one message as two lots that start together", () => {
+    const world = openArrived();
+
+    world.receive(
+      cellsOf([
+        { version: 8, cells: rowOf(5, 5, 9) },
+        { version: 9, cells: rowOf(5, 8, 12) },
+      ]),
+    );
+    flush(FRAME_MS * 8);
+
+    const byRow = (row: number) =>
+      arrivingOf()
+        .filter(({ y }) => y === row)
+        .map(({ progress }) => progress);
+    expect(byRow(5)).toEqual(byRow(8));
+    expect(byRow(5)[0]).toBeGreaterThan(byRow(5)[2] ?? 1);
+  });
+
+  // Une case réécrite pendant son fondu repart de la couleur montrée à ce moment vers la nouvelle, sans saut
+  it("starts a rewritten cell again from the color it was showing", () => {
+    const world = openArrived();
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS * 4);
+    const showing = progressesAt(0).at(-1) ?? 0;
+
+    world.receive(placedByOther(5, 5, 14));
+    flush(FRAME_MS);
+
+    const [rewritten] = arrivingOf();
+    expect(showing).toBeGreaterThan(0);
+    expect(rewritten?.colorIndex).toBe(14);
+    expect(rewritten?.progress).toBe(0);
+    expect(rewritten?.base.map(({ colorIndex }) => colorIndex)).toEqual([0, 9]);
+    expect(rewritten?.base[1]?.alpha).toBeCloseTo(showing, 1);
+    flush(SETTLE_MS);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Au plus 200 cases en fondu ou en attente : un lot qui ne tient pas dans la place restante paraît en entier d'un coup
+  it("shows a lot that does not fit in the room left at once, never half animated", () => {
+    const world = openArrived();
+
+    world.receive(
+      cellsOf([
+        { version: 8, cells: rowOf(48, 1, 9) },
+        { version: 9, cells: rowOf(48, 2, 9) },
+        { version: 10, cells: rowOf(48, 3, 9) },
+        { version: 11, cells: rowOf(48, 4, 9) },
+        { version: 12, cells: rowOf(48, 5, 9) },
+      ]),
+    );
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toHaveLength(192);
+    expect(arrivingOf().some(({ y }) => y === 5)).toBe(false);
+    expect(lastFrame().colorIndexAt(10, 5)).toBe(9);
+    // Un petit lot de plus ne tient pas non plus dans les 8 places restantes : lui aussi d'un coup.
+    world.receive(cellsOf([{ version: 13, cells: rowOf(10, 6, 12) }]));
+    flush(FRAME_MS);
+    expect(arrivingOf()).toHaveLength(192);
+    expect(arrivingOf().some(({ y }) => y === 6)).toBe(false);
+    flush(SETTLE_MS * 4);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un lot d'un coup remplace le fondu qu'une de ses cases avait en cours
+  it("replaces a running fade with the lot that comes at once", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(48, 1, 9) }]));
+    world.receive(cellsOf([{ version: 9, cells: rowOf(48, 2, 9) }]));
+    world.receive(cellsOf([{ version: 10, cells: rowOf(48, 3, 9) }]));
+    world.receive(cellsOf([{ version: 11, cells: rowOf(48, 4, 9) }]));
+    flush(FRAME_MS);
+    expect(arrivingOf().some(({ y }) => y === 1)).toBe(true);
+
+    // Trente cases déjà en fondu et trente neuves : le lot ne tient pas, il paraît d'un coup et vide leurs fondus.
+    world.receive(cellsOf([{ version: 12, cells: [...rowOf(30, 1, 14), ...rowOf(30, 9, 14)] }]));
+    flush(FRAME_MS);
+
+    expect(arrivingOf().filter(({ y }) => y === 1)).toHaveLength(18);
+    expect(arrivingOf().some(({ y }) => y === 9)).toBe(false);
+    expect(lastFrame().colorIndexAt(0, 1)).toBe(14);
+  });
+
+  // Sa propre pose, que la page a déjà montrée, n'a pas de nouveau fondu quand le gateway la rediffuse
+  it("does not fade the own pose again when the gateway sends it back", () => {
+    const world = openArrived();
+    void world.store.placeBatch([{ x: 5, y: 5, colorIndex: 3 }], "ptest0001");
+
+    world.receive(placedByOther(5, 5, 3));
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Pendant la mosaïque, les cases arrivées paraissent d'un coup : l'image du moment est celle qui s'affiche à la fin
+  it("shows the cells that arrive during the mosaic at once", () => {
+    const world = openScene(LAPTOP_PLACE, { isLoaded: true });
+    flush(FRAME_MS * 4);
+    expect(lastFrame().reveal).not.toBeNull();
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(probe.frames.every(({ arriving }) => arriving.length === 0)).toBe(true);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, tout paraît d'un coup, sans décalage ni image attendue
+  it("shows everything at once when motion is reduced", () => {
+    const world = openArrived({ isReducedMotion: true });
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(SETTLE_MS);
+
+    expect(probe.frames.every(({ arriving }) => arriving.length === 0)).toBe(true);
+    expect(lastFrame().colorIndexAt(9, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement ou un zoom pendant les fondus ne les casse pas
+  it("goes on through a pan and a zoom", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 5);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    flush(FRAME_MS);
+    expect(arrivingOf().length).toBeGreaterThan(0);
+    flush(SETTLE_MS * 3);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Quand la scène se défait pendant un fondu, plus aucune image n'est attendue
+  it("schedules nothing once the scene is disposed", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 3);
+
+    world.scene.dispose();
+
+    expect(world.pendingFrames()).toBe(0);
+  });
+});
+
 describe("draft-zoom, Écart §9.3 (JOURNAL 2026-10-09)", () => {
   // Plus de zoom d'entrée en Dessin dans le module : ne restent les tailles de confort, le zoom du toucher et l'animation
   it("keeps no entry zoom: only the comfort sizes, the tap zoom and the animation", async () => {
@@ -1027,19 +2058,19 @@ describe("la scène du canvas et le fond de la fresque, Écart §9.1 (JOURNAL 20
   it("follows a background, an image and an opacity changed live, without a reload", () => {
     const world = openScene(LAPTOP_PLACE);
 
-    world.receive({ t: "backgroundImage", at: 1_760_000_000_000 });
+    world.receiveAndPaint({ t: "backgroundImage", at: 1_760_000_000_000 });
     FakeImage.made[0]?.load();
     flush(FRAME_MS);
     expect(lastFrame().backdrop).toMatchObject({ fill: null, image: { opacity: 40 } });
 
-    world.receive({ t: "obsBackground", obsBackground: "black" });
-    world.receive({ t: "backgroundImageOpacity", backgroundImageOpacity: 70 });
+    world.receiveAndPaint({ t: "obsBackground", obsBackground: "black" });
+    world.receiveAndPaint({ t: "backgroundImageOpacity", backgroundImageOpacity: 70 });
     expect(lastFrame().backdrop).toMatchObject({ fill: "#000000", image: { opacity: 70 } });
 
-    world.receive({ t: "backgroundImage" });
+    world.receiveAndPaint({ t: "backgroundImage" });
     expect(lastFrame().backdrop).toEqual({ fill: "#000000", image: null });
 
-    world.receive({ t: "obsBackground", obsBackground: "transparent" });
+    world.receiveAndPaint({ t: "obsBackground", obsBackground: "transparent" });
     expect(lastFrame().backdrop).toEqual({ fill: null, image: null });
     expect(fakeLayer.hidden).toBe(false);
   });
