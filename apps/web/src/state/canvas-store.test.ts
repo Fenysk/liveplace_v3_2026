@@ -1144,6 +1144,60 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
     });
   });
 
+  // Prend la nouvelle opacité de l'image du fond, celle du welcome puis celle d'une frame, et envoie celle que le streamer choisit
+  it("takes the image opacity of the welcome, then a changed one, and sends the one the owner picks", () => {
+    const { store, sent, receive } = setup({ isWelcomed: false });
+    const plain = { ...welcome, params: { ...welcome.params } };
+    if (plain.t !== "welcome") throw new Error("le welcome d'exemple n'en est pas un");
+
+    receive({ ...plain, params: { ...plain.params, backgroundImageOpacity: 70 } });
+    expect(store.getView().params?.backgroundImageOpacity).toBe(70);
+
+    receive({ t: "backgroundImageOpacity", backgroundImageOpacity: 20 });
+    store.setBackgroundImageOpacity(90);
+
+    expect(store.getView().params).toEqual({ ...plain.params, backgroundImageOpacity: 20 });
+    expect(sent.at(-1)).toEqual({
+      t: "setBackgroundImageOpacity",
+      requestId: expect.any(String),
+      backgroundImageOpacity: 90,
+    });
+  });
+
+  // Prend l'instant de l'image du fond du welcome, puis celui d'une frame qui la change, puis plus aucun quand la frame n'en
+  // porte pas, sans toucher au reste des params (Écart §8.1, JOURNAL 2026-10-10)
+  it("takes the instant of the background image of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+    const plain = { ...welcome, params: { ...welcome.params } };
+    if (plain.t !== "welcome") throw new Error("le welcome d'exemple n'en est pas un");
+
+    receive({ ...plain, params: { ...plain.params, backgroundImageAt: 1_760_000_000_000 } });
+    expect(store.getView().params?.backgroundImageAt).toBe(1_760_000_000_000);
+
+    receive({ t: "backgroundImage", at: 1_770_000_000_000 });
+    expect(store.getView().params).toEqual({ ...plain.params, backgroundImageAt: 1_770_000_000_000 });
+
+    receive({ t: "backgroundImage" });
+    expect(store.getView().params).toEqual(plain.params);
+    expect(store.getView().params).not.toHaveProperty("backgroundImageAt");
+  });
+
+  // Une reconnexion dit l'image du moment : un welcome sans image retire celle qu'on avait ; une frame arrivée avant le
+  // premier welcome n'a rien à changer
+  it("lets a reconnection's welcome without an image drop the one it had, and ignores a frame before the first welcome", () => {
+    const { store, receive, close } = setup({ isWelcomed: false });
+
+    receive({ t: "backgroundImage", at: 1_760_000_000_000 });
+    expect(store.getView().params).toBeUndefined();
+
+    receive(welcome);
+    receive({ t: "backgroundImage", at: 1_760_000_000_000 });
+    close();
+    receive(welcome);
+
+    expect(store.getView().params).not.toHaveProperty("backgroundImageAt");
+  });
+
   // Prend le thème du welcome, puis celui d'une frame qui le change, puis plus aucun quand la frame n'en porte pas, sans
   // toucher au reste des params (Écart §8.1, JOURNAL 2026-10-07)
   it("takes the theme of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {

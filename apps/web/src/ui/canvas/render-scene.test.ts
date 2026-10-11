@@ -7,7 +7,7 @@ const SHADES = { void: "void", border: "border", grid: "grid", outlineIn: "in", 
 const NO_OP = (): void => undefined;
 
 type Call = {
-  op: "clearRect" | "fillRect" | "stroke" | "drawImage";
+  op: "clearRect" | "fillRect" | "stroke" | "drawImage" | "save" | "restore" | "rect" | "clip";
   alpha: number;
   style: string;
   rect?: number[];
@@ -29,6 +29,10 @@ type FakeContext = Pick<
   "canvas" | "globalAlpha" | "fillStyle" | "strokeStyle" | "lineWidth" | "lineCap" | "imageSmoothingEnabled"
 > & {
   setTransform: (...args: never[]) => void;
+  save: () => void;
+  restore: () => void;
+  rect: (...args: never[]) => void;
+  clip: () => void;
   clearRect: (...args: never[]) => void;
   drawImage: (...args: never[]) => void;
   fillRect: (...args: never[]) => void;
@@ -51,6 +55,18 @@ const recordingContext = () => {
     lineCap: "butt",
     imageSmoothingEnabled: true,
     setTransform: NO_OP,
+    save: () => {
+      calls.push({ op: "save", alpha: fake.globalAlpha, style: "" });
+    },
+    restore: () => {
+      calls.push({ op: "restore", alpha: fake.globalAlpha, style: "" });
+    },
+    rect: (...rect: number[]) => {
+      calls.push({ op: "rect", alpha: fake.globalAlpha, style: "", rect });
+    },
+    clip: () => {
+      calls.push({ op: "clip", alpha: fake.globalAlpha, style: "" });
+    },
     drawImage: (source: object, ...args: number[]) => {
       calls.push({ op: "drawImage", alpha: fake.globalAlpha, style: "", source: TAGS.get(source), args });
     },
@@ -80,6 +96,7 @@ type SceneParts = {
   draftFades?: Scene["draftFades"];
   settling?: readonly SettlingBatch[];
   arriving?: Scene["arriving"];
+  backdrop?: Scene["backdrop"];
   reveal?: Scene["reveal"];
   ghost?: Scene["ghost"];
   shown?: number;
@@ -92,6 +109,7 @@ const sceneOf = ({
   draftFades = new Map(),
   settling = [],
   arriving = [],
+  backdrop = { fill: null, image: null },
   reveal = null,
   ghost = null,
   shown = 0,
@@ -102,6 +120,7 @@ const sceneOf = ({
   viewport: { scale: 10, offsetX: 0, offsetY: 0 },
   canvas: { width: 10, height: 10 },
   image: IMAGE,
+  backdrop,
   reveal,
   ghost,
   shades: SHADES,
@@ -491,5 +510,59 @@ describe("une case posée par un autre joueur, en fondu", () => {
 
     expect(context.globalAlpha).toBe(1);
     expect(paint({}).calls.some((call) => call.op === "clearRect" && isOnCell(call))).toBe(false);
+  });
+});
+
+describe("les effets sur une fresque à fond noir, blanc ou image (Écart §9.1, JOURNAL 2026-10-10)", () => {
+  const BLACK = { fill: "black", image: null } as const;
+  const arriving = [{ ...CELL, base: [{ colorIndex: 1, alpha: 1 }], colorIndex: 2, progress: 0.5 }];
+
+  // Une case vidée pour être refaite retrouve le fond dans son seul rectangle, avant ses couleurs : pas de trou dans le fond
+  it("gives the backdrop back to a cell it clears, inside its own rectangle only, before its colors", () => {
+    const { calls } = paint({ arriving, backdrop: BLACK });
+    const start = calls.findIndex((call) => call.op === "clearRect" && isOnCell(call));
+
+    expect(calls.slice(start, start + 8).map(({ op, style, rect }) => [op, style, rect?.join()])).toEqual([
+      ["clearRect", "", CELL_RECT.join()],
+      ["save", "", undefined],
+      ["rect", "", CELL_RECT.join()],
+      ["clip", "", undefined],
+      ["fillRect", "black", "0,0,100,100"],
+      ["restore", "", undefined],
+      ["fillRect", PALETTE[1], CELL_RECT.join()],
+      ["fillRect", PALETTE[2], CELL_RECT.join()],
+    ]);
+  });
+
+  // Sans fond (le transparent sans image), une case vidée reste vide : le damier du jeu se voit à travers
+  it("leaves a cleared cell empty without a backdrop, for the checkerboard to show through", () => {
+    const { calls } = paint({ arriving });
+
+    expect(calls.some((call) => call.op === "clip")).toBe(false);
+  });
+
+  // Une pose en vol ou qui se pose refait sa case de la même façon : le fond d'abord
+  it("does the same for a cell that settles", () => {
+    const { calls } = paint({ settling: [settlingOf(0.5, 2, 1)], shown: 2, backdrop: BLACK });
+    const start = calls.findIndex((call) => call.op === "clearRect" && isOnCell(call));
+
+    expect(calls.slice(start, start + 6).map((call) => call.op)).toEqual([
+      "clearRect",
+      "save",
+      "rect",
+      "clip",
+      "fillRect",
+      "restore",
+    ]);
+  });
+
+  // Pendant la mosaïque, le fond est déjà peint sous les blocs : il vient avant la première étape
+  it("paints the backdrop before the first step of the mosaic, so it is already there under the blocks", () => {
+    const { calls } = paint({ backdrop: BLACK, reveal: { levels: LEVELS, step: 0, progress: 0.5 } });
+    const fill = calls.findIndex((call) => call.op === "fillRect" && call.style === "black");
+    const blocks = calls.findIndex((call) => call.source === "blocks of 8");
+
+    expect(fill).toBeGreaterThanOrEqual(0);
+    expect(fill).toBeLessThan(blocks);
   });
 });

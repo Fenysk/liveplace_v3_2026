@@ -74,12 +74,26 @@ const setup = () => {
     for (const listener of listeners) listener();
   };
   const setBackground = (obsBackground: ObsBackground) => {
-    const params = viewWithDelay(10_000).params;
-    if (params) view = { ...view, params: { ...params, obsBackground } };
+    if (view.params) view = { ...view, params: { ...view.params, obsBackground } };
+    for (const listener of listeners) listener();
+  };
+  // L'image et son opacité se disent seules : le reste de `params` est celui du moment, sans l'ancienne image ni l'ancienne opacité.
+  const setBackgroundImage = (image: { at?: number; opacity?: number }) => {
+    if (view.params) {
+      const { backgroundImageAt: previousAt, backgroundImageOpacity: previousOpacity, ...rest } = view.params;
+      view = {
+        ...view,
+        params: {
+          ...rest,
+          ...(image.at ? { backgroundImageAt: image.at } : {}),
+          ...(image.opacity === undefined ? {} : { backgroundImageOpacity: image.opacity }),
+        },
+      };
+    }
     for (const listener of listeners) listener();
   };
   const store = createObsStore(canvas, obsClock);
-  return { store, advanceTo, arrive, setDelay, setBackground };
+  return { store, advanceTo, arrive, setDelay, setBackground, setBackgroundImage };
 };
 
 const pose = (placedAt: number) => ({
@@ -132,6 +146,36 @@ describe("createObsStore (§9.5, JOURNAL 2026-09-25)", () => {
 
     setBackground("black");
     expect(store.getView().background).toBe("black");
+  });
+
+  // Prend l'image du fond posée, changée ou retirée à chaud, sans toucher au fond, sans rechargement (Écart §9.1, JOURNAL 2026-10-10)
+  it("takes a background image set, changed or cleared live, leaving the background alone, without a reload", () => {
+    const { store, arrive, setBackground, setBackgroundImage } = setup();
+    arrive({ kind: "snapshot", pixels: new Uint8Array(16), recent: null });
+    expect(store.getView().backgroundImageAt).toBeUndefined();
+
+    setBackground("black");
+    setBackgroundImage({ at: 1_760_000_000_000 });
+    expect(store.getView()).toMatchObject({ background: "black", backgroundImageAt: 1_760_000_000_000 });
+
+    setBackgroundImage({ at: 1_770_000_000_000 });
+    expect(store.getView().backgroundImageAt).toBe(1_770_000_000_000);
+
+    setBackgroundImage({});
+    expect(store.getView().backgroundImageAt).toBeUndefined();
+  });
+
+  // L'opacité de l'image : 40 % tant que le canvas n'en dit pas une, puis celle qu'il dit, à chaud
+  it("shows 40 % for the image opacity until the canvas says another, then takes it live", () => {
+    const { store, arrive, setBackgroundImage } = setup();
+    arrive({ kind: "snapshot", pixels: new Uint8Array(16), recent: null });
+    expect(store.getView().backgroundImageOpacity).toBe(40);
+
+    setBackgroundImage({ opacity: 80 });
+    expect(store.getView().backgroundImageOpacity).toBe(80);
+
+    setBackgroundImage({ opacity: 0 });
+    expect(store.getView().backgroundImageOpacity).toBe(0);
   });
 
   // N'est prête qu'après son premier snapshot

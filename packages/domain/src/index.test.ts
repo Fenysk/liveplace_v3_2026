@@ -1,6 +1,10 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   AUDIENCE_DAYS,
+  BACKGROUND_IMAGE_MAX_BYTES,
+  BACKGROUND_IMAGE_MAX_SIDE,
+  BACKGROUND_IMAGE_OPACITY,
+  BACKGROUND_IMAGE_OPACITY_STEPS,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
   CANVAS_STATUSES,
@@ -16,6 +20,7 @@ import {
   GAUGE_MAX_START,
   type GaugeParams,
   generateLinkCode,
+  isBackgroundImageOpacity,
   isCanvasSize,
   isDeveloper,
   isGaugeLimits,
@@ -353,10 +358,25 @@ describe("the canvas sizes (CDC 2026 §1)", () => {
 });
 
 describe("the OBS backgrounds (CDC 2026 §1)", () => {
-  // Transparent par défaut, puis noir et blanc, dans l'ordre où le réglage les montre
-  it("lists transparent, black and white, transparent being the default", () => {
+  // Transparent par défaut, puis noir et blanc : l'image n'est pas un fond, elle se pose par-dessus (Écart §9.1, JOURNAL 2026-10-10)
+  it("lists transparent, black and white, transparent being the default, and no image: it lies over any of them", () => {
     expect(OBS_BACKGROUNDS).toEqual(["transparent", "black", "white"]);
     expect(OBS_BACKGROUND).toBe("transparent");
+  });
+
+  // L'opacité de l'image va de 0 à 100 % par crans de 10, et vaut 40 % par défaut ; rien entre deux crans
+  it("steps the image opacity from 0 to 100 % by ten, 40 % by default, and accepts nothing between two steps", () => {
+    expect(BACKGROUND_IMAGE_OPACITY_STEPS).toEqual([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+    expect(BACKGROUND_IMAGE_OPACITY).toBe(40);
+    expect(BACKGROUND_IMAGE_OPACITY_STEPS.every(isBackgroundImageOpacity)).toBe(true);
+    for (const opacity of [-10, 5, 45, 101, 110, Number.NaN])
+      expect(isBackgroundImageOpacity(opacity)).toBe(false);
+  });
+
+  // L'image du fond se borne à 2048 px et 2 Mo : ce que la page respecte, et que le web refuse au-delà
+  it("bounds the background image to 2048 px and 2 MB", () => {
+    expect(BACKGROUND_IMAGE_MAX_SIDE).toBe(2048);
+    expect(BACKGROUND_IMAGE_MAX_BYTES).toBe(2 * 1024 * 1024);
   });
 });
 

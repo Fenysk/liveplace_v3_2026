@@ -17,11 +17,11 @@ const browserClock: ObsClock = {
   },
 };
 
-type ObsPageProps = { canvasId: string; openCanvas: CanvasOpener };
+type ObsPageProps = { canvasId: string; login: string; openCanvas: CanvasOpener };
 
 type Stores = { canvas: CanvasStore; obs: ObsStore };
 
-export const ObsPage = ({ canvasId, openCanvas }: ObsPageProps) => {
+export const ObsPage = ({ canvasId, login, openCanvas }: ObsPageProps) => {
   const [stores, setStores] = useState<Stores>();
   useFollowActiveCanvas(stores?.canvas);
 
@@ -36,5 +36,5 @@ export const ObsPage = ({ canvasId, openCanvas }: ObsPageProps) => {
     };
   }, [canvasId, openCanvas]);
 
-  return <main className="lp-obs">{stores && <ObsCanvas store={stores.obs} />}</main>;
+  return <main className="lp-obs">{stores && <ObsCanvas store={stores.obs} login={login} />}</main>;
 };

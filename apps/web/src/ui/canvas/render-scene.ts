@@ -1,14 +1,15 @@
-// Une image à l'écran (§9.3), dans l'ordre : les pixels (ou leur mosaïque à l'apparition), les cases des autres joueurs
-// en fondu, les cases qui se posent, le brouillon, la grille, la bordure,
-// le contour du brouillon, celui des cases qui se posent, la case visée, le viseur de la case inspectée,
-// puis la fresque que la page vient de quitter, qui s'efface.
+// Une image à l'écran (§9.3), dans l'ordre : le fond de la fresque, les pixels (ou leur mosaïque à l'apparition), les cases des
+// autres joueurs en fondu, les cases qui se posent, le brouillon, la grille, la bordure, le contour du brouillon, celui des cases
+// qui se posent, la case visée, le viseur de la case inspectée, puis la fresque que la page vient de quitter, qui s'efface.
 // Le vide et le damier ne sont pas ici : ce sont deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent
-// pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents.
+// pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents, sauf quand la fresque a un
+// fond noir, blanc ou image : il le peint lui-même, sous les pixels, et le damier se retire (Écart §9.1, JOURNAL 2026-10-10).
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
 import type { ConfirmedPixel, Pixel } from "../../state/canvas-store";
 import { type ColorLayer, shownLayers } from "./arrival";
+import { type Backdrop, renderBackdrop } from "./canvas-background";
 import { REVEAL_BLOCKS } from "./mosaic";
 import type { Cell, Size, Viewport } from "./viewport";
 
@@ -50,6 +51,7 @@ export type Scene = {
   viewport: Viewport;
   canvas: Size;
   image: CanvasImageSource;
+  backdrop: Backdrop; // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, sous les pixels ; le damier cède quand il peint
   reveal: Reveal | null;
   ghost: Ghost | null;
   shades: SceneShades;
@@ -123,6 +125,29 @@ export const fillErased = (
   context.stroke();
 };
 
+// Le cadre de la fresque à l'écran, en pixels physiques.
+const frameOf = ({ viewport, pixelRatio, canvas }: Scene): Rect => {
+  const cellSize = viewport.scale * pixelRatio;
+  return {
+    left: viewport.offsetX * pixelRatio,
+    top: viewport.offsetY * pixelRatio,
+    width: canvas.width * cellSize,
+    height: canvas.height * cellSize,
+  };
+};
+
+// Une case vidée pour être refaite : le fond de la fresque (noir, blanc, image) lui est rendu, sinon elle ferait un trou.
+const clearCell = (context: CanvasRenderingContext2D, scene: Scene, rect: Rect) => {
+  context.clearRect(rect.left, rect.top, rect.width, rect.height);
+  if (scene.backdrop.fill === null && !scene.backdrop.image) return;
+  context.save();
+  context.beginPath();
+  context.rect(rect.left, rect.top, rect.width, rect.height);
+  context.clip();
+  renderBackdrop(context, frameOf(scene), scene.backdrop);
+  context.restore();
+};
+
 // L'image porte déjà la pose optimiste d'une case : on lui rend la couleur d'avant, sous l'aspect brouillon qui la recouvre.
 // Une gomme n'en a pas besoin : son aspect couvre la case.
 const restoreCell = (
@@ -132,7 +157,7 @@ const restoreCell = (
   { colorIndex }: Pixel,
   previousColorIndex: number,
 ) => {
-  context.clearRect(rect.left, rect.top, rect.width, rect.height);
+  clearCell(context, scene, rect);
   if (colorIndex === TRANSPARENT_COLOR_INDEX) return;
   context.globalAlpha = 1;
   context.fillStyle = scene.palette[previousColorIndex] ?? scene.shades.void;
@@ -355,7 +380,7 @@ const strokeReticle = (
 const renderArriving = (context: CanvasRenderingContext2D, scene: Scene, cellRect: CellRect) => {
   for (const { x, y, base, colorIndex, progress } of scene.arriving) {
     const rect = cellRect(x, y);
-    context.clearRect(rect.left, rect.top, rect.width, rect.height);
+    clearCell(context, scene, rect);
     for (const layer of shownLayers(base, colorIndex, progress)) {
       context.globalAlpha = layer.alpha;
       context.fillStyle = scene.palette[layer.colorIndex] ?? scene.shades.void;
@@ -430,14 +455,11 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, screenWidth, screenHeight);
 
+  const canvasFrame = frameOf(scene);
+  renderBackdrop(context, canvasFrame, scene.backdrop);
   // Remis à chaque image : redimensionner un <canvas> remet son contexte à zéro.
   context.imageSmoothingEnabled = false;
-  renderImage(context, scene, {
-    left: originX,
-    top: originY,
-    width: canvas.width * cellSize,
-    height: canvas.height * cellSize,
-  });
+  renderImage(context, scene, canvasFrame);
   const oneCellRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
   renderArriving(context, scene, oneCellRect);
   fillSettling(context, scene, oneCellRect, lineWidth);

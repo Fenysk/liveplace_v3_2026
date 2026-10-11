@@ -217,6 +217,8 @@ type SetupOptions = {
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
   archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
   theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
+  backgroundImageAt?: number; // l'instant de l'image du fond lu dans `meta` (Écart §8.1, JOURNAL 2026-10-10)
+  backgroundImageOpacity?: number; // l'opacité de cette image lue dans `meta` (Écart §9.1, JOURNAL 2026-10-10)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   isForbiddenByScripts?: boolean; // les scripts répondent `forbidden`, comme après un rôle perdu que le gateway ignore encore
   isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
@@ -239,6 +241,7 @@ const setup = (options: SetupOptions = {}) => {
   const recentSince: number[] = [];
   const obsDelays: number[] = [];
   const obsBackgrounds: string[] = [];
+  const backgroundImageOpacities: number[] = [];
   const claims: GaugeClaim[] = [];
   const gaugeLimits: GaugeLimits[] = [];
   const namedModerators: ModeratorRole[] = [];
@@ -251,6 +254,10 @@ const setup = (options: SetupOptions = {}) => {
     ...meta,
     ...(options.archivedAt === undefined ? {} : { archivedAt: options.archivedAt }),
     ...(options.theme === undefined ? {} : { theme: options.theme }),
+    ...(options.backgroundImageAt === undefined ? {} : { backgroundImageAt: options.backgroundImageAt }),
+    ...(options.backgroundImageOpacity === undefined
+      ? {}
+      : { backgroundImageOpacity: options.backgroundImageOpacity }),
   };
   const core = {
     async getCanvas(asked: string) {
@@ -323,6 +330,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     async setObsBackground(_asked: string, obsBackground: ObsBackground) {
       obsBackgrounds.push(obsBackground);
+    },
+    async setBackgroundImageOpacity(_asked: string, backgroundImageOpacity: number) {
+      backgroundImageOpacities.push(backgroundImageOpacity);
     },
     async claimGauge(_asked: string, claim: GaugeClaim) {
       claims.push(claim);
@@ -439,6 +449,7 @@ const setup = (options: SetupOptions = {}) => {
     recentSince,
     obsDelays,
     obsBackgrounds,
+    backgroundImageOpacities,
     claims,
     gaugeLimits,
     namedModerators,
@@ -1221,6 +1232,88 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
   });
 
+  // L'opacité de l'image se demande comme le fond : le streamer seul, le cœur l'écrit, toutes les pages la reçoivent (Écart §9.1, JOURNAL 2026-10-10)
+  it("passes the image opacity only for the owner, and hands it to every page", async () => {
+    const context = setup({ session: owner });
+    const viewer = context.open(session);
+    const obs = context.open(null);
+    for (const opened of [context, viewer]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    const setOpacity = JSON.stringify({
+      t: "setBackgroundImageOpacity",
+      requestId: "opacity-1",
+      backgroundImageOpacity: 80,
+    });
+
+    await viewer.connection.receive(setOpacity);
+    await context.connection.receive(setOpacity);
+    context.control({ t: "backgroundImageOpacity", backgroundImageOpacity: 80 });
+
+    expect(viewer.sent.at(-2)).toEqual({ t: "error", code: "forbidden", requestId: "opacity-1" });
+    expect(context.backgroundImageOpacities).toEqual([80]);
+    for (const opened of [context, viewer, obs])
+      expect(opened.sent.at(-1)).toEqual({ t: "backgroundImageOpacity", backgroundImageOpacity: 80 });
+  });
+
+  // Refuse un cran qui n'en est pas un avant le cœur : le schéma du protocole le dit, la connexion ne l'écrit pas
+  it("never writes an opacity that is no step: the schema refuses it before the core", async () => {
+    const context = setup({ session: owner });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(
+      JSON.stringify({ t: "setBackgroundImageOpacity", requestId: "opacity-2", backgroundImageOpacity: 45 }),
+    );
+
+    expect(context.backgroundImageOpacities).toEqual([]);
+  });
+
+  // Donne l'instant de l'image du fond dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-10)
+  it("gives the instant of the background image in the params of the welcome, to everyone, and none when the canvas has none", async () => {
+    const pictured = setup({
+      session: owner,
+      backgroundImageAt: 1_760_000_000_000,
+      backgroundImageOpacity: 70,
+    });
+    const viewer = pictured.open(session);
+    const guest = pictured.open(null);
+    const obs = pictured.open(null);
+    const plain = setup();
+
+    for (const opened of [pictured, viewer, guest]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    await plain.connection.receive(hello());
+
+    for (const opened of [pictured, viewer, guest, obs])
+      expect(opened.sent[0]).toMatchObject({
+        t: "welcome",
+        params: { backgroundImageAt: 1_760_000_000_000, backgroundImageOpacity: 70 },
+      });
+    const plainWelcome = plain.sent[0];
+    expect(plainWelcome).toMatchObject({ t: "welcome" });
+    expect(plainWelcome && "params" in plainWelcome && "backgroundImageAt" in plainWelcome.params).toBe(
+      false,
+    );
+    expect(plainWelcome && "params" in plainWelcome && "backgroundImageOpacity" in plainWelcome.params).toBe(
+      false,
+    );
+  });
+
+  // Transmet une image qui change, ou qui part, à toutes les pages du canvas, vue OBS comprise, telle que le web l'a publiée
+  it("hands a background image that changes or goes away to every page of the canvas, OBS view included, as the web published it", async () => {
+    const context = setup({ session: owner, backgroundImageAt: 1_760_000_000_000 });
+    const viewer = context.open(session);
+    const obs = context.open(null);
+    for (const opened of [context, viewer]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+
+    context.control({ t: "backgroundImage", at: 1_770_000_000_000 });
+    for (const opened of [context, viewer, obs])
+      expect(opened.sent.at(-1)).toEqual({ t: "backgroundImage", at: 1_770_000_000_000 });
+
+    context.control({ t: "backgroundImage" });
+    for (const opened of [context, viewer, obs]) expect(opened.sent.at(-1)).toEqual({ t: "backgroundImage" });
+  });
+
   // Donne le thème du canvas dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-07)
   it("gives the canvas theme in the params of the welcome, to everyone, and none when the canvas has none", async () => {
     const themed = setup({ session: owner, theme: "Halloween" });
@@ -1495,6 +1588,11 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
     { name: "setObsDelay", minimum: "owner", frame: { t: "setObsDelay", obsDelayMs: 60_000 } },
     { name: "setObsBackground", minimum: "owner", frame: { t: "setObsBackground", obsBackground: "white" } },
     {
+      name: "setBackgroundImageOpacity",
+      minimum: "owner",
+      frame: { t: "setBackgroundImageOpacity", backgroundImageOpacity: 80 },
+    },
+    {
       name: "setGaugeLimits",
       minimum: "owner",
       frame: { t: "setGaugeLimits", gaugeMaxStart: 20, gaugeMaxCeiling: 40 },
@@ -1511,6 +1609,7 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
     ...context.namedModerators,
     ...context.obsDelays,
     ...context.obsBackgrounds,
+    ...context.backgroundImageOpacities,
     ...context.gaugeLimits,
   ];
 
@@ -1702,6 +1801,11 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
     resizeCanvas: { t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 },
     setObsDelay: { t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 },
     setObsBackground: { t: "setObsBackground", requestId: "background-1", obsBackground: "white" },
+    setBackgroundImageOpacity: {
+      t: "setBackgroundImageOpacity",
+      requestId: "opacity-1",
+      backgroundImageOpacity: 80,
+    },
     setGaugeLimits: { t: "setGaugeLimits", requestId: "limits-1", gaugeMaxStart: 20, gaugeMaxCeiling: 40 },
     listBans: { t: "listBans", requestId: "bans-1" },
     listModerators: { t: "listModerators", requestId: "moderators-1" },
@@ -1764,9 +1868,10 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
       context.reports,
       context.obsDelays,
       context.obsBackgrounds,
+      context.backgroundImageOpacities,
       context.gaugeLimits,
       context.listedPixels,
-    ]).toEqual([[], [], [], [], [], [], [], [], []]);
+    ]).toEqual([[], [], [], [], [], [], [], [], [], []]);
   });
 
   // Laisse l'inspection et le ping : une archive se regarde, et la connexion reste en vie

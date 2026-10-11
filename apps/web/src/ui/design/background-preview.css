@@ -1,0 +1,88 @@
+/* La vignette de l'image du fond (Écart §9.1, JOURNAL 2026-10-10) : l'image par-dessus le fond choisi, à l'opacité du curseur.
+   Le fond est celui du jeu : le damier du transparent, le vrai noir et le vrai blanc de tokens.css. L'opacité vient de
+   `data-opacity`, un cran par règle : la CSP de production bloque l'attribut `style` du HTML du serveur. */
+.lp-bg-preview {
+  position: relative;
+  flex: none;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--chip-hover);
+}
+
+.lp-bg-preview--transparent {
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 14px 14px;
+}
+
+.lp-bg-preview--black {
+  background: var(--obs-black);
+}
+
+.lp-bg-preview--white {
+  background: var(--obs-white);
+}
+
+.lp-bg-preview-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lp-bg-preview-image[data-opacity="0"] {
+  opacity: 0;
+}
+
+.lp-bg-preview-image[data-opacity="10"] {
+  opacity: 0.1;
+}
+
+.lp-bg-preview-image[data-opacity="20"] {
+  opacity: 0.2;
+}
+
+.lp-bg-preview-image[data-opacity="30"] {
+  opacity: 0.3;
+}
+
+.lp-bg-preview-image[data-opacity="40"] {
+  opacity: 0.4;
+}
+
+.lp-bg-preview-image[data-opacity="50"] {
+  opacity: 0.5;
+}
+
+.lp-bg-preview-image[data-opacity="60"] {
+  opacity: 0.6;
+}
+
+.lp-bg-preview-image[data-opacity="70"] {
+  opacity: 0.7;
+}
+
+.lp-bg-preview-image[data-opacity="80"] {
+  opacity: 0.8;
+}
+
+.lp-bg-preview-image[data-opacity="90"] {
+  opacity: 0.9;
+}
+
+/* L'image, sa vignette et ses deux boutons sur une rangée ; sur un écran étroit, les boutons passent dessous */
+.lp-bg-image-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.lp-bg-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

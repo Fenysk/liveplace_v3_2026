@@ -7,8 +7,9 @@ import { CanvasNotFound, noStoreHeaders, resolveCanvasPage } from "./-canvas-pag
 
 const ForcedObsPage = () => {
   const { canvasId } = Route.useLoaderData();
+  const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
-  return <ObsPage canvasId={canvasId} openCanvas={openCanvas} />;
+  return <ObsPage canvasId={canvasId} login={login} openCanvas={openCanvas} />;
 };
 
 export const Route = createFileRoute("/$login_/obs")({

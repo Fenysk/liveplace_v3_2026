@@ -21,6 +21,7 @@ import {
   createTwitchLiveSource,
   createTwitchWebhook,
 } from "../infra/twitch";
+import { createBackgroundImages } from "../usecase/background-images";
 import { createCanvasPreviews } from "../usecase/canvas-preview";
 import { createTwitchLiveTracker } from "../usecase/twitch-live";
 import { parseWebConfig } from "./config";
@@ -66,6 +67,8 @@ const buildServerDeps = () => {
       }),
       now: Date.now,
     }),
+    // Écart §9.1 (JOURNAL 2026-10-10) : l'image du fond d'une fresque, lue dans Convex une fois par login et par instant
+    backgroundImages: createBackgroundImages({ durable, now: Date.now }),
     capacityWrites: createCapacityWrites(redis), // Écart §2 et §9 (JOURNAL 2026-10-07) : l'occupation du web, l'usage de Convex
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub,

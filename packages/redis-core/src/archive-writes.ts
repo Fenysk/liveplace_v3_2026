@@ -157,6 +157,27 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
       await redis.publish(canvasKeysOf(canvasId).live, JSON.stringify(control));
     },
 
+    // L'image se pose par-dessus le fond, qui ne bouge pas, avec l'opacité qu'elle avait : ni l'un ni l'autre n'est touché.
+    async setBackgroundImage(canvasId, at) {
+      const keys = canvasKeysOf(canvasId);
+      const control: LiveMessage = { ctl: { t: "backgroundImage", at } };
+      await redis
+        .multi()
+        .hset(keys.meta, "backgroundImageAt", at)
+        .publish(keys.live, JSON.stringify(control))
+        .exec();
+    },
+
+    async clearBackgroundImage(canvasId) {
+      const keys = canvasKeysOf(canvasId);
+      const control: LiveMessage = { ctl: { t: "backgroundImage" } };
+      await redis
+        .multi()
+        .hdel(keys.meta, "backgroundImageAt")
+        .publish(keys.live, JSON.stringify(control))
+        .exec();
+    },
+
     async discardCanvas(canvasId) {
       await unlinkAll(redis, await scanKeys(redis, `${canvasKeysOf(canvasId).prefix}*`));
     },

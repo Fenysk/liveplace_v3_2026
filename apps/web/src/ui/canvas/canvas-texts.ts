@@ -7,6 +7,18 @@ import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 
 type SizeInCells = { width: number; height: number };
 
+// Pourquoi l'image du fond n'est pas enregistrée : la préparation dans la page, ou la réponse du web.
+export type ImageFailure =
+  | "unreadable"
+  | "unsupported"
+  | "too_big"
+  | "invalid_image"
+  | "not_active"
+  | "unauthenticated"
+  | "bad_request"
+  | "failed"
+  | "network";
+
 export const CANVAS_TEXTS = defineTexts({
   // Le canvas introuvable, et la page du canvas pour un lecteur d'écran.
   notFound: {
@@ -76,6 +88,80 @@ export const CANVAS_TEXTS = defineTexts({
       isSingular(count, "en")
         ? `${MODERATION_TEXTS.en.pixelCount(count)} refused: it stays in the draft.`
         : `${MODERATION_TEXTS.en.pixelCount(count)} refused: they stay in the draft.`,
+  }),
+
+  // Le fond de la fresque, puis son image, dans la section Canvas de la fenêtre (Écart §9.1, JOURNAL 2026-10-10).
+  background: { fr: "Fond de la fresque", en: "Canvas background" },
+  backgroundNote: {
+    fr: "Noir ou blanc : les cases vides prennent cette couleur. Transparent : le damier dans le jeu, rien dans la vue OBS.",
+    en: "Black or white: empty cells take that color. Transparent: the checkerboard in the game, nothing in the OBS view.",
+  },
+  backgroundSaved: localized({
+    fr: (background: string) => `Fond enregistré : ${background.toLowerCase()}`,
+    en: (background) => `Background saved: ${background.toLowerCase()}`,
+  }),
+  imageSection: { fr: "Image de la fresque", en: "Canvas image" },
+  imageChoose: { fr: "Choisir une image", en: "Choose an image" },
+  imageChange: { fr: "Changer l'image", en: "Change image" },
+  imageClear: { fr: "Retirer l'image", en: "Remove image" },
+  imageNote: {
+    fr: "PNG, JPEG ou WebP, 2 Mo au plus une fois réduite à 2048 px.",
+    en: "PNG, JPEG or WebP, 2 MB at most once shrunk to 2048 px.",
+  },
+  imageSaved: { fr: "Image enregistrée", en: "Image saved" },
+  imageCleared: { fr: "Image retirée", en: "Image removed" },
+  imageOpacity: { fr: "Opacité de l'image", en: "Image opacity" },
+  imagePreviewLabel: { fr: "L'image sur le fond choisi", en: "The image over the chosen background" },
+  // Le pourcentage : une espace avant « % » en français, aucune en anglais.
+  opacityLabel: localized({ fr: (percent: number) => `${percent} %`, en: (percent) => `${percent}%` }),
+  imageOpacitySaved: localized({
+    fr: (opacity: string) => `Opacité enregistrée : ${opacity}`,
+    en: (opacity) => `Opacity saved: ${opacity}`,
+  }),
+  // Des `switch` exhaustifs : le compilateur signale toute raison laissée sans phrase.
+  imageFailure: localized({
+    fr: (failure: ImageFailure) => {
+      switch (failure) {
+        case "unreadable":
+          return "Cette image ne peut pas être lue. Choisis un PNG, un JPEG ou un WebP.";
+        case "unsupported":
+          return "Ton navigateur ne sait pas préparer cette image (WebP). Essaie avec un autre navigateur.";
+        case "too_big":
+          return "Image trop lourde : 2 Mo au plus une fois réduite. Choisis-en une plus légère.";
+        case "invalid_image":
+          return "Cette image n'a pas pu être préparée. Choisis-en une autre.";
+        case "not_active":
+          return "La fresque a changé : rouvre cette fenêtre, puis réessaie.";
+        case "unauthenticated":
+          return "Tu n'es plus connecté·e : reconnecte-toi, puis réessaie.";
+        case "network":
+          return "Connexion perdue : l'image n'a pas été enregistrée. Réessaie.";
+        case "bad_request":
+        case "failed":
+          return "L'image n'a pas été enregistrée. Réessaie.";
+      }
+    },
+    en: (failure) => {
+      switch (failure) {
+        case "unreadable":
+          return "This image can't be read. Pick a PNG, a JPEG or a WebP.";
+        case "unsupported":
+          return "Your browser can't prepare this image (WebP). Try another browser.";
+        case "too_big":
+          return "Image too heavy: 2 MB at most once shrunk. Pick a lighter one.";
+        case "invalid_image":
+          return "This image couldn't be prepared. Pick another one.";
+        case "not_active":
+          return "The canvas changed: reopen this window, then try again.";
+        case "unauthenticated":
+          return "You're signed out: sign back in, then try again.";
+        case "network":
+          return "Connection lost: the image wasn't saved. Try again.";
+        case "bad_request":
+        case "failed":
+          return "The image wasn't saved. Try again.";
+      }
+    },
   }),
 
   // La section Canvas de la fenêtre : le nom, la taille, la confirmation.

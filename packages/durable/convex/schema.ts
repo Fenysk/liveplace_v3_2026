@@ -44,6 +44,8 @@ export default defineSchema({
     // Ancien nom du thème, recopié dans `theme` par `canvases:moveNameToTheme`, retiré au prochain changement de schéma.
     name: v.optional(v.string()),
     linkCode: v.optional(v.string()),
+    // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond, un fichier de `_storage` ; `at` date son adresse, `size` se décompte dans `storageUsage`.
+    backgroundImage: v.optional(v.object({ storageId: v.id("_storage"), at: v.number(), size: v.number() })),
   })
     .index("by_canvasId", ["canvasId"])
     .index("by_owner_active", ["ownerId", "isActive"]),

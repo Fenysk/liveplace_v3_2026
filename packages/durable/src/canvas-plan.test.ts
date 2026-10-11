@@ -1,8 +1,10 @@
 import { MAX_ARCHIVES } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
 import {
+  pickBackgroundImage,
   pickLinkedCanvas,
   planArchive,
+  planBackgroundImage,
   planDiscard,
   planNameToTheme,
   planReopen,
@@ -450,5 +452,46 @@ describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)
     });
     expect(pickLinkedCanvas(canvases, "kept123456")).toEqual({ status: "active" });
     expect(pickLinkedCanvas(canvases, "unknown123")).toBeNull();
+  });
+});
+
+describe("planBackgroundImage and pickBackgroundImage (Écart §8.1, JOURNAL 2026-10-10)", () => {
+  const image = { storageId: "storage-1", at: 1_760_000_000_000, size: 120_000 };
+
+  // Le canvas actif de ce propriétaire peut porter une image : le plan rend celle qu'elle remplace, pour que son fichier parte
+  it("lets the active canvas of this owner carry an image, and hands back the one it replaces so its file can go", () => {
+    expect(planBackgroundImage([active, ...archives(2)], ownerId, active.canvasId)).toEqual({ ok: true });
+    expect(planBackgroundImage([{ ...active, backgroundImage: image }], ownerId, active.canvasId)).toEqual({
+      ok: true,
+      previous: image,
+    });
+  });
+
+  // Jamais une archive, ni le canvas d'un autre propriétaire, ni un inconnu : `not_active`
+  it("never lets an archive, another owner's canvas or an unknown one carry an image", () => {
+    const canvases = [active, ...archives(2)];
+
+    expect(planBackgroundImage(canvases, ownerId, "canvas-archive-1")).toEqual({
+      ok: false,
+      error: "not_active",
+    });
+    expect(planBackgroundImage(canvases, "owner-2", active.canvasId)).toEqual({
+      ok: false,
+      error: "not_active",
+    });
+    expect(planBackgroundImage(canvases, ownerId, "canvas-unknown")).toEqual({
+      ok: false,
+      error: "not_active",
+    });
+  });
+
+  // Le fichier d'une adresse n'est rendu que si l'image du canvas actif date bien de cet instant : une autre, ou aucune, rend rien
+  it("hands out the file of an address only when the image of the active canvas dates from that instant", () => {
+    const pictured = { ...active, backgroundImage: image };
+
+    expect(pickBackgroundImage(pictured, image.at)).toEqual(image);
+    expect(pickBackgroundImage(pictured, image.at + 1)).toBeNull();
+    expect(pickBackgroundImage(active, image.at)).toBeNull();
+    expect(pickBackgroundImage(undefined, image.at)).toBeNull();
   });
 });

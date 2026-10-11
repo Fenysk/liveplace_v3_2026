@@ -315,7 +315,7 @@ describe("protocol 14: the archive", () => {
     expect(decodeClientFrame({ ...hello, protocolVersion: 16 }).ok).toBe(false);
     expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
     expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(15);
-    expect(PROTOCOL_VERSION).toBe(19);
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(19);
   });
 
   // Garde la date d'archivage dans le welcome, et accepte un welcome sans elle
@@ -591,7 +591,7 @@ describe("activity frames", () => {
       canvases: z.array(z.object({ canvasId: z.string(), obsViews: z.number() })),
     });
 
-    expect(PROTOCOL_VERSION).toBe(19);
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(19);
     expect(decodeServerFrame(activity)).toEqual({ ok: true, value: activity });
     expect(beforeActivity.safeParse(activity).data).toEqual({
       t: "activity",
@@ -737,6 +737,106 @@ describe("the canvas of the socket in the activity frames", () => {
 
     expect(before.safeParse({ ...history, canvasPoints: [canvasPoint] }).data).toEqual(history);
     expect(beforeActivity.safeParse({ ...activity, here }).data).toEqual({ t: "activity", canvases: [] });
+  });
+});
+
+// Protocole 20 (Écart §4.3, JOURNAL 2026-10-10) : l'image du fond, dans le welcome et dans la frame `backgroundImage`, et son opacité
+describe("protocol 20: the background image of the canvas", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "black",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  };
+  const withImage = (backgroundImageAt: unknown) => ({
+    ...welcome,
+    params: { ...welcome.params, backgroundImageAt },
+  });
+
+  // Refuse un hello resté au protocole 19, celui des ressources de Capacité ; et `image` n'est plus un fond, nulle part
+  it("refuses a hello still on protocol 19, and `image` as a background in every frame that carries a background", () => {
+    const hello = { t: "hello", protocolVersion: 19, canvasId: "abc123", mode: "ui" };
+
+    expect(decodeClientFrame(hello).ok).toBe(false);
+    expect(decodeClientFrame({ ...hello, protocolVersion: PROTOCOL_VERSION }).ok).toBe(true);
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(20);
+    expect(decodeClientFrame({ t: "setObsBackground", requestId: "r", obsBackground: "image" }).ok).toBe(
+      false,
+    );
+    expect(decodeServerFrame({ t: "obsBackground", obsBackground: "image" }).ok).toBe(false);
+    expect(decodeServerFrame(welcome).ok).toBe(true);
+  });
+
+  // Garde l'instant de l'image dans les params du welcome, et accepte un welcome sans image
+  it("keeps the instant of the image in the params of a welcome, and accepts a welcome without one", () => {
+    expect(decodeServerFrame(withImage(1_760_000_000_000))).toEqual({
+      ok: true,
+      value: withImage(1_760_000_000_000),
+    });
+    expect(decodeServerFrame(welcome).ok).toBe(true);
+  });
+
+  // Refuse un instant qui n'est pas un entier positif : il date l'adresse de l'image, un autre texte n'en serait pas un
+  it("refuses an instant that is not a positive whole number", () => {
+    for (const bad of [0, -5, 1.5, "1760000000000", null])
+      expect(decodeServerFrame(withImage(bad)).ok).toBe(false);
+  });
+
+  // Annonce une image qui change ou qui part, sans rien d'autre qu'un instant
+  it("announces an image that changes or goes away, and nothing but an instant", () => {
+    expect(decodeServerFrame({ t: "backgroundImage", at: 1_760_000_000_000 })).toEqual({
+      ok: true,
+      value: { t: "backgroundImage", at: 1_760_000_000_000 },
+    });
+    expect(decodeServerFrame({ t: "backgroundImage" })).toEqual({
+      ok: true,
+      value: { t: "backgroundImage" },
+    });
+    expect(decodeServerFrame({ t: "backgroundImage", at: 0 }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "backgroundImage", at: "now" }).ok).toBe(false);
+  });
+
+  // L'opacité se demande, se confirme et se dit dans le welcome, un cran à la fois, de 0 à 100
+  it("asks for the opacity, confirms it and tells it in the welcome, one step at a time from 0 to 100", () => {
+    for (const backgroundImageOpacity of [0, 10, 40, 80, 100]) {
+      const ask = { t: "setBackgroundImageOpacity", requestId: "r", backgroundImageOpacity };
+
+      expect(decodeClientFrame(ask)).toEqual({ ok: true, value: ask });
+      expect(decodeServerFrame({ t: "backgroundImageOpacity", backgroundImageOpacity }).ok).toBe(true);
+      expect(
+        decodeServerFrame({ ...welcome, params: { ...welcome.params, backgroundImageOpacity } }).ok,
+      ).toBe(true);
+    }
+    expect(decodeServerFrame(welcome).ok).toBe(true);
+  });
+
+  // Refuse tout ce qui n'est pas un cran : entre deux crans, hors de 0 à 100, un texte, une virgule, ou un champ de plus
+  it("refuses anything that is not a step: between two steps, out of 0 to 100, text, a fraction, or an extra field", () => {
+    const ask = (backgroundImageOpacity: unknown) => ({
+      t: "setBackgroundImageOpacity",
+      requestId: "r",
+      backgroundImageOpacity,
+    });
+
+    for (const bad of [45, -10, 110, 40.5, "40", null, undefined]) {
+      expect(decodeClientFrame(ask(bad)).ok).toBe(false);
+      expect(decodeServerFrame({ t: "backgroundImageOpacity", backgroundImageOpacity: bad }).ok).toBe(false);
+    }
+    expect(decodeClientFrame({ ...ask(40), extra: true }).ok).toBe(false);
+  });
+
+  // Pas de frame client pour poser l'image : elle passe par la requête du web, jamais par le gateway
+  it("has no client frame to set the image", () => {
+    expect(decodeClientFrame({ t: "setBackgroundImage", requestId: "r", at: 1 }).ok).toBe(false);
   });
 });
 

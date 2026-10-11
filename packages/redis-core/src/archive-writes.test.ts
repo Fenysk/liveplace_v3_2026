@@ -333,6 +333,109 @@ describe("the theme of a canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
+describe("the background image of a canvas (Écart §8.1, JOURNAL 2026-10-10)", () => {
+  const listen = async (canvasId: string) => {
+    const subscriber = redis.duplicate();
+    const received: string[] = [];
+    subscriber.on("message", (_channel: string, raw: string) => received.push(raw));
+    await subscriber.subscribe(buildCanvasKeys(canvasId).live);
+    return { received, stop: () => subscriber.quit() };
+  };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
+
+  // Pose l'instant de l'image dans meta et le publie au canal live ; le fond et l'opacité, eux, ne bougent pas
+  it("puts the instant of the image into meta and publishes it on the live channel, leaving the background and the opacity alone", async () => {
+    const canvasId = uniqueCanvasId();
+    await signIn.createCanvas(canvasId, { ...meta, obsBackground: "white" });
+    await redis.hset(buildCanvasKeys(canvasId).meta, "backgroundImageOpacity", 80);
+    const { received, stop } = await listen(canvasId);
+    try {
+      await writes.setBackgroundImage(canvasId, 1_760_000_000_000);
+      await settle();
+    } finally {
+      await stop();
+    }
+
+    expect(await writes.getCanvas(canvasId)).toEqual({
+      ...meta,
+      obsBackground: "white",
+      backgroundImageOpacity: 80,
+      backgroundImageAt: 1_760_000_000_000,
+    });
+    expect(received.map((raw) => JSON.parse(raw))).toEqual([
+      { ctl: { t: "backgroundImage", at: 1_760_000_000_000 } },
+    ]);
+  });
+
+  // Retirer l'image fait partir le champ et le dit en une frame ; le fond et l'opacité restent ce qu'ils étaient
+  it("clears the field and says so in one frame, the background and the opacity staying what they were", async () => {
+    const canvasId = uniqueCanvasId();
+    await signIn.createCanvas(canvasId, { ...meta, obsBackground: "black" });
+    await redis.hset(buildCanvasKeys(canvasId).meta, {
+      backgroundImageAt: 1_760_000_000_000,
+      backgroundImageOpacity: 30,
+    });
+    const { received, stop } = await listen(canvasId);
+    try {
+      await writes.clearBackgroundImage(canvasId);
+      await settle();
+    } finally {
+      await stop();
+    }
+
+    expect(await writes.getCanvas(canvasId)).toEqual({
+      ...meta,
+      obsBackground: "black",
+      backgroundImageOpacity: 30,
+    });
+    expect(await redis.hexists(buildCanvasKeys(canvasId).meta, "backgroundImageAt")).toBe(0);
+    expect(received.map((raw) => JSON.parse(raw))).toEqual([{ ctl: { t: "backgroundImage" } }]);
+  });
+
+  // Une image remplacée est un autre instant : meta garde le dernier, et chaque pose le dit
+  it("keeps the last instant in meta when the image is replaced, and says each one", async () => {
+    const canvasId = uniqueCanvasId();
+    await signIn.createCanvas(canvasId, meta);
+    const { received, stop } = await listen(canvasId);
+    try {
+      await writes.setBackgroundImage(canvasId, 1_760_000_000_000);
+      await writes.setBackgroundImage(canvasId, 1_770_000_000_000);
+      await settle();
+    } finally {
+      await stop();
+    }
+
+    expect((await writes.getCanvas(canvasId))?.backgroundImageAt).toBe(1_770_000_000_000);
+    expect(received.map((raw) => JSON.parse(raw))).toEqual([
+      { ctl: { t: "backgroundImage", at: 1_760_000_000_000 } },
+      { ctl: { t: "backgroundImage", at: 1_770_000_000_000 } },
+    ]);
+  });
+
+  // Copier ce qui est commun recopie le fond, jamais l'image ni son opacité : chaque canvas garde les siennes
+  it("copies the background when copying what is shared, never the image nor its opacity: each canvas keeps its own", async () => {
+    const [outgoing, bare, owner] = [uniqueCanvasId(), uniqueCanvasId(), uniqueCanvasId()];
+    await signIn.createCanvas(outgoing, { ...meta, obsBackground: "black" });
+    await signIn.createCanvas(bare, meta);
+    await signIn.createCanvas(owner, meta);
+    await redis.hset(buildCanvasKeys(outgoing).meta, {
+      backgroundImageAt: 1_760_000_000_000,
+      backgroundImageOpacity: 80,
+    });
+    await writes.setBackgroundImage(owner, 1_770_000_000_000);
+
+    await writes.copyShared(outgoing, bare);
+    await writes.copyShared(outgoing, owner);
+
+    expect(await writes.getCanvas(bare)).toEqual({ ...meta, obsBackground: "black" });
+    expect(await writes.getCanvas(owner)).toEqual({
+      ...meta,
+      obsBackground: "black",
+      backgroundImageAt: 1_770_000_000_000,
+    });
+  });
+});
+
 describe("discarding a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   // Efface toutes les clés du canvas, le classement et ses scores à l'écart compris, et pas celles d'un canvas dont
   // l'identifiant commence pareil

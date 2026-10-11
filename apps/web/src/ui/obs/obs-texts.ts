@@ -1,4 +1,5 @@
 // Les phrases de la vue OBS (Écart §14, JOURNAL 2026-10-07) : la surface qu'OBS affiche, et la section de la fenêtre.
+// Le fond est parti dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10).
 
 import { defineTexts, localized } from "../locale/texts";
 
@@ -12,10 +13,6 @@ export const OBS_TEXTS = defineTexts({
     fr: (delay: string) => `Délai enregistré : ${delay}`,
     en: (delay) => `Delay saved: ${delay}`,
   }),
-  backgroundSaved: localized({
-    fr: (background: string) => `Fond enregistré : ${background.toLowerCase()}`,
-    en: (background) => `Background saved: ${background.toLowerCase()}`,
-  }),
 
   address: { fr: "Adresse à coller dans OBS", en: "Address to paste into OBS" },
   howTo: {
@@ -26,10 +23,5 @@ export const OBS_TEXTS = defineTexts({
   delayNote: {
     fr: "Le temps de retirer un pixel avant qu'il n'arrive sur le stream.",
     en: "Time to clear a pixel before it reaches the stream.",
-  },
-  background: { fr: "Fond de la vue OBS", en: "OBS view background" },
-  backgroundNote: {
-    fr: "Transparent, le stream montre ce qu'il y a derrière les pixels. Noir ou blanc, la fresque se pose sur ce fond.",
-    en: "Transparent, the stream shows whatever is behind the pixels. Black or white, the canvas sits on that background.",
   },
 });

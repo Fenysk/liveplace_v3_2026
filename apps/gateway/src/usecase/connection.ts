@@ -73,6 +73,7 @@ type ModerateFrame = Extract<ClientFrame, { t: "moderate" }>;
 type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetObsBackgroundFrame = Extract<ClientFrame, { t: "setObsBackground" }>;
+type SetBackgroundImageOpacityFrame = Extract<ClientFrame, { t: "setBackgroundImageOpacity" }>;
 type SetGaugeLimitsFrame = Extract<ClientFrame, { t: "setGaugeLimits" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
@@ -97,6 +98,8 @@ type ControlFrame = Extract<
       | "staleList"
       | "scoreboard"
       | "canvasStatus"
+      | "backgroundImage"
+      | "backgroundImageOpacity"
       | "theme"
       | "twitchLive";
   }
@@ -212,6 +215,10 @@ const buildWelcome = (
     refillCharges: meta.refillCharges,
     obsDelayMs: meta.obsDelayMs,
     obsBackground: meta.obsBackground,
+    ...(meta.backgroundImageAt === undefined ? {} : { backgroundImageAt: meta.backgroundImageAt }), // Écart §8.1 (JOURNAL 2026-10-10)
+    ...(meta.backgroundImageOpacity === undefined
+      ? {}
+      : { backgroundImageOpacity: meta.backgroundImageOpacity }),
     ...(meta.theme === undefined ? {} : { theme: meta.theme }), // Écart §8.1 (JOURNAL 2026-10-07)
   },
   palette: [...PALETTE],
@@ -233,18 +240,28 @@ const twitchLiveFrameOf = (
     ? { t: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) }
     : null;
 
+type Control = Exclude<LiveControl, { t: "role" | "resize" | "gaugeLimits" }> | TwitchLiveControl;
+
+type BackgroundImageControl = Extract<Control, { t: "backgroundImage" | "backgroundImageOpacity" }>;
+
+const isBackgroundImageControl = (control: Control): control is BackgroundImageControl =>
+  control.t === "backgroundImage" || control.t === "backgroundImageOpacity";
+
+// Écart §4.3 (JOURNAL 2026-10-10) : l'image du fond et son opacité, les mêmes pour toutes les pages, telles que le web les a publiées.
+const backgroundImageFrameOf = (control: BackgroundImageControl): ControlFrame =>
+  control.t === "backgroundImage"
+    ? { t: "backgroundImage", ...(control.at ? { at: control.at } : {}) }
+    : { t: "backgroundImageOpacity", backgroundImageOpacity: control.backgroundImageOpacity };
+
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
-const controlFrameOf = (
-  control: Exclude<LiveControl, { t: "role" | "resize" | "gaugeLimits" }> | TwitchLiveControl,
-  session: Session | null,
-  page: Page,
-): ControlFrame | null => {
+const controlFrameOf = (control: Control, session: Session | null, page: Page): ControlFrame | null => {
   if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
   if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
   if (control.t === "reports")
     return canModerate(page.role) ? { t: "reportCount", count: control.count } : null;
   if (control.t === "canvasStatus") return { t: "canvasStatus", status: control.status };
+  if (isBackgroundImageControl(control)) return backgroundImageFrameOf(control);
   if (control.t === "theme") return { t: "theme", theme: control.theme };
   if (control.t === "twitchLive") return twitchLiveFrameOf(control, session, page);
   return control.userId === session?.userId ? { t: control.t } : null;
@@ -750,6 +767,15 @@ export function createConnection(
     await deps.core.setObsBackground(ready.canvasId, obsBackground);
   };
 
+  // Écart §9.1 (JOURNAL 2026-10-10) : le streamer seul, comme le fond. Le schéma n'a laissé passer qu'un cran.
+  const setBackgroundImageOpacity = async (
+    { requestId, backgroundImageOpacity }: SetBackgroundImageOpacityFrame,
+    ready: ReadyState,
+  ) => {
+    if (ready.role !== "owner") return forbid(requestId);
+    await deps.core.setBackgroundImageOpacity(ready.canvasId, backgroundImageOpacity);
+  };
+
   // JOURNAL 2026-09-30 : le streamer seul. Le schéma n'a laissé passer que des bornes valides.
   const setGaugeLimits = async (
     { requestId, gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
@@ -806,6 +832,8 @@ export function createConnection(
         return setObsDelay(frame, ready);
       case "setObsBackground":
         return setObsBackground(frame, ready);
+      case "setBackgroundImageOpacity":
+        return setBackgroundImageOpacity(frame, ready);
       case "claimGauge":
         return claimGauge(frame.requestId, ready.canvasId);
       case "setGaugeLimits":

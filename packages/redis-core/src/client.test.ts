@@ -906,4 +906,32 @@ describe("setObsDelay (JOURNAL 2026-09-25)", () => {
     await redis.hset(buildCanvasKeys(canvasId).meta, "obsBackground", "red");
     expect((await core.getCanvas(canvasId))?.obsBackground).toBe("transparent");
   });
+
+  // L'image du fond se relit, avec son instant quand meta en a un ; sans instant, la clé est absente (Écart §8.1, JOURNAL 2026-10-10)
+  it("reads the image of the background, with its instant when meta has one, and none without it", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+
+    expect(await core.getCanvas(canvasId)).toEqual(meta);
+    await redis.hset(buildCanvasKeys(canvasId).meta, "backgroundImageAt", 1_760_000_000_000);
+    expect((await core.getCanvas(canvasId))?.backgroundImageAt).toBe(1_760_000_000_000);
+  });
+
+  // Écrit l'opacité de l'image dans meta et prévient les pages, sans créer de version ; une valeur qui n'est pas un cran se relit absente
+  it("writes the image opacity into meta and tells the pages, without a version; a value that is no step reads as absent", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    await core.setBackgroundImageOpacity(canvasId, 80);
+    await delay(100);
+    await unsubscribe();
+
+    expect((await core.getCanvas(canvasId))?.backgroundImageOpacity).toBe(80);
+    expect(received).toEqual([{ ctl: { t: "backgroundImageOpacity", backgroundImageOpacity: 80 } }]);
+    expect(await redis.get(buildCanvasKeys(canvasId).version)).toBe("0");
+    await redis.hset(buildCanvasKeys(canvasId).meta, "backgroundImageOpacity", "45");
+    expect((await core.getCanvas(canvasId))?.backgroundImageOpacity).toBeUndefined();
+  });
 });

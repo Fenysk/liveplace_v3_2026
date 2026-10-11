@@ -14,7 +14,11 @@ export type StoredCanvas = {
   // Écart §8.1 (JOURNAL 2026-10-07) : l'ancien nom du thème, que seule `planNameToTheme` lit, retiré au prochain changement de schéma.
   name?: string;
   linkCode?: string;
+  backgroundImage?: StoredBackgroundImage;
 };
+
+// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond d'un canvas, un fichier de Convex ; `at` la date, et date son adresse.
+export type StoredBackgroundImage = { storageId: string; at: number; size: number };
 
 // Un champ à `undefined` est retiré du document par `db.patch`.
 export type CanvasFields = {
@@ -157,6 +161,24 @@ export function planSetTheme(
   if (!getActiveCanvas(canvases, ownerId, canvasId)) return { ok: false, error: "not_active" };
   return { ok: true, writes: [{ kind: "patch", canvasId, fields: themeFields(theme) }] };
 }
+
+// Écart §8.1 (JOURNAL 2026-10-10) : poser ou retirer l'image du fond n'a lieu que sur le canvas actif de ce propriétaire. Le plan
+// rend l'image que l'écriture remplace, dont le fichier doit partir.
+export function planBackgroundImage(
+  canvases: readonly StoredCanvas[],
+  ownerId: string,
+  canvasId: string,
+): { ok: true; previous?: StoredBackgroundImage } | { ok: false; error: "not_active" } {
+  const canvas = getActiveCanvas(canvases, ownerId, canvasId);
+  if (!canvas) return { ok: false, error: "not_active" };
+  return canvas.backgroundImage ? { ok: true, previous: canvas.backgroundImage } : { ok: true };
+}
+
+// L'adresse d'une image dit son instant : une autre image, ou aucune, ne se sert pas sous elle.
+export const pickBackgroundImage = (
+  canvas: StoredCanvas | undefined,
+  at: number,
+): StoredBackgroundImage | null => (canvas?.backgroundImage?.at === at ? canvas.backgroundImage : null);
 
 // Écart §8.1 (JOURNAL 2026-10-07) : la migration de `name` vers `theme`, idempotente et non destructive : `name` reste, le
 // code d'avant l'affiche encore. Elle ne copie que dans un thème vide, jamais sur un thème posé ; un nom vide ne donne

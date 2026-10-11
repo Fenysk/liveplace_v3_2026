@@ -1,40 +1,16 @@
 // La section Vue OBS, branchée sur le store (JOURNAL 2026-09-25) : le délai choisi part au gateway, et la valeur
 // affichée est la demandée tant que la frame `obsDelay` ne l'a pas confirmée.
 
-import { OBS_BACKGROUND, OBS_DELAY_MS, type ObsBackground } from "@liveplace/domain";
+import { OBS_DELAY_MS } from "@liveplace/domain";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
-import { DESIGN_TEXTS } from "../design/design-texts";
 import { useToast } from "../design/toast";
-import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { obsDelayLabel } from "./obs-delay-label";
 import { ObsSettings } from "./obs-settings";
 import { OBS_TEXTS } from "./obs-texts";
 
 type ObsTabProps = { canvas: CanvasStore; login: string; onCopy: () => void };
-
-// Le fond, comme le délai : la valeur demandée tant que la frame `obsBackground` ne l'a pas confirmée (JOURNAL 2026-09-29).
-const useObsBackground = (canvas: CanvasStore) => {
-  const getConfirmed = () => canvas.getView().params?.obsBackground ?? OBS_BACKGROUND;
-  const confirmed = useSyncExternalStore(canvas.subscribe, getConfirmed, getConfirmed);
-  const [requested, setRequested] = useState<ObsBackground | null>(null);
-  const toast = useToast();
-  const t = useTexts(OBS_TEXTS);
-  const { backgroundNames } = useTexts(DESIGN_TEXTS);
-  useEffect(() => {
-    if (requested !== confirmed) return;
-    setRequested(null);
-    toast("success", t.backgroundSaved(backgroundNames[confirmed]));
-  }, [requested, confirmed, toast, t, backgroundNames]);
-  return {
-    obsBackground: requested ?? confirmed,
-    onPickBackground: (obsBackground: ObsBackground) => {
-      setRequested(obsBackground);
-      canvas.setObsBackground(obsBackground);
-    },
-  };
-};
 
 export const ObsTab = ({ canvas, login, onCopy }: ObsTabProps) => {
   const getConfirmed = () => canvas.getView().params?.obsDelayMs ?? OBS_DELAY_MS;
@@ -51,8 +27,6 @@ export const ObsTab = ({ canvas, login, onCopy }: ObsTabProps) => {
   }, [requested, confirmed, toast, t, locale]);
   // Montée seulement quand la fenêtre s'ouvre sur cette section : toujours dans le navigateur.
   const url = `${window.location.origin}/${login}`;
-  const background = useObsBackground(canvas);
-  const isTouch = useMediaQuery(COMPACT_SCREEN_QUERY);
   return (
     <ObsSettings
       address={url.replace(/^https?:\/\//, "")}
@@ -63,8 +37,6 @@ export const ObsTab = ({ canvas, login, onCopy }: ObsTabProps) => {
         setRequested(obsDelayMs);
         canvas.setObsDelay(obsDelayMs);
       }}
-      {...background}
-      isTouch={isTouch}
     />
   );
 };

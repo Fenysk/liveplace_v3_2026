@@ -1,7 +1,15 @@
 // Le canvas vivant (§9.3) : sa taille, son viewport, la case visée, les gestes, le brouillon, et un dessin seulement quand quelque chose a changé.
 // Créé dans un `useEffect` : la taille de l'écran, `window` et `ResizeObserver` n'existent que dans le navigateur.
 
-import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey, toStateOffset } from "@liveplace/domain";
+import {
+  BACKGROUND_IMAGE_OPACITY,
+  type CellKey,
+  OBS_BACKGROUND,
+  TRANSPARENT_COLOR_INDEX,
+  toCellKey,
+  toStateOffset,
+} from "@liveplace/domain";
+import { backgroundImagePath } from "../../shared/background-image-path";
 import type { ArrivedPixel, CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
 import type { Draft } from "../../state/draft";
 import type { DraftMode, DraftStore } from "../../state/draft-store";
@@ -23,6 +31,7 @@ import {
   observeZone,
   ZONE_ABOVE_ATTRIBUTE,
 } from "./arrival-insets";
+import { createBackdropImage, createPropertyReader, toBackdrop } from "./canvas-background";
 import { createCanvasImage, toLevelCanvases } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { draftFadeStarts, MAX_DRAFT_FADES } from "./draft-fade";
@@ -83,8 +92,10 @@ export type CanvasScene = {
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `login` (Écart §9.1, JOURNAL 2026-10-10) : celui de la page, qui nomme l'adresse de l'image du fond.
 // `handoff` : le passage d'une scène à la suivante, quand la page suit une autre fresque.
 type SceneOptions = {
+  login: string;
   initialViewport: Viewport | null;
   isFramedInFreeArea: boolean;
   onNavigate?: ((kind: NavigationKind) => void) | undefined;
@@ -208,12 +219,14 @@ export function createCanvasScene(
   const context = surface.getContext("2d");
   if (!context) throw new Error("canvas-scene : contexte 2d indisponible");
   const image = createCanvasImage();
+  const backdropImage = createBackdropImage(() => requestRender());
   const tracker = createGestureTracker({ isTouchTracing: () => draftStore.getView().isTouchTracing });
   const navigation = createNavigationWatch((kind) => options.onNavigate?.(kind));
   let screen: Size = { width: 0, height: 0 };
   let pixelRatio = 1;
   const root = document.documentElement;
   let shades = getSceneShades(root);
+  const getProperty = createPropertyReader(root);
   let viewport = options.initialViewport;
   // Les marges du cadrage d'arrivée, et si la vue est restée à l'arrivée : un viewport retrouvé après F5, ou déplacé, n'est
   // jamais recadré quand elles changent.
@@ -428,6 +441,20 @@ export function createCanvasScene(
     return fades;
   };
 
+  // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque et son image, sous les pixels ; le damier ne se retire que pour un fond plein.
+  const getBackdrop = (params: CanvasView["params"]) => {
+    const imageAt = params?.backgroundImageAt;
+    backdropImage.set(imageAt ? backgroundImagePath(options.login, imageAt) : null);
+    const backdrop = toBackdrop(
+      params?.obsBackground ?? OBS_BACKGROUND,
+      backdropImage.get(),
+      params?.backgroundImageOpacity ?? BACKGROUND_IMAGE_OPACITY,
+      getProperty,
+    );
+    options.checker.hidden = backdrop.fill !== null;
+    return backdrop;
+  };
+
   const render = (now: number) => {
     frameRequest = 0;
     const view = store.getView();
@@ -445,6 +472,7 @@ export function createCanvasScene(
       image.repaint(view);
       isImageStale = false;
     }
+    const backdrop = getBackdrop(view.params);
     // Le brouillon ne se voit qu'en Dessin, le viseur qu'en Vue (CDC 2026).
     const draftView = draftStore.getView();
     const isDrafting = draftView.mode === "draft";
@@ -455,6 +483,7 @@ export function createCanvasScene(
       viewport,
       canvas,
       image: image.source,
+      backdrop,
       reveal: revealing,
       ghost: advanceGhost(revealing),
       shades,
@@ -860,6 +889,7 @@ export function createCanvasScene(
       unobserveZone();
       setPanning(false);
       root.removeAttribute(ZONE_ABOVE_ATTRIBUTE);
+      backdropImage.dispose();
       if (hasPainted && options.handoff) {
         options.handoff.surface = surface;
         options.handoff.leftAt = performance.now();

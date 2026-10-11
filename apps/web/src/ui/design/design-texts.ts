@@ -59,7 +59,7 @@ export const DESIGN_TEXTS = defineTexts({
   },
   charges: { fr: "Charges", en: "Charges" },
 
-  // Le fond d'une image : le PNG d'une archive, la vue OBS (SwatchChoice).
+  // Le fond d'une image : le PNG d'une archive, la fresque (SwatchChoice).
   backgroundNames: localized<Record<ObsBackground, string>>({
     fr: { transparent: "Transparent", black: "Noir", white: "Blanc" },
     en: { transparent: "Transparent", black: "Black", white: "White" },
