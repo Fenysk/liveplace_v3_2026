@@ -52,6 +52,11 @@
   animation: lp-canvas-activity-in var(--lp-dur-fade) ease;
 }
 
+/* Dans une carte dépliée, c'est la liste qui arrive : ses comptes n'ajoutent pas leur propre arrivée */
+.lp-canvas-activity-accounts .lp-arrives {
+  animation: none;
+}
+
 /* La liste des comptes, seule (la section Ce canvas) ou dans une carte */
 .lp-connected-accounts {
   margin: 0;

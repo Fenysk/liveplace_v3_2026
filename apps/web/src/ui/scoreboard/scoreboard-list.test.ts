@@ -22,8 +22,12 @@ describe("la liste du Classement sur mobile (JOURNAL 2026-10-06)", () => {
 
     expect(first).toContain('src="https://static-cdn.jtvnw.net/ada.png"');
     expect(first).toContain(">Ada</span>");
-    expect(first).toContain(`1<sup class="lp-rank-sup">er</sup> · ${(1204).toLocaleString("fr-FR")} pixels`);
-    expect(second).toContain('2<sup class="lp-rank-sup">e</sup> · 1 pixel<');
+    expect(first).toContain(
+      `1<sup class="lp-rank-sup">er</sup> · <span class="lp-rolling"><span class="lp-visually-hidden">${(1204).toLocaleString("fr-FR")} pixels</span>`,
+    );
+    expect(second).toContain(
+      '2<sup class="lp-rank-sup">e</sup> · <span class="lp-rolling"><span class="lp-visually-hidden">1 pixel</span>',
+    );
   });
 
   // Est une liste ordonnée nommée Classement, chaque ligne dite d'un trait à un lecteur d'écran, sans dièse

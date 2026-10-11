@@ -76,6 +76,7 @@ import {
   useNowMs,
   WithValue,
 } from "./entry-layout";
+import { RollingDurationDemo, RollingPercentDemo, RollingTileDemo } from "./rolling-demo";
 
 const PREVIEWS = [
   { name: "Un petit dessin", detail: "Cadré de près, la gomme en croix.", pixels: SAMPLE_DRAWING },
@@ -386,7 +387,7 @@ export const ActivityCardEntry = () => {
       slug="carte-d-activite"
       components={["CanvasActivityCard", "CanvasActivityOwner", "ConnectedAccounts"]}
       file="ui/design/canvas-activity-card.tsx"
-      note="Une ligne par fresque, une carte sur mobile. Le chevron déplie qui est dessus."
+      note="Une ligne par fresque, une carte sur mobile. Le chevron déplie qui est dessus. Les lignes arrivent en fondu, toutes ensemble (hors mouvement réduit)."
     >
       <Block title="Carte">
         {kalyss && (
@@ -488,7 +489,10 @@ export const FieldsEntry = () => (
       </StateRow>
     </Block>
     <Block title="Case à cocher">
-      <StateRow name="Une case à cocher" detail="Le libellé la coche aussi.">
+      <StateRow
+        name="Une case à cocher"
+        detail="Le libellé la coche aussi. La coche paraît en fondu et disparaît de même."
+      >
         <InSmallWindow>
           <WithValue initial={false}>
             {(isChecked, setIsChecked) => (
@@ -520,7 +524,10 @@ export const FieldsEntry = () => (
       </StateRow>
     </Block>
     <Block title="Valeur à copier">
-      <StateRow name="Copier, puis « Copié » un instant">
+      <StateRow
+        name="Copier, puis « Copié » un instant"
+        detail="Les deux icônes se croisent en fondu, à l'aller comme au retour."
+      >
         <InWindow>
           <CopyButton value="liveplace.tv/kalyss" copyText="https://liveplace.tv/kalyss" />
         </InWindow>
@@ -562,11 +569,12 @@ export const StatTilesEntry = () => {
         "StatTiles",
         "StatTile",
         "StatTable",
+        "RollingNumber",
         "SaturationFigure",
         "CapacityLinkRows",
         "CapacityRow",
       ]}
-      file="ui/design/{stat-tile,stat-table,saturation-figure,capacity-row}.tsx"
+      file="ui/design/{stat-tile,stat-table,rolling-number,saturation-figure,capacity-row}.tsx"
       note="Un chiffre de l'instant. Quatre sur une ligne, deux sur mobile. La capacité a les siens : la saturation en grand, et les ressources en lignes."
     >
       <Block title="Tuiles">
@@ -578,6 +586,30 @@ export const StatTilesEntry = () => {
               <StatTile label="Pixels de la dernière minute" value="87" />
               <StatTile label="Nouveaux comptes aujourd'hui" value="3" />
             </StatTiles>
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Qui défilent"
+        note="Quand un nombre change pendant qu'on le regarde, seuls ses chiffres qui diffèrent défilent : vers le haut s'il monte, vers le bas s'il descend. Les séparateurs et les unités restent fixes, et la largeur aussi. Au premier affichage, rien ne bouge."
+      >
+        <StateRow name="Un chiffre de l'instant" detail="Touche −1, +1 ou +250." isDemo>
+          <InWindow>
+            <RollingTileDemo />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Un pourcentage" detail="Le symbole % ne bouge pas." isDemo>
+          <InWindow>
+            <RollingPercentDemo />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Une durée dans une phrase"
+          detail="Les mots ne bougent pas, seuls les chiffres défilent."
+          isDemo
+        >
+          <InWindow>
+            <RollingDurationDemo />
           </InWindow>
         </StateRow>
       </Block>

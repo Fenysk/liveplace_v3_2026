@@ -3,6 +3,7 @@
 
 import type { ScoreboardRow, ScoreboardRows } from "../../state/scoreboard";
 import { classNames } from "../design/class-names";
+import { RollingNumber } from "../design/rolling-number";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import { RankAvatar } from "./rank-avatar";
@@ -29,7 +30,8 @@ const ListRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean })
       </span>
       <span className="lp-scoreboard-meta lp-type-caption lp-muted" aria-hidden="true">
         {rank}
-        <sup className="lp-rank-sup">{ordinalSuffix(rank, locale)}</sup> · {moderation.pixelCount(pixels)}
+        <sup className="lp-rank-sup">{ordinalSuffix(rank, locale)}</sup> ·{" "}
+        <RollingNumber value={moderation.pixelCount(pixels)} />
       </span>
     </li>
   );

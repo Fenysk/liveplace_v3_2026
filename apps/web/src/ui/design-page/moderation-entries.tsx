@@ -321,7 +321,7 @@ export const ModerationEntry = () => {
       slug="moderation"
       components={["ReportedPlacements", "TwitchSyncBlock", "ModeratorUsers", "BannedUsers"]}
       file="ui/moderation/{reported-placements,twitch-sync,moderator-users,banned-users}.tsx"
-      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran."
+      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran. Les lignes de chaque liste arrivent en fondu, toutes ensemble (hors mouvement réduit)."
     >
       <Block title="Signalements">
         {REPORT_STATES(nowMs).map(({ name, detail, props }) => (

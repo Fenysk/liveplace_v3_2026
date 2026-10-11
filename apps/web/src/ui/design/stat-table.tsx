@@ -1,6 +1,8 @@
 // Un tableau de chiffres (l'audience de la section Activité, JOURNAL 2026-10-07) : une ligne par chiffre, une colonne par
 // période, et sous une valeur une précision facultative. Sur mobile, il garde ses colonnes.
 
+import { RollingNumber } from "./rolling-number";
+
 export type StatTableCell = { value: string; note?: string | undefined };
 
 export type StatTableRow = { label: string; cells: readonly StatTableCell[] }; // une cellule par colonne
@@ -34,8 +36,14 @@ export const StatTable = ({ caption, columns, rows }: StatTableProps) => (
           </th>
           {cells.map(({ value, note }, index) => (
             <td key={columns[index] ?? index} className="lp-stat-table-cell">
-              <span className="lp-stat-table-value lp-type-title">{value}</span>
-              {note && <span className="lp-type-caption lp-muted">{note}</span>}
+              <span className="lp-stat-table-value lp-type-title">
+                <RollingNumber value={value} />
+              </span>
+              {note && (
+                <span className="lp-type-caption lp-muted">
+                  <RollingNumber value={note} />
+                </span>
+              )}
             </td>
           ))}
         </tr>

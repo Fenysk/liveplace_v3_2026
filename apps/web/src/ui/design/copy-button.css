@@ -24,3 +24,34 @@
   border-radius: var(--radius-pill);
   background: var(--pill-surface);
 }
+
+/* Copier et Coché sur la même place : l'un s'efface en rapetissant pendant que l'autre paraît, à l'aller comme au retour */
+.lp-copy-icon {
+  display: inline-grid;
+}
+
+.lp-copy-icon > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--lp-dur-fast) var(--lp-ease),
+    transform var(--lp-dur-fast) var(--lp-ease);
+}
+
+.lp-copy-icon > svg:first-child {
+  opacity: 1;
+}
+
+.lp-copy-icon > svg:last-child {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+.is-copied .lp-copy-icon > svg:first-child {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+.is-copied .lp-copy-icon > svg:last-child {
+  opacity: 1;
+  transform: none;
+}

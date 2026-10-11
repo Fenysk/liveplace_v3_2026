@@ -3,6 +3,7 @@
 
 import { type CapacityTone, TONE_CLASSES } from "./capacity-tone";
 import { classNames } from "./class-names";
+import { RollingNumber } from "./rolling-number";
 
 type SaturationFigureProps = {
   percent: string; // « 62 % », déjà au format français
@@ -13,7 +14,9 @@ type SaturationFigureProps = {
 
 export const SaturationFigure = ({ percent, tone, caption, note }: SaturationFigureProps) => (
   <div className="lp-saturation">
-    <span className={classNames("lp-saturation-value lp-type-display", TONE_CLASSES[tone])}>{percent}</span>
+    <span className={classNames("lp-saturation-value lp-type-display", TONE_CLASSES[tone])}>
+      <RollingNumber value={percent} />
+    </span>
     <span className="lp-saturation-text">
       <span className="lp-type-title">Saturation</span>
       <span className="lp-type-caption lp-muted">{caption}</span>

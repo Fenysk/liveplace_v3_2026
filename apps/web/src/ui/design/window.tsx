@@ -235,10 +235,17 @@ export const SmallWindow = ({
 
 // Une ligne de la fenêtre : un libellé à gauche, sa valeur ou son contrôle à droite.
 // `hasProfile` : le libellé est un profil, dont le nom se coupe plutôt que de pousser les actions.
-type WindowRowProps = { label: ReactNode; hasProfile?: boolean; children: ReactNode };
+// `isListed` : une ligne d'une liste, qui arrive en fondu avec elle (arrival.css).
+type WindowRowProps = { label: ReactNode; hasProfile?: boolean; isListed?: boolean; children: ReactNode };
 
-export const WindowRow = ({ label, hasProfile = false, children }: WindowRowProps) => (
-  <div className={classNames("lp-window-row lp-type-body", hasProfile && "lp-window-row--profile")}>
+export const WindowRow = ({ label, hasProfile = false, isListed = false, children }: WindowRowProps) => (
+  <div
+    className={classNames(
+      "lp-window-row lp-type-body",
+      hasProfile && "lp-window-row--profile",
+      isListed && "lp-arrives",
+    )}
+  >
     <span>{label}</span>
     {children}
   </div>

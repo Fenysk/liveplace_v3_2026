@@ -41,6 +41,7 @@ const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: Banne
         <MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.banMention(user.isFromTwitch)} />
       }
       hasProfile
+      isListed
     >
       <div className="lp-row">
         <span className="lp-type-caption lp-muted">{t.pixelCount(user.pixelCount)}</span>

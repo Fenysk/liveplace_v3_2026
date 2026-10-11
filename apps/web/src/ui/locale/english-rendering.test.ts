@@ -361,7 +361,9 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
     expect(pill).toContain('aria-label="Collapse the scoreboard"');
     expect(pill).toContain('aria-label="Scoreboard"');
     expect(list).toContain("12<sup");
-    expect(list).toContain(">th</sup> · 2 pixels");
+    expect(list).toContain(
+      '>th</sup> · <span class="lp-rolling"><span class="lp-visually-hidden">2 pixels</span>',
+    );
   });
 });
 

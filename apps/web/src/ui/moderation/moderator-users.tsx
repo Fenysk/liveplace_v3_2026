@@ -33,6 +33,7 @@ const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) 
       key={user.userId}
       label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.moderatorMention(user)} />}
       hasProfile
+      isListed
     >
       {onRemove && user.isNamedHere && (
         <Button
