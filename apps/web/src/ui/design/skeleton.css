@@ -1,0 +1,75 @@
+/* Le squelette (skeleton.tsx) : des blocs gris doux, fixes. La seule boucle de l'interface reste celle de la reconnexion. */
+
+.lp-skeleton {
+  display: block;
+  flex: none;
+  background: var(--chip-hover);
+}
+
+/* Une barre de texte : la hauteur de ligne du texte qu'elle remplace (sa classe lp-type-*), peinte sur trois quarts de la
+   taille de police. Le rayon est réduit à la hauteur de la barre : une capsule, comme les contrôles. */
+.lp-skeleton-bar {
+  box-sizing: content-box;
+  height: 0.75em;
+  padding-block: calc((1lh - 0.75em) / 2);
+  border-radius: var(--radius-pill);
+  background-clip: content-box;
+}
+
+.lp-skeleton-bar--short {
+  width: 4.5em;
+}
+
+.lp-skeleton-bar--medium {
+  width: 7em;
+}
+
+.lp-skeleton-bar--long {
+  width: 10em;
+}
+
+.lp-skeleton-block--avatar {
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+}
+
+/* Les mesures de la pastille de couleur de l'inspection (palette.css) */
+.lp-skeleton-block--swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+.lp-skeleton-block--field {
+  width: 100%;
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+}
+
+.lp-skeleton-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Le conteneur et le contenu qui arrive ne comptent pas dans la mise en page : leurs enfants se rangent chez leur parent */
+.lp-skeleton-region,
+.lp-skeleton-reveal {
+  display: contents;
+}
+
+/* Avant 200 ms, le squelette est là sans se voir : la place du contenu est déjà prise */
+.lp-skeleton-region.is-pending {
+  visibility: hidden;
+}
+
+.lp-skeleton-reveal > * {
+  animation: lp-skeleton-in var(--lp-dur-fast) ease;
+}
+
+@keyframes lp-skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
