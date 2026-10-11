@@ -75,9 +75,9 @@
   }
 }
 
-.lp-window-nav .lp-btn[aria-current="page"] {
-  background: var(--pill-surface);
-  box-shadow: var(--pill-shadow);
+/* Le fond de l'onglet choisi est son `::before` (selection-glide.css) : le survol ne le recouvre pas */
+.lp-window-nav .lp-btn.is-selected {
+  background: transparent;
 }
 
 .lp-window-grabber {
@@ -111,6 +111,12 @@
   display: grid;
   align-content: start;
   gap: var(--space-4);
+}
+
+/* La hauteur de la fenêtre glisse au changement de section (use-section-morph.ts) : le contenu, plus haut qu'elle, ne montre pas de
+   barre de défilement le temps du glissement */
+.lp-window[data-morphing] .lp-window-body {
+  overflow: hidden;
 }
 
 /* Un réglage de la fenêtre : son libellé, son contrôle, sa phrase d'aide, les uns sous les autres (maquette) */
