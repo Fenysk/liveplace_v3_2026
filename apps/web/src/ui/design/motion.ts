@@ -1,7 +1,12 @@
 // Les durées et la courbe du mouvement, lues dans tokens.css là où JavaScript anime : jamais recopiées ici.
 // Avec `prefers-reduced-motion`, tokens.css les met à 0 : l'animation n'a pas lieu.
 
-export type MotionVariable = "--lp-dur" | "--lp-dur-fade" | "--lp-dur-fast" | "--lp-dur-reveal";
+export type MotionVariable =
+  | "--lp-dur"
+  | "--lp-dur-fade"
+  | "--lp-dur-fast"
+  | "--lp-dur-reveal"
+  | "--lp-dur-arrival";
 
 const MS_PER_SECOND = 1000;
 

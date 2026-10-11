@@ -1,13 +1,22 @@
 // Le canvas vivant (§9.3) : sa taille, son viewport, la case visée, les gestes, le brouillon, et un dessin seulement quand quelque chose a changé.
 // Créé dans un `useEffect` : la taille de l'écran, `window` et `ResizeObserver` n'existent que dans le navigateur.
 
-import { type CellKey, TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
-import type { CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
+import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey, toStateOffset } from "@liveplace/domain";
+import type { ArrivedPixel, CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
 import type { Draft } from "../../state/draft";
 import type { DraftMode, DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { easingCurve, motionEasing, motionMs } from "../design/motion";
 import { COARSE_POINTER_QUERY, SIDE_COLUMN_QUERY } from "../design/use-media-query";
+import {
+  type ArrivalClock,
+  arrivalDelay,
+  arrivalProgress,
+  type ColorLayer,
+  isArrivalDone,
+  MAX_ARRIVALS,
+  shownLayers,
+} from "./arrival";
 import {
   measureArrivalInsets,
   measureDraftInsets,
@@ -29,6 +38,7 @@ import {
 import { mosaicLevels, REVEAL_STEPS } from "./mosaic";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
 import {
+  type ArrivingCell,
   type DraftFade,
   type Ghost,
   type Reveal,
@@ -144,6 +154,15 @@ const takeLeftBehind = (handoff: Handoff | undefined): HTMLCanvasElement | null 
   const { surface, leftAt } = handoff;
   handoff.surface = null;
   return performance.now() - leftAt <= HANDOFF_MAX_AGE_MS ? surface : null;
+};
+
+// Une case posée par un autre joueur : son fondu de `base` (ce qu'elle montrait) vers `colorIndex`, sur `--lp-dur-arrival`
+// et `--lp-ease`, après son tour dans le lot.
+type ArrivalRun = ArrivalClock & {
+  x: number;
+  y: number;
+  base: readonly ColorLayer[];
+  colorIndex: number;
 };
 
 // L'apparition en mosaïque, sur `--lp-dur-reveal` partagée en REVEAL_STEPS étapes égales, chacune sur `--lp-ease`.
@@ -298,6 +317,53 @@ export function createCanvasScene(
     return { source: ghostSurface, alpha: 1 - current.progress };
   };
 
+  // Les cases des autres joueurs ne passent d'un coup que pendant la mosaïque, le mouvement réduit et au-delà du plafond.
+  const arrivals = new Map<CellKey, ArrivalRun>();
+  let lastFrameAt = 0; // un fondu qu'une réécriture interrompt repart de ce qu'il montrait à la dernière image
+  const advanceArrivals = (now: number, view: CanvasView): ArrivingCell[] => {
+    const cells: ArrivingCell[] = [];
+    for (const [key, run] of arrivals) {
+      run.startedAt ??= now;
+      if (isArrivalDone(run, now) || run.x >= view.width || run.y >= view.height) arrivals.delete(key);
+      else {
+        const { x, y, base, colorIndex } = run;
+        cells.push({ x, y, base, colorIndex, progress: arrivalProgress(run, now) });
+      }
+    }
+    lastFrameAt = now;
+    if (arrivals.size > 0) requestRender();
+    return cells;
+  };
+  const fadeArrivals = (lot: readonly ArrivedPixel[], duration: number) => {
+    const ease = easingCurve(motionEasing(root));
+    lot.forEach(({ x, y, colorIndex, previousColorIndex }, index) => {
+      const key = toCellKey(x, y);
+      const running = arrivals.get(key);
+      const base = running
+        ? shownLayers(running.base, running.colorIndex, arrivalProgress(running, lastFrameAt))
+        : [{ colorIndex: previousColorIndex, alpha: 1 }];
+      arrivals.set(key, {
+        x,
+        y,
+        base,
+        colorIndex,
+        delay: arrivalDelay(index, lot.length),
+        duration,
+        ease,
+        startedAt: null,
+      });
+    });
+  };
+  // Un lot qui ne tient pas dans la place restante paraît en entier d'un coup, jamais à moitié animé.
+  const startArrivals = (lot: readonly ArrivedPixel[]) => {
+    const duration = motionMs(root, "--lp-dur-arrival");
+    const isFading = hasRevealed && !reveal && duration > 0;
+    const fresh = lot.filter(({ x, y }) => !arrivals.has(toCellKey(x, y))).length;
+    if (isFading && arrivals.size + fresh <= MAX_ARRIVALS) fadeArrivals(lot, duration);
+    else for (const { x, y } of lot) arrivals.delete(toCellKey(x, y));
+    requestRender();
+  };
+
   let settles: Settle[] = [];
   // Une pose qui arrive au bout s'en va : l'image porte déjà son but. Une case que le canvas a quittée (un autre joueur la
   // reprend, une nouvelle taille) ne se pose plus.
@@ -396,6 +462,7 @@ export function createCanvasScene(
       inspectedCell: advanceReticle(now, isDrafting ? null : view.inspection),
       draft: isDrafting ? [...draftView.draft.values()] : [],
       draftFades: advanceDraftFades(now, isDrafting),
+      arriving: advanceArrivals(now, view),
       settling: advanceSettles(now, view),
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
@@ -654,6 +721,8 @@ export function createCanvasScene(
     requestRender();
   });
 
+  const unsubscribeArrived = store.listenArrived(startArrivals);
+
   // Mouvement réduit : la durée vaut 0, la case passe pleine d'un coup.
   const unsubscribeConfirmed = store.listenConfirmed((pixels) => {
     const duration = motionMs(root, "--lp-dur");
@@ -797,6 +866,7 @@ export function createCanvasScene(
       }
       unsubscribe();
       unsubscribeConfirmed();
+      unsubscribeArrived();
       unsubscribeDraft();
       listening.abort();
     },

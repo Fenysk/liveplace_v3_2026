@@ -79,6 +79,7 @@ type SceneParts = {
   draft?: Scene["draft"];
   draftFades?: Scene["draftFades"];
   settling?: readonly SettlingBatch[];
+  arriving?: Scene["arriving"];
   reveal?: Scene["reveal"];
   ghost?: Scene["ghost"];
   shown?: number;
@@ -90,6 +91,7 @@ const sceneOf = ({
   draft = [],
   draftFades = new Map(),
   settling = [],
+  arriving = [],
   reveal = null,
   ghost = null,
   shown = 0,
@@ -107,6 +109,7 @@ const sceneOf = ({
   inspectedCell: null,
   draft,
   draftFades,
+  arriving,
   settling,
   palette: PALETTE,
   colorIndexAt: () => shown,
@@ -428,5 +431,65 @@ describe("la fresque que la page vient de quitter", () => {
 
     expect(calls.map((call) => call.op)).toEqual(["clearRect", "drawImage"]);
     expect(calls[1]?.source).toBe("left behind");
+  });
+});
+
+describe("une case posée par un autre joueur, en fondu", () => {
+  const arrivingOf = (progress: number, colorIndex: number, base = [{ colorIndex: 1, alpha: 1 }]) => ({
+    arriving: [{ ...CELL, base, colorIndex, progress }],
+  });
+
+  // L'image porte déjà la nouvelle couleur : la case est vidée, l'ancienne refaite dessous, la nouvelle posée dessus à l'avancée
+  it("clears the cell, remakes the old color under it and fades the new one in over it", () => {
+    const { cell } = paint(arrivingOf(0.25, 2));
+
+    expect(cell.map(({ op, alpha, style }) => [op, alpha, style])).toEqual([
+      ["clearRect", 1, ""],
+      ["fillRect", 1, PALETTE[1]],
+      ["fillRect", 0.25, PALETTE[2]],
+    ]);
+  });
+
+  // À l'avancée 0 la case montre encore l'ancienne couleur seule, comme avant l'arrivée : aucun saut au départ
+  it("shows the old color alone at progress 0, so nothing jumps when the cell arrives", () => {
+    const { cell } = paint(arrivingOf(0, 2));
+
+    expect(cell.at(-1)).toMatchObject({ style: PALETTE[2], alpha: 0 });
+    expect(cell.at(-2)).toMatchObject({ style: PALETTE[1], alpha: 1 });
+  });
+
+  // Vers le transparent, l'ancienne s'efface : la case vidée garde le damier dessous
+  it("fades the old color out when the cell goes back to transparent", () => {
+    const { cell } = paint(arrivingOf(0.5, 0));
+
+    expect(cell.map(({ op, alpha, style }) => [op, alpha, style])).toEqual([
+      ["clearRect", 1, ""],
+      ["fillRect", 0.5, PALETTE[1]],
+    ]);
+  });
+
+  // Une case réécrite pendant son fondu repart de ses couleurs superposées
+  it("starts a rewritten cell again from the layers it was showing", () => {
+    const base = [
+      { colorIndex: 1, alpha: 1 },
+      { colorIndex: 2, alpha: 0.4 },
+    ];
+
+    const { cell } = paint(arrivingOf(0.5, 3, base));
+
+    expect(cell.filter((call) => call.op === "fillRect").map(({ alpha, style }) => [style, alpha])).toEqual([
+      [PALETTE[1], 1],
+      [PALETTE[2], 0.4],
+      [PALETTE[3], 0.5],
+    ]);
+  });
+
+  // Le reste de la scène retrouve son opacité entière, et sans case en fondu l'image n'est pas vidée
+  it("gives the rest of the scene its full opacity back, and clears nothing without an arriving cell", () => {
+    const { context } = recordingContext();
+    renderScene(context, sceneOf(arrivingOf(0.5, 2)));
+
+    expect(context.globalAlpha).toBe(1);
+    expect(paint({}).calls.some((call) => call.op === "clearRect" && isOnCell(call))).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
-// Une image à l'écran (§9.3), dans l'ordre : les pixels (ou leur mosaïque à l'apparition), les cases qui se posent, le brouillon, la grille, la bordure,
+// Une image à l'écran (§9.3), dans l'ordre : les pixels (ou leur mosaïque à l'apparition), les cases des autres joueurs
+// en fondu, les cases qui se posent, le brouillon, la grille, la bordure,
 // le contour du brouillon, celui des cases qui se posent, la case visée, le viseur de la case inspectée,
 // puis la fresque que la page vient de quitter, qui s'efface.
 // Le vide et le damier ne sont pas ici : ce sont deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent
@@ -7,6 +8,7 @@
 
 import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
 import type { ConfirmedPixel, Pixel } from "../../state/canvas-store";
+import { type ColorLayer, shownLayers } from "./arrival";
 import { REVEAL_BLOCKS } from "./mosaic";
 import type { Cell, Size, Viewport } from "./viewport";
 
@@ -29,6 +31,16 @@ export type DraftFade = { progress: number; from: number | null };
 // À l'étape `step`, l'étape d'avant reste entière dessous et celle-ci paraît dessus, de `progress` 0 à 1 (la courbe est déjà appliquée).
 export type Reveal = { levels: readonly CanvasImageSource[]; step: number; progress: number };
 
+// Une case posée par un autre joueur, en fondu de `base` (ce qu'elle montrait, couleurs l'une sur l'autre) vers `colorIndex` :
+// `progress` de 0 à 1, la courbe déjà appliquée. L'image porte déjà la nouvelle couleur : la case est refaite par-dessus.
+export type ArrivingCell = {
+  x: number;
+  y: number;
+  base: readonly ColorLayer[];
+  colorIndex: number;
+  progress: number;
+};
+
 // La fresque que la page vient de quitter : la dernière surface peinte, à l'opacité `alpha`, par-dessus la nouvelle.
 export type Ghost = { source: CanvasImageSource; alpha: number };
 
@@ -45,6 +57,7 @@ export type Scene = {
   inspectedCell: Cell | null; // en cases de la fresque : à virgule pendant que le viseur glisse
   draft: readonly Pixel[];
   draftFades: ReadonlyMap<CellKey, DraftFade>; // une case du brouillon absente de la table est entière
+  arriving: readonly ArrivingCell[];
   settling: readonly SettlingBatch[];
   palette: readonly string[];
   colorIndexAt(x: number, y: number): number; // la couleur de l'image, pose optimiste comprise
@@ -338,6 +351,20 @@ const strokeReticle = (
   context.lineCap = "butt";
 };
 
+// Les cases des autres joueurs en fondu : l'image les porte déjà à leur nouvelle couleur, elles sont vidées et refaites.
+const renderArriving = (context: CanvasRenderingContext2D, scene: Scene, cellRect: CellRect) => {
+  for (const { x, y, base, colorIndex, progress } of scene.arriving) {
+    const rect = cellRect(x, y);
+    context.clearRect(rect.left, rect.top, rect.width, rect.height);
+    for (const layer of shownLayers(base, colorIndex, progress)) {
+      context.globalAlpha = layer.alpha;
+      context.fillStyle = scene.palette[layer.colorIndex] ?? scene.shades.void;
+      context.fillRect(rect.left, rect.top, rect.width, rect.height);
+    }
+  }
+  context.globalAlpha = 1;
+};
+
 // L'image : nette, ou à une étape de la mosaïque. Les blocs s'agrandissent sans lissage, la source rognée au dernier bloc entier.
 const renderImage = (context: CanvasRenderingContext2D, scene: Scene, frame: Rect) => {
   const { reveal, canvas } = scene;
@@ -412,6 +439,7 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
     height: canvas.height * cellSize,
   });
   const oneCellRect: CellRect = (x, y) => cellRect(x, y, 1, 1);
+  renderArriving(context, scene, oneCellRect);
   fillSettling(context, scene, oneCellRect, lineWidth);
   fillDraft(context, scene, oneCellRect, lineWidth);
 

@@ -5,6 +5,7 @@ import { type ClientFrame, PROTOCOL_VERSION, type ServerFrame } from "@liveplace
 import { describe, expect, it } from "vitest";
 import {
   type Arrival,
+  type ArrivedPixel,
   type CanvasStoreOptions,
   type ConfirmedPixel,
   createCanvasStore,
@@ -663,6 +664,106 @@ describe("l'image de la fresque (la mosaïque d'apparition)", () => {
     receive(welcome);
 
     expect(store.getView().isImageLoaded).toBe(true);
+  });
+});
+
+describe("les cases des autres joueurs, par lot", () => {
+  const listenToArrived = (store: ReturnType<typeof setup>["store"]) => {
+    const heard: (readonly ArrivedPixel[])[] = [];
+    store.listenArrived((pixels) => heard.push(pixels));
+    return heard;
+  };
+  const cellOf = (
+    x: number,
+    y: number,
+    colorIndex: number,
+    version: number,
+    kind: "place" | "clear" | "hide" | "unhide" = "place",
+  ) => ({
+    x,
+    y,
+    colorIndex,
+    previousColorIndex: 0,
+    placedAt: now,
+    version,
+    kind,
+  });
+
+  // Les cases d'un même événement (la même version) font un lot, dans l'ordre du message ; deux événements, deux lots
+  it("tells one lot per event of a cells frame, in the order of the frame", () => {
+    const { store, receive } = setup();
+    const heard = listenToArrived(store);
+
+    receive({
+      t: "cells",
+      toVersion: 9,
+      cells: [cellOf(0, 0, 5, 8), cellOf(1, 0, 6, 8), cellOf(2, 0, 7, 9)],
+    });
+
+    expect(heard).toEqual([
+      [
+        { x: 0, y: 0, colorIndex: 5, previousColorIndex: 0 },
+        { x: 1, y: 0, colorIndex: 6, previousColorIndex: 0 },
+      ],
+      [{ x: 2, y: 0, colorIndex: 7, previousColorIndex: 0 }],
+    ]);
+  });
+
+  // Une case dit la couleur que la page montrait, pas celle que le serveur croyait remplacer
+  it("gives the color the page showed, not the one the server thought it replaced", () => {
+    const { store, receive } = setup();
+    receive({ t: "cells", toVersion: 8, cells: [cellOf(1, 1, 9, 8)] });
+    const heard = listenToArrived(store);
+
+    receive({ t: "cells", toVersion: 9, cells: [{ ...cellOf(1, 1, 4, 9), previousColorIndex: 2 }] });
+
+    expect(heard).toEqual([[{ x: 1, y: 1, colorIndex: 4, previousColorIndex: 9 }]]);
+  });
+
+  // Une case qui ne change rien à ce que la page montre n'y est pas : la pose que la page a déjà montrée, ou rejouée
+  it("leaves out a cell that changes nothing of what the page shows, like its own pose already shown", async () => {
+    const { store, receive } = setup();
+    const heard = listenToArrived(store);
+    void store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+
+    receive({ t: "cells", toVersion: 8, cells: [cellOf(1, 2, 5, 8), cellOf(3, 3, 0, 8)] });
+
+    expect(heard).toEqual([]);
+  });
+
+  // Ni un hide ni un unhide (le stream seul), ni une case hors du cadre
+  it("leaves out the hide and unhide kinds, and the cells outside the frame", () => {
+    const { store, receive } = setup();
+    const heard = listenToArrived(store);
+
+    receive({
+      t: "cells",
+      toVersion: 8,
+      cells: [cellOf(0, 0, 5, 8, "hide"), cellOf(1, 0, 5, 8, "unhide"), cellOf(99, 0, 5, 8)],
+    });
+
+    expect(heard).toEqual([]);
+  });
+
+  // Un clear (la modération) est un lot comme un autre : la case revient au transparent
+  it("tells a clear like any other lot: the cell goes back to transparent", () => {
+    const { store, receive } = setup();
+    receive({ t: "cells", toVersion: 8, cells: [cellOf(1, 1, 9, 8)] });
+    const heard = listenToArrived(store);
+
+    receive({ t: "cells", toVersion: 9, cells: [cellOf(1, 1, 0, 9, "clear")] });
+
+    expect(heard).toEqual([[{ x: 1, y: 1, colorIndex: 0, previousColorIndex: 9 }]]);
+  });
+
+  // L'état complet d'un welcome (le snapshot et son `recent`) n'est pas un lot : c'est la mosaïque qui le montre
+  it("does not tell the snapshot", () => {
+    const { store, snapshot } = setup();
+    const heard = listenToArrived(store);
+
+    snapshot(new Uint8Array(width * 4).fill(3));
+
+    expect(heard).toEqual([]);
   });
 });
 

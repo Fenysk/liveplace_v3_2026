@@ -226,6 +226,7 @@ const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
   if (name === "--lp-dur-fast") return browser.isReducedMotion ? "0s" : "0.14s";
   if (name === "--lp-dur-reveal") return browser.isReducedMotion ? "0s" : "0.5s";
+  if (name === "--lp-dur-arrival") return browser.isReducedMotion ? "0s" : "0.3s";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
 };
 
@@ -1528,6 +1529,252 @@ describe("la fresque que la page quitte pour en suivre une autre", () => {
     held.scene.dispose();
 
     expect(handoff.surface).toBeNull();
+  });
+});
+
+// Un message cells : des cases de plusieurs événements, chacun sous sa version.
+const cellsOf = (
+  lots: { version: number; cells: { x: number; y: number; colorIndex: number }[] }[],
+): ServerFrame => ({
+  t: "cells",
+  toVersion: Math.max(...lots.map(({ version }) => version)),
+  cells: lots.flatMap(({ version, cells }) =>
+    cells.map(({ x, y, colorIndex }) => ({
+      x,
+      y,
+      colorIndex,
+      previousColorIndex: 0,
+      placedAt: NOW,
+      version,
+      kind: "place" as const,
+    })),
+  ),
+});
+
+// `size` cases d'une rangée, à partir de la case (`from`, `row`), toutes de la même couleur.
+const rowOf = (size: number, row: number, colorIndex: number, from = 0) =>
+  Array.from({ length: size }, (_, index) => ({ x: from + index, y: row, colorIndex }));
+
+describe("les cases des autres joueurs, en fondu décalé", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // La fresque est là, sa mosaïque finie : les cases qui arrivent ensuite sont celles des autres joueurs
+  const openArrived = (options: Options = {}) => {
+    const world = openScene(LAPTOP_PLACE, { ...options, isLoaded: true });
+    flush(SETTLE_MS);
+    return world;
+  };
+  const arrivingOf = () => lastFrame().arriving;
+  const progressesAt = (index: number) =>
+    probe.frames.flatMap(({ arriving }) => {
+      const cell = arriving[index];
+      return cell ? [cell.progress] : [];
+    });
+
+  // Une case arrive : elle part de la couleur montrée, passe à la nouvelle sur `--lp-dur-arrival`, puis plus rien n'est attendu
+  it("fades a cell from the color shown to the new one over --lp-dur-arrival, then schedules nothing", () => {
+    const world = openArrived();
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toEqual([
+      { x: 5, y: 5, base: [{ colorIndex: 0, alpha: 1 }], colorIndex: 9, progress: 0 },
+    ]);
+    flush(SETTLE_MS);
+    const progresses = progressesAt(0);
+    expect(progresses).toEqual([...progresses].sort((a, b) => a - b));
+    expect(progresses.at(-1)).toBeLessThan(1);
+    expect(progresses.length).toBeGreaterThanOrEqual(17);
+    expect(progresses.length).toBeLessThanOrEqual(21);
+    expect(arrivingOf()).toEqual([]);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Les cases d'un lot paraissent l'une après l'autre, dans l'ordre du lot : la case i a toujours de l'avance sur la i + 1
+  it("shows the cells of a lot one after the other, in the order of the lot", () => {
+    const world = openArrived();
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 25);
+
+    const progresses = arrivingOf().map(({ progress }) => progress);
+    expect(progresses.length).toBeGreaterThanOrEqual(5);
+    expect(progresses).toEqual([...progresses].sort((a, b) => b - a));
+    expect(progresses.at(-1)).toBe(0);
+    flush(SETTLE_MS * 2);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un lot met 1,2 s au plus à démarrer en entier : les 64 cases d'un lot ont fini avant 1,5 s
+  it("starts a whole lot within 1.2 s, whatever its size", () => {
+    const world = openArrived();
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(64, 5, 9) }]));
+    flush(1200);
+    expect(arrivingOf().length).toBeGreaterThan(0);
+    flush(FRAME_MS * 20);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Deux événements d'un même message sont deux lots : ils démarrent ensemble, chacun avec son propre décalage
+  it("treats two events of one message as two lots that start together", () => {
+    const world = openArrived();
+
+    world.receive(
+      cellsOf([
+        { version: 8, cells: rowOf(5, 5, 9) },
+        { version: 9, cells: rowOf(5, 8, 12) },
+      ]),
+    );
+    flush(FRAME_MS * 8);
+
+    const byRow = (row: number) =>
+      arrivingOf()
+        .filter(({ y }) => y === row)
+        .map(({ progress }) => progress);
+    expect(byRow(5)).toEqual(byRow(8));
+    expect(byRow(5)[0]).toBeGreaterThan(byRow(5)[2] ?? 1);
+  });
+
+  // Une case réécrite pendant son fondu repart de la couleur montrée à ce moment vers la nouvelle, sans saut
+  it("starts a rewritten cell again from the color it was showing", () => {
+    const world = openArrived();
+    world.receive(placedByOther(5, 5, 9));
+    flush(FRAME_MS * 4);
+    const showing = progressesAt(0).at(-1) ?? 0;
+
+    world.receive(placedByOther(5, 5, 14));
+    flush(FRAME_MS);
+
+    const [rewritten] = arrivingOf();
+    expect(showing).toBeGreaterThan(0);
+    expect(rewritten?.colorIndex).toBe(14);
+    expect(rewritten?.progress).toBe(0);
+    expect(rewritten?.base.map(({ colorIndex }) => colorIndex)).toEqual([0, 9]);
+    expect(rewritten?.base[1]?.alpha).toBeCloseTo(showing, 1);
+    flush(SETTLE_MS);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Au plus 200 cases en fondu ou en attente : un lot qui ne tient pas dans la place restante paraît en entier d'un coup
+  it("shows a lot that does not fit in the room left at once, never half animated", () => {
+    const world = openArrived();
+
+    world.receive(
+      cellsOf([
+        { version: 8, cells: rowOf(48, 1, 9) },
+        { version: 9, cells: rowOf(48, 2, 9) },
+        { version: 10, cells: rowOf(48, 3, 9) },
+        { version: 11, cells: rowOf(48, 4, 9) },
+        { version: 12, cells: rowOf(48, 5, 9) },
+      ]),
+    );
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toHaveLength(192);
+    expect(arrivingOf().some(({ y }) => y === 5)).toBe(false);
+    expect(lastFrame().colorIndexAt(10, 5)).toBe(9);
+    // Un petit lot de plus ne tient pas non plus dans les 8 places restantes : lui aussi d'un coup.
+    world.receive(cellsOf([{ version: 13, cells: rowOf(10, 6, 12) }]));
+    flush(FRAME_MS);
+    expect(arrivingOf()).toHaveLength(192);
+    expect(arrivingOf().some(({ y }) => y === 6)).toBe(false);
+    flush(SETTLE_MS * 4);
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un lot d'un coup remplace le fondu qu'une de ses cases avait en cours
+  it("replaces a running fade with the lot that comes at once", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(48, 1, 9) }]));
+    world.receive(cellsOf([{ version: 9, cells: rowOf(48, 2, 9) }]));
+    world.receive(cellsOf([{ version: 10, cells: rowOf(48, 3, 9) }]));
+    world.receive(cellsOf([{ version: 11, cells: rowOf(48, 4, 9) }]));
+    flush(FRAME_MS);
+    expect(arrivingOf().some(({ y }) => y === 1)).toBe(true);
+
+    // Trente cases déjà en fondu et trente neuves : le lot ne tient pas, il paraît d'un coup et vide leurs fondus.
+    world.receive(cellsOf([{ version: 12, cells: [...rowOf(30, 1, 14), ...rowOf(30, 9, 14)] }]));
+    flush(FRAME_MS);
+
+    expect(arrivingOf().filter(({ y }) => y === 1)).toHaveLength(18);
+    expect(arrivingOf().some(({ y }) => y === 9)).toBe(false);
+    expect(lastFrame().colorIndexAt(0, 1)).toBe(14);
+  });
+
+  // Sa propre pose, que la page a déjà montrée, n'a pas de nouveau fondu quand le gateway la rediffuse
+  it("does not fade the own pose again when the gateway sends it back", () => {
+    const world = openArrived();
+    void world.store.placeBatch([{ x: 5, y: 5, colorIndex: 3 }], "ptest0001");
+
+    world.receive(placedByOther(5, 5, 3));
+    flush(FRAME_MS);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Pendant la mosaïque, les cases arrivées paraissent d'un coup : l'image du moment est celle qui s'affiche à la fin
+  it("shows the cells that arrive during the mosaic at once", () => {
+    const world = openScene(LAPTOP_PLACE, { isLoaded: true });
+    flush(FRAME_MS * 4);
+    expect(lastFrame().reveal).not.toBeNull();
+
+    world.receive(placedByOther(5, 5, 9));
+    flush(SETTLE_MS);
+
+    expect(probe.frames.every(({ arriving }) => arriving.length === 0)).toBe(true);
+    expect(lastFrame().colorIndexAt(5, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Mouvement réduit : la durée vaut 0, tout paraît d'un coup, sans décalage ni image attendue
+  it("shows everything at once when motion is reduced", () => {
+    const world = openArrived({ isReducedMotion: true });
+
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(SETTLE_MS);
+
+    expect(probe.frames.every(({ arriving }) => arriving.length === 0)).toBe(true);
+    expect(lastFrame().colorIndexAt(9, 5)).toBe(9);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Un déplacement ou un zoom pendant les fondus ne les casse pas
+  it("goes on through a pan and a zoom", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 5);
+
+    world.drag({ x: 700, y: 450 }, { x: 600, y: 450 });
+    world.scene.zoomBy(2);
+    flush(FRAME_MS);
+    expect(arrivingOf().length).toBeGreaterThan(0);
+    flush(SETTLE_MS * 3);
+
+    expect(arrivingOf()).toEqual([]);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Quand la scène se défait pendant un fondu, plus aucune image n'est attendue
+  it("schedules nothing once the scene is disposed", () => {
+    const world = openArrived();
+    world.receive(cellsOf([{ version: 8, cells: rowOf(10, 5, 9) }]));
+    flush(FRAME_MS * 3);
+
+    world.scene.dispose();
+
+    expect(world.pendingFrames()).toBe(0);
   });
 });
 

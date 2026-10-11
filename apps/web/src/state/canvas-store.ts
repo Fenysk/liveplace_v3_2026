@@ -64,6 +64,8 @@ export type Arrival =
 export type Pixel = Placement["pixels"][number];
 // Une case de sa pose que le serveur a acceptée, avec la couleur qu'elle remplace.
 export type ConfirmedPixel = Pixel & { previousColorIndex: number };
+// Une case venue d'un autre joueur (ou de la modération) qui change ce que la page montre, avec la couleur qu'elle montrait.
+export type ArrivedPixel = Pixel & { previousColorIndex: number };
 export type ServerGauge = AckFrame["gauge"];
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
@@ -123,6 +125,9 @@ export type CanvasStore = {
   confirmedColorIndexAt(x: number, y: number): number;
   // À chaque ack : les cases acceptées du lot. Un refus, une coupure ou une case venue d'un autre joueur n'y passent jamais.
   listenConfirmed(listener: (pixels: readonly ConfirmedPixel[]) => void): () => void;
+  // À chaque message `cells` : un lot par événement (la pose d'un joueur, une tranche de modération), dans l'ordre du message.
+  // Seules y sont les cases qui changent ce que la page montre : la pose d'un joueur que la page a déjà montrée n'y est pas.
+  listenArrived(listener: (pixels: readonly ArrivedPixel[]) => void): () => void;
   inspect(x: number, y: number): void;
   closeInspection(): void;
   // Réglée à la dernière tranche, avec le total des cases retirées (§4.3).
@@ -245,6 +250,7 @@ export function createCanvasStore(
   let previousInspection: Inspection | null = null; // rendue si le gateway refuse la suivante (JOURNAL 2026-09-27)
   const arrivalListeners = new Set<(arrival: Arrival) => void>();
   const confirmedListeners = new Set<(pixels: readonly ConfirmedPixel[]) => void>();
+  const arrivedListeners = new Set<(pixels: readonly ArrivedPixel[]) => void>();
   const staleListeners = new Set<(list: StaleList) => void>();
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
@@ -272,19 +278,40 @@ export function createCanvasStore(
   };
 
   // §5.3 : une case d'avant une nouvelle taille peut tomber hors du cadre.
-  const writeCell = ({ x, y, colorIndex }: BroadcastCell): void => {
-    if (x >= view.width || y >= view.height) return;
+  // Rend la couleur que la page montrait, ou rien si la case est hors du cadre.
+  const writeCell = ({ x, y, colorIndex }: BroadcastCell): number | undefined => {
+    if (x >= view.width || y >= view.height) return undefined;
     const offset = toStateOffset(x, y, view.width);
+    const shown = view.pixels[offset];
     view.pixels[offset] = colorIndex;
     for (const batch of pending.values()) if (batch.offsets.includes(offset)) batch.touched.add(offset);
+    return shown;
+  };
+
+  // Les cases d'un même événement portent la même `version` : c'est un lot, la pose d'un joueur ou une tranche de modération.
+  // Un lot ne garde que les cases qui changent ce que la page montre.
+  const writeCells = ({ cells }: CellsFrame): Map<number, ArrivedPixel[]> => {
+    const lots = new Map<number, ArrivedPixel[]>();
+    for (const cell of cells) {
+      const previousColorIndex = writeCell(cell);
+      if (previousColorIndex === undefined || previousColorIndex === cell.colorIndex) continue;
+      const lot = lots.get(cell.version) ?? [];
+      lot.push({ x: cell.x, y: cell.y, colorIndex: cell.colorIndex, previousColorIndex });
+      lots.set(cell.version, lot);
+    }
+    return lots;
   };
 
   // Le seul chemin d'écriture des cases venues du serveur : flux live, et plus tard resync et vue OBS (§9.2).
   // §4.3 : `hide` et `unhide` ne regardent que le stream, la page garde l'état réel.
   const apply = (frame: CellsFrame): void => {
-    for (const cell of frame.cells) if (cell.kind === "place" || cell.kind === "clear") writeCell(cell);
+    const lots = writeCells({
+      ...frame,
+      cells: frame.cells.filter(({ kind }) => kind === "place" || kind === "clear"),
+    });
     publish({ version: frame.toVersion });
     emit({ kind: "cells", frame: { toVersion: frame.toVersion, cells: frame.cells } });
+    for (const lot of lots.values()) for (const listener of arrivedListeners) listener(lot);
   };
 
   const restore = (batch: PendingBatch, indexes: readonly number[]): void => {
@@ -636,6 +663,10 @@ export function createCanvasStore(
     listenConfirmed(listener) {
       confirmedListeners.add(listener);
       return () => confirmedListeners.delete(listener);
+    },
+    listenArrived(listener) {
+      arrivedListeners.add(listener);
+      return () => arrivedListeners.delete(listener);
     },
     inspect(x, y) {
       if (view.inspection?.status !== "loading") previousInspection = view.inspection;
