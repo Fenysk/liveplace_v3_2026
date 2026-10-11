@@ -49,8 +49,9 @@ En local, `PUBLIC_URL` vaut `http://localhost:3000` : le web y construit le redi
 le gateway n'accepte un WebSocket que de cette origine.
 
 Redis s'adresse en `127.0.0.1`, jamais `localhost` : sous Windows, `wslrelay` écoute aussi en
-IPv6 sur le même port. Et `pnpm gate` exige ce Redis de dev, parce que les tests de
-`redis-core` tournent contre un vrai Redis.
+IPv6 sur le même port. Les tests n'utilisent pas ce Redis : chaque lancement de Vitest (`pnpm gate`,
+`pnpm test`) démarre le sien dans Docker et l'arrête à la fin, donc Docker doit tourner
+(sinon le lancement s'arrête et demande de démarrer Docker Desktop).
 
 Twitch accepte `http://localhost:3000/auth/twitch/callback` comme redirect : l'OAuth marche en
 local, sans tunnel, sur la première place seulement.

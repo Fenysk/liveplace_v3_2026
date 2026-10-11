@@ -2,8 +2,8 @@
 #
 #   docker compose -f docker-compose.dev.yml up -d
 #
-# Le port est publié ici, contrairement à la production où aucun port ne l'est :
-# les tests de packages/redis-core tournent contre ce Redis-là, depuis l'hôte.
+# Le port est publié ici, contrairement à la production où aucun port ne l'est : les apps
+# en `pnpm dev` tournent sur l'hôte. Les tests n'y touchent pas (JOURNAL 2026-10-11).
 services:
   redis:
     image: redis:7-alpine

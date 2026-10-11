@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-11 — Écart §11.7 : chaque lancement de tests a son propre Redis, jetable, dans Docker
+
+**Contexte.** Tous les tests de toutes les séances partageaient la base 15 du Redis de dev : jusqu'à 5 gates en même temps s'effaçaient la file `twitch:commands`, et saturaient la machine au point que Docker se figeait plusieurs secondes (un Redis à vide aussi) et que des tests dépassaient leurs 5 s, dont celui des 5 000 cases. Deux échecs au hasard.
+**Décision.** Un `globalSetup` de Vitest démarre un `redis:7-alpine` à chaque lancement (label `liveplace.test-redis`, `--rm`, port libre choisi par Docker), passe son port aux tests (`inject("redisPort")`) et l'arrête à la fin ; il balaie d'abord les conteneurs de test orphelins (créateur mort, ou plus de 30 min) et ne touche à aucun autre. Docker devient une dépendance du gate : absent ou arrêté, le lancement s'arrête sur un message qui dit de démarrer Docker Desktop, sans repli vers le Redis de dev, que les tests n'utilisent plus. Vitest plafonne ses workers à 50 % des cœurs (`maxWorkers`), et le test des 5 000 cases va plus vite sans rien perdre de ce qu'il prouve : les lots d'une pose partent d'un coup, et sa perte lit les clés en un seul SCAN.
+**Renoncement.** Un préfixe de clés par test pour `twitch:commands` (la file ne change pas) ; un Redis de test partagé et durable (il garde les collisions) ; un repli silencieux vers le Redis de dev quand Docker manque ; un délai relevé pour le test des 5 000 cases ; moins de cases pour ce test (il garde ses deux franchissements de lot).
+
 ## 2026-10-10 — Écart §4.3, §8.1 et §9.1 : le fond quitte « Vue OBS » pour « Fresque », s'applique aussi en jeu, et reçoit une image à part, d'une opacité réglable (aperçu bêta, protocole 20)
 
 **Contexte.** Le fond Transparent, Noir ou Blanc ne touchait que la source OBS et vivait dans « Vue OBS ». Alexis veut le régler dans « Fresque », le voir aussi en jeu, et poser une image du streamer sous les pixels, avec n'importe quel fond. Aperçu pour la bêta : la sauvegarde, les archives, l'export et la modération de l'image attendent.

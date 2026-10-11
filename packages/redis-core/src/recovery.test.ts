@@ -57,9 +57,10 @@ const moderateAll = async (canvasId: string, action: Moderation["action"]) => {
 };
 
 // La perte totale : tout ce qui est à ce canvas, et les miroirs des personnes que Redis garde à part.
+// Un seul aller-retour par SCAN (count élevé) : chaque aller-retour de plus coûte cher quand la machine est chargée.
 const lose = async (canvasId: string, userIds: readonly string[] = []) => {
   const found: string[] = [];
-  for await (const names of redis.scanStream({ match: `cv:${canvasId}:*`, count: 1000 }))
+  for await (const names of redis.scanStream({ match: `cv:${canvasId}:*`, count: 100_000 }))
     found.push(...names);
   if (found.length > 0) await redis.unlink(...found);
   if (userIds.length > 0) await redis.unlink(...userIds.map(userKey));

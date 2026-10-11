@@ -1,16 +1,22 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { Redis } from "ioredis";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from "vitest";
 import { createPresence, HEARTBEAT_KEY, LEASE_KEY, LEASE_TTL_MS } from "./presence";
 
-// Base 14 : ni celle du dev, ni la 15 des tests de redis-core. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
-const redis = new Redis({ host: "127.0.0.1", db: 14, lazyConnect: true, retryStrategy: () => null });
+// Le Redis de ce lancement (redis-core/src/test-global-setup.ts), base 14 : la 15 est celle de redis-core. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
+const redis = new Redis({
+  host: "127.0.0.1",
+  port: inject("redisPort"),
+  db: 14,
+  lazyConnect: true,
+  retryStrategy: () => null,
+});
 
 const now = 1_700_000_000_000;
 
 beforeAll(async () => {
   await redis.connect().catch(() => {
-    throw new Error("Redis absent : docker compose -f docker-compose.dev.yml up -d");
+    throw new Error("Redis de test injoignable : son conteneur Docker s'est arrêté");
   });
 });
 
