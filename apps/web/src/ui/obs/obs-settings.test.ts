@@ -1,4 +1,3 @@
-import { OBS_BACKGROUNDS, type ObsBackground } from "@liveplace/domain";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -7,107 +6,81 @@ import { ObsSettings } from "./obs-settings";
 
 const doNothing = (): void => undefined;
 
-const BACKGROUND_NAMES: Record<ObsBackground, string> = {
-  transparent: "Transparent",
-  black: "Noir",
-  white: "Blanc",
-};
-
-// Le contenu de la légende : le titre du groupe, puis le nom du choix à sa droite
-const legendOf = (html: string): string => html.match(/<legend[^>]*>(.*?)<\/legend>/)?.[1] ?? "";
-
-const settingsHtml = (obsBackground: ObsBackground, isTouch = false): string =>
+const settingsHtml = (): string =>
   renderToString(
     createElement(ObsSettings, {
       address: "liveplace.test/kalyss",
       url: "https://liveplace.test/kalyss",
       obsDelayMs: 10_000,
       onPickDelay: doNothing,
-      obsBackground,
-      onPickBackground: doNothing,
-      isTouch,
     }),
   );
 
-describe("the background of the OBS view in the settings (CDC 2026 §1)", () => {
-  // Plus d'interrupteur : le clavier de couleurs du PNG, sous « Fond de la vue OBS »
-  it("shows the color keyboard of the PNG under « Fond de la vue OBS », and no switch any more", () => {
-    const html = settingsHtml("transparent");
+// Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque se règle dans la section Fresque, avec un choix de plus, l'image. Ces cas,
+// qui disaient où il se choisissait dans « Vue OBS », disent maintenant qu'il n'y est plus ; son comportement est prouvé par la
+// section Fresque (canvas-background-settings.test.ts).
+describe("the OBS section of the settings no longer holds the background (Écart §9.1, JOURNAL 2026-10-10)", () => {
+  // Plus de clavier de couleurs, ni de titre « Fond de la vue OBS », ni d'interrupteur
+  it("has no color keyboard under « Fond de la vue OBS » any more, and no switch", () => {
+    const html = settingsHtml();
 
-    expect(html).toContain("<legend");
-    expect(html).toContain("Fond de la vue OBS");
+    expect(html).not.toContain("<legend");
+    expect(html).not.toContain("Fond de la vue OBS");
     expect(html).not.toContain("Fond transparent");
     expect(html).not.toContain('type="checkbox"');
   });
 
-  // Transparent, Noir, Blanc, dans cet ordre, sans nom dessous ; le noir et le blanc par une classe de teinte
-  it("offers Transparent, Noir and Blanc in that order, black and white by a tone class, transparent by the checker", () => {
-    const html = settingsHtml("transparent");
-    const swatches = [...html.matchAll(/<button[^>]*class="(lp-swatch[^"]*)"[^>]*aria-label="([^"]*)"/g)].map(
-      ([, className, label]) => [className, label],
-    );
+  // Ni Transparent, ni Noir, ni Blanc : aucune pastille dans la section
+  it("offers no Transparent, Noir or Blanc swatch", () => {
+    const swatches = [
+      ...settingsHtml().matchAll(/<button[^>]*class="(lp-swatch[^"]*)"[^>]*aria-label="([^"]*)"/g),
+    ];
 
-    expect(swatches).toEqual([
-      ["lp-swatch is-transparent", "Transparent"],
-      ["lp-swatch lp-swatch--png-black", "Noir"],
-      ["lp-swatch lp-swatch--png-white", "Blanc"],
-    ]);
+    expect(swatches).toEqual([]);
   });
 
-  // Un réglage : la valeur actuelle est toujours sélectionnée, jamais de choix vide
-  it("always selects the current value, whichever it is, and only it", () => {
-    for (const background of OBS_BACKGROUNDS) {
-      const pressed = [
-        ...settingsHtml(background).matchAll(/aria-label="([^"]*)"[^>]*aria-pressed="true"/g),
-      ].map(([, label]) => label);
-
-      expect(pressed).toEqual([BACKGROUND_NAMES[background]]);
-    }
+  // Aucun bouton enfoncé : le fond n'est plus un réglage de cette section, pas même celui d'avant
+  it("holds no pressed button, the background being no setting of this section any more", () => {
+    expect([...settingsHtml().matchAll(/aria-pressed="true"/g)]).toEqual([]);
   });
 
-  // JOURNAL 2026-10-10 : le nom du fond choisi est à droite du titre, comme « 10 s » à droite de « Délai », et caché aux lecteurs
-  it("names the chosen background on the right of the title, whichever it is, and hides that name from screen readers", () => {
-    for (const background of OBS_BACKGROUNDS) {
-      expect(legendOf(settingsHtml(background))).toMatch(
-        new RegExp(
-          `^Fond de la vue OBS<span class="lp-type-numeric" aria-hidden="true">${BACKGROUND_NAMES[background]}</span>$`,
-        ),
-      );
-    }
+  // Plus aucune légende : le groupe du fond était la seule
+  it("holds no legend any more: the background group was the only one", () => {
+    expect(settingsHtml().match(/<legend/g)).toBeNull();
   });
 
-  // La rangée du titre prend les classes de celle du Délai : les deux réglages voisins se ressemblent
-  it("lays the title row out with the classes of the row of « Délai » and its value", () => {
-    const html = settingsHtml("black");
+  // La rangée du Délai garde ses classes et sa valeur : c'est elle que le nom du fond imitait
+  it("keeps the row of « Délai » with its classes and its value", () => {
+    const html = settingsHtml();
     const [, delayRow = ""] =
       html.match(
         /<div class="([^"]*)"><label[^>]*>Délai<\/label><span class="lp-type-numeric">10 s<\/span>/,
       ) ?? [];
-    const [, legendClasses = ""] = html.match(/<legend class="([^"]*)">/) ?? [];
 
     expect(delayRow).toBe("lp-slider-row lp-type-body");
-    for (const className of delayRow.split(" ")) expect(legendClasses.split(" ")).toContain(className);
+    expect(html).toContain("Le temps de retirer un pixel avant qu&#x27;il n&#x27;arrive sur le stream.");
   });
 
-  // JOURNAL 2026-10-10 : les noms de largeurs différentes rendaient les écarts inégaux ; les pastilles sont seules dans leur rangée
-  it("puts no name under the swatches: the row holds the three buttons only, with no label around them", () => {
-    const html = settingsHtml("black");
-    const row = html.match(/<div class="lp-palette lp-palette--choice[^"]*">(.*?)<\/div>/)?.[1] ?? "";
+  // Plus de palette, de pastille ni de nom sous une pastille
+  it("puts no palette in the section: no swatch, no row of them, no name under one", () => {
+    const html = settingsHtml();
 
-    expect(row.match(/<button[^>]*><\/button>/g)).toHaveLength(OBS_BACKGROUNDS.length);
-    expect(row.replace(/<button[^>]*><\/button>/g, "")).toBe("");
+    expect(html).not.toContain("lp-palette");
+    expect(html).not.toContain("lp-swatch");
     expect(html).not.toContain("lp-swatch-option");
   });
 
-  // Sur un écran étroit ou tactile : les pastilles rondes de la taille d'un contrôle, comme dans la fenêtre du PNG
-  it("gives round touch swatches on a narrow or touch screen, and the compact ones otherwise", () => {
-    expect(settingsHtml("white", true)).toContain("lp-palette--touch");
-    expect(settingsHtml("white")).not.toContain("lp-palette--touch");
+  // La phrase de la marche à suivre reste, celle du fond est partie avec lui
+  it("keeps the sentence of the walkthrough, and drops the one of the background", () => {
+    const html = settingsHtml();
+
+    expect(html).toContain("Dans OBS Studio ou Streamlabs");
+    expect(html).not.toContain("Transparent, le stream montre");
   });
 
-  // La CSP de production bloque l'attribut `style` du HTML du serveur : les pastilles ont leur teinte par une classe
+  // La CSP de production bloque l'attribut `style` du HTML du serveur : la section n'en porte aucun
   it("carries no inline style: the production CSP would block it", () => {
-    for (const background of OBS_BACKGROUNDS) expect(settingsHtml(background)).not.toMatch(/\sstyle=/);
+    expect(settingsHtml()).not.toMatch(/\sstyle=/);
   });
 });
 
@@ -128,8 +101,6 @@ describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2
     url: "https://liveplace.test/kalyss",
     obsDelayMs: 10_000,
     onPickDelay: doNothing,
-    obsBackground: "transparent",
-    onPickBackground: doNothing,
   } as const;
 
   // Dans la page de jeu : un `<span>` entoure le champ, et lui seul, que la bulle vise
@@ -144,6 +115,6 @@ describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2
 
   // Hors de la page de jeu (/design), le champ reste seul
   it("leaves the field alone outside the game page", () => {
-    expect(settingsHtml("transparent")).not.toContain("lp-bubble-target");
+    expect(settingsHtml()).not.toContain("lp-bubble-target");
   });
 });

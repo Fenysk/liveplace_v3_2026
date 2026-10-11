@@ -1,4 +1,4 @@
-import { PALETTE } from "@liveplace/domain";
+import { type ObsBackground, PALETTE } from "@liveplace/domain";
 import type { Transport, TransportListeners } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -206,6 +206,8 @@ class FakeMutationObserver {
 // Les jetons que la scène lit sur <html> : la durée et la courbe de tokens.css, ou 0 en mouvement réduit.
 const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
+  if (name === "--obs-black") return "#000000";
+  if (name === "--obs-white") return "#ffffff";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
 };
 
@@ -221,6 +223,7 @@ const startBrowser = () => {
   browser.mutations.length = 0;
   browser.attributes.clear();
   probe.frames.length = 0;
+  fakeLayer.hidden = false;
   const root = {
     toggleAttribute: (name: string, force?: boolean) => {
       if (force) browser.attributes.add(name);
@@ -273,7 +276,7 @@ const lastFrame = (): Scene => {
 
 // Node n'a pas de DOM : un faux élément ne porte que ce que la scène lit. Le vrai élément est de ce type, et le compilateur
 // le vérifie à l'assertion qui suit : aucun membre ne peut diverger sans qu'il le dise.
-type FakeLayer = {
+type FakeLayer = Pick<HTMLElement, "hidden"> & {
   style: Pick<CSSStyleDeclaration, "setProperty">;
   animate: (...args: never[]) => Pick<Animation, "cancel">;
 };
@@ -283,7 +286,11 @@ type FakeSurface = Pick<HTMLCanvasElement, "width" | "height" | "clientWidth" | 
   addEventListener: (...args: never[]) => void;
 };
 
-const fakeLayer: FakeLayer = { style: { setProperty: NO_OP }, animate: () => ({ cancel: NO_OP }) };
+const fakeLayer: FakeLayer = {
+  hidden: false,
+  style: { setProperty: NO_OP },
+  animate: () => ({ cancel: NO_OP }),
+};
 const LAYER = fakeLayer as HTMLElement;
 
 const createSurface = () => {
@@ -303,7 +310,13 @@ const createSurface = () => {
   return { element: fakeSurface as HTMLCanvasElement, dispatch };
 };
 
-const welcomeOf = (canvas: Size): ServerFrame => ({
+type BackgroundParams = {
+  obsBackground?: ObsBackground;
+  backgroundImageAt?: number;
+  backgroundImageOpacity?: number;
+};
+
+const welcomeOf = (canvas: Size, background: BackgroundParams = {}): ServerFrame => ({
   t: "welcome",
   canvas: { canvasId: "canvas-1", width: canvas.width, height: canvas.height, ownerId: "owner-1" },
   params: {
@@ -313,6 +326,7 @@ const welcomeOf = (canvas: Size): ServerFrame => ({
     refillCharges: 1,
     obsDelayMs: 5000,
     obsBackground: "transparent",
+    ...background,
   },
   palette: [...PALETTE],
   version: 7,
@@ -356,10 +370,18 @@ const LAPTOP_PLACE: Place = {
 // Sur le PC, 256 cases de côté tiennent à 3 px la case.
 const BIG_CANVAS = { width: 256, height: 256 };
 
-type Options = { canvas?: Size; draft?: readonly Cell[]; isReducedMotion?: boolean };
+type Options = {
+  canvas?: Size;
+  draft?: readonly Cell[];
+  isReducedMotion?: boolean;
+  background?: BackgroundParams; // le fond de la fresque que le welcome annonce (Écart §9.1, JOURNAL 2026-10-10)
+};
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
-const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion = false }: Options = {}) => {
+const openScene = (
+  place: Place,
+  { canvas = CANVAS, draft = [], isReducedMotion = false, background }: Options = {},
+) => {
   probe.arrival = place.arrival;
   probe.draftInsets = place.draftInsets;
   browser.isCoarse = place.isTouch;
@@ -378,7 +400,7 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
     reload: () => undefined,
   });
   listening.listeners?.onOpen();
-  listening.listeners?.onFrame(welcomeOf(canvas));
+  listening.listeners?.onFrame(welcomeOf(canvas, background));
   const saved = new Map<string, string>();
   if (draft.length > 0)
     saved.set(DRAFT_KEY, JSON.stringify(draft.map(({ x, y }) => ({ x, y, colorIndex: 3 }))));
@@ -395,6 +417,7 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
   const hooks = { onViewportMove: vi.fn(), onFraming: vi.fn(), onGesture: vi.fn(), onNavigate: vi.fn() };
   const surface = createSurface();
   const scene = createCanvasScene(surface.element, store, draftStore, {
+    login: "kalyss",
     initialViewport: null,
     isFramedInFreeArea: true,
     ...hooks,
@@ -416,6 +439,10 @@ const openScene = (place: Place, { canvas = CANVAS, draft = [], isReducedMotion 
     draftStore,
     scene,
     hooks,
+    receive: (frame: ServerFrame) => {
+      listening.listeners?.onFrame(frame);
+      flush(FRAME_MS);
+    },
     view: (): Viewport => lastFrame().viewport,
     shownDraft: () => lastFrame().draft.length,
     moves: () => hooks.onViewportMove.mock.calls.length,
@@ -895,5 +922,125 @@ describe("freeArea, Écart §9.3 (JOURNAL 2026-10-09)", () => {
     expect(freeArea(PHONE, NO_INSETS)).toEqual({ left: 0, top: 0, right: 375, bottom: 812 });
     expect(freeArea(PHONE, DRAFT_INSETS)).toEqual({ left: 0, top: 96, right: 375, bottom: 592 });
     expect(freeArea(LANDSCAPE, LANDSCAPE_INSETS)).toEqual({ left: 47, top: 44, right: 469, bottom: 369 });
+  });
+});
+
+// Le navigateur ne charge pas d'image ici : un faux <img> qui note son adresse, et que le test charge quand il le décide.
+class FakeImage {
+  static made: FakeImage[] = [];
+  src = "";
+  naturalWidth = 0;
+  naturalHeight = 0;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor() {
+    FakeImage.made.push(this);
+  }
+  load() {
+    this.naturalWidth = 1600;
+    this.naturalHeight = 900;
+    this.onload?.();
+  }
+}
+
+describe("la scène du canvas et le fond de la fresque, Écart §9.1 (JOURNAL 2026-10-10)", () => {
+  beforeEach(() => {
+    startBrowser();
+    FakeImage.made = [];
+    vi.stubGlobal("Image", FakeImage);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Sans fond ni image : la scène ne peint rien dessous, et le damier reste
+  it("paints nothing under the pixels for a transparent background without an image, and leaves the checkerboard", () => {
+    openScene(LAPTOP_PLACE);
+
+    expect(lastFrame().backdrop).toEqual({ fill: null, image: null });
+    expect(fakeLayer.hidden).toBe(false);
+  });
+
+  // Noir ou blanc : le vrai noir ou le vrai blanc des jetons, sous les pixels, et le damier se retire
+  it("paints the real black or white of the tokens under the pixels, and takes the checkerboard away", () => {
+    openScene(LAPTOP_PLACE, { background: { obsBackground: "black" } });
+    expect(lastFrame().backdrop).toEqual({ fill: "#000000", image: null });
+    expect(fakeLayer.hidden).toBe(true);
+
+    startBrowser();
+    openScene(LAPTOP_PLACE, { background: { obsBackground: "white" } });
+    expect(lastFrame().backdrop).toEqual({ fill: "#ffffff", image: null });
+    expect(fakeLayer.hidden).toBe(true);
+  });
+
+  // L'image se charge à l'adresse du pseudo, sur n'importe quel fond ; transparent, elle se pose sur le damier, qui reste
+  it("loads the image from the address of the login, whatever the background, and over a transparent one lays it on the checkerboard, which stays", () => {
+    const world = openScene(LAPTOP_PLACE, { background: { backgroundImageAt: 1_760_000_000_000 } });
+
+    expect(FakeImage.made.map(({ src }) => src)).toEqual(["/kalyss/background?v=1760000000000"]);
+    expect(lastFrame().backdrop).toEqual({ fill: null, image: null });
+
+    FakeImage.made[0]?.load();
+    flush(FRAME_MS);
+
+    expect(lastFrame().backdrop).toMatchObject({
+      fill: null,
+      image: { size: { width: 1600, height: 900 }, opacity: 40 },
+    });
+    expect(fakeLayer.hidden).toBe(false);
+    expect(world.pendingFrames()).toBe(0);
+  });
+
+  // Sur un fond plein, l'image se pose à l'opacité du réglage, et le damier se retire avec le fond
+  it("lays the image over a plain background at the opacity of the setting, the checkerboard going with the background", () => {
+    openScene(LAPTOP_PLACE, {
+      background: {
+        obsBackground: "white",
+        backgroundImageAt: 1_760_000_000_000,
+        backgroundImageOpacity: 80,
+      },
+    });
+
+    FakeImage.made[0]?.load();
+    flush(FRAME_MS);
+
+    expect(lastFrame().backdrop).toMatchObject({ fill: "#ffffff", image: { opacity: 80 } });
+    expect(fakeLayer.hidden).toBe(true);
+  });
+
+  // Sans image, rien n'est chargé, quel que soit le fond ; à 0 %, l'image chargée ne peint rien
+  it("loads nothing without an image, whatever the background, and an image at 0 % paints nothing", () => {
+    openScene(LAPTOP_PLACE, { background: { obsBackground: "black" } });
+    expect(FakeImage.made).toEqual([]);
+    expect(lastFrame().backdrop.image).toBeNull();
+
+    startBrowser();
+    openScene(LAPTOP_PLACE, {
+      background: { backgroundImageAt: 1_760_000_000_000, backgroundImageOpacity: 0 },
+    });
+    FakeImage.made.at(-1)?.load();
+    flush(FRAME_MS);
+    expect(lastFrame().backdrop.image).toBeNull();
+  });
+
+  // Un fond, une image et une opacité changés en direct : la scène suit chaque frame, sans recharger la page
+  it("follows a background, an image and an opacity changed live, without a reload", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.receive({ t: "backgroundImage", at: 1_760_000_000_000 });
+    FakeImage.made[0]?.load();
+    flush(FRAME_MS);
+    expect(lastFrame().backdrop).toMatchObject({ fill: null, image: { opacity: 40 } });
+
+    world.receive({ t: "obsBackground", obsBackground: "black" });
+    world.receive({ t: "backgroundImageOpacity", backgroundImageOpacity: 70 });
+    expect(lastFrame().backdrop).toMatchObject({ fill: "#000000", image: { opacity: 70 } });
+
+    world.receive({ t: "backgroundImage" });
+    expect(lastFrame().backdrop).toEqual({ fill: "#000000", image: null });
+
+    world.receive({ t: "obsBackground", obsBackground: "transparent" });
+    expect(lastFrame().backdrop).toEqual({ fill: null, image: null });
+    expect(fakeLayer.hidden).toBe(false);
   });
 });

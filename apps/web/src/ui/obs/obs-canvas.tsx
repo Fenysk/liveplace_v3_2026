@@ -1,14 +1,22 @@
-// La surface de la vue OBS (CDC 2026, Vue OBS) : les pixels seuls, sur fond transparent, noir ou blanc. Le canvas remplit la source
-// sans se déformer, centré : une case peut faire 4 px et sa voisine 5 px (JOURNAL 2026-09-25). Ni geste, ni curseur.
+// La surface de la vue OBS (CDC 2026, Vue OBS) : les pixels seuls, sur le fond de la fresque (transparent, noir ou blanc) et son image
+// (Écart §9.1, JOURNAL 2026-10-10). Le canvas remplit la source sans se déformer, centré : une case peut faire 4 px et sa voisine
+// 5 px (JOURNAL 2026-09-25). Ni geste, ni curseur.
 
 import { useEffect, useRef } from "react";
+import { backgroundImagePath } from "../../shared/background-image-path";
 import type { ObsStore, ObsView } from "../../state/obs-store";
+import {
+  createBackdropImage,
+  createPropertyReader,
+  renderBackdrop,
+  toBackdrop,
+} from "../canvas/canvas-background";
 import { createCanvasImage } from "../canvas/canvas-image";
 import { useTexts } from "../locale/use-locale";
-import { obsFillStyle } from "./obs-background";
 import { OBS_TEXTS } from "./obs-texts";
 
-type ObsCanvasProps = { store: ObsStore };
+// `login` : celui de la page, qui nomme l'adresse de l'image du fond.
+type ObsCanvasProps = { store: ObsStore; login: string };
 
 type Rect = { left: number; top: number; width: number; height: number };
 
@@ -28,7 +36,7 @@ const fitRect = (surface: { width: number; height: number }, view: ObsView): Rec
   return { left: (surface.width - width) / 2, top: (surface.height - height) / 2, width, height };
 };
 
-export const ObsCanvas = ({ store }: ObsCanvasProps) => {
+export const ObsCanvas = ({ store, login }: ObsCanvasProps) => {
   const surface = useRef<HTMLCanvasElement>(null);
   const t = useTexts(OBS_TEXTS);
 
@@ -38,6 +46,8 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
     const context = element.getContext("2d");
     if (!context) throw new Error("obs-canvas : contexte 2d indisponible");
     const image = createCanvasImage();
+    const backdropImage = createBackdropImage(() => requestPaint());
+    const getProperty = createPropertyReader(element);
     let frame = 0;
 
     const paint = (): void => {
@@ -48,11 +58,14 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
       const { width, height } = sizeSurface(element);
       const { left, top, width: drawnWidth, height: drawnHeight } = fitRect({ width, height }, view);
       context.clearRect(0, 0, width, height);
-      // CDC 2026 §1 : le fond noir ou blanc, sous les pixels, dans le cadre du canvas seulement.
-      context.fillStyle = obsFillStyle(view.background, (property) =>
-        getComputedStyle(element).getPropertyValue(property),
+      // CDC 2026 §1, Écart §9.1 (JOURNAL 2026-10-10) : le fond noir ou blanc, puis l'image par-dessus à son opacité, sous les pixels,
+      // dans le cadre du canvas seulement. Sans fond, l'image se pose sur la transparence : OBS montre sa source à travers.
+      backdropImage.set(view.backgroundImageAt ? backgroundImagePath(login, view.backgroundImageAt) : null);
+      renderBackdrop(
+        context,
+        { left, top, width: drawnWidth, height: drawnHeight },
+        toBackdrop(view.background, backdropImage.get(), view.backgroundImageOpacity, getProperty),
       );
-      context.fillRect(left, top, drawnWidth, drawnHeight);
       context.imageSmoothingEnabled = false;
       context.drawImage(image.source, left, top, drawnWidth, drawnHeight);
     };
@@ -67,11 +80,12 @@ export const ObsCanvas = ({ store }: ObsCanvasProps) => {
     resizeObserver.observe(element);
     requestPaint();
     return () => {
+      backdropImage.dispose();
       unsubscribe();
       resizeObserver.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [store]);
+  }, [store, login]);
 
   return <canvas ref={surface} className="lp-obs-surface" aria-label={t.surfaceLabel} />;
 };

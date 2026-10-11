@@ -1,11 +1,13 @@
 // Une image à l'écran (§9.3), dans l'ordre : les pixels, le brouillon, la grille, la bordure,
 // le contour du brouillon, la case visée, le viseur de la case inspectée. Le vide et le damier ne sont pas ici : ce sont
 // deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent pas le viewport. Le canvas reste
-// transparent autour de l'image, et sous ses pixels transparents.
+// transparent autour de l'image, et sous ses pixels transparents, sauf quand la fresque a un fond noir, blanc ou image : il
+// le peint lui-même, sous les pixels, et le damier se retire (Écart §9.1, JOURNAL 2026-10-10).
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "../../state/canvas-store";
+import { type Backdrop, renderBackdrop } from "./canvas-background";
 import type { Cell, Size, Viewport } from "./viewport";
 
 // Les teintes du canvas, lues dans les tokens de l'apparence (tokens.css) : aucune n'est écrite ici.
@@ -23,6 +25,7 @@ export type Scene = {
   viewport: Viewport;
   canvas: Size;
   image: CanvasImageSource;
+  backdrop: Backdrop; // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, sous les pixels ; le damier cède quand il peint
   shades: SceneShades;
   targetCell: Cell | null;
   inspectedCell: Cell | null;
@@ -224,6 +227,13 @@ export function renderScene(context: CanvasRenderingContext2D, scene: Scene): vo
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, screenWidth, screenHeight);
 
+  const canvasFrame = {
+    left: originX,
+    top: originY,
+    width: canvas.width * cellSize,
+    height: canvas.height * cellSize,
+  };
+  renderBackdrop(context, canvasFrame, scene.backdrop);
   // Remis à chaque image : redimensionner un <canvas> remet son contexte à zéro.
   context.imageSmoothingEnabled = false;
   context.drawImage(scene.image, originX, originY, canvas.width * cellSize, canvas.height * cellSize);

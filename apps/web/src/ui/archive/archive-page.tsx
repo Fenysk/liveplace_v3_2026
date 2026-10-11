@@ -181,6 +181,7 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
           store={stores.canvas}
           draftStore={stores.draft}
           canvasId={canvasId}
+          login={owner.login}
           ownerName={owner.displayName}
         />
       )}

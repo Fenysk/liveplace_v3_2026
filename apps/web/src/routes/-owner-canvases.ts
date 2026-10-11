@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { archiveCanvas } from "../usecase/archive-canvas";
+import { clearCanvasBackgroundImage } from "../usecase/canvas-background-image";
 import type { SwitchDeps } from "../usecase/canvas-switch";
 import { discardOwnerArchive } from "../usecase/discard-owner-archive";
 import { listCanvases } from "../usecase/list-canvases";
@@ -27,6 +28,7 @@ const ReopenRequestSchema = z.object({ canvasId: CanvasIdSchema, progress: Progr
 const DiscardRequestSchema = z.object({ canvasId: CanvasIdSchema });
 // Même borne que l'archivage : `toTheme` nettoie et coupe à 40 caractères.
 const ThemeRequestSchema = z.object({ canvasId: CanvasIdSchema, theme: z.string().max(400) });
+const BackgroundImageRequestSchema = z.object({ canvasId: CanvasIdSchema });
 
 // Ce que le contexte du serveur donne aux usecases : les mêmes dépendances pour les quatre.
 type OwnerCanvasDeps = {
@@ -86,5 +88,18 @@ export const setCanvasThemeFn = createServerFn({ method: "POST" })
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
       setCanvasTheme({ durable: context.deps.durable, redis: context.deps.archiveWrites }, ownerId, data),
+    ),
+  );
+
+// Écart §9.1 (JOURNAL 2026-10-10) : retirer l'image du fond. La poser est la requête `POST /{login}/background`, qui porte les octets.
+export const clearCanvasBackgroundImageFn = createServerFn({ method: "POST" })
+  .validator(BackgroundImageRequestSchema)
+  .handler(({ data, context }) =>
+    withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
+      clearCanvasBackgroundImage(
+        { durable: context.deps.durable, redis: context.deps.archiveWrites },
+        ownerId,
+        data,
+      ),
     ),
   );

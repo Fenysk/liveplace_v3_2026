@@ -76,6 +76,32 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
       });
       return result.ok ? { ok: true, value: undefined } : result;
     },
+    // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond part à l'adresse d'envoi de Convex, comme un snapshot, puis la mutation la
+    // range sur le canvas actif ; un refus de Convex est une valeur, et le fichier part avec.
+    async setActiveCanvasBackgroundImage(ownerId, canvasId, image) {
+      const uploadUrl = await convex.mutation(api.snapshots.generateUploadUrl, { serviceKey });
+      const storageId = await uploadFile(uploadUrl, image);
+      const result = await convex.mutation(api.canvases.setBackgroundImage, {
+        serviceKey,
+        ownerId,
+        canvasId,
+        storageId,
+        size: image.byteLength,
+      });
+      return result.ok ? { ok: true, value: { at: result.at } } : result;
+    },
+    async clearActiveCanvasBackgroundImage(ownerId, canvasId) {
+      const result = await convex.mutation(api.canvases.clearBackgroundImage, {
+        serviceKey,
+        ownerId,
+        canvasId,
+      });
+      return result.ok ? { ok: true, value: undefined } : result;
+    },
+    async getActiveCanvasBackgroundImage(ownerId, at) {
+      const url = await convex.query(api.canvases.getBackgroundImageUrl, { serviceKey, ownerId, at });
+      return url ? downloadFile(url, "l'image du fond") : null;
+    },
     async discardArchive(ownerId, canvasId) {
       const result = await convex.mutation(api.canvases.discard, { serviceKey, ownerId, canvasId });
       return result.ok ? { ok: true, value: undefined } : result;

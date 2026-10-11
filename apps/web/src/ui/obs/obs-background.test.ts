@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { OBS_BACKGROUNDS } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
+import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { obsFillStyle } from "./obs-background";
-import { OBS_TEXTS } from "./obs-texts";
 
 const tokens = readFileSync(join(import.meta.dirname, "..", "design", "tokens.css"), "utf8");
 
@@ -35,11 +35,12 @@ describe("the fill of the OBS view (CDC 2026 §1)", () => {
   });
 });
 
+// Le fond se règle dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10) : son toast est dans les phrases de la fresque
 describe("the toast of the saved background (CDC 2026, Toasts)", () => {
   // Dit le fond enregistré par son nom, en minuscules après les deux-points
   it("says the saved background by its name", () => {
     const saved = (background: "transparent" | "black" | "white", locale: "fr" | "en") =>
-      OBS_TEXTS[locale].backgroundSaved(DESIGN_TEXTS[locale].backgroundNames[background]);
+      CANVAS_TEXTS[locale].backgroundSaved(DESIGN_TEXTS[locale].backgroundNames[background]);
 
     expect(saved("transparent", "fr")).toBe("Fond enregistré : transparent");
     expect(saved("black", "fr")).toBe("Fond enregistré : noir");

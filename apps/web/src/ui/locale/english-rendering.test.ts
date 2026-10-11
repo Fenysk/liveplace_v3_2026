@@ -373,6 +373,16 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     const section = inEnglish(
       createElement(CanvasSettings, {
         theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
+        background: { value: "black", isTouch: false, onPick: doNothing },
+        image: {
+          imageUrl: "/kalyss/background?v=1760000000000",
+          background: "black",
+          opacity: 40,
+          isSending: false,
+          onChooseFile: doNothing,
+          onClearImage: doNothing,
+          onPickOpacity: doNothing,
+        },
         current,
         choice: { format: "16:9", sizeIndex: 1 },
         chosen: { width: 64, height: 36 },
@@ -395,6 +405,16 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(section).toContain("Currently 32 × 32 cells.");
     expect(section).toContain("Landscape 16:9, 64 × 36 cells. Nothing is lost");
     for (const label of ["Small", "Medium", "Large", "Change size"]) expect(section).toContain(label);
+    // Le fond de la fresque, avec son image (Écart §9.1, JOURNAL 2026-10-10)
+    for (const label of [
+      "Canvas background",
+      "Canvas image",
+      "Change image",
+      "Remove image",
+      ">Image opacity</label>",
+    ])
+      expect(section).toContain(label);
+    expect(section).toContain(">40%</span>");
     expect(resize).toContain("Switch to 64 × 36 cells?");
     expect(resize).toContain("1 pixel falls outside the frame");
     expect(resize).toContain("it comes back when the canvas grows");
@@ -504,8 +524,6 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
         url: "https://liveplace.test/kalyss",
         obsDelayMs: 0,
         onPickDelay: doNothing,
-        obsBackground: "black",
-        onPickBackground: doNothing,
       }),
     );
 
@@ -513,9 +531,10 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(markup).toContain("In OBS Studio or Streamlabs: Sources, +, Browser.");
     expect(markup).toContain(">Delay</label>");
     expect(markup).toContain(">None</span>");
-    expect(markup).toContain("OBS view background");
-    expect(markup).toContain('aria-label="Transparent"');
-    expect(markup).toContain('aria-label="Black"');
+    // Le fond n'est plus ici : il se règle dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10)
+    expect(markup).not.toContain("OBS view background");
+    expect(markup).not.toContain('aria-label="Transparent"');
+    expect(markup).not.toContain('aria-label="Black"');
   });
 });
 

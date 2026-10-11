@@ -4,8 +4,10 @@ import { v } from "convex/values";
 import {
   type CanvasWrite,
   type Plan,
+  pickBackgroundImage,
   pickLinkedCanvas,
   planArchive,
+  planBackgroundImage,
   planDiscard,
   planNameToTheme,
   planReopen,
@@ -15,7 +17,9 @@ import {
 } from "../src/canvas-plan";
 import { requireServiceKey } from "../src/service-key";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import { addUsage, FILES_KEY, releaseFile } from "./usage";
 
 const activeCanvasOf = (db: QueryCtx["db"], ownerId: string) =>
   db
@@ -172,6 +176,60 @@ export const setTheme = mutation({
   },
 });
 
+// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond du canvas actif, un fichier que le web vient d'envoyer à l'adresse de
+// `snapshots:generateUploadUrl`. Elle remplace la précédente, dont le fichier part. Refusée, le fichier envoyé part avec : rien n'y renvoie.
+export const setBackgroundImage = mutation({
+  args: {
+    serviceKey: v.string(),
+    ownerId: v.string(),
+    canvasId: v.string(),
+    storageId: v.id("_storage"),
+    size: v.number(),
+  },
+  handler: async (ctx, { serviceKey, ownerId, canvasId, storageId, size }) => {
+    requireServiceKey(serviceKey);
+    const docs = await canvasesOf(ctx.db, ownerId);
+    const plan = planBackgroundImage(docs, ownerId, canvasId);
+    if (!plan.ok) {
+      await ctx.storage.delete(storageId);
+      return plan;
+    }
+    const doc = docs.find((candidate) => candidate.canvasId === canvasId);
+    if (!doc) throw new Error(`canvas ${canvasId} absent du plan`);
+    const at = Date.now();
+    await ctx.db.patch(doc._id, { backgroundImage: { storageId, at, size } });
+    await addUsage(ctx, FILES_KEY, size, 1);
+    if (plan.previous) await releaseFile(ctx, plan.previous.storageId as Id<"_storage">, plan.previous.size);
+    return { ok: true as const, at };
+  },
+});
+
+// Sans image, le patch retire le champ, et son fichier part.
+export const clearBackgroundImage = mutation({
+  args: { serviceKey: v.string(), ownerId: v.string(), canvasId: v.string() },
+  handler: async (ctx, { serviceKey, ownerId, canvasId }) => {
+    requireServiceKey(serviceKey);
+    const docs = await canvasesOf(ctx.db, ownerId);
+    const plan = planBackgroundImage(docs, ownerId, canvasId);
+    if (!plan.ok) return plan;
+    const doc = docs.find((candidate) => candidate.canvasId === canvasId);
+    if (!doc) throw new Error(`canvas ${canvasId} absent du plan`);
+    await ctx.db.patch(doc._id, { backgroundImage: undefined });
+    if (plan.previous) await releaseFile(ctx, plan.previous.storageId as Id<"_storage">, plan.previous.size);
+    return { ok: true as const };
+  },
+});
+
+// Sans session : l'adresse d'une image publique n'a pas d'autre clé que son instant. `null` : plus d'image, ou une autre.
+export const getBackgroundImageUrl = query({
+  args: { serviceKey: v.string(), ownerId: v.string(), at: v.number() },
+  handler: async (ctx, { serviceKey, ownerId, at }) => {
+    requireServiceKey(serviceKey);
+    const image = pickBackgroundImage((await activeCanvasOf(ctx.db, ownerId)) ?? undefined, at);
+    return image ? ctx.storage.getUrl(image.storageId as Id<"_storage">) : null;
+  },
+});
+
 // Ancien appel, retiré au prochain changement de schéma : le code d'avant règle le thème par `name`. Le nouveau code ne
 // l'appelle jamais.
 export const rename = mutation({
@@ -210,8 +268,12 @@ export const discard = mutation({
   handler: async (ctx, { serviceKey, ownerId, canvasId }) => {
     requireServiceKey(serviceKey);
     const docs = await canvasesOf(ctx.db, ownerId);
+    const image = docs.find((candidate) => candidate.canvasId === canvasId)?.backgroundImage;
     const settled = await settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
-    if (settled.ok) await purgeLater(ctx, canvasId);
+    if (!settled.ok) return settled;
+    // Écart §8.1 (JOURNAL 2026-10-10) : le fichier de l'image part avec son canvas.
+    if (image) await releaseFile(ctx, image.storageId, image.size);
+    await purgeLater(ctx, canvasId);
     return settled;
   },
 });

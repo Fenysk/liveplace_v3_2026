@@ -185,7 +185,11 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
               <ObsTab canvas={stores.canvas} login={login} onCopy={help.onObsAddressCopied} />
             ) : undefined
           }
-          canvasTab={isOwner ? <CanvasTab canvas={stores.canvas} /> : undefined}
+          canvasTab={
+            isOwner ? (
+              <CanvasTab canvas={stores.canvas} canvasId={stores.canvasId} login={login} />
+            ) : undefined
+          }
           canvasesTab={
             isOwner ? (
               <ArchivesTab
@@ -273,6 +277,7 @@ const GamePage = () => {
           store={stores.canvas}
           draftStore={stores.draft}
           canvasId={canvasId}
+          login={login}
           ownerName={owner.displayName}
           isFramedInFreeArea
           onGesture={foldCanvasPill}
@@ -309,8 +314,13 @@ const GamePage = () => {
 // La même adresse dans le navigateur et dans OBS (§9.1) : la marque posée avant la première peinture décide.
 const CanvasPage = () => {
   const { canvasId } = Route.useLoaderData();
+  const { login } = Route.useParams();
   const { openCanvas } = Route.useRouteContext();
-  return useIsObsView() ? <ObsPage canvasId={canvasId} openCanvas={openCanvas} /> : <GamePage />;
+  return useIsObsView() ? (
+    <ObsPage canvasId={canvasId} login={login} openCanvas={openCanvas} />
+  ) : (
+    <GamePage />
+  );
 };
 
 // L'application web de ce canvas (Écart §9.1, JOURNAL 2026-10-08, sans la vue OBS forcée `$login_.obs`), puis la carte d'aperçu du lien.

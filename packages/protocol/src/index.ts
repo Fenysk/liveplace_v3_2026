@@ -4,6 +4,7 @@ import {
   ACTIVITY_PERIODS,
   CANVAS_STATUSES,
   DEVICES,
+  isBackgroundImageOpacity,
   isCanvasSize,
   isGaugeLimits,
   isObsDelayStep,
@@ -36,7 +37,9 @@ import { z } from "zod";
 // 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (Écart §4 et §10.1, JOURNAL 2026-10-07).
 // 18 : un canvas en récupération, le code d'erreur `canvas_recovering` (Écart §4.2, JOURNAL 2026-10-08).
 // 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (Écart §4.3, JOURNAL 2026-10-08).
-export const PROTOCOL_VERSION = 19;
+// 20 : l'image du fond de la fresque, dans le `welcome` et dans la frame `backgroundImage`, et son opacité, `setBackgroundImageOpacity`
+// et `backgroundImageOpacity` (Écart §4.3, JOURNAL 2026-10-10).
+export const PROTOCOL_VERSION = 20;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -280,6 +283,19 @@ const ResizeCanvasFrameSchema = z
   })
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
+// Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de l'image du fond, un cran de dix points de 0 à 100.
+const BackgroundImageOpacitySchema = z
+  .number()
+  .int()
+  .refine(isBackgroundImageOpacity, "pas un cran de l'opacité de l'image");
+
+// Écart §9.1 (JOURNAL 2026-10-10) : le streamer seul, pris aussitôt par chaque page, comme le fond.
+const SetBackgroundImageOpacityFrameSchema = z.strictObject({
+  t: z.literal("setBackgroundImageOpacity"),
+  requestId: RequestIdSchema,
+  backgroundImageOpacity: BackgroundImageOpacitySchema,
+});
+
 // CDC 2026 §1 : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
 const SetObsBackgroundFrameSchema = z.strictObject({
   t: z.literal("setObsBackground"),
@@ -336,6 +352,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListReportsFrameSchema,
   ResizeCanvasFrameSchema,
   SetObsBackgroundFrameSchema,
+  SetBackgroundImageOpacityFrameSchema,
   ClaimGaugeFrameSchema,
   SetGaugeLimitsFrameSchema,
   WatchActivityFrameSchema,
@@ -375,6 +392,8 @@ const WelcomeFrameSchema = z.object({
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
     obsBackground: z.enum(OBS_BACKGROUNDS), // JOURNAL 2026-09-29
+    backgroundImageAt: TimestampSchema.int().positive().optional(), // Écart §4.3 (JOURNAL 2026-10-10) : absent, le canvas n'a pas d'image
+    backgroundImageOpacity: BackgroundImageOpacitySchema.optional(), // de même : absent, 40 %
     theme: ThemeSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : absent, le canvas n'a pas de thème
   }),
   palette: z.array(z.string()),
@@ -547,6 +566,19 @@ const ObsDelayFrameSchema = z.object({ t: z.literal("obsDelay"), obsDelayMs: Obs
 const ObsBackgroundFrameSchema = z.object({
   t: z.literal("obsBackground"),
   obsBackground: z.enum(OBS_BACKGROUNDS),
+});
+
+// L'opacité de l'image du fond vient de changer : toutes les pages du canvas la prennent aussitôt (Écart §4.3, JOURNAL 2026-10-10).
+const BackgroundImageOpacityFrameSchema = z.object({
+  t: z.literal("backgroundImageOpacity"),
+  backgroundImageOpacity: BackgroundImageOpacitySchema,
+});
+
+// L'image du fond vient de changer : toutes les pages du canvas la prennent aussitôt ; sans `at`, il n'y en a plus
+// (Écart §4.3, JOURNAL 2026-10-10).
+const BackgroundImageFrameSchema = z.object({
+  t: z.literal("backgroundImage"),
+  at: TimestampSchema.int().positive().optional(),
 });
 
 // Le thème vient de changer : toutes les pages du canvas le prennent aussitôt ; sans `theme`, il n'y en a plus
@@ -773,6 +805,8 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   RoleFrameSchema,
   ObsDelayFrameSchema,
   ObsBackgroundFrameSchema,
+  BackgroundImageFrameSchema,
+  BackgroundImageOpacityFrameSchema,
   ThemeFrameSchema,
   GaugeLimitsFrameSchema,
   ReportedFrameSchema,

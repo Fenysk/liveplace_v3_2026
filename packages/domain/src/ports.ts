@@ -159,6 +159,8 @@ export type LiveControl =
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   | { t: "resize" } // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
   | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (Écart §15, JOURNAL 2026-10-06)
+  | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (Écart §4.3, JOURNAL 2026-10-10)
+  | { t: "backgroundImage"; at?: Timestamp } // publié par le web : l'image du fond a changé, sans `at` il n'y en a plus (Écart §4.3, JOURNAL 2026-10-10)
   | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (Écart §4.3, JOURNAL 2026-10-07)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
@@ -224,6 +226,7 @@ export interface CanvasCore {
   // CDC 2026 §1 : `meta` et le `ctl` ensemble, sans version.
   setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
   setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
+  setBackgroundImageOpacity(canvasId: string, backgroundImageOpacity: number): Promise<void>; // Écart §9.1 (JOURNAL 2026-10-10), de même
   setGaugeLimits(canvasId: string, limits: GaugeLimits): Promise<void>; // JOURNAL 2026-09-30, comme le délai
   // §5.1 : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
   setModerator(canvasId: string, change: ModeratorRole): Promise<Result<void, CanvasRefusal | "forbidden">>;
@@ -473,6 +476,10 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
   // le `ctl` `theme`, pour les pages d'un canvas qui reste là. Archiver ou rouvrir n'écrit que la copie : ses pages changent de canvas.
   setTheme(canvasId: string, theme: string | undefined): Promise<void>;
   publishTheme(canvasId: string, theme: string | undefined): Promise<void>;
+  // Écart §8.1 (JOURNAL 2026-10-10) : la copie de l'image du fond dans `meta`, puis le `ctl` `backgroundImage` pour les pages du
+  // canvas. Le fond et l'opacité ne bougent pas : l'image se pose par-dessus n'importe quel fond.
+  setBackgroundImage(canvasId: string, at: Timestamp): Promise<void>;
+  clearBackgroundImage(canvasId: string): Promise<void>;
   discardCanvas(canvasId: string): Promise<void>; // toutes les clés `cv:<id>:*`
   getCanvasImage(canvasId: string): Promise<CanvasImage | null>;
 }
@@ -545,6 +552,16 @@ export interface DurableStore {
     canvasId: string,
     theme?: string,
   ): Promise<Result<void, "not_active">>;
+  // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond du canvas actif seulement (`not_active` sinon), remplaçant la précédente, dont le
+  // fichier part. `at` : l'instant où Convex l'a rangée, qui date aussi son adresse.
+  setActiveCanvasBackgroundImage(
+    ownerId: string,
+    canvasId: string,
+    image: Uint8Array,
+  ): Promise<Result<{ at: Timestamp }, "not_active">>;
+  clearActiveCanvasBackgroundImage(ownerId: string, canvasId: string): Promise<Result<void, "not_active">>;
+  // Les octets de l'image du canvas actif de ce propriétaire, si elle date de `at` ; `null` : plus d'image, ou une autre.
+  getActiveCanvasBackgroundImage(ownerId: string, at: Timestamp): Promise<Uint8Array | null>;
   // Jamais le canvas actif, jamais celui d'un autre propriétaire : `not_archive`.
   discardArchive(ownerId: string, canvasId: string): Promise<Result<void, "not_archive">>;
   // `null` : aucun canvas de ce propriétaire n'a ce code. Rendu sans session : le lien suffit à voir une archive.

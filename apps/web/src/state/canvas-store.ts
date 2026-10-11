@@ -125,6 +125,7 @@ export type CanvasStore = {
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   setObsBackground(obsBackground: ObsBackground): void; // confirmé par la frame `obsBackground` (JOURNAL 2026-09-29)
+  setBackgroundImageOpacity(backgroundImageOpacity: number): void; // confirmé par la frame du même nom (Écart §9.1, JOURNAL 2026-10-10)
   // JOURNAL 2026-09-30 : la jauge arrive par l'`ack` ; les bornes, le streamer seul, par la frame `gaugeLimits`.
   claimGauge(): void;
   setGaugeLimits(limits: GaugeLimits): void;
@@ -457,7 +458,10 @@ export function createCanvasStore(
   const takeSetting = ({
     t,
     ...change
-  }: Extract<ServerFrame, { t: "obsDelay" | "obsBackground" | "gaugeLimits" }>): void => {
+  }: Extract<
+    ServerFrame,
+    { t: "obsDelay" | "obsBackground" | "backgroundImageOpacity" | "gaugeLimits" }
+  >): void => {
     if (view.params) publish({ params: { ...view.params, ...change } });
   };
 
@@ -466,6 +470,13 @@ export function createCanvasStore(
     if (!view.params) return;
     const { theme: previous, ...rest } = view.params;
     publish({ params: theme === undefined ? rest : { ...rest, theme } });
+  };
+
+  // Écart §8.1 (JOURNAL 2026-10-10) : sans `at`, le canvas n'a plus d'image de fond ; le reste de `params` ne bouge pas.
+  const takeBackgroundImage = ({ at }: Extract<ServerFrame, { t: "backgroundImage" }>): void => {
+    if (!view.params) return;
+    const { backgroundImageAt: previous, ...rest } = view.params;
+    publish({ params: at === undefined ? rest : { ...rest, backgroundImageAt: at } });
   };
 
   const onInspected = (frame: Extract<ServerFrame, { t: "inspected" }>): void => {
@@ -532,8 +543,12 @@ export function createCanvasStore(
         break;
       case "obsDelay":
       case "obsBackground":
+      case "backgroundImageOpacity":
       case "gaugeLimits":
         takeSetting(frame);
+        break;
+      case "backgroundImage":
+        takeBackgroundImage(frame);
         break;
       case "theme":
         takeTheme(frame);
@@ -637,6 +652,12 @@ export function createCanvasStore(
       transport.send({ t: "setObsDelay", requestId: crypto.randomUUID(), obsDelayMs }),
     setObsBackground: (obsBackground) =>
       transport.send({ t: "setObsBackground", requestId: crypto.randomUUID(), obsBackground }),
+    setBackgroundImageOpacity: (backgroundImageOpacity) =>
+      transport.send({
+        t: "setBackgroundImageOpacity",
+        requestId: crypto.randomUUID(),
+        backgroundImageOpacity,
+      }),
     claimGauge: () => transport.send({ t: "claimGauge", requestId: crypto.randomUUID() }),
     // Les deux bornes seules : la frame est stricte, et `params` porte bien d'autres réglages.
     setGaugeLimits: ({ gaugeMaxStart, gaugeMaxCeiling }) =>

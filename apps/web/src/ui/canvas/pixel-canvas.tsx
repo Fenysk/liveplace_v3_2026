@@ -21,10 +21,12 @@ const getBrowserStorage = () => window.localStorage;
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page de jeu, dont l'arrivée se cadre sous ses pills du haut.
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue (déplacer, zoomer, ouvrir une case) ; stable, la scène est recréée sinon.
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `login` (Écart §9.1, JOURNAL 2026-10-10) : celui de la page, qui nomme l'adresse de l'image du fond.
 type PixelCanvasProps = {
   store: CanvasStore;
   draftStore: DraftStore;
   canvasId: string;
+  login: string;
   ownerName: string;
   isFramedInFreeArea?: boolean;
   onGesture?: () => void;
@@ -37,6 +39,7 @@ export const PixelCanvas = ({
   store,
   draftStore,
   canvasId,
+  login,
   ownerName,
   isFramedInFreeArea = false,
   onGesture = doNothing,
@@ -64,6 +67,7 @@ export const PixelCanvas = ({
     if (!surface.current || !checker.current || !checkerTiles.current) return;
     const saver = createViewportSaver(getBrowserStorage, canvasId);
     const created = createCanvasScene(surface.current, store, draftStore, {
+      login,
       initialViewport: getSavedViewport(getBrowserStorage, canvasId),
       isFramedInFreeArea,
       onNavigate: (kind) => navigated.current?.(kind),
@@ -78,7 +82,7 @@ export const PixelCanvas = ({
       created.dispose();
       saver.cancel();
     };
-  }, [store, draftStore, canvasId, isFramedInFreeArea, onGesture]);
+  }, [store, draftStore, canvasId, login, isFramedInFreeArea, onGesture]);
 
   return (
     <>

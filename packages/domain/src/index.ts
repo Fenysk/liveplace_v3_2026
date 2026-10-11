@@ -135,6 +135,10 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     height: number;
     obsDelayMs: number;
     obsBackground: ObsBackground;
+    // Écart §8.1 (JOURNAL 2026-10-10) : la copie du gateway ; Convex fait foi. L'instant où l'image du fond a été posée, absent : pas d'image.
+    backgroundImageAt?: Timestamp;
+    // Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de cette image, un cran de `BACKGROUND_IMAGE_OPACITY_STEPS`. Absente : 40 %.
+    backgroundImageOpacity?: number;
     // Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus aucune écriture ; `successorId` est le canvas qui l'a remplacée.
     archivedAt?: Timestamp;
     successorId?: string;
@@ -186,10 +190,26 @@ export function toTheme(raw: string): string | undefined {
   return theme === "" ? undefined : theme;
 }
 
-// CDC 2026 §1 : le fond de la vue OBS, transparent, noir ou blanc. Transparent par défaut, et sur un canvas d'avant.
+// CDC 2026 §1 et Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, en jeu et dans la vue OBS : transparent, noir ou blanc.
+// Le nom `obsBackground` est resté celui d'avant. Transparent par défaut, et sur un canvas d'avant. L'image du streamer n'en est
+// pas un choix : elle se pose par-dessus n'importe lequel.
 export const OBS_BACKGROUNDS = ["transparent", "black", "white"] as const;
 export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
 export const OBS_BACKGROUND: ObsBackground = "transparent";
+
+// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond arrive réduite et encodée en WebP par la page ; le web et le gateway la
+// refusent au-delà de ces bornes, la page les respecte avant d'envoyer.
+export const BACKGROUND_IMAGE_MAX_SIDE = 2048;
+export const BACKGROUND_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+// Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de l'image par-dessus le fond, en pourcents, de 10 en 10. 40 par défaut, et sur un
+// canvas d'avant.
+export const BACKGROUND_IMAGE_OPACITY_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+export const BACKGROUND_IMAGE_OPACITY = 40;
+
+export function isBackgroundImageOpacity(opacity: number): boolean {
+  return BACKGROUND_IMAGE_OPACITY_STEPS.some((step) => step === opacity);
+}
 
 export const GAUGE_MAX_START = 10;
 export const GAUGE_MAX_CEILING = 150;

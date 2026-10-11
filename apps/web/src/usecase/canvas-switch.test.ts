@@ -95,6 +95,8 @@ const setup = (scenario: Scenario = {}) => {
     publishStatus: async (canvasId, status) => act("publishStatus", canvasId, status),
     setTheme: async (canvasId, theme) => act("setTheme", canvasId, theme ?? null),
     publishTheme: async (canvasId, theme) => act("publishTheme", canvasId, theme ?? null),
+    setBackgroundImage: async (canvasId, at) => act("setBackgroundImage", canvasId, at),
+    clearBackgroundImage: async (canvasId) => act("clearBackgroundImage", canvasId),
     discardCanvas: async (canvasId) => act("discardCanvas", canvasId),
     getCanvasImage: async () => null,
   };

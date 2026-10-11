@@ -1,5 +1,5 @@
-// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le thème du canvas, la taille choisie, sa confirmation,
-// puis la demande au gateway. La nouvelle taille arrive d'elle-même, par un `welcome` et un snapshot, à toutes les pages.
+// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le thème du canvas, son fond (Écart §9.1, JOURNAL 2026-10-10), la
+// taille choisie, sa confirmation, puis la demande au gateway. La nouvelle taille arrive d'elle-même, par un `welcome` et un snapshot, à toutes les pages.
 
 import { useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
@@ -8,11 +8,13 @@ import { useTexts } from "../locale/use-locale";
 import { CanvasSettings, type ResizeStatus, ResizeWindow } from "./canvas-settings";
 import { listOutsidePixels, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
 import { CANVAS_TEXTS } from "./canvas-texts";
+import { useBackgroundFields } from "./use-background-fields";
 import { useThemeField } from "./use-theme-field";
 
-type CanvasTabProps = { canvas: CanvasStore };
+// `canvasId` et `login` : ceux de la page, qui visent l'image du fond.
+type CanvasTabProps = { canvas: CanvasStore; canvasId: string; login: string };
 
-export const CanvasTab = ({ canvas }: CanvasTabProps) => {
+export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
   const { width, height, palette, pixels } = useSyncExternalStore(
     canvas.subscribe,
     canvas.getView,
@@ -26,6 +28,7 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
   const toast = useToast();
   const t = useTexts(CANVAS_TEXTS);
   const theme = useThemeField();
+  const { background, image } = useBackgroundFields({ canvas, canvasId, login });
 
   const confirm = () => {
     setStatus("running");
@@ -41,6 +44,8 @@ export const CanvasTab = ({ canvas }: CanvasTabProps) => {
     <>
       <CanvasSettings
         theme={theme}
+        background={background}
+        image={image}
         current={current}
         choice={choice}
         chosen={chosen}

@@ -8,6 +8,7 @@ import {
   claimableRewards,
   GAUGE_GROWTH_FACTOR,
   type GaugeLimits,
+  isBackgroundImageOpacity,
   OBS_BACKGROUND,
   OBS_BACKGROUNDS,
   PALETTE,
@@ -141,6 +142,15 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
     // CDC 2026 §1 : absent sur un canvas d'avant, ou d'une valeur inconnue, donc transparent.
     obsBackground:
       OBS_BACKGROUNDS.find((background) => background === fields.obsBackground) ?? OBS_BACKGROUND,
+    // Écart §8.1 (JOURNAL 2026-10-10) : absent, le canvas n'a pas d'image de fond.
+    ...(fields.backgroundImageAt === undefined
+      ? {}
+      : { backgroundImageAt: metaNumber(fields, "backgroundImageAt") }),
+    // Écart §9.1 (JOURNAL 2026-10-10) : absente, ou hors des crans, 40 % ; le web sait lire une opacité qui manque.
+    ...(fields.backgroundImageOpacity !== undefined &&
+    isBackgroundImageOpacity(Number(fields.backgroundImageOpacity))
+      ? { backgroundImageOpacity: Number(fields.backgroundImageOpacity) }
+      : {}),
     ...(fields.archivedAt === undefined ? {} : { archivedAt: metaNumber(fields, "archivedAt") }),
     ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
     // Écart §8.1 (JOURNAL 2026-10-07) : un champ vide vaut pas de thème.
@@ -957,6 +967,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       await redis
         .multi()
         .hset(keys.meta, "obsBackground", obsBackground)
+        .publish(keys.live, JSON.stringify(control))
+        .exec();
+    },
+
+    // Écart §9.1 (JOURNAL 2026-10-10) : comme le fond, `meta` et le `ctl` ensemble, sans version.
+    async setBackgroundImageOpacity(canvasId, backgroundImageOpacity) {
+      const keys = buildCanvasKeys(canvasId);
+      const control: LiveMessage = { ctl: { t: "backgroundImageOpacity", backgroundImageOpacity } };
+      await redis
+        .multi()
+        .hset(keys.meta, "backgroundImageOpacity", backgroundImageOpacity)
         .publish(keys.live, JSON.stringify(control))
         .exec();
     },
