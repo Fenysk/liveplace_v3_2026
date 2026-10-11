@@ -5,10 +5,9 @@ import type { ActivityPeriod } from "@liveplace/domain";
 import type { ActivityHistory } from "@liveplace/domain/ports";
 import { useMemo, useRef } from "react";
 import { Segmented } from "../design/segmented";
+import { SkeletonBlock, SkeletonSwap } from "../design/skeleton";
 import { type ChartSlot, type TimeChartLine, TimeCharts } from "../design/time-charts";
 import { PERIOD_OPTIONS } from "./activity-labels";
-
-export const LOADING = <span className="lp-type-caption lp-muted">Chargement…</span>;
 
 // Ce que la section regarde : la période choisie, et l'historique qui en vient, en chargement, prêt ou en échec. Celui de
 // l'activité et celui de la capacité ont cette forme, avec leurs propres points.
@@ -63,16 +62,20 @@ export const HistoryBlock = <History,>({
           L'historique n'a pas pu se charger. Il se relit dans une minute.
         </span>
       )}
-      {chart && (
-        <TimeCharts
-          lines={chart.lines}
-          slots={chart.slots}
-          emptyText={emptyText}
-          isLoading={view.history.status !== "ready"}
-        />
-      )}
-      {shown && !chart && <span className="lp-type-caption lp-muted">{unavailableText}</span>}
-      {!shown && view.history.status === "loading" && LOADING}
+      <SkeletonSwap
+        isLoading={!shown && view.history.status === "loading"}
+        skeleton={<SkeletonBlock shape="area" />}
+      >
+        {chart && (
+          <TimeCharts
+            lines={chart.lines}
+            slots={chart.slots}
+            emptyText={emptyText}
+            isLoading={view.history.status !== "ready"}
+          />
+        )}
+        {shown && !chart && <span className="lp-type-caption lp-muted">{unavailableText}</span>}
+      </SkeletonSwap>
     </>
   );
 };

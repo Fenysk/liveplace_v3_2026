@@ -1,7 +1,7 @@
 // Le chapitre Composants (2/2) : ceux qui bougent ou qui ouvrent quelque chose. Les démos se manipulent pour de bon.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { LocateFixed, Minus, Plus, User } from "lucide-react";
+import { Layers, LocateFixed, Minus, Plus, Scaling, User } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
@@ -17,7 +17,7 @@ import { Toast, ToastProvider, useToast } from "../design/toast";
 import { ToastAnnouncement, ToastAnnouncementContext, type ToastMessage } from "../design/toast-announcement";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
-import { SmallWindow, Window, WindowRow } from "../design/window";
+import { SmallWindow, Window, WindowRow, type WindowSection } from "../design/window";
 import { noop, SAMPLE_OWNER } from "./design-fixtures";
 import { Block, DIALOG_NOTE, Entry, InPhone, OpenWindow, StateRow, WithValue } from "./entry-layout";
 
@@ -163,29 +163,72 @@ export const PaletteEntry = () => {
   );
 };
 
-// La fenêtre d'un viewer : Mon compte seul. Les sections du streamer et de qui modère suivent, dans leurs entrées.
-const DEMO_SECTIONS = [{ id: "account", label: "Mon compte", icon: User }] as const;
+// Trois sections de hauteurs différentes, pour voir la fenêtre en changer : la hauteur de la feuille glisse sur mobile, le contenu arrive
+// en fondu. Les sections du streamer et de qui modère sont dans leurs entrées.
+type DemoSectionId = "short" | "long" | "account";
+
+const DEMO_SECTIONS: readonly WindowSection<DemoSectionId>[] = [
+  { id: "short", label: "Courte", icon: Scaling },
+  { id: "long", label: "Longue", icon: Layers },
+  { id: "account", label: "Mon compte", icon: User },
+];
+
+const LONG_SECTION_ROWS = ["Taille", "Délai", "Jauge", "Palette", "Thème", "Fond", "Invitation", "Archives"];
+
+type SectionsWindowProps = {
+  isOpen: boolean;
+  close: () => void;
+  initialId: DemoSectionId;
+  isLarge?: boolean;
+};
+
+const SectionsWindow = ({ isOpen, close, initialId, isLarge = false }: SectionsWindowProps) => {
+  const [sectionId, setSectionId] = useState(initialId);
+  const appearanceChoice = useAppearanceChoice();
+  return (
+    <Window
+      isOpen={isOpen}
+      sections={DEMO_SECTIONS}
+      sectionId={sectionId}
+      onSelect={setSectionId}
+      onClose={close}
+      isLarge={isLarge}
+    >
+      {sectionId === "short" && (
+        <p className="lp-type-body lp-muted">Une section qui profite de la largeur.</p>
+      )}
+      {sectionId === "long" &&
+        LONG_SECTION_ROWS.map((label) => (
+          <WindowRow key={label} label={label}>
+            <Button label="Modifier" onPress={noop} />
+          </WindowRow>
+        ))}
+      {sectionId === "account" && (
+        <>
+          <WindowRow label={<Profile user={SAMPLE_OWNER} variant="full" />}>
+            <Button label="Se déconnecter" onPress={noop} />
+          </WindowRow>
+          <WindowRow label="Apparence">
+            <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
+          </WindowRow>
+          <WindowRow label="Langue">
+            <LocalePicker />
+          </WindowRow>
+        </>
+      )}
+    </Window>
+  );
+};
 
 export const WindowEntry = () => (
   <Entry slug="fenetre" components={["Window", "SmallWindow"]} file="ui/design/window.tsx">
     <Block title="Grande fenêtre">
       <StateRow
         name="Grande fenêtre"
-        detail="Sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran ; sur mobile, la même feuille."
+        detail="Sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran ; sur mobile, la même feuille. Changer de section : le contenu arrive en fondu, et la hauteur de la feuille glisse sur mobile."
       >
         <OpenWindow>
-          {({ isOpen, close }) => (
-            <Window
-              isOpen={isOpen}
-              sections={DEMO_SECTIONS}
-              sectionId="account"
-              onSelect={noop}
-              onClose={close}
-              isLarge
-            >
-              <p className="lp-type-body lp-muted">Une section qui profite de la largeur.</p>
-            </Window>
-          )}
+          {({ isOpen, close }) => <SectionsWindow isOpen={isOpen} close={close} initialId="short" isLarge />}
         </OpenWindow>
       </StateRow>
     </Block>
@@ -213,43 +256,22 @@ export const WindowEntry = () => (
   </Entry>
 );
 
-export const AccountWindowEntry = () => {
-  const appearanceChoice = useAppearanceChoice();
-  return (
-    <Entry
-      slug="mon-compte"
-      components={["Window", "WindowRow"]}
-      file="ui/design/window.tsx"
-      note="Les sections dépendent du rôle ; seules celles qui servent aujourd'hui existent."
-    >
-      <Block title="États">
-        <StateRow name="Modale sur un voile" detail="Échap ou Fermer, le focus revient au bouton.">
-          <OpenWindow>
-            {({ isOpen, close }) => (
-              <Window
-                isOpen={isOpen}
-                sections={DEMO_SECTIONS}
-                sectionId="account"
-                onSelect={noop}
-                onClose={close}
-              >
-                <WindowRow label={<Profile user={SAMPLE_OWNER} variant="full" />}>
-                  <Button label="Se déconnecter" onPress={noop} />
-                </WindowRow>
-                <WindowRow label="Apparence">
-                  <AppearancePicker choice={appearanceChoice} onPick={pickAppearance} />
-                </WindowRow>
-                <WindowRow label="Langue">
-                  <LocalePicker />
-                </WindowRow>
-              </Window>
-            )}
-          </OpenWindow>
-        </StateRow>
-      </Block>
-    </Entry>
-  );
-};
+export const AccountWindowEntry = () => (
+  <Entry
+    slug="mon-compte"
+    components={["Window", "WindowRow"]}
+    file="ui/design/window.tsx"
+    note="Les sections dépendent du rôle ; seules celles qui servent aujourd'hui existent."
+  >
+    <Block title="États">
+      <StateRow name="Modale sur un voile" detail="Échap ou Fermer, le focus revient au bouton.">
+        <OpenWindow>
+          {({ isOpen, close }) => <SectionsWindow isOpen={isOpen} close={close} initialId="account" />}
+        </OpenWindow>
+      </StateRow>
+    </Block>
+  </Entry>
+);
 
 export const SignInEntry = () => (
   <Entry

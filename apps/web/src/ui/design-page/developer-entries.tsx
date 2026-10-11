@@ -165,7 +165,10 @@ export const DeveloperEntry = () => {
             <SectionScene nowMs={nowMs} sectionId="all" here={here} />
           </InLargeWindow>
         </StateRow>
-        <StateRow name="Tout LivePlace avant la première frame et le premier historique">
+        <StateRow
+          name="Tout LivePlace avant la première frame et le premier historique"
+          detail="Les tuiles de chiffres et les zones, en gris, après 200 ms."
+        >
           <InWindow>
             <ActivitySection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} />
           </InWindow>
@@ -249,6 +252,14 @@ export const DeveloperEntry = () => {
         >
           <InWindow>
             <CapacityScene nowMs={nowMs} variant="quota" initialPeriod="all" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Capacité avant la première frame et le premier historique"
+          detail="Le grand pourcentage et la place des ressources, en gris, après 200 ms."
+        >
+          <InWindow>
+            <CapacitySection view={WAITING_CAPACITY} nowMs={nowMs} onSelectPeriod={noop} />
           </InWindow>
         </StateRow>
         <StateRow name="Capacité avant la première frame, l'historique en échec">

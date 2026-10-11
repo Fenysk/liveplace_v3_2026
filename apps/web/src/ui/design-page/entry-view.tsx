@@ -60,6 +60,7 @@ import {
   ModerationWindowEntry,
 } from "./moderation-entries";
 import { ScoreboardListEntry, ScoreboardPillEntry } from "./scoreboard-entries";
+import { SkeletonEntry } from "./skeleton-entries";
 
 const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   couleurs: ColorTokensEntry,
@@ -84,6 +85,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   palette: PaletteEntry,
   pill: PillEntry,
   "se-connecter": SignInEntry,
+  squelette: SkeletonEntry,
   toast: ToastEntry,
 
   "pill-canvas": CanvasPillEntry,

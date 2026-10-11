@@ -3,8 +3,9 @@
 
 import { HOUR_MS, MINUTE_MS, PALETTE } from "@liveplace/domain";
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
+import { Button } from "../design/button";
 import { InspectionPill, type ReportControl } from "../inspection/inspection-pill";
 import { BannedUsers, type BannedUsersProps, type BanPreview } from "../moderation/banned-users";
 import { BannedWindow } from "../moderation/banned-window";
@@ -71,6 +72,11 @@ type InspectionScene = {
 };
 
 const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
+  {
+    name: "En attente de la réponse",
+    detail: "La pill s'ouvre sur un squelette si la réponse tarde plus de 200 ms.",
+    inspection: { status: "loading", x: 122, y: 82 },
+  },
   {
     name: "Un pixel et son auteur",
     inspection: {
@@ -197,6 +203,32 @@ const InspectionBlock = ({
   </Block>
 );
 
+// Toucher une case : la réponse arrive après `replyMs`. Sous 200 ms, la pill s'ouvre directement sur la case ; au-delà, sur un
+// squelette que la case remplace.
+const InspectionReplyScene = ({ replyMs, nowMs }: { replyMs: number; nowMs: number }) => {
+  const [inspection, setInspection] = useState<Inspection | null>(null);
+  useEffect(() => {
+    if (inspection?.status !== "loading") return;
+    const timer = setTimeout(() => setInspection(inspectionOf(nowMs, TROLL)), replyMs);
+    return () => clearTimeout(timer);
+  }, [inspection, replyMs, nowMs]);
+  return (
+    <div className="design-delay-scene">
+      <Button
+        label={`Réponse en ${replyMs} ms`}
+        onPress={() => setInspection({ status: "loading", x: 122, y: 82 })}
+      />
+      <InspectionPill
+        inspection={inspection}
+        palette={PALETTE}
+        nowMs={nowMs}
+        onClose={() => setInspection(null)}
+        isDocked={false}
+      />
+    </div>
+  );
+};
+
 export const InspectionEntry = () => {
   const nowMs = useNowMs();
   return (
@@ -207,6 +239,17 @@ export const InspectionEntry = () => {
       note="Seulement pendant une inspection, en mode Vue."
       where="Au centre à droite · sur mobile, au-dessus de la barre du bas · en paysage, en bas à gauche"
     >
+      <Block
+        title="Au toucher"
+        note="Touche : la pill s'ouvre sans attendre le serveur, sur un squelette si la réponse dépasse 200 ms."
+      >
+        <StateRow name="Réponse rapide" detail="Elle s'ouvre directement sur la case." isDemo>
+          <InspectionReplyScene replyMs={100} nowMs={nowMs} />
+        </StateRow>
+        <StateRow name="Réponse lente" detail="Le squelette paraît à 200 ms, la case le remplace." isDemo>
+          <InspectionReplyScene replyMs={2000} nowMs={nowMs} />
+        </StateRow>
+      </Block>
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock
         title="Pour qui modère"
@@ -277,6 +320,11 @@ const REPORT_STATES = (
   const [approving] = reports;
   return [
     {
+      name: "Les signalements se chargent",
+      detail: "Trois lignes grises après 200 ms, puis les vraies arrivent en fondu.",
+      props: { ...REPORTS_BASE(nowMs), list: { status: "loading" } },
+    },
+    {
       name: "Trois signalements",
       detail: "Une pose cachée du stream, une pose en attente du seuil, un dessin de plusieurs poses.",
       props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports } },
@@ -305,6 +353,11 @@ const REPORT_STATES = (
 };
 
 const SYNC_STATES = (nowMs: number): readonly { name: string; detail?: string; sync: TwitchSyncView }[] => [
+  {
+    name: "Pour le streamer, la synchro se lit",
+    detail: "Deux barres de texte attendent la réponse du gateway, après 200 ms.",
+    sync: { status: "loading" },
+  },
   { name: "Pour le streamer, jamais synchronisé", sync: { status: "never" } },
   { name: "Pour le streamer, synchronisé", sync: { status: "ok", syncedAt: nowMs - 3 * MINUTE_MS } },
   {
@@ -321,7 +374,7 @@ export const ModerationEntry = () => {
       slug="moderation"
       components={["ReportedPlacements", "TwitchSyncBlock", "ModeratorUsers", "BannedUsers"]}
       file="ui/moderation/{reported-placements,twitch-sync,moderator-users,banned-users}.tsx"
-      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran."
+      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran. Les lignes de chaque liste arrivent en fondu, toutes ensemble (hors mouvement réduit)."
     >
       <Block title="Signalements">
         {REPORT_STATES(nowMs).map(({ name, detail, props }) => (
@@ -342,6 +395,14 @@ export const ModerationEntry = () => {
         ))}
       </Block>
       <Block title="Modérateurs">
+        <StateRow
+          name="La liste se charge"
+          detail="Les mêmes trois lignes grises que les signalements et les bannis."
+        >
+          <InWindow>
+            <ModeratorUsers list={{ status: "loading" }} />
+          </InWindow>
+        </StateRow>
         <StateRow name="Les modérateurs" detail="De Twitch, nommé ici, pas encore sur LivePlace.">
           <InWindow>
             <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} onRemove={noop} />

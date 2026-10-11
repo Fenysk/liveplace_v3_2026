@@ -3,16 +3,19 @@
 
 import {
   BACKGROUND_IMAGE_OPACITY,
+  type CellKey,
   OBS_BACKGROUND,
   TRANSPARENT_COLOR_INDEX,
   toStateOffset,
 } from "@liveplace/domain";
 import { backgroundImagePath } from "../../shared/background-image-path";
-import type { CanvasStore, CanvasView } from "../../state/canvas-store";
-import type { DraftStore } from "../../state/draft-store";
+import type { ArrivedPixel, CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
+import type { Draft } from "../../state/draft";
+import type { DraftMode, DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { easingCurve, motionEasing, motionMs } from "../design/motion";
 import { COARSE_POINTER_QUERY, SIDE_COLUMN_QUERY } from "../design/use-media-query";
+import { createArrivalFades } from "./arrival-fades";
 import {
   measureArrivalInsets,
   measureDraftInsets,
@@ -22,6 +25,7 @@ import {
 import { createBackdropImage, createPropertyReader, toBackdrop } from "./canvas-background";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
+import { draftFadeStarts, MAX_DRAFT_FADES } from "./draft-fade";
 import { freeArea, type PointerGrain, tapZoomTarget, zoomFrame } from "./draft-zoom";
 import {
   createGestureTracker,
@@ -31,8 +35,18 @@ import {
   type PointerInput,
   wheelFactor,
 } from "./gestures";
+import { type Handoff, takeLeftBehind } from "./handoff";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
-import { renderScene } from "./render-scene";
+import {
+  type ArrivingCell,
+  type DraftFade,
+  type Ghost,
+  type Reveal,
+  renderGhost,
+  renderScene,
+  type SettlingBatch,
+} from "./render-scene";
+import { createRevealer, ghostOver } from "./revealer";
 import { getSceneShades } from "./scene-shades";
 import {
   type Cell,
@@ -71,6 +85,7 @@ export type CanvasScene = {
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
 // `login` (Écart §9.1, JOURNAL 2026-10-10) : celui de la page, qui nomme l'adresse de l'image du fond.
+// `handoff` : le passage d'une scène à la suivante, quand la page suit une autre fresque.
 type SceneOptions = {
   login: string;
   initialViewport: Viewport | null;
@@ -79,6 +94,7 @@ type SceneOptions = {
   onViewportMove(viewport: Viewport): void;
   onFraming(framing: Framing): void;
   onGesture(): void;
+  handoff?: Handoff | undefined;
   checker: HTMLElement;
   checkerTiles: HTMLElement;
 };
@@ -112,6 +128,49 @@ const toPointerInput = (event: PointerEvent): PointerInput => ({
 });
 
 const isSameCell = (a: Cell | null, b: Cell | null) => a?.x === b?.x && a?.y === b?.y;
+
+// Les cases d'un ack se posent en douceur, de l'aspect brouillon à l'aspect posé, sur `--lp-dur` et `--lp-ease` lus à l'ack.
+// `startedAt` : l'instant de la première image qui les peint, pour qu'une image tardive n'en saute pas le début.
+type Settle = {
+  pixels: readonly ConfirmedPixel[];
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number | null;
+};
+
+// Une case qui entre au brouillon, ou y change de couleur (`from`), en fondu sur `--lp-dur-fast` et `--lp-ease`.
+type DraftFadeRun = {
+  from: number | null;
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number | null;
+};
+
+// Le viseur qui glisse depuis `from`, sur `--lp-dur` et `--lp-ease`.
+type ReticleGlide = {
+  from: Cell;
+  duration: number;
+  ease: (progress: number) => number;
+  startedAt: number;
+};
+
+// Mouvement réduit : la durée vaut 0, le viseur saute à la nouvelle case.
+const startGlide = (root: Element, from: Cell, startedAt: number): ReticleGlide | null => {
+  const duration = motionMs(root, "--lp-dur");
+  return duration > 0 ? { from, duration, ease: easingCurve(motionEasing(root)), startedAt } : null;
+};
+
+// Où en est le glissement vers `to` à l'instant `now` : sa place entre les deux cases, nul une fois arrivé.
+const glidePosition = (
+  { from, duration, ease, startedAt }: ReticleGlide,
+  to: Cell,
+  now: number,
+): Cell | null => {
+  const progress = (now - startedAt) / duration;
+  if (progress >= 1) return null;
+  const eased = ease(progress);
+  return { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased };
+};
 
 export function createCanvasScene(
   surface: HTMLCanvasElement,
@@ -184,6 +243,109 @@ export function createCanvasScene(
     options.checker.style.setProperty("--lp-checker-clip", `inset(${inset.join(" ")})`);
   };
 
+  // L'apparition en mosaïque (revealer.ts) : l'état est partagé avec la vue OBS.
+  const revealer = createRevealer(root);
+  const advanceReveal = (now: number, view: CanvasView): Reveal | null => {
+    const reveal = revealer.advance(now, { isLoaded: view.isImageLoaded, ...view });
+    if (revealer.isRunning()) requestRender();
+    return reveal;
+  };
+
+  // La fresque que la page vient de quitter reste à l'écran jusqu'à l'arrivée de celle-ci, puis s'efface pendant la première étape.
+  let ghostSurface = takeLeftBehind(options.handoff);
+  let hasPainted = false;
+  const holdsGhost = (view: CanvasView): boolean => {
+    if (!ghostSurface || view.isImageLoaded) return false;
+    renderGhost(context, ghostSurface);
+    return true;
+  };
+  const advanceGhost = (current: Reveal | null): Ghost | null => {
+    const ghost = ghostSurface ? ghostOver(ghostSurface, current) : null;
+    if (!ghost) ghostSurface = null;
+    return ghost;
+  };
+
+  // Les cases des autres joueurs (arrival-fades.ts, partagé avec la vue OBS) ne passent d'un coup que pendant la mosaïque,
+  // le mouvement réduit et au-delà du plafond.
+  const fades = createArrivalFades(root);
+  const advanceArrivals = (now: number, view: CanvasView): ArrivingCell[] => {
+    const cells = fades.advance(
+      now,
+      view,
+      (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
+    );
+    if (fades.isRunning()) requestRender();
+    return cells;
+  };
+  const startArrivals = (lot: readonly ArrivedPixel[]) => {
+    fades.start(lot, revealer.isSettled());
+    requestRender();
+  };
+
+  let settles: Settle[] = [];
+  // Une pose qui arrive au bout s'en va : l'image porte déjà son but. Une case que le canvas a quittée (un autre joueur la
+  // reprend, une nouvelle taille) ne se pose plus.
+  const advanceSettles = (now: number, view: CanvasView): SettlingBatch[] => {
+    const running: Settle[] = [];
+    const batches: SettlingBatch[] = [];
+    for (const settle of settles) {
+      settle.startedAt ??= now;
+      const progress = (now - settle.startedAt) / settle.duration;
+      if (progress >= 1) continue;
+      running.push(settle);
+      const pixels = settle.pixels.filter(
+        ({ x, y, colorIndex }) =>
+          x < view.width && y < view.height && view.pixels[toStateOffset(x, y, view.width)] === colorIndex,
+      );
+      batches.push({ pixels, progress: settle.ease(progress) });
+    }
+    settles = running;
+    // Une image de plus tant qu'une pose se fait ; ensuite, plus rien n'est attendu.
+    if (running.length > 0) requestRender();
+    return batches;
+  };
+
+  // Le viseur de l'inspection glisse de la case d'avant à la nouvelle, en cases de la fresque : un déplacement ou un zoom
+  // pendant le glissement le laisse juste. Il paraît sur place la première fois, et part d'un coup à la fermeture.
+  let reticleTarget: Cell | null = null;
+  let reticleShown: Cell | null = null; // où il s'est dessiné à la dernière image : un nouveau choix repart de là
+  let reticleGlide: ReticleGlide | null = null;
+  const advanceReticle = (now: number, inspected: Cell | null): Cell | null => {
+    if (!inspected) {
+      reticleTarget = reticleShown = reticleGlide = null;
+      return null;
+    }
+    const target = { x: inspected.x, y: inspected.y };
+    if (!reticleTarget || !reticleShown) {
+      reticleTarget = reticleShown = target;
+      return target;
+    }
+    if (!isSameCell(target, reticleTarget)) {
+      reticleGlide = startGlide(root, reticleShown, now);
+      reticleTarget = target;
+    }
+    const gliding = reticleGlide && glidePosition(reticleGlide, target, now);
+    if (gliding) requestRender();
+    else reticleGlide = null;
+    reticleShown = gliding ?? target;
+    return reticleShown;
+  };
+
+  const draftFades = new Map<CellKey, DraftFadeRun>();
+  // Hors Dessin, le brouillon ne se voit pas : plus de fondu. Un fondu fini s'en va ; une image de plus tant qu'il en reste.
+  const advanceDraftFades = (now: number, isDrafting: boolean): Map<CellKey, DraftFade> => {
+    if (!isDrafting) draftFades.clear();
+    const fades = new Map<CellKey, DraftFade>();
+    for (const [key, run] of draftFades) {
+      run.startedAt ??= now;
+      const progress = (now - run.startedAt) / run.duration;
+      if (progress >= 1) draftFades.delete(key);
+      else fades.set(key, { from: run.from, progress: run.ease(progress) });
+    }
+    if (draftFades.size > 0) requestRender();
+    return fades;
+  };
+
   // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque et son image, sous les pixels ; le damier ne se retire que pour un fond plein.
   const getBackdrop = (params: CanvasView["params"]) => {
     const imageAt = params?.backgroundImageAt;
@@ -198,10 +360,10 @@ export function createCanvasScene(
     return backdrop;
   };
 
-  const render = () => {
+  const render = (now: number) => {
     frameRequest = 0;
     const view = store.getView();
-    if (view.width === 0 || screen.width === 0) return;
+    if (holdsGhost(view) || view.width === 0 || screen.width === 0) return;
     const canvas = { width: view.width, height: view.height };
     if (!viewport) {
       // Les pills ont eu le temps de se mesurer depuis la création de la scène : la première arrivée les relit.
@@ -219,6 +381,7 @@ export function createCanvasScene(
     // Le brouillon ne se voit qu'en Dessin, le viseur qu'en Vue (CDC 2026).
     const draftView = draftStore.getView();
     const isDrafting = draftView.mode === "draft";
+    const revealing = advanceReveal(now, view);
     renderScene(context, {
       screen,
       pixelRatio,
@@ -226,13 +389,20 @@ export function createCanvasScene(
       canvas,
       image: image.source,
       backdrop,
+      reveal: revealing,
+      ghost: advanceGhost(revealing),
       shades,
       targetCell,
-      inspectedCell: isDrafting ? null : view.inspection,
+      inspectedCell: advanceReticle(now, isDrafting ? null : view.inspection),
       draft: isDrafting ? [...draftView.draft.values()] : [],
+      draftFades: advanceDraftFades(now, isDrafting),
+      arriving: advanceArrivals(now, view),
+      settling: advanceSettles(now, view),
       palette: view.palette,
       colorIndexAt: (x, y) => view.pixels[toStateOffset(x, y, view.width)] ?? TRANSPARENT_COLOR_INDEX,
+      confirmedColorIndexAt: (x, y) => store.confirmedColorIndexAt(x, y),
     });
+    hasPainted = true;
   };
 
   // Au plus un dessin par rafraîchissement de l'écran, et aucun si rien n'a bougé.
@@ -485,10 +655,36 @@ export function createCanvasScene(
     requestRender();
   });
 
+  const unsubscribeArrived = store.listenArrived(startArrivals);
+
+  // Mouvement réduit : la durée vaut 0, la case passe pleine d'un coup.
+  const unsubscribeConfirmed = store.listenConfirmed((pixels) => {
+    const duration = motionMs(root, "--lp-dur");
+    if (duration === 0) return;
+    settles.push({ pixels, duration, ease: easingCurve(motionEasing(root)), startedAt: null });
+    requestRender();
+  });
+
+  // Une case retirée part d'un coup. Les cases neuves ou repeintes entrent en fondu, sauf au-delà du plafond : un brouillon
+  // gardé (rendu avant d'entrer en Dessin) ou le mouvement réduit les fait paraître d'un coup.
+  const startDraftFades = (previous: Draft, next: Draft, mode: DraftMode) => {
+    for (const key of draftFades.keys()) if (!next.has(key)) draftFades.delete(key);
+    const duration = motionMs(root, "--lp-dur-fast");
+    if (mode !== "draft" || duration === 0) return;
+    const ease = easingCurve(motionEasing(root));
+    for (const { key, from } of draftFadeStarts(previous, next, MAX_DRAFT_FADES - draftFades.size))
+      draftFades.set(key, { from, duration, ease, startedAt: null });
+  };
+
+  let lastDraft = draftStore.getView().draft;
   let wasTracing = false;
   // Écart §9.3 (JOURNAL 2026-10-09) : entrer en Dessin, comme en sortir, ne touche pas à la vue.
   const unsubscribeDraft = draftStore.subscribe(() => {
-    const { isTracing, mode } = draftStore.getView();
+    const { isTracing, mode, draft } = draftStore.getView();
+    if (draft !== lastDraft) {
+      startDraftFades(lastDraft, draft, mode);
+      lastDraft = draft;
+    }
     if (isTracing !== wasTracing) {
       lastTracedCell = null;
       wasTracing = isTracing; // avant traceTo : il republie, et l'abonnement rentre à nouveau
@@ -599,7 +795,13 @@ export function createCanvasScene(
       setPanning(false);
       root.removeAttribute(ZONE_ABOVE_ATTRIBUTE);
       backdropImage.dispose();
+      if (hasPainted && options.handoff) {
+        options.handoff.surface = surface;
+        options.handoff.leftAt = performance.now();
+      }
       unsubscribe();
+      unsubscribeConfirmed();
+      unsubscribeArrived();
       unsubscribeDraft();
       listening.abort();
     },

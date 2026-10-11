@@ -76,7 +76,9 @@ describe("the capacity section (écart §4.3, JOURNAL 2026-10-07)", () => {
   it("shows the percentage of the saturation in its tone, and each measured resource with its bar and its ratio", () => {
     const markup = render({ capacity: frame, period: "day", history: loading });
 
-    expect(markup).toMatch(/lp-saturation-value lp-type-display lp-warning">62\u00a0%</);
+    expect(markup).toMatch(
+      /lp-saturation-value lp-type-display lp-warning"><span class="lp-rolling"><span class="lp-visually-hidden">62\u00a0%</,
+    );
     expect(markup).toContain("318\u00a0Mo sur 512\u00a0Mo");
     expect(markup.match(/<meter /g)).toHaveLength(2);
     expect(markup).toContain("lp-capacity-rate lp-type-title lp-danger");
@@ -147,6 +149,8 @@ describe("the capacity section (écart §4.3, JOURNAL 2026-10-07)", () => {
     const waiting = render({ capacity: null, period: "all", history: { status: "failed" } });
 
     expect(waiting).toContain("Chargement…");
+    expect(waiting).toContain("lp-type-display");
+    expect(waiting).toContain("lp-skeleton-block--area");
     expect(waiting).not.toContain("Saturation");
     expect(waiting).not.toContain("<meter");
     expect(waiting).toContain("L&#x27;historique n&#x27;a pas pu se charger.");

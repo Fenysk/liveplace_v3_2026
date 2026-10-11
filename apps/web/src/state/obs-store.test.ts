@@ -1,6 +1,6 @@
 import { type ObsBackground, PALETTE } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
-import type { Arrival, CanvasView } from "./canvas-store";
+import type { Arrival, ArrivedPixel, CanvasView } from "./canvas-store";
 import { createObsStore, type ObsCanvas, type ObsClock } from "./obs-store";
 
 const t0 = 1_700_000_000_000;
@@ -28,6 +28,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   isBanned: false,
   isArchived: false,
   isDiscarded: false,
+  isImageLoaded: true,
   pixels: new Uint8Array(16),
 });
 
@@ -118,6 +119,35 @@ describe("createObsStore (§9.5, JOURNAL 2026-09-25)", () => {
     expect(store.getView().pixels[OFFSET]).toBe(3);
     advanceTo(t0 + 10_000);
     expect(store.getView().pixels[OFFSET]).toBe(5);
+  });
+
+  // Dit les cases qui paraissent à l'heure où le stream les montre, pas à leur réception : le fondu part de là
+  it("tells the cells at the time the stream shows them, not when they are received", () => {
+    const { store, advanceTo, arrive } = setup();
+    const heard: (readonly ArrivedPixel[])[] = [];
+    store.listenArrived((lot) => heard.push(lot));
+    arrive({ kind: "snapshot", pixels: new Uint8Array(16).fill(3), recent: null });
+
+    arrive(pose(t0));
+    advanceTo(t0 + 9999);
+    expect(heard).toEqual([]);
+    advanceTo(t0 + 10_000);
+
+    expect(heard).toEqual([[{ x: 1, y: 2, colorIndex: 5, previousColorIndex: 3 }]]);
+  });
+
+  // Ne dit rien d'un snapshot, ni de ce que le délai laisse attendre
+  it("tells nothing of a snapshot, nor once the listener has left", () => {
+    const { store, advanceTo, arrive } = setup();
+    const heard: (readonly ArrivedPixel[])[] = [];
+    const stop = store.listenArrived((lot) => heard.push(lot));
+
+    arrive({ kind: "snapshot", pixels: new Uint8Array(16).fill(3), recent: null });
+    stop();
+    arrive(pose(t0));
+    advanceTo(t0 + 10_000);
+
+    expect(heard).toEqual([]);
   });
 
   // Prend un délai changé à chaud : ce qui attend suit le nouveau délai, sans rechargement

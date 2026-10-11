@@ -7,8 +7,8 @@ import { Archive, ArchiveRestore, ExternalLink, Link2, Trash2 } from "lucide-rea
 import { useMemo } from "react";
 import type { ListedArchive, ListedCanvas, ListedCanvases } from "../../usecase/list-canvases";
 import { Button } from "../design/button";
-import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
+import { SkeletonRows, SkeletonSwap } from "../design/skeleton";
 import { WindowRow } from "../design/window";
 import { useLocale, useTexts } from "../locale/use-locale";
 import {
@@ -80,6 +80,7 @@ export const ActiveCanvasRow = ({ canvas, isArchiveFull, onArchive }: ActiveCanv
     <>
       <WindowRow
         hasProfile
+        isListed
         label={
           <span className="lp-canvas-id">
             <CanvasThumbnail canvas={canvas} label={t.currentThumbnail} />
@@ -121,6 +122,7 @@ export const ArchiveRow = ({ archive, login, onCopyLink, onReopen, onDiscard }: 
     <li>
       <WindowRow
         hasProfile
+        isListed
         label={
           <a
             className="lp-canvas-id lp-canvas-link"
@@ -160,7 +162,11 @@ type ArchivesSectionProps = {
   onRetry: () => void;
 };
 
-export const ArchivesSection = ({
+type ArchivesLoadedProps = Omit<ArchivesSectionProps, "list"> & {
+  list: Exclude<ArchivesList, { status: "loading" }>;
+};
+
+const ArchivesLoaded = ({
   list,
   login,
   onArchive,
@@ -168,10 +174,8 @@ export const ArchivesSection = ({
   onReopen,
   onDiscard,
   onRetry,
-}: ArchivesSectionProps) => {
+}: ArchivesLoadedProps) => {
   const t = useTexts(ARCHIVE_TEXTS);
-  const design = useTexts(DESIGN_TEXTS);
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
   if (list.status === "failed")
     return (
       <div className="lp-setting">
@@ -220,3 +224,10 @@ export const ArchivesSection = ({
     </>
   );
 };
+
+// Trois lignes grises tiennent la place de la liste ; ses vraies lignes arrivent en fondu d'elles-mêmes (arrival.css).
+export const ArchivesSection = ({ list, ...rows }: ArchivesSectionProps) => (
+  <SkeletonSwap isLoading={list.status === "loading"} skeleton={<SkeletonRows kind="canvas" />} hasOwnArrival>
+    {list.status !== "loading" && <ArchivesLoaded list={list} {...rows} />}
+  </SkeletonSwap>
+);

@@ -166,6 +166,8 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
 
     expect(empty).toContain("Personne sur LivePlace en ce moment.");
     expect(waiting).toContain("Chargement…");
+    expect(waiting).toContain("lp-skeleton-block--area");
+    expect(waiting.split('class="lp-stat-tile"').length - 1).toBe(4);
     expect(waiting).not.toContain("Personnes connectées");
     expect(waiting).not.toContain("<table");
     expect(waiting).toContain("L&#x27;historique n&#x27;a pas pu se charger.");

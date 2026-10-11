@@ -18,6 +18,7 @@ import { blurAfterClick } from "../design/button";
 import { classNames } from "../design/class-names";
 import { Segmented } from "../design/segmented";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
+import { useSelectionGlide } from "../design/use-selection-glide";
 import {
   DESIGN_CHAPTERS,
   DESIGN_ENTRIES,
@@ -74,7 +75,10 @@ const ChapterNav = ({ chapter, isOpen, currentSlug, onToggle, onShow }: ChapterN
             <li key={entry.slug}>
               <button
                 type="button"
-                className="lp-btn lp-type-body design-nav-entry"
+                className={classNames(
+                  "lp-btn lp-type-body design-nav-entry",
+                  entry.slug === currentSlug && "is-selected",
+                )}
                 aria-current={entry.slug === currentSlug ? "page" : undefined}
                 onClick={blurAfterClick(() => onShow(entry))}
               >
@@ -96,6 +100,7 @@ export const DesignPage = () => {
   const [pointer, setPointer] = useState<Pointer>("mouse");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const treeId = useId();
+  const selection = useSelectionGlide<HTMLDivElement>();
   const { entry, openChapterIds, showEntry, toggleChapter } = useDesignEntry();
   const shownChapter = DESIGN_CHAPTERS.find(({ id }) => id === entry.chapterId);
   const ShownIcon = CHAPTER_ICONS[entry.chapterId];
@@ -119,7 +124,7 @@ export const DesignPage = () => {
             </span>
             <MenuChevron className="design-chapter-chevron" aria-hidden="true" />
           </button>
-          <div id={treeId} className="design-nav-tree">
+          <div ref={selection} id={treeId} className="design-nav-tree lp-selection">
             <p className="design-nav-title lp-type-title">Design system LivePlace</p>
             <ul>
               {DESIGN_CHAPTERS.map((chapter) => (

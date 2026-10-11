@@ -6,8 +6,8 @@
 import { EyeOff } from "lucide-react";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
-import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
+import { SkeletonRows, SkeletonSwap } from "../design/skeleton";
 import { formatPlacedAgo } from "../inspection/placed-ago";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "./can-ban";
@@ -47,7 +47,7 @@ const ReportRow = ({
   const t = useTexts(MODERATION_TEXTS);
   const hasSeveralPlacements = report.placementIds.length > 1;
   return (
-    <div className="lp-report">
+    <div className="lp-report lp-arrives">
       <div className="lp-report-preview">
         <PixelPreview
           {...canvas}
@@ -81,13 +81,23 @@ const ReportRow = ({
 
 const ReportRows = ({ list, ...rowProps }: ReportedPlacementsProps) => {
   const t = useTexts(MODERATION_TEXTS);
-  const design = useTexts(DESIGN_TEXTS);
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
-  if (list.status === "failed") return null; // `ConnectionLost`, juste après
-  if (list.reports.length === 0) return <span className="lp-type-caption lp-muted">{t.noReports}</span>;
-  return list.reports.map((report) => (
-    <ReportRow key={pendingReportKey(report)} report={report} {...rowProps} />
-  ));
+  // `failed` : rien, `ConnectionLost` le dit juste après.
+  return (
+    <SkeletonSwap
+      isLoading={list.status === "loading"}
+      skeleton={<SkeletonRows kind="profile" />}
+      hasOwnArrival
+    >
+      {list.status === "ready" &&
+        (list.reports.length === 0 ? (
+          <span className="lp-type-caption lp-muted">{t.noReports}</span>
+        ) : (
+          list.reports.map((report) => (
+            <ReportRow key={pendingReportKey(report)} report={report} {...rowProps} />
+          ))
+        ))}
+    </SkeletonSwap>
+  );
 };
 
 export const ReportedPlacements = (props: ReportedPlacementsProps) => {

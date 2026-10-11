@@ -7,9 +7,10 @@ import type { CapacityFrame, CapacityHistory } from "@liveplace/domain/ports";
 import type { CapacityWatchView } from "../../state/capacity-watch";
 import { CapacityLinkRows, CapacityRow } from "../design/capacity-row";
 import { SaturationFigure } from "../design/saturation-figure";
+import { SkeletonBar, SkeletonBlock, SkeletonSwap } from "../design/skeleton";
 import { toCapacityLinks, toSaturationView } from "./capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "./capacity-slots";
-import { HistoryBlock, LOADING, type ShownChart, type ShownHistory } from "./history-block";
+import { HistoryBlock, type ShownChart, type ShownHistory } from "./history-block";
 
 export type CapacitySectionProps = {
   view: CapacityWatchView;
@@ -38,9 +39,19 @@ const LiveBlocks = ({ capacity, nowMs }: { capacity: CapacityFrame; nowMs: Times
   </>
 );
 
+// Le grand pourcentage de la saturation, puis la place des ressources.
+const CapacitySkeleton = () => (
+  <>
+    <SkeletonBar text="display" width="short" />
+    <SkeletonBlock shape="area" />
+  </>
+);
+
 export const CapacitySection = ({ view, nowMs, onSelectPeriod }: CapacitySectionProps) => (
   <div className="lp-window-layout">
-    {view.capacity ? <LiveBlocks capacity={view.capacity} nowMs={nowMs} /> : LOADING}
+    <SkeletonSwap isLoading={!view.capacity} skeleton={<CapacitySkeleton />}>
+      {view.capacity && <LiveBlocks capacity={view.capacity} nowMs={nowMs} />}
+    </SkeletonSwap>
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Historique</h3>
       <HistoryBlock

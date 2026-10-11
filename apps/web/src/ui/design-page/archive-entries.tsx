@@ -4,7 +4,7 @@
 import { HOUR_MS, MAX_ARCHIVES } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
 import { toBase64 } from "@liveplace/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
 import type { ListedArchive, ListedCanvas, ListedCanvases, Thumbnail } from "../../usecase/list-canvases";
 import { ArchiveBanner } from "../archive/archive-banner";
@@ -13,6 +13,7 @@ import { type ArchivesList, ArchivesSection } from "../archive/canvas-cards";
 import { DownloadWindow } from "../archive/download-window";
 import type { PngBackground } from "../archive/png-export";
 import { DiscardWindow, type SwitchRequest, type SwitchStatus, SwitchWindow } from "../archive/switch-window";
+import { Button } from "../design/button";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { noop, SAMPLE_DRAWING, SAMPLE_OWNER } from "./design-fixtures";
 import { Block, DIALOG_NOTE, Entry, InPhone, InWindow, OpenWindow, StateRow, useNowMs } from "./entry-layout";
@@ -187,6 +188,36 @@ const ArchivesScene = ({ list }: { list: ArchivesList }) => (
   />
 );
 
+const RELOAD_MS = 700; // le temps d'une lecture qui se charge, avant que ses lignes n'arrivent
+
+// Recharger : la liste se vide, puis ses lignes arrivent toutes ensemble. Ajouter : seule la nouvelle ligne arrive.
+const ArrivingRowsScene = ({ nowMs }: { nowMs: number }) => {
+  const [count, setCount] = useState(2);
+  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    if (!isLoading) return;
+    const timer = setTimeout(() => setIsLoading(false), RELOAD_MS);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+  return (
+    <div className="lp-setting">
+      <InWindow>
+        <ArchivesScene
+          list={isLoading ? { status: "loading" } : { status: "ready", canvases: withArchives(nowMs, count) }}
+        />
+      </InWindow>
+      <div className="lp-row">
+        <Button label="Recharger" isDisabled={isLoading} onPress={() => setIsLoading(true)} />
+        <Button
+          label="Ajouter une archive"
+          isDisabled={isLoading || count >= MAX_ARCHIVES}
+          onPress={() => setCount(count + 1)}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const ArchivesEntry = () => {
   const nowMs = useNowMs();
   return (
@@ -204,6 +235,15 @@ export const ArchivesEntry = () => {
             </InWindow>
           </StateRow>
         ))}
+      </Block>
+      <Block title="Qui arrivent">
+        <StateRow
+          name="Les lignes d'une liste"
+          detail="Quand la liste reçoit ses données, ses lignes arrivent en fondu avec une montée de 4 px, toutes ensemble. Une ligne ajoutée arrive de même ; les autres ne bougent pas."
+          isDemo
+        >
+          <ArrivingRowsScene nowMs={nowMs} />
+        </StateRow>
       </Block>
       <Block title="Sur mobile">
         <StateRow

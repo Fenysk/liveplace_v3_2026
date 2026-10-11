@@ -19,7 +19,6 @@
   border-radius: var(--radius-pill);
   color: var(--ink);
   cursor: pointer;
-  transition: background var(--lp-dur-fast);
 }
 
 .lp-segmented-option svg {
@@ -34,11 +33,6 @@
   margin: 0;
   opacity: 0;
   cursor: pointer;
-}
-
-.lp-segmented-option:has(input:checked) {
-  background: var(--pill-surface);
-  box-shadow: var(--pill-shadow);
 }
 
 .lp-segmented-option:has(input:focus-visible) {

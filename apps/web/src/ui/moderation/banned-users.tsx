@@ -7,6 +7,7 @@ import { Eye } from "lucide-react";
 import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
+import { SkeletonRows, SkeletonSwap } from "../design/skeleton";
 import { SmallWindow, useShownWhileClosing, WindowRow } from "../design/window";
 import { useTexts } from "../locale/use-locale";
 import { ConnectionLost } from "./connection-lost";
@@ -41,6 +42,7 @@ const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: Banne
         <MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.banMention(user.isFromTwitch)} />
       }
       hasProfile
+      isListed
     >
       <div className="lp-row">
         <span className="lp-type-caption lp-muted">{t.pixelCount(user.pixelCount)}</span>
@@ -95,20 +97,30 @@ const PreviewWindow = ({ isOpen, shown, canvas, onClose }: PreviewWindowProps) =
 
 const BannedRows = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
   const t = useTexts(MODERATION_TEXTS);
-  const design = useTexts(DESIGN_TEXTS);
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
-  if (list.status === "failed") return null; // `ConnectionLost`, juste après
-  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">{t.nobodyBanned}</span>;
-  return list.users.map((user) => (
-    <BannedRow
-      key={user.userId}
-      user={user}
-      preview={preview}
-      unbanningUserId={unbanningUserId}
-      onPreview={onPreview}
-      onUnban={onUnban}
-    />
-  ));
+  // `failed` : rien, `ConnectionLost` le dit juste après.
+  return (
+    <SkeletonSwap
+      isLoading={list.status === "loading"}
+      skeleton={<SkeletonRows kind="profile" />}
+      hasOwnArrival
+    >
+      {list.status === "ready" &&
+        (list.users.length === 0 ? (
+          <span className="lp-type-caption lp-muted">{t.nobodyBanned}</span>
+        ) : (
+          list.users.map((user) => (
+            <BannedRow
+              key={user.userId}
+              user={user}
+              preview={preview}
+              unbanningUserId={unbanningUserId}
+              onPreview={onPreview}
+              onUnban={onUnban}
+            />
+          ))
+        ))}
+    </SkeletonSwap>
+  );
 };
 
 export const BannedUsers = (props: BannedUsersProps) => {

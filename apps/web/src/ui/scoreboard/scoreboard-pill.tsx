@@ -10,6 +10,7 @@ import type { ScoreboardRow, ScoreboardRows } from "../../state/scoreboard";
 import { Button } from "../design/button";
 import { classNames } from "../design/class-names";
 import { Pill, type PillDock } from "../design/pill";
+import { RollingNumber } from "../design/rolling-number";
 import { useShownWhileClosing } from "../design/window";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -63,7 +64,7 @@ const ExpandedRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolea
         )}
       </span>
       <span className="lp-rank-pixels lp-type-numeric lp-muted" aria-hidden="true">
-        {pixelsNumber(row.pixels, locale)}
+        <RollingNumber value={pixelsNumber(row.pixels, locale)} />
       </span>
     </>
   );
@@ -99,7 +100,7 @@ const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
         <span className="lp-rank-tip" aria-hidden="true">
           <span className="lp-rank-tip-name lp-type-body">{player.displayName}</span>
           <span className="lp-rank-tip-meta lp-type-caption lp-muted">
-            <Ordinal rank={rank} /> · {moderation.pixelCount(pixels)}
+            <Ordinal rank={rank} /> · <RollingNumber value={moderation.pixelCount(pixels)} />
           </span>
         </span>
       )}

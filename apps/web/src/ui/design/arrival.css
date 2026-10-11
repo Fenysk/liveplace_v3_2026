@@ -1,0 +1,14 @@
+/* Une ligne qui arrive : dans une liste de la fenêtre (Archives, Modération, section Activité), ses lignes naissent en fondu
+   avec une montée de 4 px, toutes ensemble. L'animation joue à l'insertion de la ligne : une ligne déjà là ne la rejoue
+   pas à un nouveau rendu, et une ligne qui s'ajoute plus tard arrive de même. */
+
+.lp-arrives {
+  animation: lp-arrives var(--lp-dur-fade) var(--lp-ease);
+}
+
+@keyframes lp-arrives {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -1,0 +1,23 @@
+/* Le fond de l'option choisie d'un sélecteur (Segmented, la barre latérale de la fenêtre, le sommaire de /design) : le `::before` de
+   l'option `.is-selected`, que use-selection-glide.ts fait glisser de l'ancienne option à la nouvelle. `isolation` garde son
+   `z-index: -1` dans le sélecteur : le fond passe sous le libellé, au-dessus du fond du sélecteur. */
+
+.lp-selection {
+  position: relative;
+  isolation: isolate;
+}
+
+.lp-selection .is-selected {
+  position: relative;
+}
+
+.lp-selection .is-selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--pill-surface);
+  box-shadow: var(--pill-shadow);
+  pointer-events: none;
+}

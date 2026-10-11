@@ -1,7 +1,7 @@
 // `/{login}` : l'unique adresse d'un canvas, dans le navigateur comme dans OBS (§9.1).
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../state/canvas-store";
 import { createDraftStore, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
@@ -16,6 +16,7 @@ import { CanvasPill, type CanvasPillFold } from "../ui/canvas/canvas-pill";
 import { CanvasRecovering, useIsCanvasRecovering } from "../ui/canvas/canvas-recovering";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
+import { createHandoff } from "../ui/canvas/handoff";
 import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
@@ -243,6 +244,8 @@ const GamePage = () => {
   // Écart §8.1 (JOURNAL 2026-10-08, 2026-10-09) : la pill Canvas se replie quand on déplace, zoome, recentre ou ouvre une case ; rien n'est retenu.
   const [isCanvasPillFolded, setIsCanvasPillFolded] = useState(false);
   const foldCanvasPill = useCallback(() => setIsCanvasPillFolded(true), []);
+  // Écart §15 : la page qui suit le canvas actif garde l'ancienne fresque à l'écran jusqu'à l'arrivée de la nouvelle.
+  const handoff = useRef(createHandoff());
   const unfoldCanvasPill = useCallback(() => setIsCanvasPillFolded(false), []);
   // Écart §15 (JOURNAL 2026-10-06) : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
   useFollowActiveCanvas(stores?.canvas);
@@ -281,6 +284,7 @@ const GamePage = () => {
           ownerName={owner.displayName}
           isFramedInFreeArea
           onGesture={foldCanvasPill}
+          handoff={handoff.current}
           onNavigate={(kind) => {
             recordFirstHintStep(kind);
             recordDraftPan(kind, stores.draft);

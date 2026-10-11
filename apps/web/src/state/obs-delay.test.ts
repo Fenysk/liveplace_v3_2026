@@ -258,3 +258,79 @@ describe("a hidden placement in the OBS queue (JOURNAL 2026-09-28)", () => {
     expect(queue.shown[OFFSET]).toBe(8);
   });
 });
+
+describe("the lots that appear in the stream (la vue OBS anime comme le jeu)", () => {
+  const cellAt = (
+    x: number,
+    y: number,
+    colorIndex: number,
+    version: number,
+    placedAt = t0,
+  ): BroadcastCell => ({
+    x,
+    y,
+    colorIndex,
+    previousColorIndex: 0,
+    placedAt,
+    version,
+    kind: "place",
+  });
+
+  // Ce qui paraît est rendu par lot, un par version, avec la couleur que le stream montrait : la notion de lot passe par la file
+  it("tells what appears as one lot per version, with the color the stream showed", () => {
+    const queue = queueOnThree();
+    queueCells(
+      queue,
+      frameOf(cellAt(0, 0, 5, 10), cellAt(1, 0, 6, 10), cellAt(2, 0, 7, 11, t0 + 50)),
+      t0,
+      DELAY,
+    );
+
+    const lots = showDueCells(queue, t0 + DELAY + 100, DELAY);
+
+    expect(lots).toEqual([
+      [
+        { x: 0, y: 0, colorIndex: 5, previousColorIndex: 0 },
+        { x: 1, y: 0, colorIndex: 6, previousColorIndex: 0 },
+      ],
+      [{ x: 2, y: 0, colorIndex: 7, previousColorIndex: 0 }],
+    ]);
+  });
+
+  // Une case qui montre déjà sa couleur n'a rien à faire paraître
+  it("leaves out a cell that already shows its color", () => {
+    const queue = queueOnThree();
+    queueCells(queue, frameOf(cellAt(1, 2, 3, 10)), t0, DELAY);
+
+    expect(showDueCells(queue, t0 + DELAY, DELAY)).toEqual([]);
+  });
+
+  // Une case qui n'est pas due ne paraît pas : rien n'est rendu
+  it("tells nothing while no cell is due", () => {
+    const queue = queueOnThree();
+    queueCells(queue, frameOf(cellAt(0, 0, 5, 10)), t0, DELAY);
+
+    expect(showDueCells(queue, t0 + DELAY - 1, DELAY)).toEqual([]);
+  });
+
+  // Deux poses d'une même case dans l'ordre de pose : chacune part de ce que montrait la précédente
+  it("starts each of two placements of one cell from what the one before showed", () => {
+    const queue = queueOnThree();
+    queueCells(queue, frameOf(cellAt(1, 2, 5, 10), cellAt(1, 2, 8, 11, t0 + 10)), t0, DELAY);
+
+    expect(showDueCells(queue, t0 + DELAY + 10, DELAY)).toEqual([
+      [{ x: 1, y: 2, colorIndex: 5, previousColorIndex: 3 }],
+      [{ x: 1, y: 2, colorIndex: 8, previousColorIndex: 5 }],
+    ]);
+  });
+
+  // Une modération est immédiate (règle 2) : elle n'est jamais rendue, rien ne la retarde en fondu
+  it("never tells a moderation, which is immediate and must not linger in a fade", () => {
+    const queue = queueOnThree();
+
+    queueCells(queue, frameOf(clear({ colorIndex: 0, placedAt: t0, version: 12 })), t0, DELAY);
+
+    expect(queue.shown[OFFSET]).toBe(0);
+    expect(showDueCells(queue, t0 + DELAY, DELAY)).toEqual([]);
+  });
+});

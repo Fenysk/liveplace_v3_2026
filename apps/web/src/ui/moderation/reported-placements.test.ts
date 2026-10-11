@@ -69,3 +69,25 @@ describe("Bannir in the reported placements (Écart §5.4, JOURNAL 2026-10-08)",
     expect(html.match(/Bannir/g)).toHaveLength(1);
   });
 });
+
+describe("the reported placements while they load", () => {
+  // Trois lignes grises tiennent la place des signalements, sous leur titre
+  it("shows three grey rows under its title while the reports load", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportedPlacements, {
+        list: { status: "loading" },
+        approvingReportKey: null,
+        canvas: { width: 4, height: 4, palette: PALETTE },
+        nowMs: 1_700_000_060_000,
+        onClear: noop,
+        onBan: noop,
+        onApprove: noop,
+      }),
+    );
+
+    expect(html).toContain("Signalements");
+    expect(html).toContain('aria-busy="true"');
+    expect(html.split("lp-skeleton-block--button").length - 1).toBe(3);
+    expect(html).not.toContain("lp-report ");
+  });
+});

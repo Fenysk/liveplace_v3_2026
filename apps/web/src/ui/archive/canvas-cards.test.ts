@@ -134,4 +134,24 @@ describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", (
     expect(html).toMatch(/lp-muted">depuis le 4 octobre 2026</);
     expect(html).not.toContain("Depuis le 4 octobre 2026");
   });
+
+  // Pendant la lecture de la liste, trois lignes grises à la forme des vraies : miniature, deux lignes, une action
+  it("shows three grey rows with a thumbnail and two lines while the list loads", () => {
+    const html = renderToString(
+      createElement(ArchivesSection, {
+        list: { status: "loading" },
+        login: "kalyss",
+        onArchive: doNothing,
+        onCopyLink: doNothing,
+        onReopen: doNothing,
+        onDiscard: doNothing,
+        onRetry: doNothing,
+      }),
+    );
+
+    expect(html).toContain('aria-busy="true"');
+    expect(html.split("lp-skeleton-block--thumb").length - 1).toBe(3);
+    expect(html).not.toContain("lp-arrives");
+    expect(html).not.toContain("Archives ·");
+  });
 });

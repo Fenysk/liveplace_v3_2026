@@ -7,7 +7,7 @@ import {
   type ObsBackground,
   type Timestamp,
 } from "@liveplace/domain";
-import type { CanvasStore } from "./canvas-store";
+import type { ArrivedPixel, CanvasStore } from "./canvas-store";
 import {
   createObsQueue,
   nextShowAt,
@@ -34,6 +34,8 @@ export type ObsView = {
 export type ObsStore = {
   subscribe(listener: () => void): () => void; // la forme qu'attend `useSyncExternalStore`
   getView(): ObsView;
+  // Les cases qui paraissent dans le stream, à l'heure où il les montre (après le délai), un lot par pose : un par version.
+  listenArrived(listener: (pixels: readonly ArrivedPixel[]) => void): () => void;
   dispose(): void;
 };
 
@@ -57,6 +59,7 @@ export function createObsStore(canvas: ObsCanvas, clock: ObsClock): ObsStore {
   let queue: ObsQueue | null = null;
   let cancelTimer = (): void => undefined;
   const listeners = new Set<() => void>();
+  const arrivedListeners = new Set<(pixels: readonly ArrivedPixel[]) => void>();
 
   // Le délai du moment, reçu au `welcome` puis par la frame `obsDelay` (JOURNAL 2026-09-25).
   const delayMs = (): number => canvas.getView().params?.obsDelayMs ?? 0;
@@ -71,7 +74,7 @@ export function createObsStore(canvas: ObsCanvas, clock: ObsClock): ObsStore {
   const showDue = (): void => {
     if (!queue) return;
     cancelTimer();
-    showDueCells(queue, clock.now(), delayMs());
+    const lots = showDueCells(queue, clock.now(), delayMs());
     const { width, height, palette } = canvas.getView();
     publish({
       isReady: true,
@@ -83,6 +86,7 @@ export function createObsStore(canvas: ObsCanvas, clock: ObsClock): ObsStore {
       backgroundImageAt: imageAtOf(),
       backgroundImageOpacity: opacityOf(),
     });
+    for (const lot of lots) for (const listener of arrivedListeners) listener(lot);
     const next = nextShowAt(queue, delayMs());
     if (next !== null) cancelTimer = clock.wait(Math.max(0, next - clock.now()), showDue);
   };
@@ -119,6 +123,10 @@ export function createObsStore(canvas: ObsCanvas, clock: ObsClock): ObsStore {
       return () => listeners.delete(listener);
     },
     getView: () => view,
+    listenArrived(listener) {
+      arrivedListeners.add(listener);
+      return () => arrivedListeners.delete(listener);
+    },
     dispose() {
       cancelTimer();
       unlistenArrivals();

@@ -6,6 +6,7 @@ import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
 import type { ActivityHere } from "@liveplace/domain/ports";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import { CanvasActivityOwner, ConnectedAccounts } from "../design/canvas-activity-card";
+import { SkeletonBlock, SkeletonSwap, SkeletonTiles } from "../design/skeleton";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import {
@@ -17,7 +18,7 @@ import {
   toGuestsLine,
 } from "./activity-labels";
 import { canvasChartLinesFor, toCanvasSlots } from "./activity-slots";
-import { HistoryBlock, LOADING, type ShownChart, type ShownHistory } from "./history-block";
+import { HistoryBlock, type ShownChart, type ShownHistory } from "./history-block";
 
 export type CanvasSectionProps = {
   view: ActivityWatchView;
@@ -80,14 +81,23 @@ const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & 
 
 export const CanvasSection = ({ view, nowMs, onSelectPeriod }: CanvasSectionProps) => (
   <div className="lp-window-layout">
-    {!view.activity && LOADING}
-    {view.activity && !view.activity.here && (
-      <span className="lp-type-body lp-muted">
-        Les chiffres de cette fresque ne sont pas disponibles pour l'instant.
-      </span>
-    )}
-    {view.activity?.here && (
-      <HereBlocks here={view.activity.here} view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
-    )}
+    <SkeletonSwap
+      isLoading={!view.activity}
+      skeleton={
+        <>
+          <SkeletonTiles />
+          <SkeletonBlock shape="area" />
+        </>
+      }
+    >
+      {view.activity && !view.activity.here && (
+        <span className="lp-type-body lp-muted">
+          Les chiffres de cette fresque ne sont pas disponibles pour l'instant.
+        </span>
+      )}
+      {view.activity?.here && (
+        <HereBlocks here={view.activity.here} view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
+      )}
+    </SkeletonSwap>
   </div>
 );

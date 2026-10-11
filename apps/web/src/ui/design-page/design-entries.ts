@@ -44,6 +44,7 @@ const ENTRIES_BY_SLUG = {
   palette: { title: "Palette", chapterId: "components" },
   pill: { title: "Pill", chapterId: "components" },
   "se-connecter": { title: "Se connecter avec Twitch", chapterId: "components" },
+  squelette: { title: "Squelette", chapterId: "components" },
   toast: { title: "Toast", chapterId: "components" },
 
   "pill-canvas": { title: "Fresque", chapterId: "game", place: "haut gauche" },

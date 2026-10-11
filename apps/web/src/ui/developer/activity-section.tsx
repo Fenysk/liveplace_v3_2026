@@ -6,6 +6,7 @@ import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
 import { useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import { CanvasActivityCard } from "../design/canvas-activity-card";
+import { SkeletonBlock, SkeletonSwap, SkeletonTiles } from "../design/skeleton";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
 import {
@@ -16,7 +17,7 @@ import {
   toCanvasActivityCard,
 } from "./activity-labels";
 import { chartLinesFor, toActivitySlots } from "./activity-slots";
-import { HistoryBlock, LOADING, type ShownChart, type ShownHistory } from "./history-block";
+import { HistoryBlock, type ShownChart, type ShownHistory } from "./history-block";
 
 export type ActivitySectionProps = {
   view: ActivityWatchView;
@@ -24,29 +25,34 @@ export type ActivitySectionProps = {
   onSelectPeriod: (period: ActivityPeriod) => void;
 };
 
-const NowBlock = ({ view }: { view: ActivityWatchView }) => {
-  if (!view.activity) return LOADING;
-  const { people, guests, streamed, pixels, signups } = view.activity.now;
-  return (
-    <StatTiles>
-      <StatTile label="Personnes connectées" value={formatCount(people)} note={guestsNote(guests)} />
-      <StatTile label="Fresques streamées" value={formatCount(streamed)} />
-      <StatTile label="Pixels de la dernière minute" value={formatCount(pixels)} />
-      <StatTile label="Nouveaux comptes aujourd'hui" value={formatCount(signups)} />
-    </StatTiles>
-  );
-};
+const NowBlock = ({ view }: { view: ActivityWatchView }) => (
+  <SkeletonSwap isLoading={!view.activity} skeleton={<SkeletonTiles />}>
+    {view.activity && (
+      <StatTiles>
+        <StatTile
+          label="Personnes connectées"
+          value={formatCount(view.activity.now.people)}
+          note={guestsNote(view.activity.now.guests)}
+        />
+        <StatTile label="Fresques streamées" value={formatCount(view.activity.now.streamed)} />
+        <StatTile label="Pixels de la dernière minute" value={formatCount(view.activity.now.pixels)} />
+        <StatTile label="Nouveaux comptes aujourd'hui" value={formatCount(view.activity.now.signups)} />
+      </StatTiles>
+    )}
+  </SkeletonSwap>
+);
 
-const AudienceBlock = ({ view }: { view: ActivityWatchView }) =>
-  view.activity ? (
-    <StatTable
-      caption="L'audience d'aujourd'hui et des 30 derniers jours"
-      columns={AUDIENCE_COLUMNS}
-      rows={toAudienceRows(view.activity.audience)}
-    />
-  ) : (
-    LOADING
-  );
+const AudienceBlock = ({ view }: { view: ActivityWatchView }) => (
+  <SkeletonSwap isLoading={!view.activity} skeleton={<SkeletonBlock shape="area" />}>
+    {view.activity && (
+      <StatTable
+        caption="L'audience d'aujourd'hui et des 30 derniers jours"
+        columns={AUDIENCE_COLUMNS}
+        rows={toAudienceRows(view.activity.audience)}
+      />
+    )}
+  </SkeletonSwap>
+);
 
 const CanvasesBlock = ({ view, nowMs }: Pick<ActivitySectionProps, "view" | "nowMs">) => {
   const [openCanvasIds, setOpenCanvasIds] = useState<ReadonlySet<string>>(new Set());
@@ -56,20 +62,24 @@ const CanvasesBlock = ({ view, nowMs }: Pick<ActivitySectionProps, "view" | "now
       if (!next.delete(canvasId)) next.add(canvasId);
       return next;
     });
-  if (!view.activity) return LOADING;
-  if (view.activity.canvases.length === 0)
-    return <span className="lp-type-body lp-muted">Personne sur LivePlace en ce moment.</span>;
   return (
-    <div>
-      {view.activity.canvases.map((canvas) => (
-        <CanvasActivityCard
-          key={canvas.canvasId}
-          {...toCanvasActivityCard(canvas, nowMs)}
-          isOpen={openCanvasIds.has(canvas.canvasId)}
-          onToggle={() => toggle(canvas.canvasId)}
-        />
-      ))}
-    </div>
+    <SkeletonSwap isLoading={!view.activity} skeleton={<SkeletonBlock shape="area" />} hasOwnArrival>
+      {view.activity &&
+        (view.activity.canvases.length === 0 ? (
+          <span className="lp-type-body lp-muted">Personne sur LivePlace en ce moment.</span>
+        ) : (
+          <div>
+            {view.activity.canvases.map((canvas) => (
+              <CanvasActivityCard
+                key={canvas.canvasId}
+                {...toCanvasActivityCard(canvas, nowMs)}
+                isOpen={openCanvasIds.has(canvas.canvasId)}
+                onToggle={() => toggle(canvas.canvasId)}
+              />
+            ))}
+          </div>
+        ))}
+    </SkeletonSwap>
   );
 };
 

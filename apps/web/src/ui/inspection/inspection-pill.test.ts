@@ -78,3 +78,46 @@ describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () 
     expect(html).not.toContain("Retirer ses pixels");
   });
 });
+
+describe("the Inspection pill while its pixel loads", () => {
+  const renderLoading = () =>
+    renderToStaticMarkup(
+      createElement(InspectionPill, {
+        inspection: { status: "loading", x: 12, y: 40 },
+        palette: PALETTE,
+        nowMs: now,
+        onClose: noop,
+        isDocked: false,
+      }),
+    );
+
+  // Tant que la réponse n'a pas 200 ms, la pill reste fermée, mais elle a déjà la forme de la case et le bouton Fermer
+  it("holds the shape of the cell, closed, before the 200 ms have passed", () => {
+    const html = renderLoading();
+
+    expect(html).toContain("lp-pill is-hidden");
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("Chargement…");
+    expect(html).toContain("(12, 40)");
+    expect(html).toContain("lp-skeleton-bar");
+    expect(html).toContain('title="Fermer (Échap)"');
+  });
+
+  // Aucun nom ni aucune date inventés pendant l'attente
+  it("shows neither a name nor a date before the answer", () => {
+    const html = renderLoading();
+
+    expect(html).not.toContain("Troll42");
+    expect(html).not.toContain("il y a");
+    expect(html).not.toContain("lp-avatar");
+  });
+
+  // Une fois la réponse là, la pill montre la case sans trace d'attente
+  it("shows the cell with no trace of the wait once the answer is there", () => {
+    const html = render(entry);
+
+    expect(html).not.toContain("aria-busy");
+    expect(html).not.toContain("lp-skeleton");
+    expect(html).toContain("Troll42");
+  });
+});

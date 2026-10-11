@@ -3,7 +3,7 @@
 
 import type { Moderator } from "@liveplace/domain/ports";
 import { Button } from "../design/button";
-import { DESIGN_TEXTS } from "../design/design-texts";
+import { SkeletonRows, SkeletonSwap } from "../design/skeleton";
 import { WindowRow } from "../design/window";
 import { useTexts } from "../locale/use-locale";
 import { ConnectionLost } from "./connection-lost";
@@ -24,25 +24,38 @@ type ModeratorUsersProps = {
 
 const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) => {
   const t = useTexts(MODERATION_TEXTS);
-  const design = useTexts(DESIGN_TEXTS);
-  if (list.status === "loading") return <span className="lp-type-caption lp-muted">{design.loading}</span>;
-  if (list.status === "failed") return null; // `ConnectionLost`, juste après
-  if (list.users.length === 0) return <span className="lp-type-caption lp-muted">{t.noModerators}</span>;
-  return list.users.map((user) => (
-    <WindowRow
-      key={user.userId}
-      label={<MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.moderatorMention(user)} />}
-      hasProfile
+  // `failed` : rien, `ConnectionLost` le dit juste après.
+  return (
+    <SkeletonSwap
+      isLoading={list.status === "loading"}
+      skeleton={<SkeletonRows kind="profile" />}
+      hasOwnArrival
     >
-      {onRemove && user.isNamedHere && (
-        <Button
-          label={t.removeModerator}
-          isDisabled={removingUserId === user.userId}
-          onPress={() => onRemove(user.userId)}
-        />
-      )}
-    </WindowRow>
-  ));
+      {list.status === "ready" &&
+        (list.users.length === 0 ? (
+          <span className="lp-type-caption lp-muted">{t.noModerators}</span>
+        ) : (
+          list.users.map((user) => (
+            <WindowRow
+              key={user.userId}
+              label={
+                <MarkedProfile user={user} hasAccount={user.hasAccount} mention={t.moderatorMention(user)} />
+              }
+              hasProfile
+              isListed
+            >
+              {onRemove && user.isNamedHere && (
+                <Button
+                  label={t.removeModerator}
+                  isDisabled={removingUserId === user.userId}
+                  onPress={() => onRemove(user.userId)}
+                />
+              )}
+            </WindowRow>
+          ))
+        ))}
+    </SkeletonSwap>
+  );
 };
 
 export const ModeratorUsers = (props: ModeratorUsersProps) => {

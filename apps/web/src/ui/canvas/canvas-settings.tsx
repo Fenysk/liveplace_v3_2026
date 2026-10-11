@@ -61,6 +61,7 @@ export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
         value={theme.value}
         maxLength={THEME_MAX_LENGTH}
         isDisabled={theme.status !== "ready" || theme.isSaving}
+        isLoading={theme.status === "loading"}
         onInput={theme.onInput}
         onCommit={theme.onCommit}
       />

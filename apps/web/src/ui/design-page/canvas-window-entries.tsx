@@ -243,6 +243,9 @@ export const CanvasSettingsEntry = () => (
       <StateRow name="Le thème s'enregistre" detail="Le champ attend la réponse.">
         <ThemeScene initial="Halloween" isSaving />
       </StateRow>
+      <StateRow name="Le thème se lit" detail="Un squelette de champ attend la réponse, après 200 ms.">
+        <ThemeScene initial="" status="loading" />
+      </StateRow>
       <StateRow name="Le thème ne se lit pas" detail="Le champ reste fermé, et le dit.">
         <ThemeScene initial="" status="unavailable" />
       </StateRow>

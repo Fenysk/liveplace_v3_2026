@@ -103,7 +103,10 @@ describe("la pill Classement (JOURNAL 2026-10-06)", () => {
     ]);
     expect(
       itemsOf(markup).map(
-        (item) => /lp-rank-pixels lp-type-numeric lp-muted" aria-hidden="true">([^<]*)</.exec(item)?.[1],
+        (item) =>
+          /lp-rank-pixels lp-type-numeric lp-muted" aria-hidden="true"><span class="lp-rolling"><span class="lp-visually-hidden">([^<]*)</.exec(
+            item,
+          )?.[1],
       ),
     ).toEqual([(1204).toLocaleString("fr-FR"), "40", "40", "7", "3"]);
     expect(markup).toContain('data-collapsed="false"');
@@ -170,7 +173,9 @@ describe("la pill Classement (JOURNAL 2026-10-06)", () => {
 
     expect(first).toContain('<span class="lp-rank-tip" aria-hidden="true">');
     expect(first).toContain(">Ada</span>");
-    expect(first).toContain(`1<sup class="lp-rank-sup">er</sup> · ${(1204).toLocaleString("fr-FR")} pixels`);
+    expect(first).toContain(
+      `1<sup class="lp-rank-sup">er</sup> · <span class="lp-rolling"><span class="lp-visually-hidden">${(1204).toLocaleString("fr-FR")} pixels</span>`,
+    );
   });
 
   // Tronque un pseudo long dans la ligne dépliée, et garde le pseudo entier dans le nom accessible

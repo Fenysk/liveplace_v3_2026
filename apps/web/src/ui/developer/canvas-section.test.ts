@@ -179,6 +179,7 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(before).toContain("L&#x27;historique de cette fresque n&#x27;est pas disponible.");
     expect(before).not.toContain("<figure");
     expect(waiting).toContain("Chargement…");
+    expect(waiting.split('class="lp-stat-tile"').length - 1).toBe(4);
     expect(waiting).not.toContain("Personnes connectées");
     expect(waiting).not.toContain("<table");
   });

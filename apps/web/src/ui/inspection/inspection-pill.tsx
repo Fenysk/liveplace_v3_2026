@@ -5,7 +5,7 @@
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { InspectEntry } from "@liveplace/domain/ports";
 import { Check, Flag, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { Inspection } from "../../state/canvas-store";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
@@ -13,13 +13,23 @@ import { DESIGN_TEXTS } from "../design/design-texts";
 import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile } from "../design/profile";
+import { SkeletonBar, SkeletonBlock, SkeletonProfile, SkeletonSlot } from "../design/skeleton";
 import { TwitchGlyph } from "../design/twitch";
+import { useAfterDelay } from "../design/use-after-delay";
+import { SKELETON_DELAY_MS } from "../design/use-skeleton-phase";
 import { formatDateTime } from "../locale/locale";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "../moderation/can-ban";
 import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { INSPECTION_TEXTS } from "./inspection-texts";
+import {
+  NOTHING_SHOWN,
+  type PillContent,
+  type PillState,
+  type ShownInspection,
+  toPillState,
+} from "./pill-content";
 import { formatPlacedAgo } from "./placed-ago";
 
 const DOCK: PillDock = "cr";
@@ -114,7 +124,7 @@ type InspectedCellProps = Pick<
   InspectionPillProps,
   "palette" | "nowMs" | "onClose" | "report" | "moderation"
 > & {
-  inspection: Exclude<Inspection, { status: "loading" }>;
+  inspection: ShownInspection;
 };
 
 const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation }: InspectedCellProps) => {
@@ -157,23 +167,56 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation
   );
 };
 
-type ShownInspection = Exclude<Inspection, { status: "loading" }>;
+// La case attendue : sa forme, avec les coordonnées qu'on connaît déjà. La couleur et la date arrivent avec la réponse.
+type SkeletonCellProps = Pick<InspectionPillProps, "onClose"> & { x: number; y: number };
 
-const toShown = (inspection: Inspection | null): ShownInspection | null =>
-  inspection && inspection.status !== "loading" ? inspection : null;
+const SkeletonCell = ({ x, y, onClose }: SkeletonCellProps) => (
+  <>
+    <div className="lp-row">
+      <SkeletonProfile />
+      <span className="lp-spacer" />
+      <CloseButton onClose={onClose} />
+    </div>
+    <div className="lp-row lp-prompt">
+      <span className="lp-color-chip">
+        <SkeletonBlock shape="swatch" />
+        <span className="lp-type-numeric">{`(${x}, ${y})`}</span>
+      </span>
+      <SkeletonBar text="caption" width="medium" />
+    </div>
+  </>
+);
 
-// La pill garde la dernière case montrée : elle s'efface avec elle à la fermeture, et une autre case la remplace
-// par un morphing sans qu'elle disparaisse (maquette). À la première ouverture, elle attend la réponse, masquée.
-const useShownInspection = (inspection: Inspection | null) => {
-  const current = toShown(inspection);
-  const [lastShown, setLastShown] = useState<ShownInspection | null>(current);
-  const wasVisible = useRef(false);
-  const isVisible = inspection !== null && (current !== null || wasVisible.current);
+type PillBodyProps = Pick<InspectionPillProps, "palette" | "nowMs" | "onClose" | "report" | "moderation"> & {
+  content: PillContent;
+};
+
+// Un squelette que la case remplace paraît en fondu ; sans squelette vu, elle paraît seule, comme avant.
+const PillBody = ({ content, onClose, ...cell }: PillBodyProps) => {
+  if (content.kind === "skeleton")
+    return (
+      <SkeletonSlot phase="shown" skeleton={<SkeletonCell x={content.x} y={content.y} onClose={onClose} />}>
+        {null}
+      </SkeletonSlot>
+    );
+  return (
+    <SkeletonSlot phase={content.isAfterSkeleton ? "revealed" : "ready"} skeleton={null}>
+      <InspectedCell inspection={content.inspection} onClose={onClose} {...cell} />
+    </SkeletonSlot>
+  );
+};
+
+// La pill garde ce qu'elle a montré : elle s'efface avec à la fermeture, et une autre case la remplace par un morphing sans
+// qu'elle disparaisse (maquette). À la première ouverture, une réponse qui tarde plus de 200 ms ouvre la pill sur un
+// squelette ; avant, elle reste fermée et s'ouvre directement sur la case (pill-content.ts).
+const usePillState = (inspection: Inspection | null): PillState => {
+  const isWaited = useAfterDelay(inspection?.status === "loading", SKELETON_DELAY_MS);
+  const previous = useRef(NOTHING_SHOWN);
+  const state = toPillState(inspection, isWaited, previous.current);
   useEffect(() => {
-    wasVisible.current = isVisible;
-    if (current) setLastShown(current);
-  }, [isVisible, current]);
-  return { shown: current ?? lastShown, isVisible };
+    previous.current = state;
+  });
+  return state;
 };
 
 export const InspectionPill = ({
@@ -185,20 +228,18 @@ export const InspectionPill = ({
   moderation,
   isDocked = true,
 }: InspectionPillProps) => {
-  const { shown, isVisible } = useShownInspection(inspection);
-  if (!inspection && !shown) return null;
+  const { content, isVisible } = usePillState(inspection);
+  if (!content) return null;
   return (
     <Pill dock={isDocked ? DOCK : undefined} layout="stack" isVisible={isVisible}>
-      {shown && (
-        <InspectedCell
-          inspection={shown}
-          palette={palette}
-          nowMs={nowMs}
-          onClose={onClose}
-          report={report}
-          moderation={moderation}
-        />
-      )}
+      <PillBody
+        content={content}
+        palette={palette}
+        nowMs={nowMs}
+        onClose={onClose}
+        report={report}
+        moderation={moderation}
+      />
     </Pill>
   );
 };

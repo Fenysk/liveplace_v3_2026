@@ -4,6 +4,7 @@
 
 import { type Timestamp, toStateOffset } from "@liveplace/domain";
 import type { BroadcastCell, CellsFrame, StreamCell } from "@liveplace/protocol";
+import type { ArrivedPixel } from "./canvas-store";
 
 // Une case qui attend : sa couleur, sa date de pose, et la version qui l'a mise là.
 type WaitingCell = { offset: number; colorIndex: number; placedAt: Timestamp; version: number };
@@ -66,14 +67,29 @@ export function queueRecent(queue: ObsQueue, recent: CellsFrame, nowMs: Timestam
   queueCells(queue, recent, nowMs, delayMs);
 }
 
-// Ce qui est dû paraît, dans l'ordre de pose : sur une case, la dernière pose l'emporte. Rend le nombre de cases.
-export function showDueCells(queue: ObsQueue, nowMs: Timestamp, delayMs: number): number {
+// Ce qui est dû paraît, dans l'ordre de pose : sur une case, la dernière pose l'emporte. Rend ce qui change l'image du stream,
+// un lot par version (la pose d'un joueur), avec la couleur que chaque case montrait : la vue OBS les anime comme le jeu.
+// Une modération est immédiate (règle 2) : elle n'y passe jamais.
+export function showDueCells(queue: ObsQueue, nowMs: Timestamp, delayMs: number): ArrivedPixel[][] {
   const due = queue.waiting.filter((waiting) => showAt(waiting, delayMs) <= nowMs);
-  if (due.length === 0) return 0;
+  if (due.length === 0) return [];
   queue.waiting = queue.waiting.filter((waiting) => showAt(waiting, delayMs) > nowMs);
   due.sort((left, right) => left.placedAt - right.placedAt || left.version - right.version);
-  for (const { offset, colorIndex } of due) queue.shown[offset] = colorIndex;
-  return due.length;
+  const lots = new Map<number, ArrivedPixel[]>();
+  for (const { offset, colorIndex, version } of due) {
+    const previousColorIndex = queue.shown[offset] ?? 0;
+    queue.shown[offset] = colorIndex;
+    if (previousColorIndex === colorIndex) continue;
+    const lot = lots.get(version) ?? [];
+    lot.push({
+      x: offset % queue.width,
+      y: Math.floor(offset / queue.width),
+      colorIndex,
+      previousColorIndex,
+    });
+    lots.set(version, lot);
+  }
+  return [...lots.values()];
 }
 
 // L'heure de la prochaine case à paraître : un seul minuteur pour toute la file.

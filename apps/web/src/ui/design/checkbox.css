@@ -10,12 +10,51 @@
   cursor: pointer;
 }
 
+/* La case native, sans son apparence : la coche se dessine dessus, et c'est elle qui paraît en fondu */
+.lp-checkbox-box {
+  flex: none;
+  display: inline-grid;
+}
+
 .lp-checkbox input {
+  appearance: none;
+  grid-area: 1 / 1;
+  box-sizing: border-box;
   width: 18px;
   height: 18px;
   margin: 0;
-  accent-color: var(--accent);
+  border: 2px solid var(--muted);
+  border-radius: 4px;
+  background: transparent;
   cursor: pointer;
+  transition:
+    background var(--lp-dur-fast) var(--lp-ease),
+    border-color var(--lp-dur-fast) var(--lp-ease);
+}
+
+.lp-checkbox input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.lp-checkbox-tick {
+  grid-area: 1 / 1;
+  place-self: center;
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+  color: var(--on-accent);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity var(--lp-dur-fast) var(--lp-ease),
+    transform var(--lp-dur-fast) var(--lp-ease);
+}
+
+.lp-checkbox input:checked + .lp-checkbox-tick {
+  opacity: 1;
+  transform: none;
 }
 
 .lp-checkbox:has(input:disabled) {

@@ -54,3 +54,18 @@ export function createCanvasImage(): CanvasImage {
     },
   };
 }
+
+// Un niveau de la mosaïque (mosaic.ts) : un pixel par bloc, `ceil(largeur / bloc)` sur `ceil(hauteur / bloc)`, en RGBA.
+export type MosaicLevel = { width: number; height: number; rgba: Uint8ClampedArray<ArrayBuffer> };
+
+// Les niveaux de la mosaïque, chacun dans son image hors écran : un pixel par bloc, agrandi sans lissage à l'écran.
+export const toLevelCanvases = (levels: readonly MosaicLevel[]): HTMLCanvasElement[] =>
+  levels.map(({ width, height, rgba }) => {
+    const level = document.createElement("canvas");
+    level.width = width;
+    level.height = height;
+    const context = level.getContext("2d");
+    if (!context) throw new Error("canvas-image : contexte 2d indisponible");
+    context.putImageData(new ImageData(rgba, width, height), 0, 0);
+    return level;
+  });
