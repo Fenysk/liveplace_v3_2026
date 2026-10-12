@@ -7,7 +7,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(HELP_TEXTS.fr.trace).toBe("Active le tracé pour dessiner en glissant");
     expect(HELP_TEXTS.fr.reward).toBe("Une récompense t'attend : +1 sur ta jauge max");
     expect(HELP_TEXTS.fr.obs).toBe("Ajoute ta fresque à OBS ici");
-    expect(HELP_TEXTS.fr.report).toBe("Un pixel a été signalé");
+    expect(HELP_TEXTS.fr.report).toBe("Un dessin a été signalé");
   });
 
   // Au doigt on touche, à la souris on clique : le verbe suit l'écran
@@ -21,7 +21,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   // Une charge toutes les 10 s : les chiffres du canvas, au singulier
   it("tells the refill of the canvas, in the singular for one pixel", () => {
     expect(HELP_TEXTS.fr.gauge({ refillMs: 10_000, refillCharges: 1 })).toBe(
-      "Ta jauge se recharge toute seule : un pixel toutes les 10 s",
+      "Ta jauge se recharge toute seule : 1 pixel toutes les 10 s",
     );
   });
 
@@ -54,7 +54,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
 describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => {
   // Chaque bulle a sa phrase anglaise, directe comme la française
   it("says every bubble in English", () => {
-    expect(HELP_TEXTS.en.report).toBe("A pixel was reported");
+    expect(HELP_TEXTS.en.report).toBe("A drawing was reported");
     expect(HELP_TEXTS.en.obs).toBe("Add your canvas to OBS here");
     expect(HELP_TEXTS.en.obsTab).toBe("Your OBS address is in this tab");
     expect(HELP_TEXTS.en.obsAddress).toBe("Copy this address and paste it into OBS");
@@ -73,7 +73,7 @@ describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => 
   // Le rythme de la recharge, au singulier et au pluriel, ou rien avant les chiffres du canvas
   it("tells the refill of the gauge in English, without inventing a figure", () => {
     expect(HELP_TEXTS.en.gauge({ refillMs: 10_000, refillCharges: 1 })).toBe(
-      "Your gauge refills on its own: one pixel every 10 s",
+      "Your gauge refills on its own: 1 pixel every 10 s",
     );
     expect(HELP_TEXTS.en.gauge({ refillMs: 30_000, refillCharges: 3 })).toBe(
       "Your gauge refills on its own: 3 pixels every 30 s",

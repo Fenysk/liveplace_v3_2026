@@ -576,8 +576,8 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
       ),
     ).join("");
 
-    expect(lines).toContain("A pixel was reported");
-    expect(lines).toContain("Your gauge refills on its own: one pixel every 10 s");
+    expect(lines).toContain("A drawing was reported");
+    expect(lines).toContain("Your gauge refills on its own: 1 pixel every 10 s");
     expect(lines).toContain("Tap the canvas to prepare your drawing, then Confirm to send it");
     expect(lines).toContain("Turn on Trace to draw by dragging");
     expect(lines).not.toMatch(/Ajoute|Copie|Active|récompense|jauge/);

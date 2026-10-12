@@ -96,6 +96,24 @@ export const isClosedBy = (bubble: HelpBubble, closing: Closing): boolean =>
 export const isDone = (bubble: HelpBubble, facts: HelpFacts): boolean =>
   isClosedBy(bubble, "done") && !isWished(bubble, facts);
 
+// Écart §8.1 (JOURNAL 2026-10-12) : après l'action qui la ferme, une bulle de tutoriel peut rester le temps d'être lue. La même durée
+// que le dernier point du conseil de première visite : une seule constante.
+export const BUBBLE_LINGER_MS = 2000;
+
+// Les bulles qui restent, chacune tant que ce qu'elle désigne est à l'écran : sortir du Dessin emporte Valider, et sa bulle part
+// aussitôt. Les autres partent dès l'action (l'écran suivant prend le relais, ou l'action se voit : le +1 réclamé, le Tracé touché).
+const LINGERS_WHILE: Partial<Record<HelpBubble, (facts: HelpFacts) => boolean>> = {
+  "first-draft": ({ pill }) => pill === "draft",
+  "empty-gauge": ({ pill }) => pill !== undefined,
+};
+
+// La bulle montrée est close (l'action suivante l'a vue, ou ce qu'elle disait n'est plus vrai) et reste à l'écran.
+export const isLingering = (
+  bubble: HelpBubble,
+  facts: HelpFacts,
+  isSeen: (bubble: HelpBubble) => boolean,
+): boolean => (isSeen(bubble) || isDone(bubble, facts)) && LINGERS_WHILE[bubble]?.(facts) === true;
+
 // Ouvrir la fenêtre sur la section qui répond à la bulle la fait trouver : elle n'a plus rien à dire. Ouvrir Vue OBS, c'est aussi
 // avoir trouvé son onglet : un streamer qui y va directement saute la bulle de l'onglet.
 const FOUND_IN_SECTION: Readonly<Record<string, readonly HelpBubble[]>> = {

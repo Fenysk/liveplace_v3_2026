@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isInsideClips, placeBubble, positionBubble } from "./bubble-position";
+import {
+  isInsideClips,
+  MIN_SQUEEZED_WIDTH,
+  placeBubble,
+  positionBubble,
+  squeezedWidth,
+} from "./bubble-position";
 
 const screen = { width: 375, height: 812 };
 const bubble = { width: 200, height: 60 };
@@ -121,6 +127,62 @@ describe("où poser une bulle d'aide contre la pill de sa cible (Écart §8.1, J
     expect(placeBubble(anchor, anchor, pill, tiny, margin, arrowSpace).side).toBe("above");
     expect(placeBubble(anchor, { ...anchor, top: 50 }, pill, tiny, margin, arrowSpace).side).toBe("above");
     expect(placeBubble(anchor, { ...anchor, top: 20 }, pill, tiny, margin, arrowSpace).side).toBe("below");
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-12) : un téléphone couché étroit (667 × 375) ou un pliable : la pill est une colonne contre le bord droit,
+// et le texte d'une ligne (415 px) ne tient ni dessus ni dessous, ni à sa gauche. La bulle se resserre au lieu de la couvrir.
+describe("une bulle à l'étroit se resserre au lieu de couvrir la pill (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  const narrow = { width: 667, height: 375 };
+  const panel = { left: 339, top: 8, width: 320, height: 359 };
+  const wide = { width: 415, height: 42 };
+
+  // Aucun côté ne tient à 415 px : la bulle prend la place qu'il y a à gauche du panneau, moins la marge et la flèche
+  it("takes the width the left of the panel leaves when no side fits the text on one line", () => {
+    expect(squeezedWidth(panel, wide, narrow, margin, arrowSpace)).toBe(319);
+  });
+
+  // Une fois resserrée, elle tient à gauche : la même pill à la largeur rendue se pose à gauche, sans couvrir le panneau
+  it("then fits to the left of the panel, without covering it", () => {
+    const squeezed = { width: 319, height: 78 };
+    const placement = placeBubble(
+      { ...panel, top: 14, height: 44 },
+      panel,
+      squeezed,
+      narrow,
+      margin,
+      arrowSpace,
+    );
+
+    expect(placement.side).toBe("left");
+    expect(placement.left + squeezed.width + arrowSpace).toBeLessThanOrEqual(panel.left);
+  });
+
+  // Un côté tient à la largeur du texte : rien à resserrer
+  it("squeezes nothing when a side fits the text on one line", () => {
+    expect(
+      squeezedWidth({ left: 492, top: 8, width: 312, height: 359 }, wide, landscape, margin, arrowSpace),
+    ).toBeUndefined();
+    expect(
+      squeezedWidth({ left: 15, top: 600, width: 345, height: 200 }, pill, screen, margin, arrowSpace),
+    ).toBeUndefined();
+  });
+
+  // Trop étroit pour y lire (moins de MIN_SQUEEZED_WIDTH) : elle ne se resserre pas, elle garde le côté qui déborde le moins
+  it("keeps its width when the room left is too narrow to read", () => {
+    const column = { left: 150, top: 8, width: 300, height: 359 };
+
+    expect(squeezedWidth(column, wide, narrow, margin, arrowSpace)).toBeUndefined();
+    expect(MIN_SQUEEZED_WIDTH).toBe(200);
+  });
+
+  // Le côté le plus large des deux, parmi ceux qu'on lui laisse : à droite d'une colonne à gauche, jamais à gauche si on l'interdit
+  it("takes the wider of the left and right sides, and only among the sides it was given", () => {
+    const column = { left: 8, top: 8, width: 320, height: 359 };
+
+    expect(squeezedWidth(column, wide, narrow, margin, arrowSpace)).toBe(319);
+    expect(squeezedWidth(column, wide, narrow, margin, arrowSpace, ["left"])).toBeUndefined();
+    expect(squeezedWidth(column, wide, narrow, margin, arrowSpace, ["right"])).toBe(319);
   });
 });
 

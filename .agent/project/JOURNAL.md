@@ -32,6 +32,18 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-12 — Écart §8.1 (amende celui du 08/10 sur les bulles d'aide) : l'élément visé porte un anneau le temps de la bulle, et une bulle à l'étroit se resserre au lieu de couvrir la pill
+
+**Contexte.** Alexis, sur téléphone : « Active le tracé pour dessiner en glissant » pointe la pill Dessin, pas le bouton Tracé ; de même Valider, la jauge, le +1. Mesuré sur la vraie page (375×812 tactile, puis 812×375) : la flèche est centrée sur sa cible à 0 px près, mais s'arrête contre la pill, à 36 px de Valider et 140 px du Tracé (feuille de trois rangées, Tracé sous Valider dans la même colonne ; en paysage, la flèche vise le bord du panneau à la hauteur de la rangée, devant la jauge ou la gomme). C'est le choix du 08/10 (pas de flèche longue : elle couvrirait les couleurs), pas une erreur de mesure. Et à 667×375 comme sur un pliable de 700×820, aucun côté ne tient à la largeur du texte : la bulle se pose dessus et recouvre le haut de la pill.
+**Décision.** `Bubble` pose `data-aimed` sur l'élément visé tant qu'elle est montrée, et `bubble.css` l'entoure de l'anneau du focus (2 px, décalé de 2 px, `--focus-ring`), qui paraît et part en fondu avec elle. La flèche reste contre la pill, à la colonne ou à la rangée du bouton ; l'anneau marque le bouton. Sans côté qui tienne, `squeezedWidth` (`bubble-position.ts`) resserre la bulle à la place que laisse un côté, 200 px au moins : son texte passe à la ligne, et elle ne couvre plus la pill.
+**Renoncement.** Une flèche prolongée jusqu'au bouton : en clair elle se fond dans la pill, et elle traverse Valider ou les couleurs ; la bulle posée sur les couleurs ; un halo qui pulse (les animations se choisissent sur un aperçu jouable) ; une bulle resserrée sous 200 px (elle couvre alors la pill, comme avant).
+
+## 2026-10-12 — Écart §8.1 (amende celui du 08/10 sur les bulles d'aide) : `first-draft` et `empty-gauge` restent 2 s après l'action qui les ferme
+
+**Contexte.** Alexis, après son test : la fin de « Valider l'envoie » ne se lit pas quand la bulle part à la première case, et la bulle de la jauge explique une recharge qui arrive pendant qu'on la lit. Le CDC 2026 les fait partir à l'action qui les ferme (`press` ou `done`).
+**Décision.** Une bulle le déclare dans `LINGERS_WHILE` (`state/help-bubbles.ts`), une ligne avec sa condition « ce qu'elle désigne est encore à l'écran » : `first-draft` (en Dessin), `empty-gauge` (une pill). Close, elle reste `BUBBLE_LINGER_MS` (2 000 ms, la durée du dernier point du conseil de première visite : une seule constante, `HINT_CLOSE_BEAT_MS` disparaît) ; pendant ce temps aucune autre bulle ne paraît, puis elle part en fondu. Sa cible quitte l'écran (sortie du Dessin), inspection ou fenêtre ouverte : elle part aussitôt. Les six autres partent comme avant. L'ordre d'affichage (une seule, un fondu entre deux) quitte `useAfterFade` pour `state/shown-bubble.ts`, un état à horloge injectée que les tests avancent sans attendre.
+**Renoncement.** Une durée par bulle (une constante suffit) ; une bulle qui reste sans condition de cible (elle resterait sur un bouton disparu) ; le test du minuteur dans le hook (il ne tient que par l'état).
+
 ## 2026-10-11 — Écart §11.7 : chaque lancement de tests a son propre Redis, jetable, dans Docker
 
 **Contexte.** Tous les tests de toutes les séances partageaient la base 15 du Redis de dev : jusqu'à 5 gates en même temps s'effaçaient la file `twitch:commands`, et saturaient la machine au point que Docker se figeait plusieurs secondes (un Redis à vide aussi) et que des tests dépassaient leurs 5 s, dont celui des 5 000 cases. Deux échecs au hasard.

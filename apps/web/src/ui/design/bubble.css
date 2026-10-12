@@ -4,6 +4,11 @@
 .lp-bubble {
   /* La flèche pointe la cible depuis le bas ; elle ne sort jamais de la partie droite du bord (le rayon de la pill) */
   --lp-bubble-inset: calc(var(--control-size) / 2 + var(--space-2));
+  /* À gauche ou à droite, la pill resserre ses deux coins du côté de la flèche : son bord est droit sur toute la base de la flèche,
+     comme dessus et dessous, et la flèche s'y pose sans raccord à refaire sur un arc */
+  --lp-bubble-side-radius: var(--space-2);
+  /* La flèche ne sort jamais de la partie droite de ce bord : le rayon, la demi-base de la flèche, et une marge */
+  --lp-bubble-side-inset: calc(var(--lp-bubble-side-radius) + var(--space-2) + 2px);
   /* La place qu'a le contenu : une longueur absolue, que le texte respecte en passant à la ligne (comme --lp-theme-room) */
   --lp-bubble-room: calc(100vw - 2 * var(--space-4));
   /* Elle paraît et part en glissant d'un cran vers la cible, d'où qu'elle soit posée */
@@ -143,6 +148,28 @@
   flex: 1 1 auto;
 }
 
+/* Tant que la bulle est montrée, l'élément qu'elle désigne (`data-aimed`, posé par bubble.tsx) porte l'anneau du focus : sa flèche
+   s'arrête contre la pill qui le porte, à sa colonne ou à sa rangée, et l'anneau marque le bouton (Écart §8.1, JOURNAL 2026-10-12).
+   Il paraît et part en fondu avec elle. */
+.lp-bubble-target {
+  position: relative;
+}
+
+.lp-bubble-target::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--space-1));
+  border: 2px solid var(--focus-ring);
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--lp-dur-fade) ease;
+}
+
+.lp-bubble-target[data-aimed]::after {
+  opacity: 1;
+}
+
 /* La flèche : un triangle contre la pill, de sa couleur et de son contour (le filet du mode sombre). Au-dessus de la cible,
    il est sous la pill et pointe vers le bas ; elle se tourne avec le côté. */
 .lp-bubble-arrow {
@@ -177,10 +204,24 @@
   clip-path: polygon(50% 1.5px, 1px 100%, calc(100% - 1px) 100%);
 }
 
-/* À gauche ou à droite : la flèche longe un bord vertical, et se place en y */
+/* À gauche ou à droite : la pill resserre ses deux coins du côté de la flèche, qui longe un bord vertical et se place en y */
+.lp-bubble[data-side="left"] > .lp-pill {
+  border-top-right-radius: var(--lp-bubble-side-radius);
+  border-bottom-right-radius: var(--lp-bubble-side-radius);
+}
+
+.lp-bubble[data-side="right"] > .lp-pill {
+  border-top-left-radius: var(--lp-bubble-side-radius);
+  border-bottom-left-radius: var(--lp-bubble-side-radius);
+}
+
 .lp-bubble[data-side="left"] .lp-bubble-arrow,
 .lp-bubble[data-side="right"] .lp-bubble-arrow {
-  top: clamp(var(--lp-bubble-inset), var(--lp-bubble-arrow-y, 50%), calc(100% - var(--lp-bubble-inset)));
+  top: clamp(
+    var(--lp-bubble-side-inset),
+    var(--lp-bubble-arrow-y, 50%),
+    calc(100% - var(--lp-bubble-side-inset))
+  );
   bottom: auto;
   width: var(--space-2);
   height: calc(2 * var(--space-2));

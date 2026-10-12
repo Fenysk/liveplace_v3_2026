@@ -4,10 +4,9 @@
 import { type FirstHintView, HINT_STEPS } from "../../state/first-hint";
 import type { FirstHintProps } from "./first-hint";
 
-// Une visite regarde le canvas un moment avant que la bulle paraisse ; le dernier point reste rempli deux secondes avant son
-// fondu (Écart §8.1, JOURNAL 2026-10-09).
+// Une visite regarde le canvas un moment avant que la bulle paraisse ; le dernier point reste rempli `BUBBLE_LINGER_MS` avant son
+// fondu (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12).
 export const HINT_SHOW_DELAY_MS = 1200;
-export const HINT_CLOSE_BEAT_MS = 2000;
 
 export type HintAside = {
   isReady: boolean; // le canvas est affiché depuis un moment

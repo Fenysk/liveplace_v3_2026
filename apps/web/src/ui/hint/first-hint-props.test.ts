@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FirstHintView } from "../../state/first-hint";
-import {
-  type FirstHintContext,
-  HINT_CLOSE_BEAT_MS,
-  type HintAside,
-  isHintBeating,
-  toFirstHintProps,
-} from "./first-hint-props";
+import { BUBBLE_LINGER_MS } from "../../state/help-bubbles";
+import { type FirstHintContext, type HintAside, isHintBeating, toFirstHintProps } from "./first-hint-props";
 
 const ready: FirstHintContext = {
   isReady: true,
@@ -72,7 +67,7 @@ describe("ce que montre le conseil de première visite (Écart §8.1, JOURNAL 20
 
   // Les trois points restent remplis deux secondes (Écart §8.1, JOURNAL 2026-10-09)
   it("keeps the last dot filled for two seconds", () => {
-    expect(HINT_CLOSE_BEAT_MS).toBe(2000);
+    expect(BUBBLE_LINGER_MS).toBe(2000);
   });
 });
 

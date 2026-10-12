@@ -6,11 +6,12 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import { createFirstHint, type FirstHintView, type HintStep } from "../../state/first-hint";
+import { BUBBLE_LINGER_MS } from "../../state/help-bubbles";
 import { useAfterDelay } from "../design/use-after-delay";
 import { TOUCH_SCREEN_QUERY } from "../design/use-media-query";
 import { seenBubbles } from "../design/use-seen-bubble";
 import type { FirstHintProps } from "./first-hint";
-import { HINT_CLOSE_BEAT_MS, HINT_SHOW_DELAY_MS, isHintBeating, toFirstHintProps } from "./first-hint-props";
+import { HINT_SHOW_DELAY_MS, isHintBeating, toFirstHintProps } from "./first-hint-props";
 
 const firstHint = createFirstHint({
   seen: seenBubbles,
@@ -28,7 +29,7 @@ const useHintSettled = (isBeating: boolean): boolean => {
   const [isSettled, setIsSettled] = useState(false);
   useEffect(() => {
     if (!isBeating || isSettled) return;
-    const timer = setTimeout(() => setIsSettled(true), HINT_CLOSE_BEAT_MS);
+    const timer = setTimeout(() => setIsSettled(true), BUBBLE_LINGER_MS);
     return () => clearTimeout(timer);
   }, [isBeating, isSettled]);
   return isSettled;

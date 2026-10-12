@@ -41,14 +41,11 @@ export function everyText(ms: number, locale: Locale): string {
   return `${prefix}${parts.join(" ")}`;
 }
 
-// Un pixel, ou plusieurs quand la recharge en rend plusieurs d'un coup.
-const PIXELS: Localized<(count: number) => string> = {
-  fr: (count) => (count === 1 ? "un pixel" : `${count} pixels`),
-  en: (count) => (count === 1 ? "one pixel" : `${count} pixels`),
-};
+// Ce que rend une recharge : « 1 pixel » ou « 3 pixels », le nombre en chiffres dans les deux langues.
+const pixelsText = (count: number): string => `${count} ${count === 1 ? "pixel" : "pixels"}`;
 
 export const HELP_TEXTS = defineTexts({
-  report: { fr: "Un pixel a été signalé", en: "A pixel was reported" },
+  report: { fr: "Un dessin a été signalé", en: "A drawing was reported" },
   obs: { fr: "Ajoute ta fresque à OBS ici", en: "Add your canvas to OBS here" },
   // La suite de la chaîne OBS, dans la fenêtre (Écart §8.1, JOURNAL 2026-10-09) : l'onglet, puis l'adresse.
   obsTab: { fr: "Ton adresse OBS est dans cet onglet", en: "Your OBS address is in this tab" },
@@ -74,11 +71,11 @@ export const HELP_TEXTS = defineTexts({
   gauge: localized({
     fr: (refill: Refill | undefined) =>
       refill
-        ? `Ta jauge se recharge toute seule : ${PIXELS.fr(refill.refillCharges)} ${everyText(refill.refillMs, "fr")}`
+        ? `Ta jauge se recharge toute seule : ${pixelsText(refill.refillCharges)} ${everyText(refill.refillMs, "fr")}`
         : "Ta jauge se recharge toute seule",
     en: (refill) =>
       refill
-        ? `Your gauge refills on its own: ${PIXELS.en(refill.refillCharges)} ${everyText(refill.refillMs, "en")}`
+        ? `Your gauge refills on its own: ${pixelsText(refill.refillCharges)} ${everyText(refill.refillMs, "en")}`
         : "Your gauge refills on its own",
   }),
 });

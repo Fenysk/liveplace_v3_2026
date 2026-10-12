@@ -4,13 +4,13 @@
 import { Brush, Eraser, Pipette, Pointer, Trash } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { HINT_STEPS } from "../../state/first-hint";
+import { BUBBLE_LINGER_MS } from "../../state/help-bubbles";
 import { Bubble, BubbleLine } from "../design/bubble";
 import { Button } from "../design/button";
 import { Pill } from "../design/pill";
 import { DraftPill } from "../draft/draft-pill";
 import { HELP_TEXTS } from "../help/help-texts";
 import { FirstHint } from "../hint/first-hint";
-import { HINT_CLOSE_BEAT_MS } from "../hint/first-hint-props";
 import { noop } from "./design-fixtures";
 import { Block, Entry, InLandscape, InPhone, StateRow, useNowMs } from "./entry-layout";
 import { DRAFT_ACTIONS, gaugeAt } from "./game-entries";
@@ -42,7 +42,7 @@ const AimedTool = ({ aimed }: { aimed: ToolName }) => {
       </Bubble>
       <Pill>
         {TOOLS.map(({ name, icon, title }) => (
-          <span key={name} ref={name === aimed ? target : undefined}>
+          <span key={name} className="lp-bubble-target" ref={name === aimed ? target : undefined}>
             <Button icon={icon} variant="ghost" title={title} onPress={noop} />
           </span>
         ))}
@@ -94,7 +94,7 @@ const HintDemo = () => {
   const isFinished = doneCount === HINT_STEPS.length;
   useEffect(() => {
     if (!isFinished) return;
-    const timer = setTimeout(() => setIsVisible(false), HINT_CLOSE_BEAT_MS);
+    const timer = setTimeout(() => setIsVisible(false), BUBBLE_LINGER_MS);
     return () => clearTimeout(timer);
   }, [isFinished]);
   const advance = () => {

@@ -394,7 +394,7 @@
   align-items: flex-end;
 }
 
-/* Une colonne et sa bulle côte à côte : la flèche vise la première des cibles */
+/* Une colonne et sa bulle côte à côte */
 .design-bubble-row {
   display: flex;
   align-items: flex-start;

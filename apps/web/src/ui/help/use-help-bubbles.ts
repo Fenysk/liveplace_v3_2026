@@ -1,6 +1,6 @@
 // Ce que montrent les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08) : quelle bulle, à cet instant, et quand elle se clôt.
 // Les stores et la pill Dessin disent ce que l'écran demande (`HelpFacts`) ; l'état pur choisit une seule bulle, la plus
-// prioritaire ; la page lui laisse le temps de paraître, et la précédente de s'effacer avant elle.
+// prioritaire ; `state/shown-bubble.ts` lui laisse le temps de paraître, et la précédente de s'effacer avant elle.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
@@ -15,10 +15,12 @@ import {
   isClosedBy,
   isDone,
   isInWindow,
+  isLingering,
   isWished,
   OBS_CHAIN,
   pickHelpBubble,
 } from "../../state/help-bubbles";
+import { createShownBubble, type ShownBubbleClock } from "../../state/shown-bubble";
 import type { NavigationKind } from "../canvas/navigation-watch";
 import { motionMs } from "../design/motion";
 import { useAfterDelay } from "../design/use-after-delay";
@@ -38,18 +40,31 @@ export const recordDraftPan = (kind: NavigationKind, draft: DraftStore): void =>
 
 const getNotPanned = (): boolean => false;
 
-// La bulle voulue attend que celle qui était là ait fini son fondu : jamais deux à l'écran.
-const useAfterFade = (wanted: HelpBubble | undefined): HelpBubble | undefined => {
-  const [shown, setShown] = useState<HelpBubble>();
-  useEffect(() => {
-    if (wanted === shown) return;
-    if (shown !== undefined) {
-      setShown(undefined);
-      return;
-    }
-    const timer = setTimeout(() => setShown(wanted), motionMs(document.documentElement, "--lp-dur-fade"));
+const bubbleClock: ShownBubbleClock = {
+  wait: (ms, run) => {
+    const timer = setTimeout(run, ms);
     return () => clearTimeout(timer);
-  }, [wanted, shown]);
+  },
+};
+
+const getNoBubble = (): HelpBubble | undefined => undefined;
+
+// La bulle voulue attend que celle qui était là ait fini son fondu : jamais deux à l'écran. Une bulle close qui reste (Écart §8.1,
+// JOURNAL 2026-10-12) garde sa place le temps d'être lue ; `canLinger` le dit pour la bulle montrée.
+const useShownBubble = (
+  wanted: HelpBubble | undefined,
+  canLinger: (shown: HelpBubble) => boolean,
+): HelpBubble | undefined => {
+  const [store] = useState(() =>
+    createShownBubble({
+      clock: bubbleClock,
+      fadeMs: () => motionMs(document.documentElement, "--lp-dur-fade"),
+    }),
+  );
+  const shown = useSyncExternalStore(store.subscribe, store.getShown, getNoBubble);
+  const isHolding = shown !== undefined && canLinger(shown);
+  useEffect(() => store.follow(wanted, isHolding), [store, wanted, isHolding]);
+  useEffect(() => store.dispose, [store]);
   return shown;
 };
 
@@ -125,7 +140,11 @@ export function useHelpBubbles(
     pending !== undefined && isInWindow(pending)
       ? isLive && isWindowSettled
       : isLive && view.inspection === null && openWindows === 0;
-  const shown = useAfterFade(canShow ? pending : undefined);
+  // Inspection ou fenêtre ouverte, connexion coupée : elle part aussitôt, sans rester.
+  const shown = useShownBubble(
+    canShow ? pending : undefined,
+    (bubble) => canShow && isLingering(bubble, facts, isSeen),
+  );
   usePressClosing(shown);
   useDoneClosing(shown, facts);
   // Quitter le Dessin efface le glissement : la prochaine occasion repart de zéro.

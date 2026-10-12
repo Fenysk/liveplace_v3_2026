@@ -28,12 +28,12 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
   it("says the validated words of each bubble, with a silent icon", () => {
     const texts = HELP_BUBBLES.map((bubble) => lineOf(bubble, true));
 
-    expect(texts[0]).toContain("Un pixel a été signalé");
+    expect(texts[0]).toContain("Un dessin a été signalé");
     expect(texts[1]).toContain("Ajoute ta fresque à OBS ici");
     expect(texts[2]).toContain("Ton adresse OBS est dans cet onglet");
     expect(texts[3]).toContain("Copie cette adresse, colle-la dans OBS");
     expect(texts[4]).toContain("Une récompense t&#x27;attend : +1 sur ta jauge max");
-    expect(texts[5]).toContain("Ta jauge se recharge toute seule : un pixel toutes les 10 s");
+    expect(texts[5]).toContain("Ta jauge se recharge toute seule : 1 pixel toutes les 10 s");
     expect(texts[6]).toContain("Active le tracé pour dessiner en glissant");
     expect(texts[7]).toContain("Touche la fresque pour préparer ton dessin, Valider l&#x27;envoie");
     for (const markup of texts) expect(markup).toContain('aria-hidden="true"');

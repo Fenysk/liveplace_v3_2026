@@ -148,7 +148,8 @@ const HELP_SCENES: readonly HelpScene[] = [
   },
   {
     name: "Jauge vide, la première fois",
-    detail: "Les chiffres viennent de la fresque : sa recharge, au singulier.",
+    detail:
+      "Les chiffres viennent de la fresque : sa recharge, au singulier. Elle reste deux secondes après l'action qui la ferme (l'action suivante, ou une charge qui revient) : la recharge se lit pendant qu'elle arrive.",
     bubble: "empty-gauge",
     align: "start",
     content: viewBar(0, false),
@@ -173,7 +174,7 @@ const HELP_SCENES: readonly HelpScene[] = [
   {
     name: "Premier passage en Dessin, au doigt",
     detail:
-      "Flèche sur Valider : rien n'est posé avant. Elle s'efface au premier pixel du brouillon, ou en sortant du Dessin. En paysage et sur un pliable déplié, elle se pose à gauche du panneau et la bande Thème s'efface le temps de la bulle.",
+      "Flèche sur Valider : rien n'est posé avant. Elle reste deux secondes après le premier pixel du brouillon, le temps de lire sa fin, puis s'efface ; en sortant du Dessin, elle s'efface aussitôt. En paysage et sur un pliable déplié, elle se pose à gauche du panneau et la bande Thème s'efface le temps de la bulle.",
     bubble: "first-draft",
     align: "end",
     isPhone: true,
@@ -255,18 +256,27 @@ const TOOLS = [
   { icon: Trash, title: "Vider le brouillon" },
 ] as const;
 
-// Des boutons dans une pill, le premier visé : en rangée ou en colonne.
-const Tools = ({ target, layout }: { target: RefObject<HTMLSpanElement | null>; layout?: "rail" }) => (
+// Des boutons dans une pill, l'un d'eux visé (le premier par défaut) : en rangée ou en colonne.
+const Tools = ({
+  target,
+  layout,
+  aimed = 0,
+}: {
+  target: RefObject<HTMLSpanElement | null>;
+  layout?: "rail";
+  aimed?: number;
+}) => (
   <Pill layout={layout}>
     {TOOLS.map(({ icon, title }, index) => (
-      <span key={title} ref={index === 0 ? target : undefined}>
+      <span key={title} className="lp-bubble-target" ref={index === aimed ? target : undefined}>
         <Button icon={icon} variant="ghost" title={title} onPress={noop} />
       </span>
     ))}
   </Pill>
 );
 
-// Une colonne de boutons, avec une bulle à sa gauche ou à sa droite : la barre du bas en paysage (colonne à droite).
+// Une colonne de boutons, avec une bulle à sa gauche ou à sa droite : la barre du bas en paysage (colonne à droite). Comme dans le
+// jeu, la bulle est centrée sur sa cible : le bouton du milieu, au centre de la colonne.
 const Beside = ({ side }: { side: "left" | "right" }) => {
   const target = useRef<HTMLSpanElement>(null);
   const line = (
@@ -274,9 +284,9 @@ const Beside = ({ side }: { side: "left" | "right" }) => {
       <BubbleLine icon={Eraser}>La bulle se pose du côté où elle tient</BubbleLine>
     </Bubble>
   );
-  const column = <Tools target={target} layout="rail" />;
+  const column = <Tools target={target} layout="rail" aimed={1} />;
   return (
-    <div className="design-bubble-row">
+    <div className="design-bubble-row design-bubble-row--middle">
       {side === "left" ? (
         <>
           {line}
@@ -310,7 +320,7 @@ export const HelpBubbleBlocks = () => {
     <>
       <Block
         title="Bulles d'aide"
-        note="Huit conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément. Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf les deux de la chaîne OBS, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent."
+        note="Huit conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément. Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Deux restent deux secondes après l'action qui les ferme (la jauge vide, le premier passage en Dessin) tant que leur cible est à l'écran ; les six autres partent aussitôt. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf les deux de la chaîne OBS, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent. La flèche s'arrête contre la pill, à la colonne ou à la rangée du bouton : l'anneau du focus entoure le bouton visé tant que la bulle est montrée. Sans côté qui tienne à la largeur du texte (un téléphone couché étroit, un pliable), la bulle se resserre à la place d'un côté et son texte passe à la ligne."
       >
         {HELP_SCENES.map((scene) => (
           <HelpSceneRow key={scene.name} scene={scene} nowMs={nowMs} />

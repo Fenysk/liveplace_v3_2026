@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUBBLE_LINGER_MS,
   bubblesFoundIn,
   HELP_BUBBLES,
   type HelpBubble,
@@ -7,6 +8,7 @@ import {
   isClosedBy,
   isDone,
   isInWindow,
+  isLingering,
   isWished,
   OBS_CHAIN,
   pickHelpBubble,
@@ -253,5 +255,64 @@ describe("la chaîne des bulles OBS (Écart §8.1, JOURNAL 2026-10-09)", () => {
   it("keeps Réglages waiting for its gesture", () => {
     expect(isDone("obs-settings", owner)).toBe(false);
     expect(isDone("obs-settings", inWindow("canvas"))).toBe(false);
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-12) : deux bulles de tutoriel restent après l'action qui les ferme, tant que leur cible est à l'écran ;
+// les six autres partent aussitôt. Le temps qu'elles restent est une seule constante, celle du conseil de première visite.
+describe("les bulles qui restent après l'action qui les ferme (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  const alwaysSeen = () => true;
+
+  // Deux secondes, comme le dernier point du conseil de première visite
+  it("stays two seconds, the same time as the last dot of the first-visit hint", () => {
+    expect(BUBBLE_LINGER_MS).toBe(2000);
+  });
+
+  // La première case clôt le premier passage (`done`) : sa fin, « Valider l'envoie », se lit encore, en Dessin
+  it("keeps the first Draft pass after the first cell, while Draft is on screen", () => {
+    expect(isLingering("first-draft", { ...drafting, draftSize: 1 }, neverSeen)).toBe(true);
+    expect(isLingering("first-draft", { ...drafting, draftSize: 1 }, alwaysSeen)).toBe(true);
+  });
+
+  // Sortir du Dessin emporte Valider : la bulle part aussitôt, qu'une case ait été posée ou non
+  it("lets the first Draft pass go at once when Draft is left", () => {
+    expect(isLingering("first-draft", { ...resting, draftSize: 1 }, neverSeen)).toBe(false);
+    expect(isLingering("first-draft", resting, neverSeen)).toBe(false);
+  });
+
+  // La jauge : l'action suivante la ferme (elle est vue), ou une charge qui revient (`done`), elle explique la recharge qui arrive
+  it("keeps the empty gauge after the next press or once a charge is back, wherever the pill is", () => {
+    const empty = { ...resting, charges: 0 };
+    expect(isLingering("empty-gauge", empty, alwaysSeen)).toBe(true);
+    expect(isLingering("empty-gauge", { ...empty, pill: "draft", draftSize: 1 }, alwaysSeen)).toBe(true);
+    expect(isLingering("empty-gauge", { ...resting, charges: 1 }, neverSeen)).toBe(true);
+  });
+
+  // Plus de pill (connexion, invité, banni) : plus de jauge à désigner, la bulle part aussitôt
+  it("lets the empty gauge go at once when no pill shows the gauge any more", () => {
+    expect(isLingering("empty-gauge", { ...resting, charges: 1, pill: undefined }, neverSeen)).toBe(false);
+    expect(isLingering("empty-gauge", { ...resting, charges: 0, pill: undefined }, alwaysSeen)).toBe(false);
+  });
+
+  // Une bulle que l'écran demande encore n'est pas close : elle est montrée comme d'habitude
+  it("does not keep a bubble the screen still asks for", () => {
+    expect(isLingering("first-draft", drafting, neverSeen)).toBe(false);
+    expect(isLingering("empty-gauge", { ...resting, charges: 0 }, neverSeen)).toBe(false);
+  });
+
+  // Les six autres partent à l'action qui les ferme : l'écran suivant prend le relais, ou l'action se voit
+  it("lets the six others go at once, whatever the screen shows", () => {
+    const owner: HelpFacts = { ...drafting, role: "owner", charges: 0, canClaim: true, windowSection: "obs" };
+    const lingering = HELP_BUBBLES.filter((bubble) => isLingering(bubble, owner, alwaysSeen));
+
+    expect(lingering).toEqual(["empty-gauge", "first-draft"]);
+    expect(HELP_BUBBLES.filter((bubble) => !lingering.includes(bubble))).toEqual([
+      "pending-report",
+      "obs-settings",
+      "obs-tab",
+      "obs-address",
+      "first-reward",
+      "draft-trace",
+    ]);
   });
 });

@@ -120,6 +120,50 @@ describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
     }
   });
 
+  // Une pill d'une ligne est une gélule, dont le bord vertical est un demi-cercle : un triangle posé sur un arc fait un raccord cassé.
+  // À gauche ou à droite, la pill resserre ses deux coins du côté de la flèche : le bord est droit sur toute sa base, comme dessus
+  // et dessous, et la flèche s'y pose sans morsure ; ses bornes suivent ce rayon
+  it("straightens the edge on the arrow's side, so the arrow of a side bubble sits on it like the others", () => {
+    expect(bubbleCss).toMatch(/--lp-bubble-side-radius: var\(--space-2\);/);
+    expect(bubbleCss).toMatch(
+      /--lp-bubble-side-inset: calc\(var\(--lp-bubble-side-radius\) \+ var\(--space-2\) \+ \d+px\);/,
+    );
+    expect(bubbleCss).toMatch(
+      /top: clamp\(\s*var\(--lp-bubble-side-inset\),\s*var\(--lp-bubble-arrow-y, 50%\),\s*calc\(100% - var\(--lp-bubble-side-inset\)\)\s*\);/,
+    );
+    expect(bubbleCss).not.toContain("bite");
+    for (const [side, edge] of [
+      ["left", "right"],
+      ["right", "left"],
+    ]) {
+      const rule = new RegExp(
+        `\\.lp-bubble\\[data-side="${side}"\\] > \\.lp-pill \\{[^}]*border-top-${edge}-radius: var\\(--lp-bubble-side-radius\\);[^}]*border-bottom-${edge}-radius: var\\(--lp-bubble-side-radius\\);`,
+      );
+      expect(bubbleCss).toMatch(rule);
+    }
+  });
+
+  // Écart §8.1 (JOURNAL 2026-10-12) : sa flèche s'arrête contre la pill qui porte la cible ; l'élément visé porte l'anneau du focus
+  // tant que la bulle est montrée, qui paraît et part en fondu avec elle
+  it("rings the element it aims at while it is shown, and takes the ring away with it", () => {
+    expect(bubbleSource).toContain('const AIMED_ATTRIBUTE = "data-aimed";');
+    expect(bubbleSource).toContain('aimed.setAttribute(AIMED_ATTRIBUTE, "")');
+    expect(bubbleSource).toContain("observed.removeAttribute(AIMED_ATTRIBUTE)");
+    expect(bubbleSource).toContain("observed?.removeAttribute(AIMED_ATTRIBUTE)");
+    expect(bubbleCss).toMatch(
+      /\.lp-bubble-target::after\s*{[^}]*border: 2px solid var\(--focus-ring\);[^}]*opacity: 0;[^}]*transition: opacity var\(--lp-dur-fade\)/,
+    );
+    expect(bubbleCss).toMatch(/\.lp-bubble-target\[data-aimed\]::after\s*{[^}]*opacity: 1;/);
+    expect(render({ isVisible: true, hasTarget: true })).not.toContain("data-aimed");
+  });
+
+  // Aucun côté ne tient à la largeur du texte : la bulle se mesure à sa largeur naturelle, puis se resserre à ce que laisse un côté
+  it("is measured at its natural width, then squeezed to what a side leaves when none fits", () => {
+    expect(bubbleSource).toContain("element.style.removeProperty(ROOM_VARIABLE)");
+    expect(bubbleSource).toContain("squeezedWidth(anchorRect, natural, screen, margin, arrowSpace, sides)");
+    expect(bubbleSource).toContain("setVariable(element, ROOM_VARIABLE, squeezed)");
+  });
+
   // Écart §9.3 (JOURNAL 2026-10-09) : le bouton visé remplit son `<span>`, qui s'étire où le bouton seul s'étirerait
   // (la colonne latérale) : le +1 prend la place de Dessiner, comme lui, sans que le `<span>` y change rien
   it("lets the button it wraps fill the span, so the +1 stretches wherever Dessiner does", () => {

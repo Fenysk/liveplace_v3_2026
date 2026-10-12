@@ -36,6 +36,29 @@ const SIDES: readonly BubbleSide[] = ["above", "below", "left", "right"];
 
 const clamp = (value: number, low: number, high: number): number => Math.max(low, Math.min(value, high));
 
+const isBeside = (side: BubbleSide): boolean => side === "left" || side === "right";
+
+// La bulle avec sa flèche, du côté où elle se pose : plus haute dessus et dessous, plus large à gauche et à droite.
+type WithArrow = { vertical: BubbleSize; horizontal: BubbleSize };
+
+const withArrow = (pill: BubbleSize, arrowSpace: number): WithArrow => ({
+  vertical: { width: pill.width, height: pill.height + arrowSpace },
+  horizontal: { width: pill.width + arrowSpace, height: pill.height },
+});
+
+// La place libre de chaque côté de `anchor`, la bulle et sa flèche retranchées : négative, elle n'y tient pas.
+const roomAround = (
+  anchor: TargetRect,
+  { vertical, horizontal }: WithArrow,
+  screen: BubbleSize,
+  margin: number,
+): Record<BubbleSide, number> => ({
+  above: anchor.top - margin - vertical.height,
+  below: screen.height - margin - (anchor.top + anchor.height) - vertical.height,
+  left: anchor.left - margin - horizontal.width,
+  right: screen.width - margin - (anchor.left + anchor.width) - horizontal.width,
+});
+
 // `pill` : la surface de la bulle, sans sa flèche ; `arrowSpace` : ce que la flèche prend, du côté de la cible ; `sides` : les
 // seuls côtés essayés, dans l'ordre (Écart §8.1, JOURNAL 2026-10-09 : une rangée d'onglets se vise de dessous, une colonne de côté).
 export function placeBubble(
@@ -47,17 +70,11 @@ export function placeBubble(
   arrowSpace: number,
   sides: readonly BubbleSide[] = SIDES,
 ): BubblePlacement {
-  const vertical = { width: pill.width, height: pill.height + arrowSpace };
-  const horizontal = { width: pill.width + arrowSpace, height: pill.height };
+  const boxes = withArrow(pill, arrowSpace);
+  const { vertical, horizontal } = boxes;
   const anchorBottom = anchor.top + anchor.height;
   const anchorRight = anchor.left + anchor.width;
-  // La place libre de chaque côté, la bulle et sa flèche retranchées : négative, elle n'y tient pas.
-  const room = {
-    above: anchor.top - margin - vertical.height,
-    below: screen.height - margin - anchorBottom - vertical.height,
-    left: anchor.left - margin - horizontal.width,
-    right: screen.width - margin - anchorRight - horizontal.width,
-  };
+  const room = roomAround(anchor, boxes, screen, margin);
   // Aucun côté ne tient : celui qui déborde le moins.
   const side =
     sides.find((candidate) => room[candidate] >= 0) ??
@@ -78,6 +95,25 @@ export function placeBubble(
   const top =
     side === "above" ? above.top : clamp(anchorBottom, margin, screen.height - margin - vertical.height);
   return { side, left: above.left, top, arrow: above.arrowX };
+}
+
+// Écart §8.1 (JOURNAL 2026-10-12) : aucun côté ne tient à la largeur du texte (un téléphone couché étroit, un pliable) : au lieu
+// de couvrir la pill, la bulle se resserre à la place que laisse un côté, et son texte passe à la ligne. `undefined` : un côté tient
+// (les côtés essayés, comme pour `placeBubble`), ou la place est trop étroite pour y lire.
+export const MIN_SQUEEZED_WIDTH = 200;
+
+export function squeezedWidth(
+  anchor: TargetRect,
+  pill: BubbleSize,
+  screen: BubbleSize,
+  margin: number,
+  arrowSpace: number,
+  sides: readonly BubbleSide[] = SIDES,
+): number | undefined {
+  const room = roomAround(anchor, withArrow(pill, arrowSpace), screen, margin);
+  if (sides.some((side) => room[side] >= 0)) return undefined;
+  const widest = Math.max(...sides.filter(isBeside).map((side) => pill.width + room[side]));
+  return widest >= MIN_SQUEEZED_WIDTH ? widest : undefined;
 }
 
 // Écart §8.1 (JOURNAL 2026-10-09) : dans une fenêtre dont le corps défile, la cible peut passer sous un bord. Elle reste à la vue

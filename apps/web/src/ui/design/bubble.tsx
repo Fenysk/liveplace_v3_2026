@@ -3,7 +3,14 @@
 // Elle ne se montre qu'une fois : `useSeenBubble` la retient, et c'est l'appelant qui décide de quand l'afficher.
 
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
-import { type BubbleSide, isInsideClips, placeBubble, type TargetRect } from "./bubble-position";
+import {
+  type BubbleSide,
+  type BubbleSize,
+  isInsideClips,
+  placeBubble,
+  squeezedWidth,
+  type TargetRect,
+} from "./bubble-position";
 import type { ButtonIcon } from "./button";
 import { classNames } from "./class-names";
 import { motionMs } from "./motion";
@@ -24,11 +31,16 @@ const SPACE_SMALL_VARIABLE = "--space-1";
 const PILL_SELECTOR = ".lp-pill";
 const DOCK_SELECTOR = "[data-dock]";
 const WINDOW_SELECTOR = "dialog";
+// La place qu'a le contenu (bubble.css) : resserrée quand aucun côté ne tient à la largeur du texte.
+const ROOM_VARIABLE = "--lp-bubble-room";
 
 // Le dock de la pill visée : le CSS fait suivre à la bulle les pills du haut quand elles s'effacent (pill.css).
 const AIMED_DOCK_ATTRIBUTE = "data-aimed-dock";
 // L'élément visé est sorti du cadre qui le rogne (le corps de la fenêtre a défilé) : le CSS efface la bulle avec lui.
 const CLIPPED_ATTRIBUTE = "data-clipped";
+// L'élément visé porte un anneau tant que la bulle est montrée (Écart §8.1, JOURNAL 2026-10-12) : sa flèche s'arrête contre la pill
+// qui le porte, parfois loin de lui (bubble.css).
+const AIMED_ATTRIBUTE = "data-aimed";
 
 const setVariable = (element: HTMLElement, name: string, pixels: number) =>
   element.style.setProperty(name, `${pixels}px`);
@@ -58,14 +70,25 @@ const dockAtTarget = (element: HTMLElement, aimed: HTMLElement, { sides, isOverW
   if (!(pill instanceof HTMLElement)) return;
   const style = getComputedStyle(element);
   const margin = getSpace(style, SPACE_VARIABLE);
+  const arrowSpace = margin + getSpace(style, SPACE_SMALL_VARIABLE);
   const anchor = isOverWindow ? aimed : (aimed.closest(PILL_SELECTOR) ?? aimed);
+  const aimedRect = rectOf(aimed);
+  const anchorRect = rectOf(anchor);
+  const screen = { width: window.innerWidth, height: window.innerHeight };
+  const measure = (): BubbleSize => ({ width: pill.offsetWidth, height: pill.offsetHeight });
+  // Mesurée à sa largeur naturelle : le resserrement de la mesure d'avant ne compte pas. Aucun côté ne tient : elle se resserre
+  // à ce que laisse un côté, son texte passe à la ligne, et se mesure de nouveau, plus haute.
+  element.style.removeProperty(ROOM_VARIABLE);
+  const natural = measure();
+  const squeezed = squeezedWidth(anchorRect, natural, screen, margin, arrowSpace, sides);
+  if (squeezed !== undefined) setVariable(element, ROOM_VARIABLE, squeezed);
   const placement = placeBubble(
-    rectOf(aimed),
-    rectOf(anchor),
-    { width: pill.offsetWidth, height: pill.offsetHeight },
-    { width: window.innerWidth, height: window.innerHeight },
+    aimedRect,
+    anchorRect,
+    squeezed === undefined ? natural : measure(),
+    screen,
     margin,
-    margin + getSpace(style, SPACE_SMALL_VARIABLE),
+    arrowSpace,
     sides,
   );
   element.dataset.side = placement.side;
@@ -115,8 +138,12 @@ const followTarget = (
   // La cible se monte parfois après la bulle : elle ne se suit qu'à partir du moment où on la trouve.
   const observe = (aimed: HTMLElement) => {
     if (aimed === observed) return;
-    if (observed) resizing.unobserve(observed);
+    if (observed) {
+      resizing.unobserve(observed);
+      observed.removeAttribute(AIMED_ATTRIBUTE);
+    }
     resizing.observe(aimed);
+    aimed.setAttribute(AIMED_ATTRIBUTE, "");
     observed = aimed;
   };
   const measure = () => {
@@ -152,6 +179,7 @@ const followTarget = (
   return () => {
     clearTimeout(settling);
     if (scrolling !== undefined) cancelAnimationFrame(scrolling);
+    observed?.removeAttribute(AIMED_ATTRIBUTE);
     resizing.disconnect();
     publishing.disconnect();
     window.removeEventListener("resize", settle);
