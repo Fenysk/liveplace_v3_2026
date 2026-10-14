@@ -17,11 +17,11 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(en.pageTitle("Kalyss")).toBe("Kalyss's canvas");
   });
 
-  // Le zoom s'écrit « 150 % » en français, « 150% » en anglais, et sans espace au-delà de 999 en français
-  it("writes the zoom percent the way each language does", () => {
-    expect(fr.zoomPercent(150)).toBe("150 %");
-    expect(fr.zoomPercent(1200)).toBe("1200%");
-    expect(en.zoomPercent(150)).toBe("150%");
+  // La pill Pratique n'a plus de pourcentage (Écart §8.1, JOURNAL 2026-10-13) : ses trois boutons se nomment dans chaque langue
+  it("names the three buttons of the Practice pill in each language", () => {
+    expect([fr.zoomIn, fr.zoomOut, fr.recenter]).toEqual(["Zoomer", "Dézoomer", "Recentrer la vue"]);
+    expect([en.zoomIn, en.zoomOut, en.recenter]).toEqual(["Zoom in", "Zoom out", "Recenter the view"]);
+    expect("zoomPercent" in fr).toBe(false);
   });
 
   // Les pixels refusés d'un envoi : un seul au singulier, le reste au pluriel, avec les milliers de la langue

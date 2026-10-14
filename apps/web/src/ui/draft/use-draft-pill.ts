@@ -7,17 +7,13 @@ import { predictGauge } from "../../state/gauge";
 import { signInHref } from "../account/auth-links";
 import type { useSigningIn } from "../account/use-signing-in";
 import type { GaugeProps } from "../design/gauge";
+import { type ShowToast, useToast } from "../design/toast";
 import { TOUCH_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import type { Locale } from "../locale/locale";
 import { useLocale } from "../locale/use-locale";
-import { msToNextSecond, waitSecondsOf } from "./draft-labels";
+import { formatWait, msToNextSecond, waitSecondsOf } from "./draft-labels";
 import type { DraftPillActions, DraftPillState } from "./draft-pill";
-import { DRAFT_TEXTS } from "./draft-texts";
-
-const formatCountdown = (ms: number): string => {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-};
+import { DRAFT_TEXTS, type DraftTexts } from "./draft-texts";
 
 export const submitDraft = (draftStore: DraftStore): void => {
   draftStore
@@ -25,9 +21,23 @@ export const submitDraft = (draftStore: DraftStore): void => {
     .catch((error: unknown) => console.error("draft-pill : envoi du brouillon interrompu", error));
 };
 
+// Vider se rattrape : un toast « Brouillon vidé » porte Rétablir, qui remet le brouillon vidé (Écart §9.3, JOURNAL 2026-10-13).
+export const discardWithRestore = (
+  draftStore: Pick<DraftStore, "discardDraft" | "restoreDraft">,
+  toast: ShowToast,
+  texts: Pick<DraftTexts, "draftCleared" | "restoreDraft">,
+): void => {
+  const cleared = draftStore.discardDraft();
+  if (!cleared) return;
+  toast("success", texts.draftCleared, {
+    label: texts.restoreDraft,
+    onPress: () => draftStore.restoreDraft(cleared),
+  });
+};
+
 // Une minuterie calée sur la seconde du compte à rebours, jamais `requestAnimationFrame` : le texte de l'infobulle et
 // celui d'Attendre en dépendent (§9.4, Écart §9.3, JOURNAL 2026-10-08). Elle repart quand la jauge change d'échéance.
-const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) => void): void => {
+export const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) => void): void => {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
@@ -45,7 +55,7 @@ const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) 
 };
 
 // Le client prédit, le serveur tranche : la jauge affichée entre deux réponses (§9.4).
-const toGaugeProps = (
+export const toGaugeProps = (
   canvas: CanvasView,
   draft: DraftView,
   nowMs: number,
@@ -54,8 +64,16 @@ const toGaugeProps = (
   const { gauge, params } = canvas;
   if (!gauge || !params) return null;
   const { charges, max, nextRefillAt, claimable } = predictGauge(gauge, params, nowMs);
-  const reserved = draft.mode === "draft" ? draft.draft.size : 0;
-  const refill = charges < max ? { endsAt: nextRefillAt, durationMs: params.refillMs } : null;
+  // Le brouillon gardé est réservé en Vue aussi (Écart §9.3, JOURNAL 2026-10-13).
+  const reserved = draft.draft.size;
+  const refill =
+    charges < max
+      ? {
+          endsAt: nextRefillAt,
+          durationMs: params.refillMs,
+          secondsLeft: waitSecondsOf(nextRefillAt - nowMs),
+        }
+      : null;
   return {
     charges,
     max,
@@ -66,7 +84,7 @@ const toGaugeProps = (
       max,
       afterPlacement: reserved > 0 ? Math.max(0, charges - reserved) : undefined,
       nextRefill: refill
-        ? { charges: params.refillCharges, countdown: formatCountdown(nextRefillAt - nowMs) }
+        ? { charges: params.refillCharges, countdown: formatWait(waitSecondsOf(nextRefillAt - nowMs)) }
         : undefined,
       claimable,
     }),
@@ -128,6 +146,7 @@ const toShownState = (
       kind: "view",
       gauge,
       canClaim,
+      draftSize: draft.draft.size,
       ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
     };
   }
@@ -153,6 +172,7 @@ export function useDraftPillProps(
   const draftView = useSyncExternalStore(draft.subscribe, draft.getView, draft.getView);
   const isTouchScreen = useMediaQuery(TOUCH_SCREEN_QUERY);
   const locale = useLocale();
+  const toast = useToast();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const gauge = toGaugeProps(canvasView, draftView, nowMs, locale);
   useCountdownTick(gauge?.refill?.endsAt, setNowMs);
@@ -167,7 +187,7 @@ export function useDraftPillProps(
       onClaim: () => canvas.claimGauge(),
       onExit: () => draft.exitDraftMode(),
       onSubmit: () => submitDraft(draft),
-      onDiscard: () => draft.discardDraft(),
+      onDiscard: () => discardWithRestore(draft, toast, DRAFT_TEXTS[locale]),
       onPickColor: (colorIndex) => draft.selectColor(colorIndex),
       onToggleEraser: () => draft.toggleEraser(),
       onTogglePicker: () => draft.togglePicker(),

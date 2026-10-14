@@ -52,7 +52,7 @@ export const SAMPLE_DRAWING: readonly Pixel[] = [
 ];
 
 // Les pixels d'un auteur, avec leur heure et leur pose (JOURNAL 2026-09-28) : le cœur est la pose inspectée, un
-// sourire est posé 4 min avant, une ligne 40 min après. Le curseur de Retirer ses pixels les ajoute un à un.
+// sourire est posé 4 min avant, une ligne 40 min après. Le curseur d'Effacer ses dessins les ajoute un à un.
 export const SAMPLE_PLACEMENT_ID = "pheart001";
 export const samplePlacements = (nowMs: number): readonly AuthoredPixel[] => [
   ...SAMPLE_DRAWING.map((pixel) => ({ ...pixel, placedAt: nowMs, placementId: SAMPLE_PLACEMENT_ID })),

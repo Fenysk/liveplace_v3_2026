@@ -15,7 +15,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
     handlers: {
       GET: async ({ request, context }) => {
         const { deps } = context;
-        // Écart §14 (JOURNAL 2026-10-07) : le visiteur lit ces deux phrases brutes dans sa langue.
+        // Écart §14 (JOURNAL 2026-10-07) : le visiteur lit cette phrase brute dans sa langue.
         const texts = ACCOUNT_TEXTS[resolveRequestLocale(request)];
         const url = new URL(request.url);
         const pending = parseOAuthCookie(
@@ -24,13 +24,10 @@ export const Route = createFileRoute("/auth/twitch/callback")({
         // Le cookie de l'aller ne sert qu'une fois.
         const clearOAuth = serializeCookie(OAUTH_COOKIE, "", 0, deps.isSecure);
 
-        // Sans le bon `state`, ce retour ne vient pas du navigateur qui est parti chez Twitch.
-        if (!pending || url.searchParams.get("state") !== pending.state) {
-          return new Response(texts.signInRefused, {
-            status: 400,
-            headers: { "set-cookie": clearOAuth },
-          });
-        }
+        // Sans le bon `state`, ce retour ne vient pas du navigateur qui est parti chez Twitch : la page le dit, avec Se connecter
+        // (Écart §14, JOURNAL 2026-10-13).
+        if (!pending || url.searchParams.get("state") !== pending.state)
+          return redirectWithCookies("/auth/expired", [clearOAuth]);
 
         const code = url.searchParams.get("code");
         // Refus sur l'écran de Twitch : retour sans session.

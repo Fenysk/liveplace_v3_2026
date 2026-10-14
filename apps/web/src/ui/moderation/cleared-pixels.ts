@@ -10,24 +10,26 @@ import { MODERATION_TEXTS } from "./moderation-texts";
 
 const MINUTE = 60_000;
 
-// A2 : un curseur à crans, qui étend la plage avant et après à la fois. Le cran 0 porte le libellé de ce qu'il vise.
-const clearSpanStepsOf = (zeroLabel: string): readonly SliderStep[] => [
-  { value: 0, label: zeroLabel },
-  { value: MINUTE, label: "± 1 min" },
-  { value: 5 * MINUTE, label: "± 5 min" },
-  { value: 15 * MINUTE, label: "± 15 min" },
-  { value: 60 * MINUTE, label: "± 1 h" },
+// A2 : un curseur à crans, qui étend la plage avant et après à la fois. Écart §14 (JOURNAL 2026-10-13) : « 5 min avant et après
+// ce dessin », jamais « ± 5 min ». Le cran 0 porte le libellé de ce qu'il vise.
+const SPANS = [
+  { value: MINUTE, duration: "1 min" },
+  { value: 5 * MINUTE, duration: "5 min" },
+  { value: 15 * MINUTE, duration: "15 min" },
+  { value: 60 * MINUTE, duration: "1 h" },
 ];
 
-// Une ligne de plusieurs poses n'a pas de « pose seule » : son cran 0 les retire toutes (JOURNAL 2026-10-07).
-export const clearSpanSteps = (placementCount: number, locale: Locale): readonly SliderStep[] =>
-  clearSpanStepsOf(
-    placementCount > 1
-      ? MODERATION_TEXTS[locale].spanReportedPlacements
-      : MODERATION_TEXTS[locale].spanPlacementOnly,
-  );
+// Une ligne de plusieurs poses n'a pas de « dessin seul » : son cran 0 les efface tous (JOURNAL 2026-10-07).
+export const clearSpanSteps = (placementCount: number, locale: Locale): readonly SliderStep[] => {
+  const t = MODERATION_TEXTS[locale];
+  const hasSeveral = placementCount > 1;
+  return [
+    { value: 0, label: hasSeveral ? t.spanReportedPlacements : t.spanPlacementOnly },
+    ...SPANS.map(({ value, duration }) => ({ value, label: t.spanAround({ duration, hasSeveral }) })),
+  ];
+};
 
-// La case « Retirer tous ses pixels », décochée par défaut, et le cran du curseur.
+// La case « Effacer tous ses dessins », décochée par défaut, et le cran du curseur.
 export type ClearScope = { isAll: boolean; spanMs: number };
 export const PLACEMENT_ONLY: ClearScope = { isAll: false, spanMs: 0 };
 

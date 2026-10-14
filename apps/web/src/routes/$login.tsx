@@ -223,7 +223,12 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
         isSidePanel={isSidePanel}
       />
       {firstHint && <FirstHint {...firstHint} isTouchScreen={help.isTouchScreen} />}
-      <HelpBubbles shown={help.shown} isTouchScreen={help.isTouchScreen} refill={help.refill} />
+      <HelpBubbles
+        shown={help.shown}
+        isTouchScreen={help.isTouchScreen}
+        refill={help.refill}
+        gaugeMax={help.gaugeMax}
+      />
       <ModerationWindow {...moderation.window} />
       <ModerationWindow {...reporting.window} />
       <BannedWindow {...banned} />

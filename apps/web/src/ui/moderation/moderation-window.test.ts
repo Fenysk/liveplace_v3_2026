@@ -54,7 +54,7 @@ describe("what a screen reader hears of the moderation window", () => {
     const markup = render({ request: { kind: "ban", author } });
 
     expect(countOf(markup)).toBe(
-      "2 pixels. Ce compte ne pourra plus poser sur cette fresque, et ses pixels seront retirés.",
+      "2 pixels. Ce viewer ne pourra plus dessiner sur cette fresque, et ses dessins seront effacés.",
     );
   });
 
@@ -87,12 +87,12 @@ describe("what a screen reader hears of the moderation window", () => {
     expect(markup).toMatch(/<dialog.*<div role="status" class="lp-visually-hidden"><span>Troll42 est banni/s);
   });
 
-  // Le titre qui suit un retrait se dit : « C'est retiré. » n'est écrit nulle part ailleurs
+  // Le titre qui suit un retrait se dit : « C'est effacé. » n'est écrit nulle part ailleurs
   it("says the title that follows a removal, which is the only place that says it is removed", () => {
     const markup = render({ request: { kind: "banAfterClear", author } });
 
     expect(markup).toContain(
-      '<span role="status" class="lp-visually-hidden">C&#x27;est retiré. Bannir aussi Troll42 ?</span>',
+      '<span role="status" class="lp-visually-hidden">C&#x27;est effacé. Bannir aussi Troll42 ?</span>',
     );
     expect(render({ request: { kind: "ban", author } })).toContain(
       '<span role="status" class="lp-visually-hidden"></span>',

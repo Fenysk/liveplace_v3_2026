@@ -1,5 +1,6 @@
-// Un doigt qui glisse en Dessin, Tracé éteint, déplace la vue au lieu de dessiner (Écart §8.1, JOURNAL 2026-10-08) : c'est ce
-// que la bulle du Tracé explique. La scène du canvas le rapporte à la fin du geste ; l'état s'efface en quittant le Dessin.
+// Un doigt qui glisse en Dessin, Tracé éteint, ou la souris, déplace la vue au lieu de dessiner (Écart §8.1, JOURNAL 2026-10-08 et
+// 2026-10-14) : c'est ce que la bulle du Tracé, ou d'Espace, explique. La scène du canvas le rapporte à la fin du geste ; l'état
+// s'efface en quittant le Dessin.
 
 import type { DraftView } from "./draft-store";
 

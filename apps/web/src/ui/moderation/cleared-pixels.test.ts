@@ -199,16 +199,24 @@ describe("clearing the placements of a report row (JOURNAL 2026-10-07)", () => {
 });
 
 describe("the slider's steps (JOURNAL 2026-10-07)", () => {
-  // Une pose : « Cette pose seule » ; plusieurs : « Les poses signalées », les autres crans restent
+  // Un dessin : « Ce dessin seul » ; plusieurs : « Les dessins signalés », les autres crans restent
   it("names step 0 after the placement alone, or after the reported ones for several, the others unchanged", () => {
     const [one, ...rest] = clearSpanSteps(1, "fr");
     const [many, ...manyRest] = clearSpanSteps(2, "fr");
 
-    expect(one).toEqual({ value: 0, label: "Cette pose seule" });
-    expect(many).toEqual({ value: 0, label: "Les poses signalées" });
-    expect(manyRest).toEqual(rest);
-    expect(rest.map(({ label }) => label)).toEqual(["± 1 min", "± 5 min", "± 15 min", "± 1 h"]);
-    expect(clearSpanSteps(1, "en")[0]).toEqual({ value: 0, label: "This placement only" });
-    expect(clearSpanSteps(3, "en")[0]).toEqual({ value: 0, label: "The reported placements" });
+    expect(one).toEqual({ value: 0, label: "Ce dessin seul" });
+    expect(many).toEqual({ value: 0, label: "Les dessins signalés" });
+    expect(rest.map(({ label }) => label)).toEqual([
+      "1 min avant et après ce dessin",
+      "5 min avant et après ce dessin",
+      "15 min avant et après ce dessin",
+      "1 h avant et après ce dessin",
+    ]);
+    expect(manyRest.map(({ value }) => value)).toEqual(rest.map(({ value }) => value));
+    expect(manyRest[1]?.label).toBe("5 min avant et après ces dessins");
+    expect(clearSpanSteps(1, "en")[0]).toEqual({ value: 0, label: "This drawing only" });
+    expect(clearSpanSteps(3, "en")[0]).toEqual({ value: 0, label: "The reported drawings" });
+    expect(clearSpanSteps(1, "en")[2]?.label).toBe("5 min before and after this drawing");
+    expect(clearSpanSteps(1, "en")[4]?.label).toBe("1 h before and after this drawing");
   });
 });

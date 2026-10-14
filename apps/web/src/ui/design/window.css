@@ -168,6 +168,31 @@
   }
 }
 
+/* Une action qui a échoué sur une ligne (Écart §8.1, JOURNAL 2026-10-13) : la ligne garde sa place, et le message avec
+   Réessayer passent dessous, sur toute sa largeur. Sans échec, l'alerte vide ne prend aucune place. */
+.lp-window-row--failed {
+  flex-wrap: wrap;
+}
+
+.lp-row-failure {
+  display: contents;
+}
+
+.lp-window-row .lp-row-failure--failed,
+.lp-report-body .lp-row-failure--failed {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* Le message garde de quoi se lire : sur une ligne étroite, Réessayer passe dessous plutôt que de l'écraser */
+.lp-row-failure--failed > :first-child {
+  flex: 1 1 14em;
+}
+
 /* Un signalement (JOURNAL 2026-09-28) : l'aperçu de la pose à gauche, qui, combien et les décisions à droite */
 .lp-report {
   display: flex;
@@ -183,6 +208,7 @@
 .lp-report-body {
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
 }
 

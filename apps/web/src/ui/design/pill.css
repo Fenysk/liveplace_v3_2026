@@ -110,15 +110,6 @@
   padding-inline: var(--space-4);
 }
 
-/* Le pourcentage de zoom tient dans la largeur d'un contrôle, même à quatre chiffres */
-.lp-zoom {
-  width: var(--control-size);
-  min-width: 0;
-  text-align: center;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
-}
-
 /* Flottante : fixée à un bord de l'écran, avec un espace */
 .lp-floating {
   position: fixed;

@@ -97,9 +97,24 @@
   overflow: hidden;
 }
 
+/* Un libellé réservé (`reservedLabel`) : son texte, invisible et sans hauteur, se pose sous le vrai ; la boîte garde la largeur du plus
+   long, et le vrai libellé se centre dedans. */
+.lp-btn-reserve {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lp-btn-reserve::after {
+  content: attr(data-reserve);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
 /* Le mot de devant d'un libellé (« Attendre » devant « 12 s ») cède quand la place manque. Mesuré sur la barre du bas d'un
-   téléphone : « Attendre 12 s » tient dès 325 px, « Attendre 1 min 05 » dès 356 px (à 352 px, le tube de la jauge passe de 3 px
-   sous Annuler) ; sous 360 px, le mot s'efface pour les deux (Écart §9.3, JOURNAL 2026-10-08). */
+   téléphone, le tube de la jauge au plus juste (la largeur de son nombre) : « Attendre 10 s », la plus longue qu'une recharge
+   de 10 s donne, tient dès 345 px ; sous 360 px, le mot s'efface (Écart §9.3, JOURNAL 2026-10-08 et 2026-10-13). */
 @media (max-width: 359px) {
   .lp-btn-lead {
     display: none;

@@ -46,7 +46,8 @@ export type DraftStore = {
   getView(): DraftView;
   enterDraftMode(): void;
   exitDraftMode(): void; // le brouillon est gardé
-  discardDraft(): void;
+  discardDraft(): Draft | undefined; // Vider : rend le brouillon vidé (`undefined` s'il n'y avait rien à vider), de quoi le rétablir
+  restoreDraft(cleared: Draft): void; // Rétablir, dans le toast de Vider : seulement tant que Vider est la dernière étape
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   selectRecentColor(slot: number): void; // les touches 1 à 5 : la récente de cette place, comme un clic sur elle
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
@@ -258,7 +259,13 @@ export function createDraftStore(
       if (!view.isSending) leaveDraftMode();
     },
     discardDraft() {
-      if (isEditable() && view.draft.size > 0) commitStep(EMPTY_DRAFT);
+      const cleared = view.draft;
+      if (!isEditable() || cleared.size === 0) return undefined;
+      commitStep(EMPTY_DRAFT);
+      return cleared;
+    },
+    restoreDraft(cleared) {
+      if (history.past.at(-1) === cleared) travel(undoDraftStep);
     },
     selectColor,
     selectRecentColor(slot) {

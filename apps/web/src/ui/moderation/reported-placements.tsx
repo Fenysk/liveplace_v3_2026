@@ -1,6 +1,6 @@
 // Les signalements en attente, dans l'onglet Modération (CDC 2026, Signalement ; JOURNAL 2026-09-28) : une ligne par
 // signalement (JOURNAL 2026-10-07), avec l'aperçu de son dessin entier, son auteur, le nombre de signalements, s'il
-// est caché du stream, puis Retirer la pose (ou les poses), Bannir (sauf un modérateur nommé ici, Écart §5.4 JOURNAL
+// est caché du stream, puis Effacer le dessin (ou les dessins), Bannir (sauf un modérateur nommé ici, Écart §5.4 JOURNAL
 // 2026-10-08) ou Rétablir. L'affichage seul, nourri par `useReportsProps`.
 
 import { EyeOff } from "lucide-react";
@@ -16,6 +16,7 @@ import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
 import { type PendingReport, pendingReportKey } from "./pending-reports";
+import { RowFailure } from "./row-failure";
 
 export type ReportList =
   | { status: "loading" }
@@ -25,9 +26,10 @@ export type ReportList =
 export type ReportedPlacementsProps = {
   list: ReportList;
   approvingReportKey: string | null; // Rétablir attend sa réponse : la clé de la ligne
+  failedReportKey?: string | null | undefined; // Rétablir a échoué : la ligne le dit, la liste reste (Écart §8.1, JOURNAL 2026-10-13)
   canvas: CanvasPreviewProps;
   nowMs: number; // pour la date relative
-  onClear: (report: PendingReport) => void; // la fenêtre Retirer ses pixels, sur les poses de cette ligne
+  onClear: (report: PendingReport) => void; // la fenêtre Effacer ses dessins, sur ceux de cette ligne
   onBan: (report: PendingReport) => void;
   onApprove: (report: PendingReport) => void; // sans confirmation : elle revient sur le stream
 };
@@ -37,6 +39,7 @@ type ReportRowProps = Omit<ReportedPlacementsProps, "list"> & { report: PendingR
 const ReportRow = ({
   report,
   approvingReportKey,
+  failedReportKey,
   canvas,
   nowMs,
   onClear,
@@ -74,6 +77,10 @@ const ReportRow = ({
             onPress={() => onApprove(report)}
           />
         </div>
+        <RowFailure
+          isFailed={failedReportKey === pendingReportKey(report)}
+          onRetry={() => onApprove(report)}
+        />
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { useTexts } from "../locale/use-locale";
 import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
+import { RowFailure } from "./row-failure";
 
 export type ModeratorListView =
   | { status: "loading" }
@@ -19,10 +20,11 @@ export type ModeratorListView =
 type ModeratorUsersProps = {
   list: ModeratorListView;
   removingUserId?: string | null | undefined; // Retirer attend sa réponse
+  failedUserId?: string | null | undefined; // Retirer a échoué : la ligne le dit, la liste reste (Écart §8.1, JOURNAL 2026-10-13)
   onRemove?: ((userId: string) => void) | undefined;
 };
 
-const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) => {
+const ModeratorRows = ({ list, removingUserId, failedUserId, onRemove }: ModeratorUsersProps) => {
   const t = useTexts(MODERATION_TEXTS);
   // `failed` : rien, `ConnectionLost` le dit juste après.
   return (
@@ -43,13 +45,17 @@ const ModeratorRows = ({ list, removingUserId, onRemove }: ModeratorUsersProps) 
               }
               hasProfile
               isListed
+              isFailed={failedUserId === user.userId}
             >
               {onRemove && user.isNamedHere && (
-                <Button
-                  label={t.removeModerator}
-                  isDisabled={removingUserId === user.userId}
-                  onPress={() => onRemove(user.userId)}
-                />
+                <>
+                  <Button
+                    label={t.removeModerator}
+                    isDisabled={removingUserId === user.userId}
+                    onPress={() => onRemove(user.userId)}
+                  />
+                  <RowFailure isFailed={failedUserId === user.userId} onRetry={() => onRemove(user.userId)} />
+                </>
               )}
             </WindowRow>
           ))

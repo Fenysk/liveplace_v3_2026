@@ -5,12 +5,12 @@ const fr = MODERATION_TEXTS.fr;
 const en = MODERATION_TEXTS.en;
 
 describe("approvedToast (JOURNAL 2026-10-07)", () => {
-  // Une pose au singulier, plusieurs poses au pluriel
+  // Un dessin au singulier, plusieurs dessins au pluriel
   it("says one placement in the singular, several in the plural", () => {
-    expect(fr.approvedToast(1)).toBe("Pose rétablie : elle revient sur le stream");
-    expect(fr.approvedToast(3)).toBe("Poses rétablies : elles reviennent sur le stream");
-    expect(en.approvedToast(1)).toBe("Placement restored: it is back on the stream");
-    expect(en.approvedToast(3)).toBe("Placements restored: they are back on the stream");
+    expect(fr.approvedToast(1)).toBe("Dessin rétabli : il revient sur le stream");
+    expect(fr.approvedToast(3)).toBe("Dessins rétablis : ils reviennent sur le stream");
+    expect(en.approvedToast(1)).toBe("Drawing restored: it is back on the stream");
+    expect(en.approvedToast(3)).toBe("Drawings restored: they are back on the stream");
   });
 });
 

@@ -5,9 +5,15 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   // Les textes validés par le propriétaire du produit, mot pour mot
   it("keeps the validated texts word for word", () => {
     expect(HELP_TEXTS.fr.trace).toBe("Active le tracé pour dessiner en glissant");
-    expect(HELP_TEXTS.fr.reward).toBe("Une récompense t'attend : +1 sur ta jauge max");
+    expect(HELP_TEXTS.fr.reward(20)).toBe("Une récompense t'attend : ta jauge passe à 21 pixels");
     expect(HELP_TEXTS.fr.obs).toBe("Ajoute ta fresque à OBS ici");
     expect(HELP_TEXTS.fr.report).toBe("Un dessin a été signalé");
+  });
+
+  // La récompense dit son effet par le chiffre : la jauge actuelle + 1 ; sans les chiffres du canvas, elle n'en invente pas
+  it("tells where the reward takes the gauge, without inventing a figure", () => {
+    expect(HELP_TEXTS.fr.reward(10)).toBe("Une récompense t'attend : ta jauge passe à 11 pixels");
+    expect(HELP_TEXTS.fr.reward(undefined)).toBe("Une récompense t'attend");
   });
 
   // La suite de la chaîne du streamer, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
@@ -20,7 +26,12 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   // Les deux bulles de qui modère, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
   it("keeps the validated texts of the moderation bubbles word for word", () => {
     expect(HELP_TEXTS.fr.moderatorWelcome).toBe("Tu modères cette fresque : tout est ici");
-    expect(HELP_TEXTS.fr.moderationActions).toBe("Retire ses pixels ou bannis ce viewer ici");
+    expect(HELP_TEXTS.fr.moderationActions).toBe("Efface ses dessins ou bannis ce viewer ici");
+  });
+
+  // La bulle d'Espace, à la souris, mot pour mot (Écart §8.1, JOURNAL 2026-10-14)
+  it("keeps the validated text of the Space bubble word for word", () => {
+    expect(HELP_TEXTS.fr.space).toBe("Maintiens Espace et glisse pour tracer");
   });
 
   // Les trois conseils du Dessin, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
@@ -70,6 +81,14 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(everyText(7_200_000, "fr")).toBe("toutes les 2 h");
     expect(everyText(5_400_000, "fr")).toBe("toutes les 1 h 30 min");
   });
+
+  // La durée garde le format de l'interface : le mot qui suit le plus grand s'écrit sur deux chiffres
+  it("writes the smaller word on two digits after the larger one", () => {
+    expect(everyText(65_000, "fr")).toBe("toutes les 1 min 05 s");
+    expect(everyText(7_500_000, "fr")).toBe("toutes les 2 h 05 min");
+    expect(everyText(65_000, "en")).toBe("every 1 min 05 s");
+    expect(everyText(7_500_000, "en")).toBe("every 2 h 05 min");
+  });
 });
 
 describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => {
@@ -79,13 +98,15 @@ describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => 
     expect(HELP_TEXTS.en.obs).toBe("Add your canvas to OBS here");
     expect(HELP_TEXTS.en.obsTab).toBe("Your OBS address is in this tab");
     expect(HELP_TEXTS.en.obsAddress).toBe("Copy this address and paste it into OBS");
-    expect(HELP_TEXTS.en.reward).toBe("A reward is waiting for you: +1 on your max gauge");
+    expect(HELP_TEXTS.en.reward(20)).toBe("A reward is waiting: your gauge goes up to 21 pixels");
+    expect(HELP_TEXTS.en.reward(undefined)).toBe("A reward is waiting");
     expect(HELP_TEXTS.en.trace).toBe("Turn on Trace to draw by dragging");
+    expect(HELP_TEXTS.en.space).toBe("Hold Space and drag to draw");
     expect(HELP_TEXTS.en.inviteLink).toBe("Share this link with your viewers too");
     expect(HELP_TEXTS.en.theme).toBe("Give your canvas a theme");
     expect(HELP_TEXTS.en.twitchSync).toBe("Import your Twitch moderators here");
     expect(HELP_TEXTS.en.moderatorWelcome).toBe("You moderate this canvas: everything is here");
-    expect(HELP_TEXTS.en.moderationActions).toBe("Clear their pixels or ban this viewer here");
+    expect(HELP_TEXTS.en.moderationActions).toBe("Clear their drawings or ban this viewer here");
     expect(HELP_TEXTS.en.palette).toBe("Tap your color to open the palette");
     expect(HELP_TEXTS.en).not.toHaveProperty("keysRecent");
     expect(HELP_TEXTS.en.keys).toBe("Ctrl+Z: undo your last stroke");

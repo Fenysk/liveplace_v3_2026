@@ -3,6 +3,7 @@
 import { PALETTE } from "@liveplace/domain";
 import { type ReactNode, useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
+import { SignInExpired } from "../account/sign-in-expired";
 import { ArchiveNotFound } from "../archive/archive-not-found";
 import { CanvasPill, type CanvasPillFold } from "../canvas/canvas-pill";
 import { CANVAS_TEXTS } from "../canvas/canvas-texts";
@@ -18,6 +19,7 @@ import { SignInButton, SignInNote } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
 import { BubbleTargetsContext, useBubbleTargets } from "../help/bubble-target";
+import { CursorBlock } from "./cursor-block";
 import { noop, SAMPLE_LIVE_OWNER, SAMPLE_OWNER } from "./design-fixtures";
 import {
   Block,
@@ -418,8 +420,11 @@ export const gaugeAt = (nowMs: number, charges: number, draft = 0): GaugeProps =
   charges,
   max: 10,
   draft,
-  refill: charges < 10 ? { endsAt: nowMs + REFILL_MS / 2, durationMs: REFILL_MS } : null,
-  label: `${charges} / 10 charges`,
+  refill:
+    charges < 10
+      ? { endsAt: nowMs + REFILL_MS / 2, durationMs: REFILL_MS, secondsLeft: REFILL_MS / 2 / 1000 }
+      : null,
+  label: `${charges} / 10 pixels`,
 });
 
 export const draftState = (
@@ -444,7 +449,7 @@ export const draftState = (
 
 type DraftScene = { name: string; detail?: string; isNarrow?: boolean; state: DraftPillState };
 
-// Les 23 états de la pill Dessin, par bloc : la connexion, l'invité et le banni, la vue, le dessin, puis le mobile.
+// Les 26 états de la pill Dessin, par bloc : la connexion, l'invité et le banni, la vue, le dessin, puis le mobile.
 type DraftBlock = { title: string; isCompact?: boolean; scenes: readonly DraftScene[] };
 
 const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
@@ -490,6 +495,12 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         state: { kind: "view", gauge: gaugeAt(nowMs, 7), canClaim: true },
       },
       {
+        name: "Un brouillon gardé",
+        detail:
+          "Dessiner dit la taille du brouillon, comme Valider, et la partie claire du fluide le réserve, comme en Dessin.",
+        state: { kind: "view", gauge: gaugeAt(nowMs, 8, 3), canClaim: false, draftSize: 3 },
+      },
+      {
         name: "Après un refus",
         detail: "La raison, à côté de Dessiner.",
         state: {
@@ -506,12 +517,13 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
     scenes: [
       {
         name: "Un brouillon de 3",
-        detail: "La jauge dit ce qui restera, Valider la taille du brouillon.",
+        detail:
+          "Le nombre de la jauge dit ce que tu as, sa partie claire ce que le brouillon réserve, Valider sa taille.",
         state: draftState(nowMs),
       },
       {
         name: "Brouillon vide",
-        detail: "Vider n'est pas là : il paraît au premier pixel.",
+        detail: "Vider est là, invisible : il paraît au premier pixel, et rien ne bouge.",
         state: draftState(nowMs, {
           gauge: gaugeAt(nowMs, 8),
           draftSize: 0,
@@ -520,8 +532,8 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         }),
       },
       {
-        name: "Plus aucune charge",
-        detail: "Valider attend la prochaine, en direct.",
+        name: "Plus aucun pixel",
+        detail: "Valider attend le prochain, en direct.",
         state: draftState(nowMs, {
           gauge: gaugeAt(nowMs, 0),
           draftSize: 0,
@@ -557,10 +569,15 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         detail: "Le +1 à la place de Dessiner.",
         state: { kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: true },
       },
+      {
+        name: "Vue, un brouillon gardé",
+        detail: "« Dessiner · 3 », et la partie claire du fluide.",
+        state: { kind: "view", gauge: gaugeAt(nowMs, 6, 3), canClaim: false, draftSize: 3 },
+      },
       { name: "Dessin", detail: "La feuille, palette repliée.", state: draftState(nowMs) },
       {
         name: "Dessin, brouillon vide",
-        detail: "Vider n'est pas là : les outils se répartissent sans lui.",
+        detail: "Vider est là, invisible : les outils gardent leur place quand il paraît.",
         state: draftState(nowMs, {
           gauge: gaugeAt(nowMs, 8),
           draftSize: 0,
@@ -569,8 +586,8 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         }),
       },
       {
-        name: "Dessin, plus aucune charge",
-        detail: "Valider attend la prochaine.",
+        name: "Dessin, plus aucun pixel",
+        detail: "Valider attend le prochain.",
         state: draftState(nowMs, {
           gauge: gaugeAt(nowMs, 0),
           draftSize: 0,
@@ -580,7 +597,7 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         }),
       },
       {
-        name: "Dessin, plus aucune charge, 320 px",
+        name: "Dessin, plus aucun pixel, 320 px",
         detail: "Sous 360 px, « Attendre » s'efface : « 5 s » seul.",
         isNarrow: true,
         state: draftState(nowMs, {
@@ -590,6 +607,13 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
           canSubmit: false,
           canDiscard: false,
         }),
+      },
+      {
+        name: "Dessin, un gros brouillon, 320 px",
+        detail:
+          "Valider garde la largeur de « Valider · 99 » : la jauge, Fermer et Valider tiennent sur 320 px.",
+        isNarrow: true,
+        state: draftState(nowMs, { draftSize: 99 }),
       },
       { name: "Invité", detail: "L'invitation au centre.", state: { kind: "guest", signInHref: "#" } },
     ],
@@ -636,6 +660,20 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
           </WithBubbleTargets>
         </InLandscape>
       </StateRow>
+      <StateRow
+        name="Vue, un brouillon gardé"
+        detail="« Dessiner · 3 » s'étire sur la colonne, le fluide garde sa partie claire."
+      >
+        <InLandscape>
+          <DraftPill
+            state={{ kind: "view", gauge: gaugeAt(nowMs, 6, 3), canClaim: false, draftSize: 3 }}
+            actions={DRAFT_ACTIONS}
+            isCompact
+            isSidePanel
+            isDocked={false}
+          />
+        </InLandscape>
+      </StateRow>
       <StateRow name="Invité" detail="L'invitation, dans la colonne.">
         <InLandscape>
           <DraftPill
@@ -654,6 +692,25 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
         <InLandscape isPanel>
           <DraftPill
             state={draftState(nowMs)}
+            actions={DRAFT_ACTIONS}
+            isCompact
+            isSidePanel
+            isDocked={false}
+          />
+        </InLandscape>
+      </StateRow>
+      <StateRow
+        name="Dessin, brouillon vide"
+        detail="Vider garde sa place, invisible : Fermer et Valider ne bougent pas au premier pixel."
+      >
+        <InLandscape isPanel>
+          <DraftPill
+            state={draftState(nowMs, {
+              gauge: gaugeAt(nowMs, 8),
+              draftSize: 0,
+              canSubmit: false,
+              canDiscard: false,
+            })}
             actions={DRAFT_ACTIONS}
             isCompact
             isSidePanel
@@ -734,9 +791,13 @@ export const DraftPillEntry = () => {
   );
 };
 
-const VIEWPORT_STATES: readonly { name: string; framing: Framing }[] = [
-  { name: "À l'arrivée", framing: { zoomPercent: 100, isArrival: true } },
-  { name: "Zoomé de près", framing: { zoomPercent: 1250, isArrival: false } },
+// Sur ordinateur, la pill est toujours là et ne dit aucun pourcentage (Écart §8.1, JOURNAL 2026-10-13).
+const VIEWPORT_STATES: readonly { name: string; detail: string; framing: Framing }[] = [
+  {
+    name: "Zoomer, dézoomer, recentrer",
+    detail: "Les mêmes à l'arrivée et zoomé de près.",
+    framing: { zoomPercent: 100, isArrival: true },
+  },
 ];
 
 const RecenterPill = () => (
@@ -781,8 +842,8 @@ export const ViewportPillEntry = () => {
       where="En bas à droite · sur mobile, Recentrer seul, quand la vue a bougé · en paysage, contre la colonne du bas · sur un écran tactile large en portrait, au-dessus de la colonne"
     >
       <Block title="États">
-        {VIEWPORT_STATES.map(({ name, framing }) => (
-          <StateRow key={name} name={name}>
+        {VIEWPORT_STATES.map(({ name, detail, framing }) => (
+          <StateRow key={name} name={name} detail={detail}>
             <ViewportPill
               framing={framing}
               onZoomIn={noop}
@@ -794,6 +855,7 @@ export const ViewportPillEntry = () => {
           </StateRow>
         ))}
       </Block>
+      <CursorBlock />
       <Block title="Sur mobile">
         <StateRow name="La vue a bougé">
           <RecenterPill />
@@ -822,7 +884,7 @@ export const NoticeEntry = () => (
     slug="message-seul"
     components={["NoticePill", "ArchiveNotFound", "CanvasRecovering"]}
     file="ui/design/pill.tsx, ui/archive/archive-not-found.tsx, ui/canvas/canvas-recovering.tsx"
-    note="La page d'accueil, une fresque introuvable, une fresque que Redis remet en place."
+    note="La page d'accueil, une fresque introuvable, une fresque que Redis remet en place, une connexion à Twitch expirée."
     where="Au centre"
   >
     <Block title="États">
@@ -840,6 +902,14 @@ export const NoticeEntry = () => (
       >
         <InNotice>
           <NoticePill title={CANVAS_TEXTS.fr.recovering} />
+        </InNotice>
+      </StateRow>
+      <StateRow
+        name="Connexion à Twitch expirée"
+        detail="Le retour de Twitch ne vient pas de ce navigateur, ou trop tard : Se connecter recommence."
+      >
+        <InNotice>
+          <SignInExpired />
         </InNotice>
       </StateRow>
       <StateRow name="Une archive supprimée, ou un lien inconnu" detail="Le bouton dit le nom affiché.">

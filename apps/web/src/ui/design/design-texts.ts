@@ -53,11 +53,13 @@ export const DESIGN_TEXTS = defineTexts({
   copyAction: { fr: "Copier", en: "Copy" },
   copied: { fr: "Copié", en: "Copied" },
 
-  claimGauge: {
-    fr: "Augmenter la jauge de +1 pixel",
-    en: "Raise the gauge by +1 pixel",
-  },
-  charges: { fr: "Charges", en: "Charges" },
+  // Le +1 dit son effet par le chiffre : la jauge actuelle + 1 (Écart §9.3, JOURNAL 2026-10-13).
+  claimGauge: localized({
+    fr: (gaugeMax: number) => `Réclamer : ta jauge passe à ${gaugeMax + 1} pixels`,
+    en: (gaugeMax) => `Claim: your gauge goes up to ${gaugeMax + 1} pixels`,
+  }),
+  // Le nom du `<meter>` de la jauge, lu par les lecteurs d'écran.
+  charges: { fr: "Pixels", en: "Pixels" },
 
   // Le fond d'une image : le PNG d'une archive, la fresque (SwatchChoice).
   backgroundNames: localized<Record<ObsBackground, string>>({

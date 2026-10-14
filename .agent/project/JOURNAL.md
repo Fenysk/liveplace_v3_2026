@@ -32,6 +32,84 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-14 — Écart §8.1 (amende les entrées du 08/10 et du 12/10 sur le Tracé) : à la souris, une bulle dit une fois de tenir Espace pour tracer
+
+**Contexte.** À la souris, glisser en Dessin déplace la vue ; pour tracer, il faut tenir Espace en bougeant (`use-draft-keys.ts`), et rien ne le dit à l'écran. Au doigt, la bulle `draft-trace` (« Active le tracé pour dessiner en glissant ») répond au premier glissement en Dessin ; à la souris, le même geste restait muet.
+**Décision.** `draft-space` : « Maintiens Espace et glisse pour tracer » (en : « Hold Space and drag to draw »), une fois par appareil, au premier glissement de la souris en Dessin (`hasPannedInDraft`, que la scène rapporte déjà pour tout pointeur ; jamais au doigt, où c'est `draft-trace`). Elle passe devant le premier passage et devant Ctrl+Z (elle répond au geste qui vient d'avoir lieu), se ferme à l'action suivante (`press`, Espace tenu compris) et part aussitôt. Sans cible, comme Ctrl+Z : Espace n'a pas de bouton, la bulle se pose au-dessus de la barre du bas, sans flèche. Rejouer le tutoriel la remet à zéro avec les autres (`HELP_BUBBLES`).
+**Renoncement.** Une flèche sur Dessiner, sur Valider ou sur la pill (aucun ne porte Espace, la flèche mentirait) ; la garder deux secondes après l'action, comme Ctrl+Z (le tracé qui suit se voit, rien à relire).
+
+## 2026-10-14 — Écart §8.1 et §14 (amende l'entrée du 12/10 sur les deux bulles de modération) : la bulle des actions de modération nomme son bouton, « Efface ses dessins »
+
+**Contexte.** La fusion du tutoriel par rôle (12/10) avec le lot de vocabulaire du 13/10 : la bulle `moderation-actions` disait « Retire ses pixels ou bannis ce viewer ici », alors que le bouton qu'elle vise s'appelle désormais « Effacer ses dessins » (`Retirer` ne se dit que d'un rôle ou de l'image).
+**Décision.** « Efface ses dessins ou bannis ce viewer ici » (en : « Clear their drawings or ban this viewer here »). `vocabulary.test.ts` lit aussi `help-texts.ts` et `design-texts.ts` (`hint-texts.ts` y était) ; `draft-texts.ts` attend son « on n'y pose plus ». Les autres textes du tutoriel suivaient déjà le vocabulaire.
+**Renoncement.** Changer « Ctrl+Z : annule ton dernier trait » (un trait n'est pas un mot écarté, et c'est le brouillon qu'on annule, non un dessin posé).
+
+## 2026-10-13 — Écart §9.3 (amende celui du 09/10) : Dessiner dit la taille du brouillon gardé, « Dessiner · 12 », et la jauge le réserve aussi en Vue
+
+**Contexte.** Audit de charge cognitive, décision validée par Alexis le 13/10. Le 09/10, « Dessiner » restait seul avec un brouillon gardé ; mais la jauge, elle, cessait de montrer ce brouillon dès qu'on sortait du Dessin : rien en Vue ne disait qu'il y en avait un, ni combien.
+**Décision.** Avec un brouillon gardé, le bouton dit « Dessiner · 12 » (`enterLabel`, la forme de « Valider · 12 »), sans brouillon « Dessiner » ; son libellé change, `hasMorphingLabel` revient et la largeur glisse. `view` de `DraftPillState` retrouve `draftSize` (optionnel : absent sans brouillon). La partie claire du fluide réserve le brouillon en Vue comme en Dessin, et l'infobulle dit « 5 après ce dessin ». La puce « D », le titre et le +1 (qui prend la place de Dessiner, avec ou sans brouillon) ne changent pas.
+**Renoncement.** « Reprendre · 5 px » du 08/10 (une phrase de plus, un mot de plus à apprendre) ; un titre qui répète la taille ; dessiner le brouillon sur la fresque en Vue, hors de cette décision.
+
+## 2026-10-13 — Écart §9.3 (amende la jauge du CDC 2026) : le nombre est dans le tube, « 8/20 », et l'anneau est le minuteur du prochain pixel
+
+**Contexte.** Audit de charge cognitive, décisions validées par Alexis le 13/10. Le nombre de l'anneau changeait de sens en Dessin (ce qui resterait après la pose), et la capacité comme le compte à rebours ne se lisaient que dans l'infobulle.
+**Décision.** Le tube (20 px, 18 px sur mobile) porte « 8/20 », les pixels qu'on a sur la capacité, avec le même sens en Vue et en Dessin : le brouillon se voit à la partie claire du fluide. Le nombre est écrit en trois couches rognées au niveau des fluides (jetons `--on-gauge-charge` et `--on-gauge-draft`) : AA sur le vide, le fluide réservé et le fluide restant, en clair comme en sombre ; en colonne verticale il se pose au-dessus du tube. L'anneau devient le minuteur : « 12 », « 1:05 » dès la minute, « 2h05 » dès l'heure (l'unique exception au format des durées), sans chiffre quand la jauge est pleine ; le chiffre paraît, défile par `RollingNumber` à chaque seconde et s'efface. `GaugeRefill` porte `secondsLeft`, tiré de la minuterie de la pill, qui reste l'unique horloge : l'anneau et « Attendre 12 s » changent ensemble.
+**Renoncement.** Un seul texte coloré par un dégradé (`background-clip: text` disparaît en contraste forcé) ; le nombre dans l'anneau ; garder « après la pose » dans le nombre ; un anneau de 40 px pour « 1:05 » (hors de `--control-size`) : le minuteur long se resserre à la place.
+
+## 2026-10-13 — Écart §8.1 et §9.3 : « charge » ne se dit plus à l'écran, la récompense dit où elle emmène la jauge, et les durées ont un seul format
+
+**Contexte.** Audit de charge cognitive, décisions validées par Alexis le 13/10. L'écran disait « charge » et « pixel » pour la même chose ; la récompense disait « +1 sur ta jauge max » sans le chiffre ; une durée s'écrivait « 0:12 » dans l'infobulle de la jauge, « 12 s » dans Attendre, « 1 min 05 » sans unité.
+**Décision.** L'écran dit « pixel » : l'infobulle de la jauge (« 8 / 20 pixels, +1 pixel dans 12 s, 1 récompense à réclamer », avec un brouillon « 5 après ce dessin »), « Attendre le prochain pixel », le nom du `<meter>` (« Pixels »). La récompense dit son effet par le chiffre, la jauge actuelle + 1 : la bulle `reward` (« Une récompense t'attend : ta jauge passe à 21 pixels ») et l'infobulle du +1 (« Réclamer : ta jauge passe à 21 pixels ») ; le +1 garde son texte « +1 ». Une durée s'écrit partout « 12 s », « 1 min 05 s », « 2 h 05 min » (`formatWait`, l'infobulle de la jauge, `everyText` : le mot qui suit le plus grand sur deux chiffres). Le code garde ses noms (`charges`).
+**Renoncement.** « +1 sur ta jauge max », qui demande un calcul ; une durée sans unité (« 1 min 05 ») ; renommer `charges` dans le code ; la phrase de Jauge maximale (« au-dessus de N charges »), qui relève des mots de la fenêtre Fresque.
+
+## 2026-10-13 — Écart §8.1 : le toast monte dans la couche supérieure du navigateur, au-dessus d'une fenêtre ouverte
+
+**Contexte.** Le toast était rendu dans la page : une fenêtre ouverte par `showModal()` le couvrait, voile compris, et sur mobile la feuille le cachait. C'est pourtant la seule confirmation des réglages enregistrés en direct (« Thème enregistré »). Audit de charge cognitive, validé par Alexis le 13/10.
+**Décision.** `Toast` docké se pose dans un `<div popover="manual">` de boîte nulle (`.lp-toast-layer`), refait à chaque message (une clé) et monté par `showPopover()` comme la bulle d'aide ; après son fondu la pill reste dans la couche, invisible et inerte, jusqu'au message suivant. Elle garde son dock fixe. Sur /design, posé sur place, il n'a pas de popover. Les régions du lecteur d'écran ne bougent pas : chaque fenêtre redit le toast dans la sienne, l'image n'est pas lue.
+**Renoncement.** Un `z-index` plus haut : rien ne dépasse la couche supérieure. Un toast dans chaque `<dialog>` : il en sortirait à la fermeture. Remonter le toast quand une fenêtre s'ouvre pendant ses secondes : un cas trop court. Sous une fenêtre modale la page est inerte, donc le bouton d'action d'un toast n'y répond pas : le seul toast à action paraît sans fenêtre.
+
+## 2026-10-13 — Écart §9.3 : Vider se rattrape par un toast « Brouillon vidé » et son bouton « Rétablir », qui reste 5 s
+
+**Contexte.** Un toucher sur la corbeille vidait le brouillon sans filet ; défaire n'existait qu'au clavier (Ctrl+Z). Audit de charge cognitive, validé par Alexis le 13/10.
+**Décision.** `discardDraft` rend le brouillon vidé ; `restoreDraft` le remet par l'historique (`undoDraftStep`), seulement tant que Vider est la dernière étape : Ctrl+Maj+Z refait ensuite le Vider. `discardWithRestore` (`use-draft-pill.ts`) montre « Brouillon vidé » et « Rétablir » (en : « Draft cleared », « Restore »). `ToastMessage` porte une `action` optionnelle, un bouton texte : l'appuyer ferme le toast puis la fait. Avec une action, le toast reste 5 s (`toastDurationMs`), 3 s sans. Toujours un seul à la fois.
+**Renoncement.** `undo()` sans garde : après un pixel dessiné, il retirerait ce pixel. Écraser le brouillon d'aujourd'hui par le vidé : une fois dessiné depuis, Rétablir ne fait rien. 3 s : trop court pour viser. Une autre place pour le toast : sur mobile il reste en haut, loin du pouce.
+
+## 2026-10-13 — Écart §9.3 (amende celui du 08/10 sur les boutons de la pill Dessin) : Vider garde sa place brouillon vide, Valider celle de « Valider · 99 »
+
+**Contexte.** Au premier pixel, la corbeille s'ouvrait et « Valider » devenait « Valider · 1 » : la pill étant centrée, Fermer et Valider glissaient sous le pointeur (audit de charge cognitive, validé par Alexis le 13/10).
+**Décision.** `Reveal` ne glisse plus en largeur : la corbeille garde sa place brouillon vide, invisible et `inert` (ni clavier, ni lecteur d'écran), et paraît en fondu au premier pixel ; la rangée d'outils mobile n'a plus de ressort propre à la corbeille (`isSpread`), `DraftSheet` y met un ressort fixe. `Button` gagne `reservedLabel` : le plus long libellé s'écrit invisible sous le vrai (`::after` lu dans `data-reserve`), Valider garde la largeur de « Valider · 99 », sauf en attente.
+**Renoncement.** Un `min-width` en `ch`, qui dépend de la police et de la langue (« Confirm · 99 »). Réserver aussi « Attendre 12 s » : le compte à rebours a ses propres largeurs. Au-delà de 99 pixels, Valider s'élargit et glisse comme avant.
+
+## 2026-10-13 — Écart §9.3 : en Dessin, « Annuler » devient « Fermer »
+
+**Contexte.** Le bouton sort du mode Dessin et garde le brouillon, mais « Annuler » laissait croire qu'il le jetait ; seule l'infobulle disait le contraire (audit de charge cognitive, validé par Alexis le 13/10).
+**Décision.** `DraftPill` écrit « Fermer » (`DESIGN_TEXTS.close`), la touche « Échap » reste ; l'infobulle `closeTip` dit « Fermer le mode Dessin : le brouillon est gardé » (en : « Close », « Close Draw mode: your draft is kept »). Les actions gardent leurs noms (`onExit`).
+**Renoncement.** « Quitter » ou « Retour » : « Fermer » est déjà le mot des fenêtres. Le seuil de 360 px de `button.css`, mesuré avec « Annuler », ne bouge pas : « Fermer » est plus court.
+
+## 2026-10-13 — Écart §9.3 (retire la règle du 25/09 « la croix partout, jamais la main ») : au PC, le curseur de la fresque dit ce que fera le clic
+
+**Contexte.** Le curseur était toujours la croix (`canvas.css`), même pendant un déplacement, sur une case trop petite que le clic zoome, ou avec la gomme, la pipette et le Tracé : rien ne disait l'outil ni l'action. L'audit de charge cognitive du 13/10.
+**Décision.** `canvas-cursor.ts` choisit : croix (Vue qui inspecte, Dessin d'une couleur), loupe `zoom-in` (Vue, case sous le seuil de `tapZoomTarget`), main fermée `grabbing` (vue qu'on déplace, avant tout outil), puis en Dessin la pipette, le Tracé (Espace maintenu, avant la gomme : le geste est le tracé) et la gomme, en icônes Lucide de leurs boutons, SVG `data:` au contour clair (les teintes `--draft-outline-out` et `-in` de tokens.css, que la scène lit déjà), point chaud au bout de l'outil, repli `crosshair`. La scène le pose par `style.cursor` (CSSOM, que la CSP de prod laisse passer ; `img-src` autorise `data:`) quand il change. Au doigt, rien ne change.
+**Renoncement.** Une main ouverte au survol de la fresque ; un curseur par couleur ; la gomme qui l'emporte sur le Tracé ; un attribut `style` rendu par le serveur.
+
+## 2026-10-13 — Écart §8.1 : une action qui échoue dans l'onglet Modération garde la liste, et la ligne dit l'échec avec Réessayer
+
+**Contexte.** L'audit du 13/10 : si Rétablir ou Débannir échouait, `setList({ status: "failed" })` vidait toute la liste, remplacée par « La connexion a sauté… » sans bouton, jusqu'au prochain changement du nombre de signalements. Retirer un modérateur, en échec, remplaçait aussi la liste et remettait la synchro Twitch à « jamais ».
+**Décision.** Rétablir, Débannir et Retirer le rôle gardent leur liste. Un état par liste dit la ligne en échec (`failedReportKey`, `failedUserId`) : sous elle, le message de connexion (`RowFailure`, alerte toujours présente et vide d'abord) et Réessayer, qui relance la même action sur la ligne telle qu'elle est alors. La lecture d'une liste qui échoue (`status: "failed"`) reste comme avant. Rien n'est animé.
+**Renoncement.** Un toast d'erreur sans ligne marquée ; un Réessayer au niveau de la liste ; garder l'ancienne liste quand la relecture échoue ; mémoriser les poses déjà rétablies d'une ligne à moitié faite.
+
+## 2026-10-13 — Écart §14 : l'interface dit « dessin », « pixel », « case » et « viewer », « Effacer » des dessins, « Retirer » un rôle ou l'image
+
+**Contexte.** L'audit de charge cognitive du 13/10 : « pose », « charge », « joueur », « utilisateur », « compte » pour une personne et « ± » se mêlaient à « pixel » et « dessin ».
+**Décision.** Fresque : le tableau entier. Dessin : une pose d'un ou plusieurs pixels. Pixel : un pixel précis, et les comptes. Case : un emplacement de la grille. Viewer : qui est connecté sur la fresque d'un autre. « Effacer » enlève des dessins, « Retirer » un rôle ou l'image. La plage de modération dit « 5 min avant et après ce dessin ». « Connexion refusée : state invalide » devient la page `/auth/expired` (« La connexion à Twitch a expiré. Recommence. », avec Se connecter) ; l'autre échec reste un texte brut. Le code garde `placement`, `charges`, `player`.
+**Renoncement.** Renommer le code ; toucher `draft-texts.ts`, `design-texts.ts` et `help-texts.ts` (un autre chantier) ; garder un texte brut sans bouton pour l'état invalide.
+
+## 2026-10-13 — Écart §8.1 : la pill Pratique n'affiche plus le pourcentage du zoom
+
+**Contexte.** L'audit de charge cognitive du 13/10 : au PC, le pourcentage (« 100 % », « 1250% ») est un chiffre que personne ne lit ni n'utilise ; + et − suffisent.
+**Décision.** La pill Pratique garde Zoomer, Dézoomer et Recentrer. Le texte `zoomPercent`, son style `.lp-zoom` et son `aria-live` partent. `Framing.zoomPercent` et `zoomPercent()` restent : ils servent encore à comparer deux cadrages.
+**Renoncement.** Le pourcentage dans l'infobulle de Zoomer ; un repère qui n'apparaît qu'en zoomant.
+
 ## 2026-10-13 — Écart §8.1 (défait l'entrée du même jour sur la flèche au centre de la pill) : la flèche d'une bulle vise le centre du bouton, contre la pill, l'anneau en plus
 
 **Contexte.** Le matin du 13/10, la bulle et sa flèche avaient été centrées sur la pill qui porte le bouton, l'anneau seul marquant le bouton (la flèche à 190 px du centre de la pill sur PC, 150 px dans la colonne du paysage, pour un seul bouton). Vu sur la bêta, Alexis : « Les flèches doivent tout de même être alignées avec l'élément concerné, et non toujours centrées. »

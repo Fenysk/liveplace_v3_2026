@@ -6,6 +6,7 @@ import { createCanvasStore } from "../../state/canvas-store";
 import { createDraftStore } from "../../state/draft-store";
 import type { DraftStorage } from "../../state/saved-draft";
 import { COARSE_POINTER_QUERY } from "../design/use-media-query";
+import { toolCursor } from "./canvas-cursor";
 import { createCanvasScene } from "./canvas-scene";
 import {
   COMFORTABLE_CELL,
@@ -223,11 +224,15 @@ class FakeMutationObserver {
 }
 
 // Les jetons que la scène lit sur <html> : la durée et la courbe de tokens.css, ou 0 en mouvement réduit.
+const OUTLINE_IN = "#ffffff";
+const OUTLINE_OUT = "#10121c";
 const cssValue = (name: string): string => {
   if (name === "--lp-dur") return browser.isReducedMotion ? "0s" : "0.34s";
   if (name === "--lp-dur-fast") return browser.isReducedMotion ? "0s" : "0.14s";
   if (name === "--lp-dur-reveal") return browser.isReducedMotion ? "0s" : "0.5s";
   if (name === "--lp-dur-arrival") return browser.isReducedMotion ? "0s" : "0.3s";
+  if (name === "--draft-outline-in") return OUTLINE_IN;
+  if (name === "--draft-outline-out") return OUTLINE_OUT;
   if (name === "--obs-black") return "#000000";
   if (name === "--obs-white") return "#ffffff";
   return name === "--lp-ease" ? "cubic-bezier(0.2, 0.8, 0.2, 1)" : "";
@@ -305,6 +310,7 @@ type FakeLayer = Pick<HTMLElement, "hidden"> & {
   animate: (...args: never[]) => Pick<Animation, "cancel">;
 };
 type FakeSurface = Pick<HTMLCanvasElement, "width" | "height" | "clientWidth" | "clientHeight"> & {
+  style: Pick<CSSStyleDeclaration, "cursor">;
   getContext: (...args: never[]) => object | null;
   setPointerCapture: (...args: never[]) => void;
   addEventListener: (...args: never[]) => void;
@@ -324,6 +330,7 @@ const createSurface = () => {
     height: 0,
     clientWidth: 0,
     clientHeight: 0,
+    style: { cursor: "" },
     getContext: () => ({}),
     setPointerCapture: NO_OP,
     addEventListener,
@@ -525,6 +532,9 @@ const openScene = (
       draftStore.exitDraftMode();
       flush(SETTLE_MS);
     },
+    hover: (point: ScreenPoint) => press("pointermove", point),
+    down: (point: ScreenPoint) => press("pointerdown", point),
+    up: (point: ScreenPoint) => press("pointerup", point),
     tap: (point: ScreenPoint) => {
       press("pointerdown", point);
       press("pointerup", point);
@@ -2166,5 +2176,125 @@ describe("la scène du canvas et le fond de la fresque, Écart §9.1 (JOURNAL 20
     world.receiveAndPaint({ t: "obsBackground", obsBackground: "transparent" });
     expect(lastFrame().backdrop).toEqual({ fill: null, image: null });
     expect(fakeLayer.hidden).toBe(false);
+  });
+});
+
+// Le curseur que la scène pose sur le canvas, Écart §9.3 (JOURNAL 2026-10-13) : il dit ce que fera le clic, à la souris.
+describe("le curseur de la scène, Écart §9.3 (JOURNAL 2026-10-13)", () => {
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const OUTLINE_SHADES = { ink: OUTLINE_OUT, halo: OUTLINE_IN };
+  const CENTER = { x: LAPTOP.width / 2, y: LAPTOP.height / 2 };
+  const ELSEWHERE = { x: CENTER.x + 200, y: CENTER.y };
+  const cursorOf = (world: ReturnType<typeof openScene>) => world.surface.style.cursor;
+
+  // En Vue sur de grandes cases, le clic inspecte : la croix, au-dessus d'une case comme à côté
+  it("shows the crosshair in View on cells big enough to inspect", () => {
+    const world = openScene(LAPTOP_PLACE);
+
+    world.hover(CENTER);
+    expect(cursorOf(world)).toBe("crosshair");
+    world.hover({ x: 4, y: 4 });
+    expect(cursorOf(world)).toBe("crosshair");
+  });
+
+  // En Vue sur des cases trop petites, la loupe au-dessus d'une case seulement : à côté du canvas, le clic ferme l'inspection
+  it("shows the magnifier over a cell too small to inspect, and the crosshair beside the canvas", () => {
+    const world = openScene(LAPTOP_PLACE, { canvas: BIG_CANVAS });
+    expect(isCellTooSmall(world.view(), "fine")).toBe(true);
+
+    world.hover(CENTER);
+    expect(cursorOf(world)).toBe("zoom-in");
+    world.hover({ x: 4, y: 4 });
+    expect(cursorOf(world)).toBe("crosshair");
+  });
+
+  // Le clic qui zoome rend la croix quand la case devient assez grande
+  it("goes back to the crosshair once the click has zoomed to a cell big enough", () => {
+    const world = openScene(LAPTOP_PLACE, { canvas: BIG_CANVAS });
+    world.hover(CENTER);
+    expect(cursorOf(world)).toBe("zoom-in");
+
+    world.tap(CENTER);
+    flush(SETTLE_MS);
+
+    expect(isCellTooSmall(world.view(), "fine")).toBe(false);
+    expect(cursorOf(world)).toBe("crosshair");
+  });
+
+  // Au doigt, le même canvas trop petit zoome au toucher : la scène ne voit jamais de survol, et aucun curseur de loupe n'est posé
+  it("never shows the magnifier to a finger, which has no hover", () => {
+    const world = openScene(PHONE_PLACE);
+    expect(isCellTooSmall(world.view(), "coarse")).toBe(true);
+
+    world.hover(CENTER);
+
+    expect(cursorOf(world)).not.toBe("zoom-in");
+  });
+
+  // Pendant un déplacement de la vue, la main fermée ; la croix revient au relâcher
+  it("shows the closed hand while the view moves, and the crosshair when the button is released", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.hover(CENTER);
+
+    world.down(CENTER);
+    expect(cursorOf(world)).toBe("crosshair");
+    world.hover(ELSEWHERE);
+    expect(cursorOf(world)).toBe("grabbing");
+    world.up(ELSEWHERE);
+
+    expect(cursorOf(world)).toBe("crosshair");
+  });
+
+  // En Dessin, une couleur garde la croix ; la gomme, la pipette et le Tracé ont l'icône de leur bouton
+  it("shows the crosshair for a color in Draft, then the eraser, the eyedropper and the brush of the Trace", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.hover(CENTER);
+    world.enterDraft();
+    expect(cursorOf(world)).toBe("crosshair");
+
+    world.draftStore.toggleEraser();
+    expect(cursorOf(world)).toBe(toolCursor("eraser", OUTLINE_SHADES));
+    world.draftStore.toggleEraser();
+    expect(cursorOf(world)).toBe("crosshair");
+
+    world.draftStore.togglePicker();
+    expect(cursorOf(world)).toBe(toolCursor("picker", OUTLINE_SHADES));
+    world.draftStore.togglePicker();
+    expect(cursorOf(world)).toBe("crosshair");
+
+    world.draftStore.startTrace();
+    expect(cursorOf(world)).toBe(toolCursor("trace", OUTLINE_SHADES));
+    world.draftStore.endTrace();
+    expect(cursorOf(world)).toBe("crosshair");
+  });
+
+  // Un déplacement en Dessin avec la gomme : la main fermée, puis la gomme revient
+  it("shows the closed hand over the eraser while the view moves in Draft", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.enterDraft();
+    world.draftStore.toggleEraser();
+
+    world.down(CENTER);
+    world.hover(ELSEWHERE);
+    expect(cursorOf(world)).toBe("grabbing");
+    world.up(ELSEWHERE);
+
+    expect(cursorOf(world)).toBe(toolCursor("eraser", OUTLINE_SHADES));
+  });
+
+  // Quitter le Dessin rend la croix, même avec la gomme en main
+  it("gives the crosshair back when Draft is left with the eraser in hand", () => {
+    const world = openScene(LAPTOP_PLACE);
+    world.enterDraft();
+    world.draftStore.toggleEraser();
+    expect(cursorOf(world)).toBe(toolCursor("eraser", OUTLINE_SHADES));
+
+    world.exitDraft();
+
+    expect(cursorOf(world)).toBe("crosshair");
   });
 });

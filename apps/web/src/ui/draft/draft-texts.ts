@@ -20,16 +20,19 @@ type GaugeSentence = {
 export const DRAFT_TEXTS = defineTexts({
   draw: { fr: "Dessiner", en: "Draw" },
   drawTip: { fr: "Passer en mode Dessin", en: "Switch to Draw mode" },
-  cancelTip: {
-    fr: "Sortir du mode Dessin (le brouillon est gardé)",
-    en: "Leave Draw mode (your draft is kept)",
+  closeTip: {
+    fr: "Fermer le mode Dessin : le brouillon est gardé",
+    en: "Close Draw mode: your draft is kept",
   },
   confirm: { fr: "Valider", en: "Confirm" },
   confirmTip: { fr: "Poser le brouillon", en: "Place the draft" },
-  // Plus aucune charge et rien à poser : le bouton compte jusqu'à la prochaine (Écart §9.3, JOURNAL 2026-10-08).
+  // Plus aucun pixel et rien à poser : le bouton compte jusqu'au prochain (Écart §9.3, JOURNAL 2026-10-08).
   waitLead: { fr: "Attendre ", en: "Wait " },
-  waitTip: { fr: "Attendre la prochaine charge", en: "Wait for the next charge" },
+  waitTip: { fr: "Attendre le prochain pixel", en: "Wait for the next pixel" },
   clearDraftTip: { fr: "Vider le brouillon", en: "Clear the draft" },
+  // Le toast de Vider : le brouillon revient d'un bouton, tant que rien n'a été dessiné depuis (Écart §9.3, JOURNAL 2026-10-13).
+  draftCleared: { fr: "Brouillon vidé", en: "Draft cleared" },
+  restoreDraft: { fr: "Rétablir", en: "Restore" },
   traceTip: {
     fr: "Tracé : un doigt dessine, deux doigts déplacent",
     en: "Trace: one finger draws, two fingers move",
@@ -100,20 +103,24 @@ export const DRAFT_TEXTS = defineTexts({
   }),
 
   // Le client prédit, le serveur tranche : l'infobulle de la jauge, dite d'un trait (§9.4).
-  // JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà.
+  // JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà. Écart §9.3 (JOURNAL 2026-10-13) : en pixels, durées en « 12 s ».
   gaugeLabel: localized({
     fr: ({ charges, max, afterPlacement, nextRefill, claimable }: GaugeSentence) => {
-      const placed = afterPlacement === undefined ? "" : `${afterPlacement} après la pose, `;
-      const refill = nextRefill ? `, +${nextRefill.charges} dans ${nextRefill.countdown}` : ", jauge pleine";
+      const placed = afterPlacement === undefined ? "" : `, ${afterPlacement} après ce dessin`;
+      const refill = nextRefill
+        ? `, +${nextRefill.charges} pixel${nextRefill.charges > 1 ? "s" : ""} dans ${nextRefill.countdown}`
+        : ", jauge pleine";
       const rewards =
         claimable === 0 ? "" : `, ${claimable} récompense${claimable > 1 ? "s" : ""} à réclamer`;
-      return `${placed}${charges} / ${max} charges${refill}${rewards}`;
+      return `${charges} / ${max} pixels${placed}${refill}${rewards}`;
     },
     en: ({ charges, max, afterPlacement, nextRefill, claimable }) => {
-      const placed = afterPlacement === undefined ? "" : `${afterPlacement} after placing, `;
-      const refill = nextRefill ? `, +${nextRefill.charges} in ${nextRefill.countdown}` : ", gauge full";
+      const placed = afterPlacement === undefined ? "" : `, ${afterPlacement} after this drawing`;
+      const refill = nextRefill
+        ? `, +${nextRefill.charges} pixel${nextRefill.charges > 1 ? "s" : ""} in ${nextRefill.countdown}`
+        : ", gauge full";
       const rewards = claimable === 0 ? "" : `, ${claimable} reward${claimable > 1 ? "s" : ""} to claim`;
-      return `${placed}${charges} / ${max} charges${refill}${rewards}`;
+      return `${charges} / ${max} pixels${placed}${refill}${rewards}`;
     },
   }),
 });

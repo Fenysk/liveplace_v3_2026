@@ -805,3 +805,20 @@
 .design-state:has(.design-in-large-window) .design-state-label {
   padding-top: 0;
 }
+
+/* Une zone où passer la souris pour voir le vrai curseur de la fresque (cursor-block.tsx) : l'image de l'outil, en grand */
+.design-cursor-zone {
+  display: grid;
+  place-items: center;
+  width: min(100%, 240px);
+  height: 88px;
+  border-radius: var(--radius-sm);
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 32px 32px;
+}
+
+.design-cursor-image {
+  width: 64px;
+  height: 64px;
+}

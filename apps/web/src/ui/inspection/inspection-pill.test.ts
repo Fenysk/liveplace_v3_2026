@@ -35,7 +35,7 @@ const render = (author: InspectEntry, moderation?: ModerationControls) =>
   );
 
 describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () => {
-  // Qui modère retire ses pixels et bannit un joueur, et un modérateur venu de Twitch seul
+  // Qui modère efface ses dessins et bannit un viewer, et un modérateur venu de Twitch seul
   it("is offered to whoever moderates on a player, and on a moderator who comes from Twitch only", () => {
     const player = render(entry, moderating);
     const fromTwitch = render(
@@ -44,12 +44,12 @@ describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () 
     );
 
     for (const html of [player, fromTwitch]) {
-      expect(html).toContain("Retirer ses pixels");
+      expect(html).toContain("Effacer ses dessins");
       expect(html).toContain("Bannir");
     }
   });
 
-  // Un modérateur nommé ici, même modérateur Twitch aussi, se vide de ses pixels mais ne se bannit pas
+  // Un modérateur nommé ici, même modérateur Twitch aussi, voit ses dessins effacés mais ne se bannit pas
   it("is absent on a moderator named here, even when Twitch names him too, who can still be cleared", () => {
     const namedHere = render(
       { ...entry, moderatorOrigin: { isFromTwitch: false, isNamedHere: true } },
@@ -58,16 +58,16 @@ describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () 
     const both = render({ ...entry, moderatorOrigin: { isFromTwitch: true, isNamedHere: true } }, moderating);
 
     for (const html of [namedHere, both]) {
-      expect(html).toContain("Retirer ses pixels");
+      expect(html).toContain("Effacer ses dessins");
       expect(html).not.toContain("Bannir");
     }
   });
 
-  // Le streamer retire d'abord son rôle à un modérateur nommé ici : l'inspection lui propose Retirer modérateur, sans Bannir
-  it("leaves the owner Retirer modérateur on a moderator named here, and no Bannir", () => {
+  // Le streamer retire d'abord son rôle à un modérateur nommé ici : l'inspection lui propose Retirer le rôle, sans Bannir
+  it("leaves the owner Retirer le rôle on a moderator named here, and no Bannir", () => {
     const html = render({ ...entry, moderatorOrigin: { isFromTwitch: false, isNamedHere: true } }, owning);
 
-    expect(html).toContain("Retirer modérateur");
+    expect(html).toContain("Retirer le rôle");
     expect(html).not.toContain("Bannir");
   });
 
@@ -76,7 +76,7 @@ describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () 
     const html = render(entry);
 
     expect(html).not.toContain("Bannir");
-    expect(html).not.toContain("Retirer ses pixels");
+    expect(html).not.toContain("Effacer ses dessins");
   });
 });
 
@@ -123,8 +123,8 @@ describe("the Inspection pill while its pixel loads", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : « Retirer ses pixels » est la cible de la bulle des actions de modération
-describe("Retirer ses pixels, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// Écart §8.1 (JOURNAL 2026-10-12) : « Effacer ses dessins » est la cible de la bulle des actions de modération
+describe("Effacer ses dessins, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
   const renderInGame = (moderation?: ModerationControls) =>
     renderToStaticMarkup(
       createElement(
@@ -147,7 +147,7 @@ describe("Retirer ses pixels, cible d'une bulle d'aide (Écart §8.1, JOURNAL 20
     const [, target = ""] = /<span class="lp-bubble-target">(<button.*?<\/button>)<\/span>/.exec(html) ?? [];
 
     expect([...html.matchAll(/<span class="lp-bubble-target">/g)]).toHaveLength(1);
-    expect(target).toContain("Retirer ses pixels");
+    expect(target).toContain("Effacer ses dessins");
     expect(target).not.toContain("Bannir");
   });
 

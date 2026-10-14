@@ -29,7 +29,11 @@ import { useTexts } from "../locale/use-locale";
 import { type BubbleTargetName, BubbleTargetsContext } from "./bubble-target";
 import { HELP_TEXTS } from "./help-texts";
 
-export type HelpTextContext = { isTouchScreen: boolean; refill: Refill | undefined };
+export type HelpTextContext = {
+  isTouchScreen: boolean;
+  refill: Refill | undefined;
+  gaugeMax: number | undefined; // la jauge actuelle : la récompense dit où elle l'emmène
+};
 
 type HelpTexts = (typeof HELP_TEXTS)["fr"];
 
@@ -58,12 +62,13 @@ const SPECS: Record<HelpBubble, HelpBubbleSpec> = {
   "invite-link": { icon: Link, target: "obs-address", text: (t) => t.inviteLink },
   theme: { icon: Tag, target: "theme", text: (t) => t.theme },
   "twitch-sync": { icon: RefreshCw, target: "moderation-tab", text: (t) => t.twitchSync, sides: TAB_SIDES },
-  "first-reward": { icon: Gift, target: "claim", text: (t) => t.reward },
+  "first-reward": { icon: Gift, target: "claim", text: (t, { gaugeMax }) => t.reward(gaugeMax) },
   // La pill Modération porte la cible des signalements : la bulle d'accueil vise le même bouton.
   "moderator-welcome": { icon: Shield, target: "reports", text: (t) => t.moderatorWelcome },
   "moderation-actions": { icon: Ban, target: "clear", text: (t) => t.moderationActions },
   "empty-gauge": { icon: Hourglass, target: "gauge", text: (t, { refill }) => t.gauge(refill) },
   "draft-trace": { icon: Brush, target: "trace", text: (t) => t.trace },
+  "draft-space": { icon: Brush, text: (t) => t.space },
   "first-draft": { icon: Pointer, target: "submit", text: (t, { isTouchScreen }) => t.draft(isTouchScreen) },
   palette: { icon: PaletteIcon, target: "palette", text: (t) => t.palette },
   keys: { icon: Undo2, text: (t) => t.keys },

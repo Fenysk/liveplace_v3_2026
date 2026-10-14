@@ -123,6 +123,7 @@ export type HelpBubblesView = {
   isBusy: boolean; // une bulle d'aide est montrée, attend son tour ou s'efface : le conseil de première visite lui cède la place
   isTouchScreen: boolean;
   refill: Refill | undefined; // les chiffres du canvas, pour la bulle de la jauge
+  gaugeMax: number | undefined; // la jauge de la personne, pour la bulle de la récompense
   onWindowSection: (sectionId: string) => void; // la fenêtre vient de s'ouvrir sur cette section
   onObsLinkCopied: () => void; // le lien de Vue OBS vient d'être copié : la chaîne OBS est finie, puis le partage (JOURNAL 2026-10-09 et 2026-10-12)
   onPaletteOpened: () => void; // la feuille Dessin vient de déplier la palette complète (JOURNAL 2026-10-12)
@@ -197,6 +198,7 @@ export function useHelpBubbles(
     isBusy: pending !== undefined || shown !== undefined,
     isTouchScreen,
     refill: view.params,
+    gaugeMax: view.gauge?.max,
     onWindowSection: (sectionId) => {
       for (const bubble of bubblesFoundIn(sectionId))
         if (isWished(bubble, facts)) seenBubbles.markSeen(bubble);

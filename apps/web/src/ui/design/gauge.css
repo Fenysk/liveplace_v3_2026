@@ -1,5 +1,6 @@
-/* Deux fluides : les charges restantes devant, celles réservées par le brouillon derrière, plus claires.
-   On les distingue par la luminosité, pas seulement par la teinte. */
+/* Un anneau-minuteur du prochain pixel, puis un tube où les pixels sont un fluide, le nombre « 8/20 » dedans (Écart §9.3,
+   JOURNAL 2026-10-13). Deux fluides : les pixels qu'on a devant, ceux que réserve le brouillon derrière, plus clairs : on les
+   distingue par la luminosité, pas seulement par la teinte. */
 
 .lp-gauge {
   display: flex;
@@ -12,7 +13,7 @@
   flex-direction: column-reverse;
 }
 
-.lp-gauge-count {
+.lp-gauge-timer {
   position: relative;
   width: var(--control-size);
   height: var(--control-size);
@@ -21,7 +22,7 @@
   place-items: center;
 }
 
-.lp-gauge-count svg {
+.lp-gauge-timer svg {
   position: absolute;
   inset: 0;
   transform: rotate(-90deg);
@@ -42,32 +43,122 @@
   stroke-linecap: round;
 }
 
-.lp-fluid {
+/* Le chiffre de l'anneau paraît en fondu en grossissant un peu, et s'efface de même (gauge.tsx). « 1:05 » est plus large que
+   « 12 » : il se resserre pour rester dans l'anneau, de 36 px au PC, de 44 px au doigt. */
+.lp-gauge-timer-text {
   position: relative;
-  display: block;
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    transform var(--lp-dur-fade) var(--lp-ease);
+  animation: lp-gauge-timer-in var(--lp-dur-fade) var(--lp-ease);
+}
+
+.lp-gauge-timer-text.is-long {
+  font-size: 0.75em;
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .lp-gauge-timer-text.is-long {
+    font-size: 0.9em;
+  }
+}
+
+.lp-gauge-timer-text.is-leaving {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+@keyframes lp-gauge-timer-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* Le tube porte le fluide et le nombre. Le fluide le remplit ; le nombre, en trois couches de même texte superposées dans une
+   seule case, donne au tube sa largeur minimale : de quoi lire « 150/150 », jamais moins (Écart §9.3, JOURNAL 2026-10-13). */
+.lp-gauge-tube {
+  position: relative;
+  display: grid;
+  align-items: center;
   width: 128px;
-  height: 14px;
-  border-radius: var(--radius-pill);
-  background: var(--gauge-empty);
-  overflow: hidden;
+  height: 20px;
   flex: none;
 }
 
+.lp-fluid {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gauge-empty);
+  overflow: hidden;
+}
+
+/* Chaque couche a la couleur lisible (AA) sur ce qu'elle recouvre. La première couvre tout le tube, vide compris ; les deux
+   autres sont rognées au niveau de leur fluide, qui glisse de la même durée que lui. Positionnées : elles passent devant le fluide. */
+.lp-gauge-text {
+  position: relative;
+  grid-area: 1 / 1;
+  padding-inline: var(--space-2);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lp-gauge-text--empty {
+  color: var(--ink);
+}
+
+.lp-gauge-text--draft,
+.lp-gauge-text--charge {
+  clip-path: inset(0 calc(100% - var(--lp-level)) 0 0);
+  transition: clip-path var(--lp-dur) var(--lp-ease);
+}
+
+.lp-gauge-text--draft {
+  color: var(--on-gauge-draft);
+}
+
+.lp-gauge-text--charge {
+  color: var(--on-gauge-charge);
+}
+
+/* En colonne, le tube est vertical et le nombre se pose au-dessus, sur la surface de la pill : une seule couche suffit. */
+.lp-gauge--v .lp-gauge-tube {
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .lp-gauge--v .lp-fluid {
+  position: relative;
+  inset: auto;
   width: 14px;
   height: 128px;
+  flex: none;
+}
+
+.lp-gauge--v .lp-gauge-text {
+  padding-inline: 0;
+}
+
+.lp-gauge--v .lp-gauge-text--draft,
+.lp-gauge--v .lp-gauge-text--charge {
+  display: none;
 }
 
 /* Le tube prend la place restante (barre du bas, sur mobile). Il cède avant que Valider, quand il compte ou attend
-   (Écart §9.3, JOURNAL 2026-10-08), ne le recouvre : 32 px au moins. */
+   (Écart §9.3, JOURNAL 2026-10-08), ne le recouvre, mais pas sous son nombre. */
 .lp-gauge--fill {
   flex: 1;
 }
 
-.lp-gauge--fill .lp-fluid {
+.lp-gauge--fill .lp-gauge-tube {
   flex: 1;
   width: auto;
-  min-width: 32px;
 }
 
 /* Le fluide se range du côté de la gravité : à gauche à l'horizontale, en bas à la verticale.
@@ -156,8 +247,9 @@
   }
 }
 
+/* Sur mobile le tube est un peu moins haut, en proportion (20 px au PC), et le nombre y tient encore */
 @media (max-width: 640px) {
-  .lp-fluid {
-    height: 12px;
+  .lp-gauge:not(.lp-gauge--v) .lp-gauge-tube {
+    height: 18px;
   }
 }

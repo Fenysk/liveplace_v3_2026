@@ -1,5 +1,5 @@
 // Un élément dont la taille glisse (Écart §9.3, JOURNAL 2026-10-08) : la pill qui l'entoure suit sa taille d'elle-même, elle ne la
-// rejoue pas à chaque image (use-morph.ts). Le bouton au libellé qui change et le contrôle qui paraît le portent le temps de glisser.
+// rejoue pas à chaque image (use-morph.ts). Le bouton au libellé qui change le porte le temps de glisser.
 
 export const MORPHING_ATTRIBUTE = "data-morphing";
 

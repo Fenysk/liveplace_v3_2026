@@ -16,10 +16,35 @@
   height: 20px;
 }
 
+/* Avec une action : son bouton ferme la pill à droite, sans marge de plus */
+.lp-toast--action {
+  padding-inline-end: 0;
+}
+
+.lp-toast .lp-btn {
+  flex: none;
+}
+
 .lp-toast--success svg {
   color: var(--gauge-charge);
 }
 
 .lp-toast--error svg {
   color: var(--danger);
+}
+
+/* Dans la couche supérieure du navigateur (`popover`, Écart §8.1, JOURNAL 2026-10-13), au-dessus d'une fenêtre modale. Ses styles de base
+   (cadre, fond, marge, remplissage, défilement) tombent et sa boîte est nulle : la pill, fixée à son bord (pill.css), garde sa place. */
+.lp-toast-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
 }

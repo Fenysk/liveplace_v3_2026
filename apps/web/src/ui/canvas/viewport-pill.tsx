@@ -1,4 +1,4 @@
-// La pill Pratique (CDC 2026), en bas à droite : de haut en bas, zoomer, le pourcentage, dézoomer, recentrer.
+// La pill Pratique (CDC 2026), en bas à droite : de haut en bas, zoomer, dézoomer, recentrer. Écart §8.1 (JOURNAL 2026-10-13) : plus de pourcentage.
 // Sur mobile, recentrer seul, et seulement quand la vue a bougé.
 
 import { LocateFixed, Minus, Plus } from "lucide-react";
@@ -41,9 +41,6 @@ export const ViewportPill = ({
   return (
     <Pill dock={dock} layout="rail">
       <Button icon={Plus} variant="ghost" title={t.zoomIn} onPress={onZoomIn} />
-      <span className="lp-zoom lp-type-numeric" aria-live="polite">
-        {framing && t.zoomPercent(framing.zoomPercent)}
-      </span>
       <Button icon={Minus} variant="ghost" title={t.zoomOut} onPress={onZoomOut} />
       <PillSeparator />
       {recenter}

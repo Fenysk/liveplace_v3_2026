@@ -40,7 +40,7 @@ const doNothing = (): void => undefined;
 const inEnglish = (element: ReactElement): string =>
   renderToStaticMarkup(createElement(LocaleProvider, { initial: "en" }, element));
 
-const GAUGE = { charges: 8, max: 10, refill: null, label: "8 / 10 charges, gauge full" };
+const GAUGE = { charges: 8, max: 10, refill: null, label: "8 / 10 pixels, gauge full" };
 const ACTIONS: DraftPillActions = {
   onEnter: doNothing,
   onClaim: doNothing,
@@ -141,8 +141,8 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
   it("says the sign-in note and the claim button in English", () => {
     expect(inEnglish(createElement(SignInNote))).toContain("By signing in, you accept the ");
     expect(inEnglish(createElement(SignInNote))).toContain("privacy policy</a>");
-    expect(inEnglish(createElement(ClaimButton, { onClaim: doNothing }))).toContain(
-      'aria-label="Raise the gauge by +1 pixel"',
+    expect(inEnglish(createElement(ClaimButton, { onClaim: doNothing, max: 20 }))).toContain(
+      'aria-label="Claim: your gauge goes up to 21 pixels"',
     );
   });
 });
@@ -188,11 +188,11 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
       isPicking: false,
     });
 
-    expect(markup).toContain(">Cancel</span>");
+    expect(markup).toContain(">Close</span>");
     expect(markup).toContain(">Confirm · 3</span>");
     expect(markup).toContain('title="Place the draft"');
     expect(markup).toContain('title="Clear the draft"');
-    expect(markup).toContain('title="Leave Draw mode (your draft is kept)"');
+    expect(markup).toContain('title="Close Draw mode: your draft is kept"');
     expect(markup).toContain('title="Trace: one finger draws, two fingers move"');
     expect(markup).toContain('title="Eyedropper (I): picks the color of a placed pixel"');
     expect(markup).toContain('title="Eraser (E)"');
@@ -227,9 +227,7 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
     );
 
     expect(markup).toContain("Ban Troll?");
-    expect(markup).toContain(
-      "No visible pixels. This account will no longer be able to place on this canvas",
-    );
+    expect(markup).toContain("No visible pixels. This viewer will no longer be able to draw on this canvas");
     expect(markup).toContain(">Ban</span>");
     expect(markup).toContain(">Cancel</span>");
     expect(markup).toContain("The connection dropped. Try again in a moment");
@@ -250,9 +248,9 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
       }),
     );
 
-    expect(markup).toContain("Report this placement by Troll?");
+    expect(markup).toContain("Report this drawing by Troll?");
     expect(markup).toContain("Time range");
-    expect(markup).toContain("This placement only");
+    expect(markup).toContain("This drawing only");
     expect(markup).toContain(">Report</span>");
   });
 
@@ -307,7 +305,7 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
     expect(empty).toContain('title="Close (Esc)"');
     expect(found).toContain("3 hours ago");
     expect(found).toContain(">Report</span>");
-    expect(found).toContain(">Clear their pixels</span>");
+    expect(found).toContain(">Clear their drawings</span>");
     expect(found).toContain(">Ban</span>");
     expect(found).toContain(">Make moderator</span>");
     expect(found).toContain('title="Transparent (eraser)"');
@@ -425,8 +423,8 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(resize).toContain("it comes back when the canvas grows");
   });
 
-  // La pill Pratique
-  it("says the tips of the zoom pill in English, the percent without a space", () => {
+  // La pill Pratique : Écart §8.1 (JOURNAL 2026-10-13), plus de pourcentage
+  it("says the tips of the zoom pill in English, and shows no percent", () => {
     const markup = inEnglish(
       createElement(ViewportPill, {
         framing: { zoomPercent: 150, isArrival: false },
@@ -440,7 +438,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(markup).toContain('title="Zoom in"');
     expect(markup).toContain('title="Zoom out"');
     expect(markup).toContain('title="Recenter the view"');
-    expect(markup).toContain(">150%</span>");
+    expect(markup).not.toContain("%");
   });
 
   // La section Archives : le canvas en cours, ses dates, la ligne d'une archive
@@ -588,6 +586,7 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
           bubble,
           isTouchScreen: true,
           refill: { refillMs: 10_000, refillCharges: 1 },
+          gaugeMax: 20,
         }),
       ),
     ).join("");
@@ -596,11 +595,13 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     expect(lines).toContain("Your gauge refills on its own: 1 pixel every 10 s");
     expect(lines).toContain("Tap the canvas to prepare your drawing, then Confirm to send it");
     expect(lines).toContain("Turn on Trace to draw by dragging");
+    expect(lines).toContain("Hold Space and drag to draw");
+    expect(lines).toContain("A reward is waiting: your gauge goes up to 21 pixels");
     expect(lines).toContain("Share this link with your viewers too");
     expect(lines).toContain("Give your canvas a theme");
     expect(lines).toContain("Import your Twitch moderators here");
     expect(lines).toContain("You moderate this canvas: everything is here");
-    expect(lines).toContain("Clear their pixels or ban this viewer here");
+    expect(lines).toContain("Clear their drawings or ban this viewer here");
     expect(lines).toContain("Tap your color to open the palette");
     expect(lines).not.toContain("1 to 5");
     expect(lines).toContain("Ctrl+Z: undo your last stroke");
@@ -608,7 +609,7 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     expect(lines).not.toMatch(/Ajoute|Copie|Active|récompense|jauge/);
   });
 
-  // L'attente d'une charge, quand il n'y a plus rien à poser
+  // L'attente d'un pixel, quand il n'y a plus rien à poser
   it("says Wait with the countdown when the gauge is empty and the draft too", () => {
     const markup = draftPill({
       kind: "draft",
@@ -627,7 +628,7 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     });
 
     expect(markup).toContain("Wait ");
-    expect(markup).toContain('title="Wait for the next charge"');
+    expect(markup).toContain('title="Wait for the next pixel"');
     expect(markup).toContain("12 s");
   });
 

@@ -25,7 +25,7 @@ export const OBS_TEXTS = defineTexts({
   },
   delay: { fr: "Délai", en: "Delay" },
   delayNote: {
-    fr: "Le temps de retirer un pixel avant qu'il n'arrive sur le stream.",
+    fr: "Le temps d'effacer un pixel avant qu'il n'arrive sur le stream.",
     en: "Time to clear a pixel before it reaches the stream.",
   },
 });

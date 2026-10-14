@@ -153,7 +153,7 @@ describe("archivesCounter and the empty list (Écart §15, JOURNAL 2026-10-06)",
   // L'état vide tient en une phrase, qui dit aussi ce que fait archiver
   it("says in one sentence that there is no archive yet and what archiving does", () => {
     expect(fr.noArchive).toBe(
-      "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur une fresque vide.",
+      "Aucune archive pour l'instant. Archiver fige ta fresque, avec son lien, et repart sur une fresque vide.",
     );
     expect(fr.noCurrentCanvas).toBe("Aucune fresque en cours.");
   });
@@ -176,7 +176,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
   // Archiver : une phrase, sans aucune dimension
   it("tells what archiving does in one sentence, without a size", () => {
     expect(fr.archiveSentence).toBe(
-      "Ton dessin est figé et garde son lien. Tes viewers passent sur une fresque vide.",
+      "Ta fresque est figée et garde son lien. Tes viewers passent sur une fresque vide.",
     );
     expect(fr.archiveSentence).not.toMatch(/\d|cases/);
     expect(en.archiveSentence).not.toMatch(/\d|cells/);

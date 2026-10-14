@@ -51,7 +51,6 @@ export const PillEntry = () => (
       <StateRow name="Rail" detail="La pill Pratique.">
         <Pill layout="rail">
           <Button icon={Plus} variant="ghost" title="Zoomer" onPress={noop} />
-          <span className="lp-zoom lp-type-numeric">100 %</span>
           <Button icon={Minus} variant="ghost" title="Dézoomer" onPress={noop} />
           <PillSeparator />
           <Button icon={LocateFixed} variant="ghost" title="Recentrer la vue" onPress={noop} />
@@ -182,6 +181,12 @@ type SectionsWindowProps = {
   isLarge?: boolean;
 };
 
+// Un réglage enregistré en direct : son toast passe au-dessus de la fenêtre et de son voile (Écart §8.1, JOURNAL 2026-10-13).
+const SaveButton = () => {
+  const toast = useToast();
+  return <Button label="Enregistrer" onPress={() => toast("success", "Réglage enregistré")} />;
+};
+
 const SectionsWindow = ({ isOpen, close, initialId, isLarge = false }: SectionsWindowProps) => {
   const [sectionId, setSectionId] = useState(initialId);
   const appearanceChoice = useAppearanceChoice();
@@ -195,7 +200,10 @@ const SectionsWindow = ({ isOpen, close, initialId, isLarge = false }: SectionsW
       isLarge={isLarge}
     >
       {sectionId === "short" && (
-        <p className="lp-type-body lp-muted">Une section qui profite de la largeur.</p>
+        <>
+          <p className="lp-type-body lp-muted">Une section qui profite de la largeur.</p>
+          <SaveButton />
+        </>
       )}
       {sectionId === "long" &&
         LONG_SECTION_ROWS.map((label) => (
@@ -225,37 +233,41 @@ const SectionsWindow = ({ isOpen, close, initialId, isLarge = false }: SectionsW
 
 export const WindowEntry = () => (
   <Entry slug="fenetre" components={["Window", "SmallWindow"]} file="ui/design/window.tsx">
-    <Block title="Grande fenêtre">
-      <StateRow
-        name="Grande fenêtre"
-        detail="Sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran ; sur mobile, la même feuille. Changer de section : le contenu arrive en fondu, et la hauteur de la feuille glisse sur mobile."
-      >
-        <OpenWindow>
-          {({ isOpen, close }) => <SectionsWindow isOpen={isOpen} close={close} initialId="short" isLarge />}
-        </OpenWindow>
-      </StateRow>
-    </Block>
-    <Block title="Petite fenêtre" note={DIALOG_NOTE}>
-      <StateRow name="Petite fenêtre" detail="Une question ou un avis, sans barre latérale.">
-        <OpenWindow>
-          {({ isOpen, close }) => (
-            <SmallWindow
-              isOpen={isOpen}
-              title="Une question"
-              onClose={close}
-              actions={
-                <>
-                  <Button label="Annuler" kbd="Échap" onPress={close} />
-                  <Button label="Confirmer" variant="primary" onPress={close} />
-                </>
-              }
-            >
-              <p className="lp-type-body lp-prompt">Une phrase courte, puis la décision.</p>
-            </SmallWindow>
-          )}
-        </OpenWindow>
-      </StateRow>
-    </Block>
+    <ToastProvider>
+      <Block title="Grande fenêtre">
+        <StateRow
+          name="Grande fenêtre"
+          detail="Sur PC, jusqu'à 1 100 px de large et 90 % de la hauteur de l'écran ; sur mobile, la même feuille. Changer de section : le contenu arrive en fondu, et la hauteur de la feuille glisse sur mobile. Enregistrer montre un toast, qui passe au-dessus de la fenêtre et de son voile."
+        >
+          <OpenWindow>
+            {({ isOpen, close }) => (
+              <SectionsWindow isOpen={isOpen} close={close} initialId="short" isLarge />
+            )}
+          </OpenWindow>
+        </StateRow>
+      </Block>
+      <Block title="Petite fenêtre" note={DIALOG_NOTE}>
+        <StateRow name="Petite fenêtre" detail="Une question ou un avis, sans barre latérale.">
+          <OpenWindow>
+            {({ isOpen, close }) => (
+              <SmallWindow
+                isOpen={isOpen}
+                title="Une question"
+                onClose={close}
+                actions={
+                  <>
+                    <Button label="Annuler" kbd="Échap" onPress={close} />
+                    <Button label="Confirmer" variant="primary" onPress={close} />
+                  </>
+                }
+              >
+                <p className="lp-type-body lp-prompt">Une phrase courte, puis la décision.</p>
+              </SmallWindow>
+            )}
+          </OpenWindow>
+        </StateRow>
+      </Block>
+    </ToastProvider>
   </Entry>
 );
 
@@ -308,6 +320,15 @@ const ToastButtons = () => {
     <div className="lp-row">
       <Button label="Succès" onPress={() => toast("success", "Délai enregistré : 10 s")} />
       <Button label="Erreur" onPress={() => toast("error", "Connexion perdue : la page se reconnecte.")} />
+      <Button
+        label="Avec une action"
+        onPress={() =>
+          toast("success", "Brouillon vidé", {
+            label: "Rétablir",
+            onPress: () => toast("success", "Brouillon rétabli"),
+          })
+        }
+      />
     </div>
   );
 };
@@ -346,7 +367,7 @@ export const ToastEntry = () => (
     slug="toast"
     components={["Toast", "ToastProvider", "ToastAnnouncement"]}
     file="ui/design/{toast,toast-announcement}.tsx"
-    note="Une icône et une phrase, 3 s, un seul à la fois. Il entre et sort comme les pills."
+    note="Une icône et une phrase, 3 s, un seul à la fois. Il entre et sort comme les pills. Avec une action, un bouton texte après la phrase, il reste 5 s : le temps d'appuyer."
   >
     <Block title="États">
       <StateRow name="Succès">
@@ -355,6 +376,17 @@ export const ToastEntry = () => (
       <StateRow name="Erreur">
         <Toast
           message={{ id: 2, tone: "error", text: "3 pixels refusés : ils restent dans le brouillon." }}
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow name="Avec une action" detail="Un bouton texte après la phrase, 5 s : appuyer le ferme.">
+        <Toast
+          message={{
+            id: 3,
+            tone: "success",
+            text: "Brouillon vidé",
+            action: { label: "Rétablir", onPress: noop },
+          }}
           isDocked={false}
         />
       </StateRow>

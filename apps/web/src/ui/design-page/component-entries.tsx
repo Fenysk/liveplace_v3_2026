@@ -243,7 +243,7 @@ const TEXT_BUTTONS: readonly { name: string; props: ButtonProps }[] = [
   },
   { name: "Secondaire", props: { label: "Annuler", kbd: "Échap", onPress: noop } },
   { name: "Avec une icône", props: { label: "Se déconnecter", icon: LogOut, onPress: noop } },
-  { name: "Modération", props: { label: "Retirer ses pixels", onPress: noop } },
+  { name: "Modération", props: { label: "Effacer ses dessins", onPress: noop } },
   { name: "Modération, danger", props: { label: "Bannir", variant: "danger", onPress: noop } },
 ];
 
@@ -283,7 +283,7 @@ const MORPHING_LABELS = [
 ];
 
 // Le libellé change : la largeur glisse de l'ancienne à la nouvelle, le texte passe en fondu quand ses mots changent,
-// les chiffres gardent leur largeur. Le contrôle qui paraît s'ouvre en largeur et en opacité.
+// les chiffres gardent leur largeur. Le contrôle qui paraît le fait en fondu, à sa place.
 const MorphingScenes = () => (
   <Block title="Qui bougent">
     <StateRow
@@ -303,7 +303,7 @@ const MorphingScenes = () => (
     </StateRow>
     <StateRow
       name="Un contrôle qui paraît"
-      detail="Touche Brouillon : la corbeille s'ouvre en largeur et en opacité."
+      detail="Touche Brouillon : la corbeille paraît en fondu, à sa place. Fermée, elle prend la même place, invisible : rien ne bouge autour d'elle."
     >
       <WithValue initial={false}>
         {(isOpen, setIsOpen) => (
@@ -312,6 +312,25 @@ const MorphingScenes = () => (
             <Reveal isOpen={isOpen}>
               <Button icon={Trash} variant="ghost" title="Vider le brouillon" onPress={noop} />
             </Reveal>
+          </Pill>
+        )}
+      </WithValue>
+    </StateRow>
+    <StateRow
+      name="Un libellé qui garde sa largeur"
+      detail="Touche Valider : il compte jusqu'à 99 sans élargir le bouton, et Fermer, à côté, ne bouge pas."
+    >
+      <WithValue initial={0}>
+        {(count, setCount) => (
+          <Pill>
+            <Button label="Fermer" kbd="Échap" onPress={noop} />
+            <Button
+              label={submitLabel(count, undefined, "fr")}
+              reservedLabel={submitLabel(99, undefined, "fr")}
+              variant="primary"
+              hasMorphingLabel
+              onPress={() => setCount((count + 1) % 100)}
+            />
           </Pill>
         )}
       </WithValue>
@@ -504,14 +523,14 @@ export const FieldsEntry = () => (
         <InSmallWindow>
           <WithValue initial={false}>
             {(isChecked, setIsChecked) => (
-              <Checkbox label="Retirer tous ses pixels" isChecked={isChecked} onToggle={setIsChecked} />
+              <Checkbox label="Effacer tous ses dessins" isChecked={isChecked} onToggle={setIsChecked} />
             )}
           </WithValue>
         </InSmallWindow>
       </StateRow>
       <StateRow name="Case désactivée, cochée">
         <InSmallWindow>
-          <Checkbox label="Retirer tous ses pixels" isChecked onToggle={noop} isDisabled />
+          <Checkbox label="Effacer tous ses dessins" isChecked onToggle={noop} isDisabled />
         </InSmallWindow>
       </StateRow>
     </Block>

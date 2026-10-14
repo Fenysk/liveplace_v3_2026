@@ -19,6 +19,7 @@ import { Route as LoginBackgroundRouteImport } from './../routes/$login_.backgro
 import { Route as LoginManifestDotwebmanifestRouteImport } from './../routes/$login_.manifest[.]webmanifest'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as LoginPreviewDotpngRouteImport } from './../routes/$login_.preview[.]png'
+import { Route as AuthExpiredRouteImport } from './../routes/auth/expired'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
 import { Route as TwitchEventsubRouteImport } from './../routes/twitch/eventsub'
@@ -76,6 +77,11 @@ const LoginPreviewDotpngRoute = LoginPreviewDotpngRouteImport.update({
   path: '/$login/preview.png',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthExpiredRoute = AuthExpiredRouteImport.update({
+  id: '/auth/expired',
+  path: '/auth/expired',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthSignoutRoute = AuthSignoutRouteImport.update({
   id: '/auth/signout',
   path: '/auth/signout',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/twitch/eventsub': typeof TwitchEventsubRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/twitch/eventsub': typeof TwitchEventsubRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/$login_/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login_/obs': typeof LoginObsRoute
   '/$login_/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/twitch/eventsub': typeof TwitchEventsubRoute
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/$login/preview.png'
+    | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
     | '/twitch/eventsub'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/$login/preview.png'
+    | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
     | '/twitch/eventsub'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/$login_/manifest.webmanifest'
     | '/$login_/obs'
     | '/$login_/preview.png'
+    | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
     | '/twitch/eventsub'
@@ -219,6 +231,7 @@ export interface RootRouteChildren {
   LoginManifestDotwebmanifestRoute: typeof LoginManifestDotwebmanifestRoute
   LoginObsRoute: typeof LoginObsRoute
   LoginPreviewDotpngRoute: typeof LoginPreviewDotpngRoute
+  AuthExpiredRoute: typeof AuthExpiredRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
   TwitchEventsubRoute: typeof TwitchEventsubRoute
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginPreviewDotpngRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/expired': {
+      id: '/auth/expired'
+      path: '/auth/expired'
+      fullPath: '/auth/expired'
+      preLoaderRoute: typeof AuthExpiredRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/signout': {
       id: '/auth/signout'
       path: '/auth/signout'
@@ -358,6 +378,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginManifestDotwebmanifestRoute: LoginManifestDotwebmanifestRoute,
   LoginObsRoute: LoginObsRoute,
   LoginPreviewDotpngRoute: LoginPreviewDotpngRoute,
+  AuthExpiredRoute: AuthExpiredRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
   TwitchEventsubRoute: TwitchEventsubRoute,

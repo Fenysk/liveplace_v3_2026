@@ -27,6 +27,7 @@ const EVERY: Localized<Every> = {
 };
 
 // L'intervalle d'une recharge, dit comme on le lit : « toutes les 10 s », « toutes les minutes », « toutes les 1 min 30 s ».
+// Le mot qui suit le plus grand s'écrit sur deux chiffres, comme `formatWait` : « 1 min 05 s », « 2 h 05 min ».
 export function everyText(ms: number, locale: Locale): string {
   const { prefix, exactly } = EVERY[locale];
   if (ms < MS_PER_SECOND) return `${prefix}${ms} ms`;
@@ -36,7 +37,8 @@ export function everyText(ms: number, locale: Locale): string {
     const count = Math.floor(rest / seconds);
     rest -= count * seconds;
     if (count === 1 && rest === 0 && parts.length === 0) return exactly[short];
-    if (count > 0) parts.push(`${count} ${short}`);
+    if (count > 0)
+      parts.push(parts.length === 0 ? `${count} ${short}` : `${String(count).padStart(2, "0")} ${short}`);
   }
   return `${prefix}${parts.join(" ")}`;
 }
@@ -58,11 +60,20 @@ export const HELP_TEXTS = defineTexts({
   inviteLink: { fr: "Partage aussi ce lien à tes viewers", en: "Share this link with your viewers too" },
   theme: { fr: "Donne un thème à ta fresque", en: "Give your canvas a theme" },
   twitchSync: { fr: "Reprends tes modérateurs Twitch ici", en: "Import your Twitch moderators here" },
-  reward: {
-    fr: "Une récompense t'attend : +1 sur ta jauge max",
-    en: "A reward is waiting for you: +1 on your max gauge",
-  },
+  // La récompense dit son effet par le chiffre : la jauge actuelle + 1 (Écart §9.3, JOURNAL 2026-10-13).
+  reward: localized({
+    fr: (gaugeMax: number | undefined) =>
+      gaugeMax === undefined
+        ? "Une récompense t'attend"
+        : `Une récompense t'attend : ta jauge passe à ${gaugeMax + 1} pixels`,
+    en: (gaugeMax) =>
+      gaugeMax === undefined
+        ? "A reward is waiting"
+        : `A reward is waiting: your gauge goes up to ${gaugeMax + 1} pixels`,
+  }),
   trace: { fr: "Active le tracé pour dessiner en glissant", en: "Turn on Trace to draw by dragging" },
+  // À la souris, glisser déplace la vue : Espace tenu trace (Écart §8.1, JOURNAL 2026-10-14).
+  space: { fr: "Maintiens Espace et glisse pour tracer", en: "Hold Space and drag to draw" },
 
   // Pour qui modère (Écart §8.1, JOURNAL 2026-10-12) : sa pill Modération, puis les actions de l'inspection.
   moderatorWelcome: {
@@ -70,8 +81,8 @@ export const HELP_TEXTS = defineTexts({
     en: "You moderate this canvas: everything is here",
   },
   moderationActions: {
-    fr: "Retire ses pixels ou bannis ce viewer ici",
-    en: "Clear their pixels or ban this viewer here",
+    fr: "Efface ses dessins ou bannis ce viewer ici",
+    en: "Clear their drawings or ban this viewer here",
   },
 
   // Ce qui reste à apprendre en Dessin, une fois des dessins posés (Écart §8.1, JOURNAL 2026-10-12) : la palette au doigt, les

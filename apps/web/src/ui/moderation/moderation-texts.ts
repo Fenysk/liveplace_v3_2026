@@ -12,6 +12,8 @@ export const MODERATION_TEXTS = defineTexts({
     fr: "La connexion a sauté. Réessaie dans un instant : la page se reconnecte seule.",
     en: "The connection dropped. Try again in a moment: the page reconnects by itself.",
   },
+  // Sur la ligne dont l'action a échoué, Écart §8.1 (JOURNAL 2026-10-13) : elle relance la même.
+  retry: { fr: "Réessayer", en: "Try again" },
 
   // JOURNAL 2026-09-28 : combien de comptes ont signalé une pose.
   reportCount: localized({
@@ -31,16 +33,16 @@ export const MODERATION_TEXTS = defineTexts({
     },
   }),
 
-  // Le toast de Rétablir : une pose, ou toutes celles d'une ligne de signalements (JOURNAL 2026-10-07).
+  // Le toast de Rétablir : un dessin, ou tous ceux d'une ligne de signalements (JOURNAL 2026-10-07).
   approvedToast: localized({
     fr: (placementCount: number) =>
       placementCount > 1
-        ? "Poses rétablies : elles reviennent sur le stream"
-        : "Pose rétablie : elle revient sur le stream",
+        ? "Dessins rétablis : ils reviennent sur le stream"
+        : "Dessin rétabli : il revient sur le stream",
     en: (placementCount) =>
       placementCount > 1
-        ? "Placements restored: they are back on the stream"
-        : "Placement restored: it is back on the stream",
+        ? "Drawings restored: they are back on the stream"
+        : "Drawing restored: it is back on the stream",
   }),
 
   // D'où vient le rôle d'un modérateur, sous son nom dans l'onglet Modération.
@@ -70,29 +72,29 @@ export const MODERATION_TEXTS = defineTexts({
   // L'onglet Modération.
   reports: { fr: "Signalements", en: "Reports" },
   noReports: { fr: "Aucun signalement en attente.", en: "No pending reports." },
-  hiddenFromStream: { fr: "Cachée du stream", en: "Hidden from the stream" },
+  hiddenFromStream: { fr: "Caché du stream", en: "Hidden from the stream" },
   reportedPlacementPreview: localized({
     fr: ({ hasSeveral, name }: { hasSeveral: boolean; name: string }) =>
-      `${hasSeveral ? "Les poses signalées" : "La pose signalée"} de ${name}`,
-    en: ({ hasSeveral, name }) => `${name}'s reported ${hasSeveral ? "placements" : "placement"}`,
+      `${hasSeveral ? "Les dessins signalés" : "Le dessin signalé"} de ${name}`,
+    en: ({ hasSeveral, name }) => `${name}'s reported ${hasSeveral ? "drawings" : "drawing"}`,
   }),
   clearPlacements: {
-    fr: { one: "Retirer la pose", several: "Retirer les poses" },
-    en: { one: "Clear the placement", several: "Clear the placements" },
+    fr: { one: "Effacer le dessin", several: "Effacer les dessins" },
+    en: { one: "Clear the drawing", several: "Clear the drawings" },
   },
   ban: { fr: "Bannir", en: "Ban" },
   unban: { fr: "Débannir", en: "Unban" },
   restore: { fr: "Rétablir", en: "Restore" },
-  bannedUsers: { fr: "Utilisateurs bannis", en: "Banned users" },
+  bannedUsers: { fr: "Viewers bannis", en: "Banned viewers" },
   nobodyBanned: { fr: "Personne n'est banni.", en: "Nobody is banned." },
   seeTheirPixels: { fr: "Voir ses pixels", en: "See their pixels" },
   moderators: { fr: "Modérateurs", en: "Moderators" },
   noModerators: { fr: "Aucun modérateur.", en: "No moderators." },
-  removeModerator: { fr: "Retirer", en: "Remove" },
+  removeModerator: { fr: "Retirer le rôle", en: "Remove the role" },
   moderatorRemoved: { fr: "Modérateur·rice retiré·e", en: "Moderator removed" },
   unbanned: {
-    fr: "Débanni·e : ce compte peut de nouveau poser",
-    en: "Unbanned: this account can place again",
+    fr: "Débanni·e : ce viewer peut de nouveau dessiner",
+    en: "Unbanned: this viewer can draw again",
   },
 
   // La synchro Twitch du streamer.
@@ -129,57 +131,63 @@ export const MODERATION_TEXTS = defineTexts({
   }),
   reportSent: { fr: "Signalement envoyé", en: "Report sent" },
   reportRefused: {
-    fr: "Signalement refusé : la case a changé, ou la pose ne se signale plus.",
-    en: "Report refused: the cell changed, or the placement can no longer be reported.",
+    fr: "Signalement refusé : la case a changé, ou le dessin ne se signale plus.",
+    en: "Report refused: the cell changed, or the drawing can no longer be reported.",
   },
 
   // La fenêtre de confirmation.
   banTitle: localized({ fr: (name: string) => `Bannir ${name} ?`, en: (name) => `Ban ${name}?` }),
   banAfterClearTitle: localized({
-    fr: (name: string) => `C'est retiré. Bannir aussi ${name} ?`,
+    fr: (name: string) => `C'est effacé. Bannir aussi ${name} ?`,
     en: (name) => `Cleared. Ban ${name} too?`,
   }),
   reportTitle: localized({
     fr: ({ name, isSingle }: { name: string; isSingle: boolean }) =>
-      isSingle ? `Signaler cette pose de ${name} ?` : `Signaler ces poses de ${name} ?`,
+      isSingle ? `Signaler ce dessin de ${name} ?` : `Signaler ces dessins de ${name} ?`,
     en: ({ name, isSingle }) =>
-      isSingle ? `Report this placement by ${name}?` : `Report these placements by ${name}?`,
+      isSingle ? `Report this drawing by ${name}?` : `Report these drawings by ${name}?`,
   }),
   clearAllTitle: localized({
-    fr: (name: string) => `Retirer tous les pixels de ${name} ?`,
-    en: (name) => `Clear all of ${name}'s pixels?`,
+    fr: (name: string) => `Effacer tous les dessins de ${name} ?`,
+    en: (name) => `Clear all of ${name}'s drawings?`,
   }),
   clearTitle: localized({
     fr: ({ name, isSingle }: { name: string; isSingle: boolean }) =>
-      isSingle ? `Retirer cette pose de ${name} ?` : `Retirer ces poses de ${name} ?`,
+      isSingle ? `Effacer ce dessin de ${name} ?` : `Effacer ces dessins de ${name} ?`,
     en: ({ name, isSingle }) =>
-      isSingle ? `Clear this placement by ${name}?` : `Clear these placements by ${name}?`,
+      isSingle ? `Clear this drawing by ${name}?` : `Clear these drawings by ${name}?`,
   }),
   banConsequence: {
-    fr: "Ce compte ne pourra plus poser sur cette fresque, et ses pixels seront retirés.",
-    en: "This account will no longer be able to place on this canvas, and its pixels will be cleared.",
+    fr: "Ce viewer ne pourra plus dessiner sur cette fresque, et ses dessins seront effacés.",
+    en: "This viewer will no longer be able to draw on this canvas, and their drawings will be cleared.",
   },
   clearConsequence: { fr: "Ceux du dessous reviendront.", en: "The ones underneath will come back." },
   reportConsequence: {
-    fr: "Assez de signalements, et la pose quitte le stream jusqu'à la décision d'un modérateur.",
-    en: "Enough reports, and the placement leaves the stream until a moderator decides.",
+    fr: "Assez de signalements, et le dessin quitte le stream jusqu'à la décision d'un modérateur.",
+    en: "Enough reports, and the drawing leaves the stream until a moderator decides.",
   },
-  clear: { fr: "Retirer", en: "Clear" },
+  clear: { fr: "Effacer", en: "Clear" },
   report: { fr: "Signaler", en: "Report" },
   no: { fr: "Non", en: "No" },
-  clearAllPixels: { fr: "Retirer tous ses pixels", en: "Clear all their pixels" },
+  clearAllPixels: { fr: "Effacer tous ses dessins", en: "Clear all their drawings" },
   timeRange: { fr: "Plage de temps", en: "Time range" },
-  // Les crans de la plage : une pose seule, ou ses voisines dans une plage d'heures (± 1 min… ± 1 h).
-  spanPlacementOnly: { fr: "Cette pose seule", en: "This placement only" },
-  spanReportedPlacements: { fr: "Les poses signalées", en: "The reported placements" },
+  // Les crans de la plage : un dessin seul, ou ses voisins dans une plage d'heures (« 5 min avant et après ce dessin »).
+  spanPlacementOnly: { fr: "Ce dessin seul", en: "This drawing only" },
+  spanReportedPlacements: { fr: "Les dessins signalés", en: "The reported drawings" },
+  spanAround: localized({
+    fr: ({ duration, hasSeveral }: { duration: string; hasSeveral: boolean }) =>
+      `${duration} avant et après ${hasSeveral ? "ces dessins" : "ce dessin"}`,
+    en: ({ duration, hasSeveral }) =>
+      `${duration} before and after ${hasSeveral ? "these drawings" : "this drawing"}`,
+  }),
 
   // La fenêtre du banni.
   bannedTitle: { fr: "Tu es banni·e de cette fresque", en: "You're banned from this canvas" },
   understood: { fr: "Je comprends", en: "Got it" },
   bannedProof: {
-    fr: "Les pixels qui t'ont valu ce bannissement ont été retirés :",
-    en: "The pixels that got you banned were cleared:",
+    fr: "Les dessins qui t'ont valu ce bannissement ont été effacés :",
+    en: "The drawings that got you banned were cleared:",
   },
-  yourClearedPixels: { fr: "Tes pixels retirés", en: "Your cleared pixels" },
+  yourClearedPixels: { fr: "Tes dessins effacés", en: "Your cleared drawings" },
   watchOnly: { fr: "Tu peux seulement regarder la fresque.", en: "You can only watch the canvas." },
 });

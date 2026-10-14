@@ -1211,3 +1211,62 @@ describe("createDraftStore — the history (CDC 2026, §8 Historique)", () => {
     expect(xs()).toEqual([]);
   });
 });
+
+describe("createDraftStore — taking a cleared draft back (Écart §9.3, JOURNAL 2026-10-13)", () => {
+  const drawing = () => {
+    const context = setup();
+    context.store.enterDraftMode();
+    const xs = () => context.cells().map(({ x }) => x);
+    const click = (x: number) => context.store.toggleCell(x, 1);
+    return { ...context, xs, click };
+  };
+
+  // Vider rend le brouillon qu'il vient de vider, de quoi le rétablir ; vider un brouillon vide ne rend rien
+  it("hands back the draft it just cleared, and nothing when the draft was already empty", () => {
+    const { store, click } = drawing();
+    click(1);
+    click(2);
+
+    expect(store.discardDraft()?.size).toBe(2);
+    expect(store.discardDraft()).toBeUndefined();
+  });
+
+  // Le rétablir remet ce brouillon : c'est l'étape que Vider avait prise, que Ctrl+Maj+Z fait refaire
+  it("brings the cleared draft back as the step Vider took, which a redo clears again", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    const cleared = store.discardDraft();
+
+    if (cleared) store.restoreDraft(cleared);
+    expect(xs()).toEqual([1, 2]);
+
+    store.redo();
+    expect(xs()).toEqual([]);
+  });
+
+  // Dessiné depuis, le rétablir n'écrase rien : le brouillon d'aujourd'hui reste
+  it("leaves the draft alone once something was drawn after Vider", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    click(2);
+    const cleared = store.discardDraft();
+    click(5);
+
+    if (cleared) store.restoreDraft(cleared);
+
+    expect(xs()).toEqual([5]);
+  });
+
+  // Sorti du Dessin, le rétablir ne touche pas au brouillon gardé
+  it("does nothing once the Draw mode is closed", () => {
+    const { store, click, xs } = drawing();
+    click(1);
+    const cleared = store.discardDraft();
+    store.exitDraftMode();
+
+    if (cleared) store.restoreDraft(cleared);
+
+    expect(xs()).toEqual([]);
+  });
+});

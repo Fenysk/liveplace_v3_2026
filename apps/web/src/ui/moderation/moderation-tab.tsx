@@ -56,6 +56,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
     sync: { status: "loading" },
   });
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [failedUserId, setFailedUserId] = useState<string | null>(null);
   const toast = useToast();
   const t = useTexts(MODERATION_TEXTS);
 
@@ -69,17 +70,20 @@ const useModeratorsProps = (canvas: CanvasStore) => {
   useEffect(relist, [relist]);
   useRelistOnStale(canvas, "moderators", relist);
 
-  // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour.
+  // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour. Écart §8.1 (JOURNAL 2026-10-13) :
+  // un échec garde la liste et se dit sur la ligne, qui relance la même action.
   const onRemove = (userId: string) => {
     setRemovingUserId(userId);
+    setFailedUserId(null);
     void canvas.setModerator(userId, false).then((result) => {
       setRemovingUserId(null);
+      if (!result.ok) return setFailedUserId(userId);
       setViews(viewsOf(result));
-      if (result.ok) toast("success", t.moderatorRemoved);
+      toast("success", t.moderatorRemoved);
     });
   };
 
-  return { ...views, removingUserId, onRemove };
+  return { ...views, removingUserId, failedUserId, onRemove };
 };
 
 // `relist` à l'ouverture de l'onglet, puis à chaque signalement ou décision, ici ou chez un autre modérateur.
@@ -101,6 +105,7 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
   const { width, height, palette } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const [list, setList] = useState<ReportList>({ status: "loading" });
   const [approvingReportKey, setApprovingReportKey] = useState<string | null>(null);
+  const [failedReportKey, setFailedReportKey] = useState<string | null>(null);
   const toast = useToast();
   const t = useTexts(MODERATION_TEXTS);
 
@@ -113,9 +118,12 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
   }, [canvas]);
   useRelistOnReports(canvas, relist);
 
-  // Une pose après l'autre, un seul toast à la fin (JOURNAL 2026-10-07).
+  // Un dessin après l'autre, un seul toast à la fin (JOURNAL 2026-10-07). Écart §8.1 (JOURNAL 2026-10-13) : un échec garde la
+  // liste et se dit sur la ligne.
   const approve = async (report: PendingReport): Promise<void> => {
-    setApprovingReportKey(pendingReportKey(report));
+    const key = pendingReportKey(report);
+    setApprovingReportKey(key);
+    setFailedReportKey(null);
     const result = await moderateInOrder(
       canvas,
       report.placementIds.map((placementId) => ({
@@ -125,13 +133,14 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
       })),
     );
     setApprovingReportKey(null);
-    if (!result.ok) return setList({ status: "failed" });
+    if (!result.ok) return setFailedReportKey(key);
     toast("success", t.approvedToast(report.placementIds.length));
   };
 
   return {
     list,
     approvingReportKey,
+    failedReportKey,
     canvas: { width, height, palette },
     nowMs: Date.now(),
     onClear: (report: PendingReport) => onModerate("clear", report),
@@ -146,6 +155,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   const [previewedUserId, setPreviewedUserId] = useState<string | null>(null);
   const listing = usePixelListing();
   const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
+  const [failedUserId, setFailedUserId] = useState<string | null>(null);
   const toast = useToast();
   const t = useTexts(MODERATION_TEXTS);
 
@@ -168,11 +178,13 @@ const useModerationTabProps = (canvas: CanvasStore) => {
     else listing.drop();
   };
 
+  // Écart §8.1 (JOURNAL 2026-10-13) : un échec garde la liste et se dit sur la ligne, qui relance la même action.
   const onUnban = (userId: string) => {
     setUnbanningUserId(userId);
+    setFailedUserId(null);
     void canvas.moderate({ action: "unban", target: userId }).then((result) => {
       setUnbanningUserId(null);
-      if (!result.ok) return setList({ status: "failed" });
+      if (!result.ok) return setFailedUserId(userId);
       toast("success", t.unbanned);
       setList((shown) =>
         shown.status === "ready"
@@ -184,12 +196,20 @@ const useModerationTabProps = (canvas: CanvasStore) => {
   };
 
   const preview = previewedUserId ? { userId: previewedUserId, pixels: listing.pixels } : null;
-  return { list, preview, unbanningUserId, canvas: { width, height, palette }, onPreview, onUnban };
+  return {
+    list,
+    preview,
+    unbanningUserId,
+    failedUserId,
+    canvas: { width, height, palette },
+    onPreview,
+    onUnban,
+  };
 };
 
 export const ModerationTab = ({ canvas, login, onSync, onModerate }: ModerationTabProps) => {
   const { role } = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
-  const { moderators, sync, removingUserId, onRemove } = useModeratorsProps(canvas);
+  const { moderators, sync, removingUserId, failedUserId, onRemove } = useModeratorsProps(canvas);
   const isOwner = role === "owner";
   return (
     <>
@@ -198,6 +218,7 @@ export const ModerationTab = ({ canvas, login, onSync, onModerate }: ModerationT
       <ModeratorUsers
         list={moderators}
         removingUserId={removingUserId}
+        failedUserId={failedUserId}
         onRemove={isOwner ? onRemove : undefined}
       />
       <BannedUsers {...useModerationTabProps(canvas)} />

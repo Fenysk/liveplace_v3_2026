@@ -23,6 +23,7 @@ import {
   ZONE_ABOVE_ATTRIBUTE,
 } from "./arrival-insets";
 import { createBackdropImage, createPropertyReader, toBackdrop } from "./canvas-background";
+import { canvasCursor } from "./canvas-cursor";
 import { createCanvasImage } from "./canvas-image";
 import { cellLine } from "./cell-line";
 import { draftFadeStarts, MAX_DRAFT_FADES } from "./draft-fade";
@@ -78,7 +79,7 @@ export type CanvasScene = {
 };
 
 // `initialViewport` : le viewport retrouvé après F5, ou `null` pour l'arrivée.
-// `onFraming` : à chaque changement du pourcentage de zoom ou du « la vue a bougé », pour la pill Pratique.
+// `onFraming` : à chaque changement du zoom ou du « la vue a bougé » (Recentrer sur mobile).
 // `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
 // et fait dériver son motif (`checkerTiles`).
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
@@ -115,6 +116,7 @@ const isSameInsets = (a: Insets, b: Insets) =>
   a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
 
 const MIDDLE_BUTTON = 1;
+const NO_POINT: ScreenPoint = { x: 0, y: 0 };
 // Au clavier, la case visée garde ses distances avec les bords de l'écran et les pills qui y flottent (CDC 2026).
 const KEY_MARGIN = 48;
 // Pendant un glissement ou un pincement, les pills s'effacent en fondu (CDC 2026) : le CSS lit cet attribut.
@@ -370,6 +372,7 @@ export function createCanvasScene(
       insets = measureInsets();
       viewport = fitViewport(screen, canvas, insets);
       isAtArrival = true;
+      refreshCursor();
     }
     reportFraming(viewport, canvas);
     clipChecker(viewport, canvas);
@@ -410,8 +413,12 @@ export function createCanvasScene(
     if (frameRequest === 0) frameRequest = requestAnimationFrame(render);
   };
 
+  // Écart §9.3 (JOURNAL 2026-10-13) : la main fermée tient tant que la vue se déplace.
+  let isViewMoving = false;
   const setPanning = (isPanning: boolean) => {
     root.toggleAttribute(PANNING_ATTRIBUTE, isPanning);
+    isViewMoving = isPanning;
+    refreshCursor();
   };
 
   // Les pills reviennent quand le dernier doigt se lève : lever un doigt d'un pincement ne les montre pas encore.
@@ -427,6 +434,7 @@ export function createCanvasScene(
     viewport = next;
     isAtArrival = false;
     options.onViewportMove(next);
+    refreshCursor();
     requestRender();
   };
 
@@ -450,6 +458,40 @@ export function createCanvasScene(
   // Le pointeur principal décide de la taille de case qui reste facile à viser.
   const pointerGrain = (): PointerGrain =>
     window.matchMedia(COARSE_POINTER_QUERY).matches ? "coarse" : "fine";
+
+  // Écart §9.3 (JOURNAL 2026-10-13) : le curseur dit ce que fera le clic (canvas-cursor.ts). La loupe, seulement sur une case
+  // que le clic zoomerait (`tapZoomTarget` ne prend le point que pour placer la vue : nul ou non, il dit si le clic zoome) ;
+  // posé par le CSSOM, et seulement quand il change.
+  let shownCursor = "";
+  const refreshCursor = () => {
+    const { mode, colorIndex, isPicking, isTracing } = draftStore.getView();
+    const willZoom =
+      mode === "view" &&
+      viewport !== null &&
+      targetCell !== null &&
+      store.getView().width > 0 &&
+      tapZoomTarget(
+        viewport,
+        NO_POINT,
+        pointerGrain(),
+        freeArea(screen, insets),
+        zoomLimits(screen, canvasSize(), insets),
+      ) !== null;
+    const next = canvasCursor(
+      {
+        mode,
+        isEraser: colorIndex === TRANSPARENT_COLOR_INDEX,
+        isPicking,
+        isTracing,
+        isPanning: isViewMoving,
+        willZoom,
+      },
+      { ink: shades.outlineOut, halo: shades.outlineIn },
+    );
+    if (next === shownCursor) return;
+    shownCursor = next;
+    surface.style.cursor = next;
+  };
 
   const animateZoom = (from: Viewport, to: Viewport, startedAt: number, onDone?: () => void) => {
     const duration = motionMs(root, "--lp-dur");
@@ -489,7 +531,7 @@ export function createCanvasScene(
   };
 
   // Les pills se mesurent après le premier cadrage (le thème arrive, l'encoche change) : si la vue n'a pas bougé depuis
-  // l'arrivée, elle suit la nouvelle zone libre ; sinon, seul le pourcentage du zoom se relit.
+  // l'arrivée, elle suit la nouvelle zone libre ; sinon, seul le cadrage se relit.
   const refreshInsets = () => {
     // Écart §9.3 (JOURNAL 2026-10-09) : pas en Dessin, où la bande Thème, plus étroite, passe sur deux lignes et recadrerait la vue.
     if (screen.width === 0 || draftStore.getView().mode === "draft") return;
@@ -498,11 +540,13 @@ export function createCanvasScene(
     insets = next;
     if (viewport && isAtArrival && store.getView().width > 0) frameArrival(canvasSize());
     else requestRender();
+    refreshCursor();
   };
 
   const setTargetCell = (cell: Cell | null) => {
     if (isSameCell(cell, targetCell)) return;
     targetCell = cell;
+    refreshCursor();
     requestRender();
   };
 
@@ -619,6 +663,7 @@ export function createCanvasScene(
     const tile = checkerTile(screen);
     options.checker.style.setProperty("--lp-checker-tile", `${tile}px`);
     driftChecker(tile);
+    refreshCursor();
     requestRender();
   });
   resizeObserver.observe(surface);
@@ -626,6 +671,7 @@ export function createCanvasScene(
   // L'apparence change (bouton, Mon compte, ou le système en auto) : nouvelles teintes. Le damier suit seul, en CSS.
   const appearanceObserver = new MutationObserver(() => {
     shades = getSceneShades(root);
+    refreshCursor();
     requestRender();
   });
   appearanceObserver.observe(root, { attributes: true, attributeFilter: ["data-appearance"] });
@@ -692,6 +738,7 @@ export function createCanvasScene(
     }
     // En Dessin, un clic ne vise plus l'auteur d'une case : l'inspection se ferme.
     if (mode === "draft" && store.getView().inspection) store.closeInspection();
+    refreshCursor();
     requestRender();
   });
 

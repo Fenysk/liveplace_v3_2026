@@ -24,6 +24,8 @@
   --warning: #b45f06;
   --gauge-charge: #26854c;
   --gauge-draft: #f3a833;
+  --on-gauge-charge: #ffffff;
+  --on-gauge-draft: #10121c;
   --claim: #f3a833;
   --claim-hover: #f7c35f;
   --on-claim: #10121c;
@@ -70,6 +72,8 @@
   --warning: #f3a833;
   --gauge-charge: #5ab552;
   --gauge-draft: #f7f3b7;
+  --on-gauge-charge: #10121c;
+  --on-gauge-draft: #10121c;
   --claim: #f3a833;
   --claim-hover: #f7c35f;
   --on-claim: #10121c;

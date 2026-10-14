@@ -1,7 +1,8 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
 // Vue : la jauge et Dessiner, ou le +1 quand une récompense attend, qui s'étire comme lui (Écart §9.3, JOURNAL 2026-10-09).
-// Dessin : la palette, puis la jauge, Vider (seulement avec un brouillon), Annuler, Valider (sa taille, ou l'attente d'une charge).
+// Dessin : la palette, puis la jauge, Vider (invisible tant que le brouillon est vide), Fermer, Valider (sa taille, ou l'attente d'une charge).
 // Les boutons suivent le brouillon et la jauge, et leur largeur glisse (Écart §9.3, JOURNAL 2026-10-08). Invité : l'invitation.
+// Vider et Fermer gardent leur place, brouillon vide ou non : rien ne bouge sous le pointeur (Écart §9.3, JOURNAL 2026-10-13).
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile). En paysage sur un écran bas,
 // un panneau sur le côté : sans poignée, la palette complète dedans (Écart §8.1, JOURNAL 2026-10-08).
 
@@ -18,7 +19,7 @@ import { Reveal } from "../design/reveal";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { BubbleTarget } from "../help/bubble-target";
 import { useLocale, useTexts } from "../locale/use-locale";
-import { submitWords } from "./draft-labels";
+import { enterLabel, submitWords } from "./draft-labels";
 import { DRAFT_TEXTS, type DraftTexts, type RefusalCode } from "./draft-texts";
 
 export type DraftPillState =
@@ -28,7 +29,7 @@ export type DraftPillState =
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
-  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; refusal?: RefusalCode }
+  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; draftSize?: number; refusal?: RefusalCode } // `draftSize` : le brouillon gardé, absent sans
   | {
       kind: "draft";
       gauge: GaugeProps;
@@ -49,7 +50,7 @@ export type DraftPillState =
 export type DraftPillActions = {
   onEnter: () => void; // Dessiner
   onClaim: () => void; // +1 de jauge max (JOURNAL 2026-09-30)
-  onExit: () => void; // Annuler : sort du Dessin
+  onExit: () => void; // Fermer : sort du Dessin, le brouillon est gardé
   onSubmit: () => void;
   onDiscard: () => void;
   onPickColor: (colorIndex: number) => void; // dans la palette, ou dans la rangée des récentes sur mobile
@@ -85,28 +86,48 @@ const Refusal = ({ code }: { code: RefusalCode | undefined }) => {
   return code ? <span className="lp-type-caption lp-danger">{t.refusal(code)}</span> : null;
 };
 
-const EnterButton = ({ onEnter }: Pick<DraftPillActions, "onEnter">) => {
+// Écart §9.3 (JOURNAL 2026-10-13) : avec un brouillon gardé, « Dessiner · 12 » ; son libellé change, la largeur glisse.
+const EnterButton = ({
+  draftSize = 0,
+  onEnter,
+}: { draftSize?: number | undefined } & Pick<DraftPillActions, "onEnter">) => {
   const t = useTexts(DRAFT_TEXTS);
-  return <Button label={t.draw} kbd="D" variant="primary" title={t.drawTip} onPress={onEnter} />;
+  return (
+    <Button
+      label={enterLabel(draftSize, useLocale())}
+      kbd="D"
+      variant="primary"
+      title={t.drawTip}
+      hasMorphingLabel
+      onPress={onEnter}
+    />
+  );
 };
 
-const CancelButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
+// Fermer, pas Annuler : il sort du Dessin et garde le brouillon (Écart §9.3, JOURNAL 2026-10-13).
+const CloseButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
   const t = useTexts(DRAFT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
-  return <Button label={design.cancel} kbd={design.escapeKey} title={t.cancelTip} onPress={onExit} />;
+  return <Button label={design.close} kbd={design.escapeKey} title={t.closeTip} onPress={onExit} />;
 };
+
+// Valider garde la largeur de « Valider · 99 » : son libellé change au fil des pixels, Fermer ne bouge pas à côté (Écart §9.3, JOURNAL 2026-10-13).
+const WIDEST_DRAFT_SIZE = 99;
 
 // Dans l'attente, plus de raccourci : Entrée ne poserait rien.
 const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: () => void }) => {
   const t = useTexts(DRAFT_TEXTS);
   const isWaiting = state.waitSeconds !== undefined;
-  const { lead, label } = submitWords(state.draftSize, state.waitSeconds, useLocale());
+  const locale = useLocale();
+  const { lead, label } = submitWords(state.draftSize, state.waitSeconds, locale);
   return (
     <BubbleTarget name="submit">
       <Button
         label={label}
         labelLead={lead}
-        {...(isWaiting ? {} : { kbd: "⏎" })}
+        {...(isWaiting
+          ? {}
+          : { kbd: "⏎", reservedLabel: submitWords(WIDEST_DRAFT_SIZE, undefined, locale).label })}
         variant="primary"
         title={isWaiting ? t.waitTip : t.confirmTip}
         isDisabled={!state.canSubmit}
@@ -117,17 +138,10 @@ const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: ()
   );
 };
 
-// Vider n'est là qu'avec un brouillon : il paraît au premier pixel et s'efface avec le dernier.
-const DiscardButton = ({
-  state,
-  isSpread = false,
-  onDiscard,
-}: {
-  state: DraftModeState;
-  isSpread?: boolean;
-  onDiscard: () => void;
-}) => (
-  <Reveal isOpen={state.draftSize > 0} isSpread={isSpread}>
+// Vider garde sa place brouillon vide, invisible : il paraît au premier pixel et s'efface avec le dernier, rien ne bouge autour de lui
+// (Écart §9.3, JOURNAL 2026-10-13).
+const DiscardButton = ({ state, onDiscard }: { state: DraftModeState; onDiscard: () => void }) => (
+  <Reveal isOpen={state.draftSize > 0}>
     <Button
       icon={Trash}
       variant="ghost"
@@ -201,7 +215,7 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
       )}
       <div className="lp-row">
         <PillGauge gauge={state.gauge} isFill />
-        <CancelButton onExit={actions.onExit} />
+        <CloseButton onExit={actions.onExit} />
         <SubmitButton state={state} onSubmit={actions.onSubmit} />
       </div>
       {/* La palette complète dépliée remplace toute la rangée : elle revient quand la palette se replie. */}
@@ -221,7 +235,7 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
           />
         </div>
       )}
-      {/* Les outils se répartissent sur toute la largeur par des ressorts : Vider y prend sa part en s'ouvrant (reveal.css). */}
+      {/* Les outils se répartissent sur toute la largeur par des ressorts, Vider compris : invisible, il garde sa part. */}
       <div className="lp-row">
         <Button
           icon={Eraser}
@@ -234,7 +248,8 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
         <PickerButton state={state} actions={actions} />
         <span className="lp-spacer" />
         <TraceButton state={state} actions={actions} />
-        <DiscardButton state={state} isSpread onDiscard={actions.onDiscard} />
+        <span className="lp-spacer" />
+        <DiscardButton state={state} onDiscard={actions.onDiscard} />
       </div>
       {/* Un clic, Entrée, Espace ou Échap replient la feuille (design system, Mobile) ; une flèche choisit sans la replier. Le panneau reste ouvert. */}
       {isOpen && (
@@ -282,7 +297,7 @@ const draftContent = (
         {state.isTouchScreen && <TraceButton state={state} actions={actions} />}
         <PickerButton state={state} actions={actions} />
         <DiscardButton state={state} onDiscard={actions.onDiscard} />
-        <CancelButton onExit={actions.onExit} />
+        <CloseButton onExit={actions.onExit} />
         <SubmitButton state={state} onSubmit={actions.onSubmit} />
       </div>
       <Refusal code={state.refusal} />
@@ -333,10 +348,10 @@ const contentOf = (
             <PillGauge gauge={state.gauge} isFill={isCompact} />
             {state.canClaim ? (
               <BubbleTarget name="claim">
-                <ClaimButton onClaim={actions.onClaim} />
+                <ClaimButton max={state.gauge.max} onClaim={actions.onClaim} />
               </BubbleTarget>
             ) : (
-              <EnterButton onEnter={actions.onEnter} />
+              <EnterButton draftSize={state.draftSize} onEnter={actions.onEnter} />
             )}
             <Refusal code={state.refusal} />
           </>

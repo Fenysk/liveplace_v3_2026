@@ -108,7 +108,7 @@ const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
     },
   },
   {
-    name: "La pose d'un autre",
+    name: "Le dessin d'un autre",
     detail: "Signaler.",
     inspection: {
       status: "found",
@@ -169,7 +169,7 @@ const FOR_OWNER = (nowMs: number): readonly InspectionScene[] => [
   },
   {
     name: "Un modérateur nommé ici",
-    detail: "Retirer modérateur, et pas de Bannir.",
+    detail: "Retirer le rôle, et pas de Bannir.",
     inspection: inspectionOf(nowMs, { ...TROLL, moderatorOrigin: NAMED_HERE }),
     moderation: OWNING,
   },
@@ -253,7 +253,7 @@ export const InspectionEntry = () => {
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock
         title="Pour qui modère"
-        note="Sous un filet : Retirer ses pixels et Bannir, sauf sur un modérateur nommé ici. Rien sur les pixels du streamer ni sur les siens."
+        note="Sous un filet : Effacer ses dessins et Bannir, sauf sur un modérateur nommé ici. Rien sur les pixels du streamer ni sur les siens."
         nowMs={nowMs}
         scenes={FOR_MODERATORS(nowMs)}
       />
@@ -290,7 +290,39 @@ const BannedUsersScene = () => {
   );
 };
 
-const BANNED_STATES: readonly { name: string; props: BannedUsersProps }[] = [
+// Débannir échoue une fois, la liste reste et la ligne le dit (Écart §8.1, JOURNAL 2026-10-13) ; Réessayer relance, et la
+// ligne part comme dans le jeu. Cette illustration reste interactive.
+const UnbanFailureScene = () => {
+  const [users, setUsers] = useState(SAMPLE_BANNED_USERS);
+  const [failedUserId, setFailedUserId] = useState<string | null>(null);
+  const [unbanningUserId, setUnbanningUserId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const onUnban = (userId: string) => {
+    setFailedUserId(null);
+    setUnbanningUserId(userId);
+    setTimeout(() => {
+      setUnbanningUserId(null);
+      if (attempts === 0) setFailedUserId(userId);
+      else setUsers((shown) => shown.filter((user) => user.userId !== userId));
+      setAttempts((count) => count + 1);
+    }, LOCKED_MS / 3);
+  };
+  return (
+    <InWindow>
+      <BannedUsers
+        list={{ status: "ready", users }}
+        preview={null}
+        unbanningUserId={unbanningUserId}
+        failedUserId={failedUserId}
+        canvas={SAMPLE_CANVAS}
+        onPreview={noop}
+        onUnban={onUnban}
+      />
+    </InWindow>
+  );
+};
+
+const BANNED_STATES: readonly { name: string; detail?: string; props: BannedUsersProps }[] = [
   {
     name: "Débannir attend sa réponse",
     props: {
@@ -299,9 +331,22 @@ const BANNED_STATES: readonly { name: string; props: BannedUsersProps }[] = [
       unbanningUserId: "4",
     },
   },
+  {
+    name: "Débannir a échoué",
+    detail: "La liste reste ; la ligne le dit, avec Réessayer qui relance Débannir.",
+    props: {
+      ...BANNED_USERS_BASE,
+      list: { status: "ready", users: SAMPLE_BANNED_USERS },
+      failedUserId: "4",
+    },
+  },
   { name: "Personne n'est banni", props: { ...BANNED_USERS_BASE, list: { status: "ready", users: [] } } },
   { name: "La liste se charge", props: { ...BANNED_USERS_BASE, list: { status: "loading" } } },
-  { name: "Connexion perdue", props: { ...BANNED_USERS_BASE, list: { status: "failed" } } },
+  {
+    name: "Connexion perdue",
+    detail: "La liste n'a pas pu être lue : seul son message reste.",
+    props: { ...BANNED_USERS_BASE, list: { status: "failed" } },
+  },
 ];
 
 const REPORTS_BASE = (nowMs: number): Omit<ReportedPlacementsProps, "list"> => ({
@@ -326,7 +371,7 @@ const REPORT_STATES = (
     },
     {
       name: "Trois signalements",
-      detail: "Une pose cachée du stream, une pose en attente du seuil, un dessin de plusieurs poses.",
+      detail: "Un dessin caché du stream, un dessin en attente du seuil, une ligne de plusieurs dessins.",
       props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports } },
     },
     {
@@ -346,6 +391,15 @@ const REPORT_STATES = (
         ...REPORTS_BASE(nowMs),
         list: { status: "ready", reports: reports.slice(0, 1) },
         approvingReportKey: approving ? pendingReportKey(approving) : null,
+      },
+    },
+    {
+      name: "Rétablir a échoué",
+      detail: "Les signalements restent ; la ligne le dit, avec Réessayer qui relance Rétablir.",
+      props: {
+        ...REPORTS_BASE(nowMs),
+        list: { status: "ready", reports },
+        failedReportKey: approving ? pendingReportKey(approving) : null,
       },
     },
     { name: "Aucun signalement", props: { ...REPORTS_BASE(nowMs), list: { status: "ready", reports: [] } } },
@@ -374,7 +428,7 @@ export const ModerationEntry = () => {
       slug="moderation"
       components={["ReportedPlacements", "TwitchSyncBlock", "ModeratorUsers", "BannedUsers"]}
       file="ui/moderation/{reported-placements,twitch-sync,moderator-users,banned-users}.tsx"
-      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran. Les lignes de chaque liste arrivent en fondu, toutes ensemble (hors mouvement réduit)."
+      note="Dans la fenêtre, pour le streamer et ses modérateurs. Une connexion coupée est lue tout de suite par un lecteur d'écran. Une action qui échoue (Rétablir, Débannir, Retirer le rôle) garde la liste : sa ligne le dit, avec Réessayer. Les lignes de chaque liste arrivent en fondu, toutes ensemble (hors mouvement réduit)."
     >
       <Block title="Signalements">
         {REPORT_STATES(nowMs).map(({ name, detail, props }) => (
@@ -408,13 +462,32 @@ export const ModerationEntry = () => {
             <ModeratorUsers list={{ status: "ready", users: SAMPLE_MODERATORS }} onRemove={noop} />
           </InWindow>
         </StateRow>
+        <StateRow
+          name="Retirer le rôle a échoué"
+          detail="La liste reste ; la ligne le dit, avec Réessayer qui relance Retirer le rôle."
+        >
+          <InWindow>
+            <ModeratorUsers
+              list={{ status: "ready", users: SAMPLE_MODERATORS }}
+              failedUserId="7"
+              onRemove={noop}
+            />
+          </InWindow>
+        </StateRow>
       </Block>
       <Block title="Bannis">
         <StateRow name="Les bannis" detail="L'œil ouvre l'aperçu de ses pixels, dans une fenêtre." isDemo>
           <BannedUsersScene />
         </StateRow>
-        {BANNED_STATES.map(({ name, props }) => (
-          <StateRow key={name} name={name}>
+        <StateRow
+          name="Débannir échoue, puis Réessayer"
+          detail="Le premier Débannir échoue ; Réessayer le relance, et la ligne part."
+          isDemo
+        >
+          <UnbanFailureScene />
+        </StateRow>
+        {BANNED_STATES.map(({ name, detail, props }) => (
+          <StateRow key={name} name={name} detail={detail}>
             <InWindow>
               <BannedUsers {...props} />
             </InWindow>
@@ -433,12 +506,12 @@ type WindowDemo = {
   scope?: ClearScope;
 };
 
-// Retirer ses pixels : décochée, cette pose seule, puis le curseur à 15 min ; cochée, tous ses pixels. Puis la
+// Effacer ses dessins : décochée, ce dessin seul, puis le curseur à 15 min ; cochée, tous ses dessins. Puis la
 // question qui suit un retrait, et Signaler, avec la même plage mais sans la case (JOURNAL 2026-09-29).
 const WINDOW_DEMOS: readonly WindowDemo[] = [
-  { name: "Retirer ses pixels", kind: "clear" },
+  { name: "Effacer ses dessins", kind: "clear" },
   { name: "Plage de 15 min", kind: "clear", scope: { isAll: false, spanMs: 15 * MINUTE_MS } },
-  { name: "Tous ses pixels", kind: "clear", scope: { isAll: true, spanMs: 0 } },
+  { name: "Tous ses dessins", kind: "clear", scope: { isAll: true, spanMs: 0 } },
   { name: "Bannir", kind: "ban" },
   { name: "Bannir, après un retrait", kind: "banAfterClear" },
   { name: "Signaler", kind: "report" },
@@ -452,7 +525,7 @@ const REPORTED_CELL = { x: 122, y: 82, displayName: TROLL.displayName, placement
 const requestOf = (kind: ModerationRequest["kind"]): ModerationRequest =>
   kind === "report" ? { kind, author: REPORTED_CELL } : { kind, author: TROLL };
 
-// Confirmer montre le verrou, puis la fenêtre se ferme ; après Retirer, elle propose de bannir. « Échec » la garde
+// Confirmer montre le verrou, puis la fenêtre se ferme ; après Effacer, elle propose de bannir. « Échec » la garde
 // ouverte avec son message. La case et le curseur marchent : l'aperçu les suit, comme dans le jeu.
 const ModerationRow = ({ demo, nowMs }: { demo: WindowDemo; nowMs: number }) => {
   const [request, setRequest] = useState<ModerationRequest>(requestOf(demo.kind));

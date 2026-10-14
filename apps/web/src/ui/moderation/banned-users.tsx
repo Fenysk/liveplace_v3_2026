@@ -14,6 +14,7 @@ import { ConnectionLost } from "./connection-lost";
 import { MarkedProfile } from "./marked-profile";
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { CanvasPreviewProps } from "./moderation-window";
+import { RowFailure } from "./row-failure";
 
 export type BannedList =
   | { status: "loading" }
@@ -27,6 +28,7 @@ export type BannedUsersProps = {
   list: BannedList;
   preview: BanPreview | null;
   unbanningUserId: string | null; // Débannir attend sa réponse
+  failedUserId?: string | null | undefined; // Débannir a échoué : la ligne le dit, la liste reste (Écart §8.1, JOURNAL 2026-10-13)
   canvas: CanvasPreviewProps;
   onPreview: (userId: string) => void; // l'œil : ouvre son aperçu, ou le referme
   onUnban: (userId: string) => void;
@@ -34,7 +36,7 @@ export type BannedUsersProps = {
 
 type BannedRowProps = Omit<BannedUsersProps, "list" | "canvas"> & { user: BannedUser };
 
-const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: BannedRowProps) => {
+const BannedRow = ({ user, preview, unbanningUserId, failedUserId, onPreview, onUnban }: BannedRowProps) => {
   const t = useTexts(MODERATION_TEXTS);
   return (
     <WindowRow
@@ -43,6 +45,7 @@ const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: Banne
       }
       hasProfile
       isListed
+      isFailed={failedUserId === user.userId}
     >
       <div className="lp-row">
         <span className="lp-type-caption lp-muted">{t.pixelCount(user.pixelCount)}</span>
@@ -60,6 +63,7 @@ const BannedRow = ({ user, preview, unbanningUserId, onPreview, onUnban }: Banne
           onPress={() => onUnban(user.userId)}
         />
       </div>
+      <RowFailure isFailed={failedUserId === user.userId} onRetry={() => onUnban(user.userId)} />
     </WindowRow>
   );
 };
@@ -95,7 +99,14 @@ const PreviewWindow = ({ isOpen, shown, canvas, onClose }: PreviewWindowProps) =
   );
 };
 
-const BannedRows = ({ list, preview, unbanningUserId, onPreview, onUnban }: BannedUsersProps) => {
+const BannedRows = ({
+  list,
+  preview,
+  unbanningUserId,
+  failedUserId,
+  onPreview,
+  onUnban,
+}: BannedUsersProps) => {
   const t = useTexts(MODERATION_TEXTS);
   // `failed` : rien, `ConnectionLost` le dit juste après.
   return (
@@ -114,6 +125,7 @@ const BannedRows = ({ list, preview, unbanningUserId, onPreview, onUnban }: Bann
               user={user}
               preview={preview}
               unbanningUserId={unbanningUserId}
+              failedUserId={failedUserId}
               onPreview={onPreview}
               onUnban={onUnban}
             />

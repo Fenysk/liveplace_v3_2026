@@ -57,11 +57,6 @@ export const CANVAS_TEXTS = defineTexts({
   recenter: { fr: "Recentrer la vue", en: "Recenter the view" },
   zoomIn: { fr: "Zoomer", en: "Zoom in" },
   zoomOut: { fr: "Dézoomer", en: "Zoom out" },
-  // À quatre chiffres, sans espace : il tient dans la largeur d'un contrôle.
-  zoomPercent: localized({
-    fr: (percent: number) => (percent < 1000 ? `${percent} %` : `${percent}%`),
-    en: (percent) => `${percent}%`,
-  }),
 
   // Les toasts de la page : la connexion, le changement de canvas, les pixels refusés.
   connectionLost: {
@@ -224,11 +219,11 @@ export const CANVAS_TEXTS = defineTexts({
     en: "No placed pixel falls outside the frame.",
   },
 
-  // Les jauges des joueurs (JOURNAL 2026-09-30), montrées dans `/design` pour l'instant.
-  playerGauge: { fr: "Jauge des joueurs", en: "Player gauge" },
+  // Les jauges des viewers (JOURNAL 2026-09-30), montrées dans `/design` pour l'instant.
+  playerGauge: { fr: "Jauge des viewers", en: "Viewers' gauge" },
   playerGaugeNote: {
-    fr: "Chaque joueur part de la jauge de départ et la fait grandir en posant sur ta fresque : un premier +1 à réclamer au 12e pixel, puis de plus en plus espacés, jusqu'à la jauge maximale.",
-    en: "Every player starts from the starting gauge and grows it by placing on your canvas: a first +1 to claim at the 12th pixel, then further and further apart, up to the maximum gauge.",
+    fr: "Chaque viewer part de la jauge de départ et la fait grandir en dessinant sur ta fresque : un premier +1 à réclamer au 12e pixel, puis de plus en plus espacés, jusqu'à la jauge maximale.",
+    en: "Every viewer starts from the starting gauge and grows it by drawing on your canvas: a first +1 to claim at the 12th pixel, then further and further apart, up to the maximum gauge.",
   },
   startingGauge: { fr: "Jauge de départ", en: "Starting gauge" },
   maximumGauge: { fr: "Jauge maximale", en: "Maximum gauge" },
@@ -238,9 +233,9 @@ export const CANVAS_TEXTS = defineTexts({
   }),
   lowerSentence: localized({
     fr: (ceiling: number) =>
-      `Les joueurs au-dessus de ${ceiling} charges vont redescendre. Ce qu'ils ont réclamé reste acquis : ils le retrouvent si la jauge maximale remonte.`,
+      `Les viewers au-dessus de ${ceiling} pixels vont redescendre. Ce qu'ils ont réclamé reste acquis : ils le retrouvent si la jauge maximale remonte.`,
     en: (ceiling) =>
-      `Players above ${ceiling} charges will drop back down. What they claimed stays theirs: they get it back if the maximum gauge goes up again.`,
+      `Viewers above ${ceiling} pixels will drop back down. What they claimed stays theirs: they get it back if the maximum gauge goes up again.`,
   }),
   lower: { fr: "Baisser", en: "Lower" },
 });

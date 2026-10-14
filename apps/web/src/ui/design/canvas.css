@@ -40,7 +40,8 @@
   height: 100%;
   display: block;
   touch-action: none;
-  /* Toujours la croix, en Vue comme en Dessin, même pendant un déplacement : jamais la main */
+  /* Écart §9.3 (JOURNAL 2026-10-13) : la croix tient avant la scène et sans elle ; la scène pose ensuite le curseur qui dit ce que
+     fera le clic (canvas-cursor.ts), par le CSSOM : la CSP de prod bloque un attribut `style` rendu par le serveur. */
   cursor: crosshair;
 }
 

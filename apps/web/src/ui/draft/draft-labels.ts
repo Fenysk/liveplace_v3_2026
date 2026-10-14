@@ -4,14 +4,25 @@ import type { Locale } from "../locale/locale";
 import { DRAFT_TEXTS } from "./draft-texts";
 
 const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 3600;
 const TICK_MS = 1000;
 
-// « 12 s », puis « 1 min 05 » dès la minute.
+const twoDigits = (count: number): string => String(count).padStart(2, "0");
+
+// Le format des durées de l'interface (Écart §9.3, JOURNAL 2026-10-13) : « 12 s », « 1 min 05 s », « 2 h 05 min ».
 export function formatWait(seconds: number): string {
   if (seconds < SECONDS_PER_MINUTE) return `${seconds} s`;
-  const rest = String(seconds % SECONDS_PER_MINUTE).padStart(2, "0");
-  return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min ${rest}`;
+  if (seconds < SECONDS_PER_HOUR)
+    return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min ${twoDigits(seconds % SECONDS_PER_MINUTE)} s`;
+  const minutes = Math.floor((seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+  return `${Math.floor(seconds / SECONDS_PER_HOUR)} h ${twoDigits(minutes)} min`;
 }
+
+// Dessiner, et la taille du brouillon gardé derrière, comme Valider (Écart §9.3, JOURNAL 2026-10-13) : « Dessiner · 12 ».
+export const enterLabel = (draftSize: number, locale: Locale): string => {
+  const { draw } = DRAFT_TEXTS[locale];
+  return draftSize > 0 ? `${draw} · ${draftSize}` : draw;
+};
 
 export type SubmitWords = { lead: string; label: string };
 

@@ -9,7 +9,7 @@ export type Viewport = { scale: number; offsetX: number; offsetY: number };
 export type ZoomLimits = { minScale: number; maxScale: number };
 // Les marges à garder aux bords de l'écran, en pixels CSS : les pills y flottent.
 export type Insets = { top: number; right: number; bottom: number; left: number };
-// Ce que la pill Pratique montre du cadrage : le pourcentage, et si la vue a bougé depuis l'arrivée.
+// Le cadrage : le pourcentage de zoom (plus affiché, Écart §8.1 JOURNAL 2026-10-13), et si la vue a bougé depuis l'arrivée.
 export type Framing = { zoomPercent: number; isArrival: boolean };
 
 export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -81,7 +81,7 @@ export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
   return { ...viewport, offsetX: viewport.offsetX + dx, offsetY: viewport.offsetY + dy };
 }
 
-// Le pourcentage de la pill Pratique : 100 % au cadrage de l'arrivée (CDC 2026).
+// Le pourcentage de zoom : 100 % au cadrage de l'arrivée (CDC 2026).
 export function zoomPercent(
   viewport: Viewport,
   screen: Size,

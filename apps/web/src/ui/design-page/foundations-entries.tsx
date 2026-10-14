@@ -29,7 +29,7 @@ type Usages = Readonly<Record<string, string>>;
 
 const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g, "$1-$2").toLowerCase();
 
-// Les 42 couleurs de `tokens.css`, rangées par famille.
+// Les 44 couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le vide et la fresque",
@@ -77,9 +77,11 @@ const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "La jauge et le +1",
     usages: {
-      gaugeCharge: "Le fluide des charges restantes, l'anneau.",
+      gaugeCharge: "Le fluide des pixels qu'on a, l'anneau.",
       gaugeDraft: "Le fluide réservé par le brouillon.",
       gaugeEmpty: "Le tube vide, la piste de l'anneau.",
+      onGaugeCharge: "Le nombre sur le fluide des pixels : AA dans les deux apparences.",
+      onGaugeDraft: "Le nombre sur le fluide réservé par le brouillon.",
       claim: "Le +1 à réclamer et son halo : le même or dans les deux apparences.",
       claimHover: "Le survol du +1.",
       onClaim: "Le texte sur le +1.",
@@ -166,7 +168,7 @@ const TYPE_STYLES = [
   {
     className: "lp-type-numeric",
     sample: "12",
-    usage: "Le nombre de la jauge, le zoom : chiffres tabulaires.",
+    usage: "Le nombre du tube de la jauge, son minuteur, le zoom : chiffres tabulaires.",
   },
   { className: "lp-type-caption", sample: "il y a 3 heures", usage: "Les informations secondaires." },
   { className: "lp-type-kbd", sample: "Échap", usage: "Un raccourci écrit dans un bouton." },

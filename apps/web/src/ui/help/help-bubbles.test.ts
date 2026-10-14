@@ -6,12 +6,17 @@ import { HelpBubbleLine, helpTargetOf } from "./help-bubbles";
 
 const lineOf = (bubble: HelpBubble, isTouchScreen: boolean): string =>
   renderToStaticMarkup(
-    createElement(HelpBubbleLine, { bubble, isTouchScreen, refill: { refillMs: 10_000, refillCharges: 1 } }),
+    createElement(HelpBubbleLine, {
+      bubble,
+      isTouchScreen,
+      refill: { refillMs: 10_000, refillCharges: 1 },
+      gaugeMax: 20,
+    }),
   );
 
 describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10-08 et 2026-10-09)", () => {
   // Chaque bulle vise son propre élément : le bouton au point des signalements, Réglages, l'onglet Vue OBS, l'adresse, le +1, le bouton Modération,
-  // Retirer ses pixels, la jauge, le pinceau, Valider, la couleur actuelle, rien (les touches : au-dessus de la barre du bas), la pipette ;
+  // Effacer ses dessins, la jauge, le pinceau, Valider, la couleur actuelle, rien (les touches : au-dessus de la barre du bas), la pipette ;
   // le même bouton que l'adresse OBS pour le partage, le champ du thème et l'onglet Modération pour la suite de la chaîne du streamer
   it("aims each bubble at its own element", () => {
     expect(HELP_BUBBLES.map(helpTargetOf)).toEqual([
@@ -27,6 +32,7 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
       "clear",
       "gauge",
       "trace",
+      undefined,
       "submit",
       "palette",
       undefined,
@@ -45,11 +51,12 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
     expect(text("invite-link")).toContain("Partage aussi ce lien à tes viewers");
     expect(text("theme")).toContain("Donne un thème à ta fresque");
     expect(text("twitch-sync")).toContain("Reprends tes modérateurs Twitch ici");
-    expect(text("first-reward")).toContain("Une récompense t&#x27;attend : +1 sur ta jauge max");
+    expect(text("first-reward")).toContain("Une récompense t&#x27;attend : ta jauge passe à 21 pixels");
     expect(text("moderator-welcome")).toContain("Tu modères cette fresque : tout est ici");
-    expect(text("moderation-actions")).toContain("Retire ses pixels ou bannis ce viewer ici");
+    expect(text("moderation-actions")).toContain("Efface ses dessins ou bannis ce viewer ici");
     expect(text("empty-gauge")).toContain("Ta jauge se recharge toute seule : 1 pixel toutes les 10 s");
     expect(text("draft-trace")).toContain("Active le tracé pour dessiner en glissant");
+    expect(text("draft-space")).toContain("Maintiens Espace et glisse pour tracer");
     expect(text("first-draft")).toContain(
       "Touche la fresque pour préparer ton dessin, Valider l&#x27;envoie",
     );
@@ -77,10 +84,12 @@ describe("les lignes d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () 
     expect(HELP_BUBBLES.map(linesOf)).toEqual(HELP_BUBBLES.map(() => 1));
   });
 
-  // La bulle des touches n'a pas de cible : elle se pose au-dessus de la barre du bas, comme le conseil de première visite
-  it("gives the keys no target: they sit above the bottom bar", () => {
+  // Les touches et Espace n'ont pas de cible : un geste du clavier n'a pas de bouton, la bulle se pose au-dessus de la barre du bas,
+  // comme le conseil de première visite
+  it("gives the keys and Space no target: they sit above the bottom bar", () => {
     expect(helpTargetOf("keys")).toBeUndefined();
-    for (const bubble of HELP_BUBBLES.filter((other) => other !== "keys"))
+    expect(helpTargetOf("draft-space")).toBeUndefined();
+    for (const bubble of HELP_BUBBLES.filter((other) => other !== "keys" && other !== "draft-space"))
       expect(helpTargetOf(bubble)).toBeDefined();
   });
 });

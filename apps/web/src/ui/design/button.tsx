@@ -29,6 +29,7 @@ export type ButtonProps = ButtonText &
     hasDot?: boolean; // quelque chose attend : le point rouge de l'avatar (profile.css), dans l'angle du bouton
     hasMorphingLabel?: boolean; // son libellé change : la largeur glisse, le texte passe en fondu (use-label-morph.ts)
     labelLead?: string; // un mot devant le libellé (« Attendre » devant « 12 s »), qui cède quand la place manque (button.css)
+    reservedLabel?: string; // le plus long libellé qu'il portera : sa largeur est gardée, un libellé plus court ne le rétrécit pas
   };
 
 // Rendre le focus après un clic de souris : sinon Espace et Entrée recliqueraient le bouton au lieu de tracer ou de valider.
@@ -39,16 +40,35 @@ export const blurAfterClick = (onPress: () => void) => (event: MouseEvent<HTMLBu
 };
 
 // Le mot de devant est masqué sur un écran étroit : le nom accessible garde le tout.
-const ButtonLabel = ({ label, lead }: { label: string; lead: string }) => (
-  <span>
-    {lead && <span className="lp-btn-lead">{lead}</span>}
-    {label}
-  </span>
-);
+// Le libellé réservé s'écrit en invisible à côté du vrai (button.css) : le nom accessible dit le vrai seul.
+const ButtonLabel = ({
+  label,
+  lead,
+  reserve,
+}: {
+  label: string;
+  lead: string;
+  reserve: string | undefined;
+}) => {
+  const text = (
+    <span>
+      {lead && <span className="lp-btn-lead">{lead}</span>}
+      {label}
+    </span>
+  );
+  return reserve === undefined ? (
+    text
+  ) : (
+    <span className="lp-btn-reserve" data-reserve={reserve}>
+      {text}
+    </span>
+  );
+};
 
-const labelParts = ({ label, labelLead = "", title }: ButtonProps) => {
+const labelParts = ({ label, labelLead = "", reservedLabel, title }: ButtonProps) => {
   const whole = label === undefined ? undefined : `${labelLead}${label}`;
-  return { lead: labelLead, whole, accessibleName: label ? (labelLead ? whole : undefined) : title };
+  const isNamedByLabel = !labelLead && reservedLabel === undefined;
+  return { lead: labelLead, whole, accessibleName: label ? (isNamedByLabel ? undefined : whole) : title };
 };
 
 export const Button = (props: ButtonProps) => {
@@ -66,7 +86,7 @@ export const Button = (props: ButtonProps) => {
   const content = (
     <>
       {Icon && <Icon aria-hidden="true" />}
-      {label && <ButtonLabel label={label} lead={lead} />}
+      {label && <ButtonLabel label={label} lead={lead} reserve={props.reservedLabel} />}
       {kbd && (
         <span className="lp-kbd lp-type-kbd" aria-hidden="true">
           {kbd}

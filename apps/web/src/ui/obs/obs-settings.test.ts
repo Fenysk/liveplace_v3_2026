@@ -58,7 +58,7 @@ describe("the OBS section of the settings no longer holds the background (Écart
       ) ?? [];
 
     expect(delayRow).toBe("lp-slider-row lp-type-body");
-    expect(html).toContain("Le temps de retirer un pixel avant qu&#x27;il n&#x27;arrive sur le stream.");
+    expect(html).toContain("Le temps d&#x27;effacer un pixel avant qu&#x27;il n&#x27;arrive sur le stream.");
   });
 
   // Plus de palette, de pastille ni de nom sous une pastille

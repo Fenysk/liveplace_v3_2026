@@ -87,7 +87,7 @@ describe("les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
   it("wishes the trace once a finger moved the view in Draft on a touch screen with Trace off", () => {
     const panned = { ...drafting, hasPannedInDraft: true, draftSize: 2 };
     expect(wishedIn(panned)).toEqual(["draft-trace"]);
-    expect(wishedIn({ ...panned, isTouchScreen: false })).toEqual([]);
+    expect(wishedIn({ ...panned, isTouchScreen: false })).toEqual(["draft-space"]);
     expect(wishedIn({ ...panned, isTouchTracing: true })).toEqual([]);
     expect(wishedIn({ ...panned, hasPannedInDraft: false })).toEqual([]);
     expect(wishedIn({ ...resting, hasPannedInDraft: true })).toEqual([]);
@@ -133,7 +133,7 @@ describe("les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
     expect(pickHelpBubble(wishing, (bubble) => bubble === "empty-gauge")).toBeUndefined();
   });
 
-  // Ce qui clôt une bulle montrée : l'action suivante pour six d'entre elles, la fin de leur condition pour neuf autres
+  // Ce qui clôt une bulle montrée : l'action suivante pour sept d'entre elles, la fin de leur condition pour douze autres
   it("closes the bubbles that ask for no precise gesture on the next press or when they are done", () => {
     const closedBy = (closing: "press" | "done") => HELP_BUBBLES.filter((b) => isClosedBy(b, closing));
     expect(closedBy("press")).toEqual([
@@ -141,6 +141,7 @@ describe("les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
       "moderation-actions",
       "empty-gauge",
       "draft-trace",
+      "draft-space",
       "keys",
       "eyedropper",
     ]);
@@ -355,6 +356,7 @@ describe("les bulles qui restent après l'action qui les ferme (Écart §8.1, JO
       "moderator-welcome",
       "moderation-actions",
       "draft-trace",
+      "draft-space",
       "palette",
     ]);
   });
@@ -469,6 +471,70 @@ describe("les conseils du Dessin après des dessins posés (Écart §8.1, JOURNA
       expect(isLingering(bubble, placed({ ...clicking, pill: "view" }, 3), () => true)).toBe(false);
       expect(isDone(bubble, placed({ ...clicking, pill: "view" }, 3))).toBe(true);
     }
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-14) : à la souris, glisser en Dessin déplace la vue ; la bulle dit une fois de tenir Espace pour tracer
+describe("la bulle d'Espace, à la souris (Écart §8.1, JOURNAL 2026-10-14)", () => {
+  const moved: HelpFacts = { ...drafting, isTouchScreen: false, hasPannedInDraft: true, draftSize: 1 };
+  const alwaysSeen = () => true;
+
+  // Elle n'arrive qu'après un glissement de la souris en Dessin : ni avant, ni en Vue, ni au doigt
+  it("wishes Space once the mouse moved the view in Draft, never before, in View or on a touch screen", () => {
+    expect(wishedIn(moved)).toEqual(["draft-space"]);
+    expect(wishedIn({ ...moved, hasPannedInDraft: false })).toEqual([]);
+    expect(wishedIn({ ...moved, pill: "view" })).toEqual([]);
+    expect(wishedIn({ ...moved, pill: undefined })).toEqual([]);
+    expect(wishedIn({ ...moved, isTouchScreen: true })).toEqual(["draft-trace"]);
+  });
+
+  // Au doigt le glissement appelle le Tracé, à la souris Espace : jamais les deux pour la même personne
+  it("answers a pan with the Trace on a touch screen and with Space with a mouse, never both", () => {
+    for (const isTouchScreen of [true, false]) {
+      const wished = wishedIn({ ...moved, isTouchScreen });
+      expect(wished).toHaveLength(1);
+      expect(wished).toEqual([isTouchScreen ? "draft-trace" : "draft-space"]);
+    }
+  });
+
+  // Elle répond au geste qui vient d'avoir lieu : devant le premier passage et devant Ctrl+Z, qui l'attendent
+  it("goes before the first Draft pass and before Ctrl+Z, one at a time", () => {
+    const pickInOrder = (facts: HelpFacts): HelpBubble[] => {
+      const seen = new Set<HelpBubble>();
+      const picked: HelpBubble[] = [];
+      for (let turn = 0; turn < 4; turn++) {
+        const next = pickHelpBubble(facts, (bubble) => seen.has(bubble));
+        if (!next) break;
+        picked.push(next);
+        seen.add(next);
+      }
+      return picked;
+    };
+
+    expect(pickInOrder({ ...moved, draftSize: 0 })).toEqual(["draft-space", "first-draft"]);
+    expect(pickInOrder({ ...moved, placementCount: 1 })).toEqual(["draft-space", "keys"]);
+  });
+
+  // Une seule fois par appareil : vue, elle ne revient jamais, même si la souris glisse encore
+  it("never comes back once seen", () => {
+    expect(pickHelpBubble(moved, (bubble) => bubble === "draft-space")).toBeUndefined();
+    expect(pickHelpBubble({ ...moved, draftSize: 0 }, (bubble) => bubble === "draft-space")).toBe(
+      "first-draft",
+    );
+  });
+
+  // L'action suivante (Espace tenu compris) la ferme, et elle part aussitôt : le tracé qui suit se voit, rien à relire
+  it("is closed by the next press and goes at once, without staying", () => {
+    expect(isClosedBy("draft-space", "press")).toBe(true);
+    expect(isClosedBy("draft-space", "done")).toBe(false);
+    expect(isLingering("draft-space", moved, alwaysSeen)).toBe(false);
+    expect(isLingering("draft-space", moved, neverSeen)).toBe(false);
+  });
+
+  // Comme le Tracé, elle vit sur l'écran : ni dans la fenêtre ni dans l'inspection
+  it("lives on the screen, not in a window or an inspection", () => {
+    expect(surfaceOf("draft-space")).toBe("screen");
+    expect(surfaceShown(moved)).toBe("screen");
   });
 });
 

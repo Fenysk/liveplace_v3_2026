@@ -5,9 +5,16 @@ import { describe, expect, it } from "vitest";
 import type { CanvasView } from "../../state/canvas-store";
 import type { DraftView } from "../../state/draft-store";
 import type { GaugeProps } from "../design/gauge";
-import { formatWait, msToNextSecond, submitLabel, submitWords, waitSecondsOf } from "./draft-labels";
+import {
+  enterLabel,
+  formatWait,
+  msToNextSecond,
+  submitLabel,
+  submitWords,
+  waitSecondsOf,
+} from "./draft-labels";
 import { DraftPill, type DraftPillActions } from "./draft-pill";
-import { toDraftPillState } from "./use-draft-pill";
+import { toDraftPillState, toGaugeProps } from "./use-draft-pill";
 
 const noop = () => undefined;
 const ACTIONS: DraftPillActions = {
@@ -67,7 +74,7 @@ const viewMarkup = (keptCells: number, claimable = 0): string =>
     }),
   );
 
-describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09)", () => {
+describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09 et 2026-10-13)", () => {
   // Sans brouillon gardé, le bouton dit Dessiner, même jauge vide
   it("says Dessiner when no draft is kept", () => {
     const markup = viewMarkup(0);
@@ -76,12 +83,13 @@ describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09)", () => {
     expect(markup).toContain('title="Passer en mode Dessin"');
   });
 
-  // Un brouillon gardé ne change pas le mot : Dessiner tout court, ni « Reprendre » ni nombre de pixels
-  it("says Dessiner and nothing more when a draft is kept", () => {
+  // Un brouillon gardé dit sa taille : « Dessiner · 5 », la même forme que « Valider · 5 », ni « Reprendre » ni « px »
+  it("says the size of the kept draft after Dessiner", () => {
     for (const keptCells of [1, 5]) {
       const markup = viewMarkup(keptCells);
 
-      expect(markup).toContain("<span>Dessiner</span>");
+      expect(markup).toContain(`<span>Dessiner · ${keptCells}</span>`);
+      expect(markup).toContain('title="Passer en mode Dessin"');
       expect(markup).not.toContain("Reprendre");
       expect(markup).not.toContain(" px");
     }
@@ -95,6 +103,42 @@ describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09)", () => {
       expect(markup).toContain("lp-claim");
       expect(markup).not.toContain("Dessiner");
     }
+  });
+});
+
+describe("enterLabel (Écart §9.3, JOURNAL 2026-10-13)", () => {
+  // Dessiner seul sans brouillon, puis sa taille derrière un point médian, dans les deux langues
+  it("adds the draft size to Dessiner only when there is one", () => {
+    expect(enterLabel(0, "fr")).toBe("Dessiner");
+    expect(enterLabel(12, "fr")).toBe("Dessiner · 12");
+    expect(enterLabel(0, "en")).toBe("Draw");
+    expect(enterLabel(12, "en")).toBe("Draw · 12");
+  });
+});
+
+describe("the gauge reserves the kept draft in View too (Écart §9.3, JOURNAL 2026-10-13)", () => {
+  const NOW = -5_000; // la prochaine recharge de `canvasView` est à 0 : la jauge est encore à 6
+  const view = (canvas: CanvasView): CanvasView => ({
+    ...canvas,
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 0,
+      obsBackground: "transparent",
+    },
+  });
+
+  // En Vue comme en Dessin, la partie crème du fluide est la taille du brouillon gardé
+  it("shows the size of the draft as the reserved part, in View as in Draw", () => {
+    const withDraft = toGaugeProps(view(canvasView(0)), viewDraft(5), NOW, "fr");
+    const without = toGaugeProps(view(canvasView(0)), viewDraft(0), NOW, "fr");
+
+    expect(withDraft?.draft).toBe(5);
+    expect(withDraft?.charges).toBe(6);
+    expect(without?.draft).toBe(0);
+    expect(withDraft?.label).toContain("1 après ce dessin");
   });
 });
 
@@ -113,7 +157,7 @@ describe("submitLabel (Écart §9.3, JOURNAL 2026-10-08)", () => {
   // Plus aucune charge et rien à poser : le bouton compte jusqu'à la prochaine
   it("counts down to the next charge when there is nothing to place and no charge", () => {
     expect(submitLabel(0, 12, "fr")).toBe("Attendre 12 s");
-    expect(submitLabel(0, 65, "fr")).toBe("Attendre 1 min 05");
+    expect(submitLabel(0, 65, "fr")).toBe("Attendre 1 min 05 s");
   });
 });
 
@@ -121,7 +165,7 @@ describe("submitWords", () => {
   // Le mot de devant « Attendre » est à part : sur un écran étroit, le bouton garde « 12 s » seul
   it("splits the leading word from the wait so a narrow screen can drop it", () => {
     expect(submitWords(0, 12, "fr")).toEqual({ lead: "Attendre ", label: "12 s" });
-    expect(submitWords(0, 65, "fr")).toEqual({ lead: "Attendre ", label: "1 min 05" });
+    expect(submitWords(0, 65, "fr")).toEqual({ lead: "Attendre ", label: "1 min 05 s" });
   });
 
   // Hors attente, aucun mot à retirer
@@ -141,10 +185,16 @@ describe("formatWait", () => {
 
   // Dès la minute, minutes et secondes sur deux chiffres
   it("writes minutes and two-digit seconds from a minute", () => {
-    expect(formatWait(60)).toBe("1 min 00");
-    expect(formatWait(65)).toBe("1 min 05");
-    expect(formatWait(125)).toBe("2 min 05");
-    expect(formatWait(600)).toBe("10 min 00");
+    expect(formatWait(60)).toBe("1 min 00 s");
+    expect(formatWait(65)).toBe("1 min 05 s");
+    expect(formatWait(125)).toBe("2 min 05 s");
+    expect(formatWait(600)).toBe("10 min 00 s");
+  });
+
+  // Dès l'heure, heures et minutes : les secondes ne se lisent plus
+  it("writes hours and two-digit minutes from an hour", () => {
+    expect(formatWait(3600)).toBe("1 h 00 min");
+    expect(formatWait(7500)).toBe("2 h 05 min");
   });
 });
 
@@ -195,7 +245,7 @@ describe("the Draw pill buttons in English (Écart §14, JOURNAL 2026-10-07)", (
     expect(submitLabel(0, undefined, "en")).toBe("Confirm");
     expect(submitLabel(3, undefined, "en")).toBe("Confirm · 3");
     expect(submitLabel(0, 12, "en")).toBe("Wait 12 s");
-    expect(submitLabel(0, 65, "en")).toBe("Wait 1 min 05");
+    expect(submitLabel(0, 65, "en")).toBe("Wait 1 min 05 s");
     expect(submitWords(0, 12, "en")).toEqual({ lead: "Wait ", label: "12 s" });
   });
 });

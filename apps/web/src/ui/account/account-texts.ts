@@ -24,8 +24,12 @@ export const ACCOUNT_TEXTS = defineTexts({
   moderation: { fr: "Modération", en: "Moderation" },
   scoreboard: { fr: "Classement", en: "Scoreboard" },
 
-  // Les réponses en texte brut de `/auth/twitch/callback`, que le visiteur lit quand la connexion échoue.
-  signInRefused: { fr: "Connexion refusée : state invalide.", en: "Sign-in refused: invalid state." },
+  // Quand la connexion échoue, le visiteur lit l'une de ces deux phrases : la première sur la page `/auth/expired`, avec
+  // Se connecter (Écart §14, JOURNAL 2026-10-13) ; la seconde en texte brut, réponse de `/auth/twitch/callback`.
+  signInRefused: {
+    fr: "La connexion à Twitch a expiré. Recommence.",
+    en: "The Twitch sign-in expired. Start again.",
+  },
   signInFailed: {
     fr: "La connexion Twitch a échoué. Réessaie dans un instant.",
     en: "Twitch sign-in failed. Try again in a moment.",

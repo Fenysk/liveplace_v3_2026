@@ -35,25 +35,25 @@ const render = (...reports: PendingReport[]) =>
   );
 
 describe("Bannir in the reported placements (Écart §5.4, JOURNAL 2026-10-08)", () => {
-  // Un signalement offre Retirer, Bannir et Rétablir pour un joueur, et pour un modérateur venu de Twitch seul
-  it("offers Retirer, Bannir and Rétablir on a player, and on a moderator who comes from Twitch only", () => {
+  // Un signalement offre Effacer, Bannir et Rétablir pour un joueur, et pour un modérateur venu de Twitch seul
+  it("offers Effacer, Bannir and Rétablir on a player, and on a moderator who comes from Twitch only", () => {
     const player = render(report());
     const fromTwitch = render(report({ moderatorOrigin: { isFromTwitch: true, isNamedHere: false } }));
 
     for (const html of [player, fromTwitch]) {
-      expect(html).toContain("Retirer la pose");
+      expect(html).toContain("Effacer le dessin");
       expect(html).toContain("Bannir");
       expect(html).toContain("Rétablir");
     }
   });
 
-  // Un modérateur nommé ici, même modérateur Twitch aussi, garde Retirer et Rétablir mais pas Bannir
-  it("drops Bannir for a moderator named here, even when Twitch names him too, and keeps Retirer and Rétablir", () => {
+  // Un modérateur nommé ici, même modérateur Twitch aussi, garde Effacer et Rétablir mais pas Bannir
+  it("drops Bannir for a moderator named here, even when Twitch names him too, and keeps Effacer and Rétablir", () => {
     const namedHere = render(report({ moderatorOrigin: { isFromTwitch: false, isNamedHere: true } }));
     const both = render(report({ moderatorOrigin: { isFromTwitch: true, isNamedHere: true } }));
 
     for (const html of [namedHere, both]) {
-      expect(html).toContain("Retirer la pose");
+      expect(html).toContain("Effacer le dessin");
       expect(html).toContain("Rétablir");
       expect(html).not.toContain("Bannir");
     }

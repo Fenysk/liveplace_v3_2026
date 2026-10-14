@@ -11,8 +11,9 @@ const CANVAS_SECTION = "canvas";
 const MODERATION_SECTION = "moderation";
 
 // Dans l'ordre de priorité : ce qui attend un geste de la personne d'abord (modérer, brancher OBS, réclamer, trouver Modération),
-// puis ce qui explique son état (la jauge vide), puis les deux guides du Dessin, qui répondent à ce qu'elle vient de faire, puis
-// les trois conseils qui viennent avec les dessins posés (Écart §8.1, JOURNAL 2026-10-12). Les bulles OBS de la fenêtre suivent
+// puis ce qui explique son état (la jauge vide), puis les guides du Dessin, qui répondent à ce qu'elle vient de faire (le Tracé au
+// doigt ou Espace à la souris après un glissement, puis le premier passage), puis les trois conseils qui viennent avec les dessins
+// posés (Écart §8.1, JOURNAL 2026-10-12 et 2026-10-14). Les bulles OBS de la fenêtre suivent
 // Réglages : la chaîne du streamer, de l'onglet Vue OBS à la synchronisation Twitch (JOURNAL 2026-10-09 et 2026-10-12).
 export const HELP_BUBBLES = [
   "pending-report",
@@ -27,6 +28,7 @@ export const HELP_BUBBLES = [
   "moderation-actions",
   "empty-gauge",
   "draft-trace",
+  "draft-space",
   "first-draft",
   "palette",
   "keys",
@@ -42,7 +44,7 @@ export type HelpFacts = {
   pill: HelpPill | undefined;
   isTouchScreen: boolean;
   isTouchTracing: boolean;
-  hasPannedInDraft: boolean; // un doigt a glissé en Dessin, Tracé éteint : la vue a bougé au lieu de dessiner
+  hasPannedInDraft: boolean; // un doigt ou la souris a glissé en Dessin, Tracé éteint : la vue a bougé au lieu de dessiner
   hasColorButton: boolean; // la feuille Dessin repliée montre le bouton de la couleur actuelle : ni le grand écran ni le panneau du paysage
   draftSize: number;
   placementCount: number; // les dessins posés sur cet appareil, plafonnés (`PLACEMENT_COUNT_CAP`)
@@ -88,6 +90,9 @@ const WISHES: Record<HelpBubble, (facts: HelpFacts) => boolean> = {
   "empty-gauge": ({ pill, charges }) => pill !== undefined && charges === 0,
   "draft-trace": ({ pill, isTouchScreen, isTouchTracing, hasPannedInDraft }) =>
     pill === "draft" && isTouchScreen && !isTouchTracing && hasPannedInDraft,
+  // Écart §8.1 (JOURNAL 2026-10-14) : la souris qui glisse en Dessin déplace la vue ; tracer demande Espace, comme le Tracé au doigt.
+  "draft-space": ({ pill, isTouchScreen, hasPannedInDraft }) =>
+    pill === "draft" && !isTouchScreen && hasPannedInDraft,
   "first-draft": ({ pill, draftSize }) => pill === "draft" && draftSize === 0,
   // Écart §8.1 (JOURNAL 2026-10-12) : en Dessin, une fois un premier dessin posé, ce qui reste à apprendre. Au doigt, la palette
   // complète s'ouvre par la couleur actuelle ; à la souris, Ctrl+Z, dès qu'il y a un pixel à annuler ; la pipette, au troisième dessin,
@@ -154,6 +159,7 @@ const CLOSINGS: Record<HelpBubble, readonly Closing[]> = {
   "moderation-actions": ["press", "done"],
   "empty-gauge": ["press", "done"],
   "draft-trace": ["press"],
+  "draft-space": ["press"], // appuyer sur Espace, ou la prochaine action, la clôt
   "first-draft": ["done"],
   palette: ["done"], // ouvrir la palette la clôt (`useHelpBubbles`), comme sortir du Dessin
   keys: ["press", "done"],

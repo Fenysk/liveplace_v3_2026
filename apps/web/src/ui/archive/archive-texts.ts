@@ -144,8 +144,8 @@ export const ARCHIVE_TEXTS = defineTexts({
 
   // Sans archive, une seule phrase : ce qu'il n'y a pas, et ce que fait archiver.
   noArchive: {
-    fr: "Aucune archive pour l'instant. Archiver fige ton dessin, avec son lien, et repart sur une fresque vide.",
-    en: "No archive yet. Archiving freezes your drawing, with its link, and starts over on an empty canvas.",
+    fr: "Aucune archive pour l'instant. Archiver fige ta fresque, avec son lien, et repart sur une fresque vide.",
+    en: "No archive yet. Archiving freezes your canvas, with its link, and starts over on an empty canvas.",
   },
   canvasesUnavailable: {
     fr: "Impossible de lire tes fresques pour l'instant. Réessaie dans un instant.",
@@ -194,8 +194,8 @@ export const ARCHIVE_TEXTS = defineTexts({
   reopenTitle: { fr: "Rouvrir cette archive ?", en: "Reopen this archive?" },
   discardTitle: { fr: "Supprimer cette archive ?", en: "Delete this archive?" },
   archiveSentence: {
-    fr: "Ton dessin est figé et garde son lien. Tes viewers passent sur une fresque vide.",
-    en: "Your drawing is frozen and keeps its link. Your viewers move to an empty canvas.",
+    fr: "Ta fresque est figée et garde son lien. Tes viewers passent sur une fresque vide.",
+    en: "Your canvas is frozen and keeps its link. Your viewers move to an empty canvas.",
   },
   reopenSentence: localized({
     fr: (title: string) => `« ${title} » remplace ta fresque actuelle, qui part dans les archives.`,
@@ -311,8 +311,8 @@ export const ARCHIVE_TEXTS = defineTexts({
     en: "Download failed: the browser couldn't produce the image.",
   },
   pngBackgroundSentence: {
-    fr: "Seules les cases vides du dessin prennent le fond ; les cases colorées ne changent pas.",
-    en: "Only the empty cells of the drawing take the background; colored cells stay as they are.",
+    fr: "Seules les cases vides de la fresque prennent le fond ; les cases colorées ne changent pas.",
+    en: "Only the empty cells of the canvas take the background; colored cells stay as they are.",
   },
   pngBackgroundLabel: { fr: "Fond de l'image", en: "Image background" },
 

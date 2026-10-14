@@ -27,6 +27,7 @@ import { Block, InPhone, StateRow, useNowMs } from "./entry-layout";
 import { DRAFT_ACTIONS, draftState, gaugeAt, SIGNED_IN } from "./game-entries";
 
 const REFILL: Refill = { refillMs: 10_000, refillCharges: 1 };
+const GAUGE_MAX = 10; // celle de `gaugeAt`
 
 type Align = "start" | "center" | "end";
 
@@ -52,7 +53,7 @@ const Aimed = ({
   const target = helpTargetOf(bubble);
   const line = (
     <Bubble isVisible isDocked={false} side={side} target={target && targets[target]}>
-      <HelpBubbleLine bubble={bubble} isTouchScreen={isTouchScreen} refill={refill} />
+      <HelpBubbleLine bubble={bubble} isTouchScreen={isTouchScreen} refill={refill} gaugeMax={GAUGE_MAX} />
     </Bubble>
   );
   return (
@@ -79,7 +80,7 @@ const Aimed = ({
   );
 };
 
-// La pose d'un autre compte, inspectée par qui modère : sa pill porte « Retirer ses pixels » et Bannir.
+// Le dessin d'un autre compte, inspecté par qui modère : sa pill porte « Effacer ses dessins » et Bannir.
 const InspectedPose = ({ nowMs }: { nowMs: number }) => (
   <InspectionPill
     inspection={{
@@ -179,14 +180,15 @@ const HELP_SCENES: readonly HelpScene[] = [
   },
   {
     name: "Une récompense attend",
-    detail: "Flèche sur le +1. Elle s'efface quand on le touche, ou à l'action suivante.",
+    detail:
+      "Flèche sur le +1. Le chiffre dit où la récompense emmène la jauge. Elle s'efface quand on le touche, ou à l'action suivante.",
     bubble: "first-reward",
     content: viewBar(7, true),
   },
   {
-    name: "Inspecter la pose d'un autre compte, pour qui modère",
+    name: "Inspecter le dessin d'un autre compte, pour qui modère",
     detail:
-      "La seule bulle montrée pendant une inspection, la première fois : flèche sur « Retirer ses pixels », où Bannir attend à côté. Elle s'efface à la fermeture de l'inspection ou à l'action suivante. Jamais sur les poses du streamer ni sur les siennes, qui n'ont pas d'actions.",
+      "La seule bulle montrée pendant une inspection, la première fois : flèche sur « Effacer ses dessins », où Bannir attend à côté. Elle s'efface à la fermeture de l'inspection ou à l'action suivante. Jamais sur les dessins du streamer ni sur les siens, qui n'ont pas d'actions.",
     bubble: "moderation-actions",
     align: "end",
     content: (nowMs) => <InspectedPose nowMs={nowMs} />,
@@ -194,13 +196,13 @@ const HELP_SCENES: readonly HelpScene[] = [
   {
     name: "Jauge vide, la première fois",
     detail:
-      "Les chiffres viennent de la fresque : sa recharge, au singulier. Elle reste deux secondes après l'action qui la ferme (l'action suivante, ou une charge qui revient) : la recharge se lit pendant qu'elle arrive.",
+      "Les chiffres viennent de la fresque : sa recharge, au singulier. Elle reste deux secondes après l'action qui la ferme (l'action suivante, ou un pixel qui revient) : la recharge se lit pendant qu'elle arrive.",
     bubble: "empty-gauge",
     align: "start",
     content: viewBar(0, false),
   },
   {
-    name: "Jauge vide, plusieurs charges par recharge",
+    name: "Jauge vide, plusieurs pixels par recharge",
     detail: "Au pluriel, avec le nombre.",
     bubble: "empty-gauge",
     align: "start",
@@ -215,6 +217,14 @@ const HELP_SCENES: readonly HelpScene[] = [
     align: "end",
     isPhone: true,
     content: (nowMs) => bar(draftState(nowMs, { isTouchScreen: true }), true),
+  },
+  {
+    name: "La souris déplace la vue au lieu de dessiner",
+    detail:
+      "Après le premier glissement en Dessin à la souris : une ligne, sans flèche (Espace n'a pas de bouton), au-dessus de la barre du bas comme Ctrl+Z. Elle part à l'action suivante, Espace tenu compris, et passe devant le premier passage et Ctrl+Z, qui attendent.",
+    bubble: "draft-space",
+    isTouchScreen: false,
+    content: (nowMs) => bar(draftState(nowMs, { draftSize: 0, canSubmit: false, canDiscard: false }), false),
   },
   {
     name: "Premier passage en Dessin, au doigt",
@@ -296,7 +306,7 @@ const TabScene = ({ side, bubble }: { side: "left" | "below"; bubble: keyof type
   );
   const line = (
     <Bubble isVisible isDocked={false} side={side} target={target && targets[target]}>
-      <HelpBubbleLine bubble={bubble} isTouchScreen={false} refill={REFILL} />
+      <HelpBubbleLine bubble={bubble} isTouchScreen={false} refill={REFILL} gaugeMax={GAUGE_MAX} />
     </Bubble>
   );
   return (
@@ -416,7 +426,7 @@ export const HelpBubbleBlocks = () => {
     <>
       <Block
         title="Bulles d'aide"
-        note="Seize conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément (Ctrl+Z, sans). Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Les trois derniers viennent avec les dessins posés sur l'appareil : la palette dès le premier, Ctrl+Z dès le premier aussi, une fois un pixel au brouillon, la pipette au troisième. Quatre restent deux secondes après l'action qui les ferme (la jauge vide, le premier passage en Dessin, Ctrl+Z, la pipette) tant que leur cible est à l'écran ; les douze autres partent aussitôt. Une inspection ouverte les fait taire toutes, sauf celle des actions de modération, qui vit dans l'inspection. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf celles de la chaîne du streamer, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent. La flèche s'arrête contre la pill, à la colonne ou à la rangée du bouton : l'anneau du focus entoure le bouton visé tant que la bulle est montrée. Sans côté qui tienne à la largeur du texte (un téléphone couché étroit, un pliable), la bulle se resserre à la place d'un côté et son texte passe à la ligne."
+        note="Dix-sept conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément (Ctrl+Z et Espace, sans). Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Les trois derniers viennent avec les dessins posés sur l'appareil : la palette dès le premier, Ctrl+Z dès le premier aussi, une fois un pixel au brouillon, la pipette au troisième. Quatre restent deux secondes après l'action qui les ferme (la jauge vide, le premier passage en Dessin, Ctrl+Z, la pipette) tant que leur cible est à l'écran ; les treize autres partent aussitôt. Une inspection ouverte les fait taire toutes, sauf celle des actions de modération, qui vit dans l'inspection. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf celles de la chaîne du streamer, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent. La flèche s'arrête contre la pill, à la colonne ou à la rangée du bouton : l'anneau du focus entoure le bouton visé tant que la bulle est montrée. Sans côté qui tienne à la largeur du texte (un téléphone couché étroit, un pliable), la bulle se resserre à la place d'un côté et son texte passe à la ligne."
       >
         {HELP_SCENES.map((scene) => (
           <HelpSceneRow key={scene.name} scene={scene} nowMs={nowMs} />

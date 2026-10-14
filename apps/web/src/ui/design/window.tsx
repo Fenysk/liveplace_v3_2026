@@ -236,14 +236,28 @@ export const SmallWindow = ({
 // Une ligne de la fenêtre : un libellé à gauche, sa valeur ou son contrôle à droite.
 // `hasProfile` : le libellé est un profil, dont le nom se coupe plutôt que de pousser les actions.
 // `isListed` : une ligne d'une liste, qui arrive en fondu avec elle (arrival.css).
-type WindowRowProps = { label: ReactNode; hasProfile?: boolean; isListed?: boolean; children: ReactNode };
+// `isFailed` (Écart §8.1, JOURNAL 2026-10-13) : son action a échoué, le message et Réessayer passent dessous.
+type WindowRowProps = {
+  label: ReactNode;
+  hasProfile?: boolean;
+  isListed?: boolean;
+  isFailed?: boolean;
+  children: ReactNode;
+};
 
-export const WindowRow = ({ label, hasProfile = false, isListed = false, children }: WindowRowProps) => (
+export const WindowRow = ({
+  label,
+  hasProfile = false,
+  isListed = false,
+  isFailed = false,
+  children,
+}: WindowRowProps) => (
   <div
     className={classNames(
       "lp-window-row lp-type-body",
       hasProfile && "lp-window-row--profile",
       isListed && "lp-arrives",
+      isFailed && "lp-window-row--failed",
     )}
   >
     <span>{label}</span>

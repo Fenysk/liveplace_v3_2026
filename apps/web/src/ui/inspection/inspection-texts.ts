@@ -10,11 +10,11 @@ export const INSPECTION_TEXTS = defineTexts({
 
   report: { fr: "Signaler", en: "Report" },
   reported: { fr: "Signalé", en: "Reported" },
-  clearTheirPixels: { fr: "Retirer ses pixels", en: "Clear their pixels" },
+  clearTheirPixels: { fr: "Effacer ses dessins", en: "Clear their drawings" },
   ban: { fr: "Bannir", en: "Ban" },
 
   // JOURNAL 2026-09-27 : pour le streamer. Nommé ici, il se retire ici ; venu de Twitch seul, il se retire sur Twitch.
-  removeModerator: { fr: "Retirer modérateur", en: "Remove moderator" },
+  removeModerator: { fr: "Retirer le rôle", en: "Remove the role" },
   makeModerator: { fr: "Nommer modérateur", en: "Make moderator" },
   twitchModerator: { fr: "Modérateur Twitch", en: "Twitch moderator" },
   twitchModeratorTip: {

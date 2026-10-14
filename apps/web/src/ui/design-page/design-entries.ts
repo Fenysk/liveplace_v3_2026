@@ -67,7 +67,7 @@ const ENTRIES_BY_SLUG = {
 
   "taille-du-canvas": { title: "Taille de la fresque", chapterId: "dialogs" },
   "jauge-maximale": { title: "Jauge maximale", chapterId: "dialogs" },
-  "retirer-bannir-signaler": { title: "Retirer, bannir, signaler", chapterId: "dialogs" },
+  "retirer-bannir-signaler": { title: "Effacer, bannir, signaler", chapterId: "dialogs" },
   banni: { title: "Banni", chapterId: "dialogs" },
   "archiver-ou-rouvrir": { title: "Archiver ou rouvrir", chapterId: "dialogs" },
   "supprimer-une-archive": { title: "Supprimer une archive", chapterId: "dialogs" },
