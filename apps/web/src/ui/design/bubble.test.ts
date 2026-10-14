@@ -157,6 +157,19 @@ describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
     expect(render({ isVisible: true, hasTarget: true })).not.toContain("data-aimed");
   });
 
+  // Écart §8.1 (JOURNAL 2026-10-13, qui défait l'entrée du même jour) : la bulle se pose contre la pill qui porte la cible, mais sa
+  // flèche vise la cible elle-même, dans l'écran comme posée sur place ; l'anneau marque aussi le bouton
+  it("sits against the pill that holds the target, its arrow aiming at the target itself and not at the pill", () => {
+    expect(bubbleSource).toContain(
+      "const anchor = isOverWindow ? aimed : (aimed.closest(PILL_SELECTOR) ?? aimed);",
+    );
+    expect(bubbleSource).toContain("const aimedRect = rectOf(aimed);");
+    expect(bubbleSource).toMatch(/placeBubble\(\s*aimedRect,\s*anchorRect,/);
+    expect(bubbleSource).toContain("aimArrowAtTarget(element, aimed.getBoundingClientRect(), side)");
+    expect(bubbleSource).not.toContain("aimArrowAtAnchor");
+    expect(bubbleSource).not.toContain("isOnTarget");
+  });
+
   // Aucun côté ne tient à la largeur du texte : la bulle se mesure à sa largeur naturelle, puis se resserre à ce que laisse un côté
   it("is measured at its natural width, then squeezed to what a side leaves when none fits", () => {
     expect(bubbleSource).toContain("element.style.removeProperty(ROOM_VARIABLE)");

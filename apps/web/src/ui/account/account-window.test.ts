@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { type BubbleTargets, BubbleTargetsContext } from "../help/bubble-target";
+import { BubbleTargetsContext, createBubbleTargets } from "../help/bubble-target";
 import { AccountWindow, SETTINGS_SECTION } from "./account-window";
 
 const doNothing = (): void => undefined;
@@ -20,6 +20,7 @@ const windowProps = (props: Partial<WindowProps> = {}): WindowProps => ({
   signOutHref: "#",
   appearanceChoice: "auto",
   onPickAppearance: doNothing,
+  onRestartTutorial: doNothing,
   ...props,
 });
 
@@ -129,6 +130,34 @@ describe("la section Mon compte (CDC 2026, Fenêtre)", () => {
   });
 });
 
+// Écart §8.1 (JOURNAL 2026-10-12) : « Revoir le tuto » remet le tutoriel à zéro sur l'appareil
+describe("« Revoir le tuto » dans Mon compte (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  // Un bouton avec son libellé, sa rangée « Tutoriel » et son icône, sous la langue
+  it("holds a Revoir le tuto button, in its own Tutoriel row below the language, with an icon", () => {
+    const markup = renderWindow();
+    const [, button = ""] =
+      /<button[^>]*>((?:<svg.*?<\/svg>)?<span>Revoir le tuto<\/span>)<\/button>/.exec(markup) ?? [];
+
+    expect(markup).toContain("Tutoriel");
+    expect(button).toContain("<svg");
+    expect(markup.indexOf("Revoir le tuto")).toBeGreaterThan(markup.indexOf('aria-label="Langue"'));
+    expect(markup.indexOf("Tutoriel")).toBeLessThan(markup.indexOf("Revoir le tuto"));
+  });
+
+  // Seulement dans Mon compte : les autres sections n'y touchent pas
+  it("is in the Mon compte section alone", () => {
+    const markup = renderWindow({ ...OWNER_TABS, sectionId: "canvas" });
+
+    expect(markup).not.toContain("Revoir le tuto");
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "obs" })).not.toContain("Revoir le tuto");
+  });
+
+  // Le bouton est un bouton pressé comme les autres, qui n'envoie ni ne lie rien à une adresse
+  it("is a plain button, not a link", () => {
+    expect(renderWindow()).not.toMatch(/<a[^>]*>(?:(?!<\/a>).)*Revoir le tuto/);
+  });
+});
+
 describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)", () => {
   const list = tab("contenu de la section Classement");
 
@@ -163,18 +192,9 @@ describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)"
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-09) : l'onglet Vue OBS est la cible de la bulle qui invite le streamer à l'ouvrir
-describe("l'onglet Vue OBS, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09)", () => {
-  const refs: BubbleTargets = {
-    trace: { current: null },
-    submit: { current: null },
-    gauge: { current: null },
-    claim: { current: null },
-    settings: { current: null },
-    reports: { current: null },
-    "obs-tab": { current: null },
-    "obs-address": { current: null },
-  };
+// Écart §8.1 (JOURNAL 2026-10-09 et 2026-10-12) : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à les ouvrir
+describe("les onglets Vue OBS et Modération, cibles d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12)", () => {
+  const refs = createBubbleTargets();
   const inGame = (props: Partial<WindowProps>): string =>
     renderToStaticMarkup(
       createElement(BubbleTargetsContext, { value: refs }, createElement(AccountWindow, windowProps(props))),
@@ -184,14 +204,17 @@ describe("l'onglet Vue OBS, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026
       ...markup.matchAll(/<span class="lp-bubble-target"><button[^>]*>(?:<svg.*?<\/svg>)([^<]+)<\/button>/g),
     ].map(([, label]) => label ?? "");
 
-  // Dans la page de jeu : le seul onglet enveloppé est Vue OBS, les autres restent des boutons seuls
-  it("wraps the Vue OBS tab, and only it, in the game page", () => {
-    expect(targetsIn(inGame(OWNER_TABS))).toEqual(["Vue OBS"]);
+  // Dans la page de jeu : les seuls onglets enveloppés sont Vue OBS et Modération, les autres restent des boutons seuls
+  it("wraps the Vue OBS and Moderation tabs, and only them, in the game page", () => {
+    expect(targetsIn(inGame(OWNER_TABS))).toEqual(["Vue OBS", "Modération"]);
   });
 
-  // Qui n'est pas le streamer n'a pas cet onglet : rien à viser
-  it("has nothing to wrap for who is not the owner", () => {
-    expect(targetsIn(inGame({ moderationTab: tab("contenu de la section Modération") }))).toEqual([]);
+  // Qui n'est pas le streamer n'a pas l'onglet Vue OBS : Modération seul, et rien sans lui
+  it("wraps only the tabs the role has: Moderation for a moderator, nothing for a viewer", () => {
+    expect(targetsIn(inGame({ moderationTab: tab("contenu de la section Modération") }))).toEqual([
+      "Modération",
+    ]);
+    expect(targetsIn(inGame({}))).toEqual([]);
   });
 
   // Hors de la page de jeu, l'onglet reste seul : aucun `<span>` de plus

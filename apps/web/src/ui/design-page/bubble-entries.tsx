@@ -185,8 +185,14 @@ export const BubbleEntry = () => (
         </StateRow>
       ))}
       <StateRow
+        name="Première visite, à la souris"
+        detail="Les mêmes deux gestes et les mêmes trois points (déplacer, molette, cliquer une case), dits à la molette et au clic. Le texte suit l'écran : au doigt « Pince » et « Touche », à la souris « Molette » et « Clique »."
+      >
+        <FirstHint doneCount={0} isVisible isDocked={false} isTouchScreen={false} />
+      </StateRow>
+      <StateRow
         name="Les points se remplissent"
-        detail="Le conseil de première visite : sur écran tactile, jamais en vue OBS, caché en Dessin et pendant l'inspection."
+        detail="Le conseil de première visite, au doigt comme à la souris : jamais en vue OBS, caché en Dessin et pendant l'inspection."
         isDemo
       >
         <HintDemo />

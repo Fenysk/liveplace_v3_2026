@@ -9,6 +9,12 @@ export const HINT_TEXTS = defineTexts({
     fr: "Touche un pixel pour voir qui l'a posé",
     en: "Tap a pixel to see who placed it",
   },
+  // À la souris (Écart §8.1, JOURNAL 2026-10-12) : les mêmes deux gestes, à la molette et au clic.
+  scroll: { fr: "Molette pour zoomer", en: "Scroll to zoom" },
+  clickPixel: {
+    fr: "Clique sur un pixel pour voir qui l'a posé",
+    en: "Click a pixel to see who placed it",
+  },
   // Les points de la bulle, dits à voix haute : combien de gestes sur combien.
   progress: localized({
     fr: (done: number, total: number) => `${done} sur ${total}`,

@@ -10,6 +10,27 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(HELP_TEXTS.fr.report).toBe("Un dessin a été signalé");
   });
 
+  // La suite de la chaîne du streamer, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  it("keeps the validated texts of the streamer's bubbles in the window word for word", () => {
+    expect(HELP_TEXTS.fr.inviteLink).toBe("Partage aussi ce lien à tes viewers");
+    expect(HELP_TEXTS.fr.theme).toBe("Donne un thème à ta fresque");
+    expect(HELP_TEXTS.fr.twitchSync).toBe("Reprends tes modérateurs Twitch ici");
+  });
+
+  // Les deux bulles de qui modère, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  it("keeps the validated texts of the moderation bubbles word for word", () => {
+    expect(HELP_TEXTS.fr.moderatorWelcome).toBe("Tu modères cette fresque : tout est ici");
+    expect(HELP_TEXTS.fr.moderationActions).toBe("Retire ses pixels ou bannis ce viewer ici");
+  });
+
+  // Les trois conseils du Dessin, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  it("keeps the validated texts of the Draft tips word for word", () => {
+    expect(HELP_TEXTS.fr.palette).toBe("Touche ta couleur pour ouvrir la palette");
+    expect(HELP_TEXTS.fr).not.toHaveProperty("keysRecent");
+    expect(HELP_TEXTS.fr.keys).toBe("Ctrl+Z : annule ton dernier trait");
+    expect(HELP_TEXTS.fr.eyedropper).toBe("La pipette reprend une couleur de la fresque");
+  });
+
   // Au doigt on touche, à la souris on clique : le verbe suit l'écran
   it("says touch on a touch screen and click with a mouse", () => {
     expect(HELP_TEXTS.fr.draft(true)).toBe("Touche la fresque pour préparer ton dessin, Valider l'envoie");
@@ -60,6 +81,15 @@ describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => 
     expect(HELP_TEXTS.en.obsAddress).toBe("Copy this address and paste it into OBS");
     expect(HELP_TEXTS.en.reward).toBe("A reward is waiting for you: +1 on your max gauge");
     expect(HELP_TEXTS.en.trace).toBe("Turn on Trace to draw by dragging");
+    expect(HELP_TEXTS.en.inviteLink).toBe("Share this link with your viewers too");
+    expect(HELP_TEXTS.en.theme).toBe("Give your canvas a theme");
+    expect(HELP_TEXTS.en.twitchSync).toBe("Import your Twitch moderators here");
+    expect(HELP_TEXTS.en.moderatorWelcome).toBe("You moderate this canvas: everything is here");
+    expect(HELP_TEXTS.en.moderationActions).toBe("Clear their pixels or ban this viewer here");
+    expect(HELP_TEXTS.en.palette).toBe("Tap your color to open the palette");
+    expect(HELP_TEXTS.en).not.toHaveProperty("keysRecent");
+    expect(HELP_TEXTS.en.keys).toBe("Ctrl+Z: undo your last stroke");
+    expect(HELP_TEXTS.en.eyedropper).toBe("The eyedropper picks up a color from the canvas");
   });
 
   // Au doigt on tape, à la souris on clique

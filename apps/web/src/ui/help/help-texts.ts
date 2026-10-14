@@ -53,11 +53,35 @@ export const HELP_TEXTS = defineTexts({
     fr: "Copie cette adresse, colle-la dans OBS",
     en: "Copy this address and paste it into OBS",
   },
+  // La suite de la chaîne du streamer (Écart §8.1, JOURNAL 2026-10-12) : le lien à partager, sur le bouton de l'adresse OBS déjà
+  // copiée ; le thème ; la synchro Twitch.
+  inviteLink: { fr: "Partage aussi ce lien à tes viewers", en: "Share this link with your viewers too" },
+  theme: { fr: "Donne un thème à ta fresque", en: "Give your canvas a theme" },
+  twitchSync: { fr: "Reprends tes modérateurs Twitch ici", en: "Import your Twitch moderators here" },
   reward: {
     fr: "Une récompense t'attend : +1 sur ta jauge max",
     en: "A reward is waiting for you: +1 on your max gauge",
   },
   trace: { fr: "Active le tracé pour dessiner en glissant", en: "Turn on Trace to draw by dragging" },
+
+  // Pour qui modère (Écart §8.1, JOURNAL 2026-10-12) : sa pill Modération, puis les actions de l'inspection.
+  moderatorWelcome: {
+    fr: "Tu modères cette fresque : tout est ici",
+    en: "You moderate this canvas: everything is here",
+  },
+  moderationActions: {
+    fr: "Retire ses pixels ou bannis ce viewer ici",
+    en: "Clear their pixels or ban this viewer here",
+  },
+
+  // Ce qui reste à apprendre en Dessin, une fois des dessins posés (Écart §8.1, JOURNAL 2026-10-12) : la palette au doigt, les
+  // Ctrl+Z à la souris (une ligne), la pipette.
+  palette: { fr: "Touche ta couleur pour ouvrir la palette", en: "Tap your color to open the palette" },
+  keys: { fr: "Ctrl+Z : annule ton dernier trait", en: "Ctrl+Z: undo your last stroke" },
+  eyedropper: {
+    fr: "La pipette reprend une couleur de la fresque",
+    en: "The eyedropper picks up a color from the canvas",
+  },
 
   // Au doigt on touche, à la souris on clique : la bulle du premier passage en Dessin dit celui des deux qui sert.
   draft: localized({

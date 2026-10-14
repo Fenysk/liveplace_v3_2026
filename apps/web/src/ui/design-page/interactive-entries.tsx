@@ -1,7 +1,7 @@
 // Le chapitre Composants (2/2) : ceux qui bougent ou qui ouvrent quelque chose. Les démos se manipulent pour de bon.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Layers, LocateFixed, Minus, Plus, Scaling, User } from "lucide-react";
+import { Layers, LocateFixed, Minus, Plus, RotateCcw, Scaling, User } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
@@ -213,6 +213,9 @@ const SectionsWindow = ({ isOpen, close, initialId, isLarge = false }: SectionsW
           </WindowRow>
           <WindowRow label="Langue">
             <LocalePicker />
+          </WindowRow>
+          <WindowRow label="Tutoriel">
+            <Button label="Revoir le tuto" icon={RotateCcw} onPress={noop} />
           </WindowRow>
         </>
       )}

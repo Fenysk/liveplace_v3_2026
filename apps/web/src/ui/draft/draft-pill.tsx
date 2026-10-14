@@ -56,6 +56,7 @@ export type DraftPillActions = {
   onToggleEraser: () => void;
   onTogglePicker: () => void; // la pipette, pour un seul clic (CDC 2026, `I`)
   onToggleTouchTracing: () => void;
+  onOpenPalette?: (() => void) | undefined; // la feuille déplie la palette complète (Écart §8.1, JOURNAL 2026-10-12)
   onReload: () => void;
   onSignIn: () => void; // la page part chez Twitch
 };
@@ -149,16 +150,19 @@ const TraceButton = ({ state, actions }: { state: DraftModeState; actions: Draft
   </BubbleTarget>
 );
 
+// La pipette, que sa bulle d'aide vise (Écart §8.1, JOURNAL 2026-10-12).
 const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
   const t = useTexts(DRAFT_TEXTS);
   return (
-    <Button
-      icon={Pipette}
-      variant="ghost"
-      title={t.eyedropperTip}
-      isPressed={state.isPicking}
-      onPress={actions.onTogglePicker}
-    />
+    <BubbleTarget name="eyedropper">
+      <Button
+        icon={Pipette}
+        variant="ghost"
+        title={t.eyedropperTip}
+        isPressed={state.isPicking}
+        onPress={actions.onTogglePicker}
+      />
+    </BubbleTarget>
   );
 };
 
@@ -179,13 +183,18 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isOpen = isPanel || isExpanded;
   const isEraser = state.colorIndex === TRANSPARENT_COLOR_INDEX;
-  const toggle = () => setIsExpanded((expanded) => !expanded);
+  // Déplier la palette le dit à la page (sa bulle d'aide part), par la poignée comme par la couleur actuelle.
+  const expand = () => {
+    setIsExpanded(true);
+    actions.onOpenPalette?.();
+  };
+  const toggle = () => (isExpanded ? setIsExpanded(false) : expand());
   return (
     <>
       {!isPanel && (
         <Grabber
           label={isExpanded ? t.collapseSheet : t.expandPalette}
-          onUp={() => setIsExpanded(true)}
+          onUp={expand}
           onDown={() => setIsExpanded(false)}
           onTap={toggle}
         />
@@ -199,10 +208,12 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
       {!isOpen && (
         <div className="lp-row">
           {/* La couleur active ouvre la palette. Toucher une récente l'échange avec elle, sur place. */}
-          <CurrentColorButton
-            color={isEraser ? undefined : state.palette[state.colorIndex]}
-            onPress={toggle}
-          />
+          <BubbleTarget name="palette">
+            <CurrentColorButton
+              color={isEraser ? undefined : state.palette[state.colorIndex]}
+              onPress={toggle}
+            />
+          </BubbleTarget>
           <RecentSwatches
             palette={state.palette}
             recentColorIndexes={state.recentColorIndexes}

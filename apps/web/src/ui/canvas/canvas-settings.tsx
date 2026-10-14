@@ -26,6 +26,7 @@ import { Segmented, type SegmentedOption } from "../design/segmented";
 import { Slider, type SliderStep } from "../design/slider";
 import { TextField } from "../design/text-field";
 import { SmallWindow, useShownWhileClosing } from "../design/window";
+import { BubbleTarget } from "../help/bubble-target";
 import { useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import type { CanvasPreviewProps } from "../moderation/moderation-window";
@@ -51,11 +52,13 @@ export type ThemeField = {
   onCommit: () => void;
 };
 
+// Le champ du thème est la cible de la bulle qui invite le streamer à en donner un (Écart §8.1, JOURNAL 2026-10-12).
 export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
   const t = useTexts(ARCHIVE_TEXTS);
   return (
     <div className="lp-setting">
       <TextField
+        wrapInput={(input) => <BubbleTarget name="theme">{input}</BubbleTarget>}
         label={t.themeLabel}
         placeholder={t.themePlaceholder}
         value={theme.value}

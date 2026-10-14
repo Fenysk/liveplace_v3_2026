@@ -3,33 +3,43 @@
 // prioritaire ; `state/shown-bubble.ts` lui laisse le temps de paraître, et la précédente de s'effacer avant elle.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
+import type { CanvasStore, CanvasView } from "../../state/canvas-store";
 import { createDraftPan } from "../../state/draft-pan";
-import type { DraftStore } from "../../state/draft-store";
+import type { DraftMode, DraftStore } from "../../state/draft-store";
 import type { Refill } from "../../state/gauge";
 import {
+  bubblesEndedByCopy,
   bubblesFoundIn,
   HELP_BUBBLES,
   type HelpBubble,
   type HelpFacts,
   isClosedBy,
   isDone,
-  isInWindow,
   isLingering,
   isWished,
-  OBS_CHAIN,
   pickHelpBubble,
+  surfaceOf,
+  surfaceShown,
 } from "../../state/help-bubbles";
 import { createShownBubble, type ShownBubbleClock } from "../../state/shown-bubble";
 import type { NavigationKind } from "../canvas/navigation-watch";
 import { motionMs } from "../design/motion";
 import { useAfterDelay } from "../design/use-after-delay";
-import { TOUCH_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import {
+  COMPACT_SCREEN_QUERY,
+  SIDE_COLUMN_QUERY,
+  TOUCH_SCREEN_QUERY,
+  useMediaQuery,
+} from "../design/use-media-query";
 import { seenBubbles, useSeenBubbles } from "../design/use-seen-bubble";
 import { useOpenWindowCount } from "../design/window-open";
 import type { DraftPillState } from "../draft/draft-pill";
 import { HINT_SHOW_DELAY_MS } from "../hint/first-hint-props";
+import { moderableUserId } from "../moderation/moderable-user";
+import type { ModerationControls } from "../moderation/use-moderation";
 import { toPillFacts } from "./help-facts";
+import { placementCount } from "./tutorial";
+import { useTwitchSyncMissing } from "./use-twitch-sync-missing";
 
 const draftPan = createDraftPan();
 
@@ -39,6 +49,7 @@ export const recordDraftPan = (kind: NavigationKind, draft: DraftStore): void =>
 };
 
 const getNotPanned = (): boolean => false;
+const getNoPlacement = (): number => 0;
 
 const bubbleClock: ShownBubbleClock = {
   wait: (ms, run) => {
@@ -96,28 +107,52 @@ const useDoneClosing = (shown: HelpBubble | undefined, facts: HelpFacts): void =
 
 type HelpStores = { canvas: CanvasStore; draft: DraftStore };
 
+// La pill Inspection montre les actions de modération d'une pose : en Vue, une case posée par un autre compte, à qui on peut les offrir.
+const canModerateInspection = (
+  inspection: CanvasView["inspection"],
+  mode: DraftMode,
+  moderation: ModerationControls | undefined,
+): boolean =>
+  mode === "view" &&
+  moderation !== undefined &&
+  inspection?.status === "found" &&
+  moderableUserId(moderation, inspection.entry) !== undefined;
+
 export type HelpBubblesView = {
   shown: HelpBubble | undefined;
   isBusy: boolean; // une bulle d'aide est montrée, attend son tour ou s'efface : le conseil de première visite lui cède la place
   isTouchScreen: boolean;
   refill: Refill | undefined; // les chiffres du canvas, pour la bulle de la jauge
   onWindowSection: (sectionId: string) => void; // la fenêtre vient de s'ouvrir sur cette section
-  onObsAddressCopied: () => void; // l'adresse OBS vient d'être copiée : la chaîne OBS est finie (Écart §8.1, JOURNAL 2026-10-09)
+  onObsLinkCopied: () => void; // le lien de Vue OBS vient d'être copié : la chaîne OBS est finie, puis le partage (JOURNAL 2026-10-09 et 2026-10-12)
+  onPaletteOpened: () => void; // la feuille Dessin vient de déplier la palette complète (JOURNAL 2026-10-12)
 };
 
 // `windowSection` : la section de la fenêtre du compte ouverte, absente si elle est fermée. Ouverte, elle a ses propres bulles.
+// `moderation` : absent, pas le droit de modérer ; l'inspection d'une pose a alors la sienne (Écart §8.1, JOURNAL 2026-10-12).
 export function useHelpBubbles(
   { canvas, draft }: HelpStores,
   pillState: DraftPillState,
   windowSection: string | undefined,
+  moderation: ModerationControls | undefined,
 ): HelpBubblesView {
   const view = useSyncExternalStore(canvas.subscribe, canvas.getView, canvas.getView);
   const { mode, draft: cells } = useSyncExternalStore(draft.subscribe, draft.getView, draft.getView);
   const hasPannedInDraft = useSyncExternalStore(draftPan.subscribe, draftPan.hasPanned, getNotPanned);
+  const placements = useSyncExternalStore(placementCount.subscribe, placementCount.getCount, getNoPlacement);
   const isTouchScreen = useMediaQuery(TOUCH_SCREEN_QUERY);
+  // Le bouton de la couleur actuelle n'existe que dans la feuille Dessin repliée : ni au grand écran, ni dans le panneau du paysage
+  // (Écart §8.1, JOURNAL 2026-10-12).
+  const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
+  const isSidePanel = useMediaQuery(SIDE_COLUMN_QUERY);
+  const hasColorButton = isCompact && !isSidePanel;
   const isReady = useAfterDelay(view.width > 0, HINT_SHOW_DELAY_MS);
   const openWindows = useOpenWindowCount();
   const isSeen = useSeenBubbles(HELP_BUBBLES);
+  const isTwitchSyncMissing = useTwitchSyncMissing(
+    canvas,
+    view.role === "owner" && windowSection !== undefined && !isSeen("twitch-sync"),
+  );
   // La fenêtre finit de s'ouvrir avant que sa bulle se pose : sa cible bouge tant qu'elle glisse.
   const [windowMotionMs] = useState(() => motionMs(document.documentElement, "--lp-dur"));
   // Seule ouverte : une petite fenêtre par-dessus la couvrirait.
@@ -128,22 +163,27 @@ export function useHelpBubbles(
     role: view.role,
     isTouchScreen,
     hasPannedInDraft,
+    hasColorButton,
     draftSize: cells.size,
+    placementCount: placements,
     pendingReports: view.reportCount,
     windowSection,
+    isThemeMissing: view.params !== undefined && view.params.theme === undefined,
+    isTwitchSyncMissing,
+    isInspecting: view.inspection !== null,
+    canModerateInspected: canModerateInspection(view.inspection, mode, moderation),
   };
   const pending = pickHelpBubble(facts, isSeen);
-  // Ni avant que le canvas se soit montré un moment, ni connexion coupée, ni inspection ou fenêtre ouverte : elle attend.
-  // Les bulles de la fenêtre (Écart §8.1, JOURNAL 2026-10-09) font l'inverse : elles n'attendent que la fenêtre.
+  // Ni avant que le canvas se soit montré un moment, ni connexion coupée, ni fenêtre ouverte : elle attend. L'inspection ouverte
+  // les fait taire, sauf la bulle des actions de modération (JOURNAL 2026-10-12) : `pickHelpBubble` ne choisit que dans la surface
+  // de l'instant. Les bulles de la fenêtre (JOURNAL 2026-10-09) font l'inverse : elles n'attendent que la fenêtre.
   const isLive = isReady && view.status === "live";
-  const canShow =
-    pending !== undefined && isInWindow(pending)
-      ? isLive && isWindowSettled
-      : isLive && view.inspection === null && openWindows === 0;
+  const surface = surfaceShown(facts);
+  const canShow = isLive && (surface === "window" ? isWindowSettled : openWindows === 0);
   // Inspection ou fenêtre ouverte, connexion coupée : elle part aussitôt, sans rester.
   const shown = useShownBubble(
     canShow ? pending : undefined,
-    (bubble) => canShow && isLingering(bubble, facts, isSeen),
+    (bubble) => canShow && surfaceOf(bubble) === surface && isLingering(bubble, facts, isSeen),
   );
   usePressClosing(shown);
   useDoneClosing(shown, facts);
@@ -161,8 +201,13 @@ export function useHelpBubbles(
       for (const bubble of bubblesFoundIn(sectionId))
         if (isWished(bubble, facts)) seenBubbles.markSeen(bubble);
     },
-    onObsAddressCopied: () => {
-      for (const bubble of OBS_CHAIN) seenBubbles.markSeen(bubble);
+    onObsLinkCopied: () => {
+      for (const bubble of bubblesEndedByCopy(isSeen)) seenBubbles.markSeen(bubble);
+    },
+    // Ouvrir la palette pendant que sa bulle la propose, ou attend : c'est l'avoir trouvée. Ouverte avant son heure, elle n'est pas
+    // consommée (rejouer le tutoriel la ramène à son moment).
+    onPaletteOpened: () => {
+      if (isWished("palette", facts)) seenBubbles.markSeen("palette");
     },
   };
 }

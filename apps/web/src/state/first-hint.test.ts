@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFirstHint, type FirstHint, type FirstHintDeps } from "./first-hint";
+import { createFirstHint, FIRST_HINT_KEY, type FirstHint, type FirstHintDeps } from "./first-hint";
 import { type BubbleStorage, createSeenBubbles } from "./seen-bubbles";
 
 const createFakeStorage = (): BubbleStorage & { entries: Map<string, string> } => {
@@ -10,47 +10,44 @@ const createFakeStorage = (): BubbleStorage & { entries: Map<string, string> } =
     setItem: (key, value) => {
       entries.set(key, value);
     },
+    removeItem: (key) => {
+      entries.delete(key);
+    },
   };
 };
 
-const refusing = (): BubbleStorage => ({
-  getItem: () => {
-    throw new Error("stockage refusé");
-  },
-  setItem: () => {
-    throw new Error("stockage refusé");
-  },
-});
+const refuse = (): never => {
+  throw new Error("stockage refusé");
+};
+
+const refusing = (): BubbleStorage => ({ getItem: refuse, setItem: refuse, removeItem: refuse });
 
 // Une visite : le même stockage d'une visite à l'autre, une mémoire des bulles vues neuve à chacune.
-const visit = (storage: BubbleStorage, isTouchScreen = true): FirstHint => {
-  const deps: FirstHintDeps = {
-    seen: createSeenBubbles(() => storage),
-    getStorage: () => storage,
-    isTouchScreen: () => isTouchScreen,
-  };
+const visit = (storage: BubbleStorage): FirstHint => {
+  const deps: FirstHintDeps = { seen: createSeenBubbles(() => storage), getStorage: () => storage };
   return createFirstHint(deps);
 };
 
 describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  // Quand rien n'a été fait sur un écran tactile, il s'ouvre sans geste fait
-  it("opens with no step done on a touch screen where nothing was kept", () => {
+  // Quand rien n'a été fait, il s'ouvre sans geste fait
+  it("opens with no step done where nothing was kept", () => {
     expect(visit(createFakeStorage()).getView()).toEqual({ status: "open", done: [] });
   });
 
-  // Sur un PC (souris), il ne s'ouvre jamais, et rien n'est lu ni écrit
-  it("never opens on a mouse screen, and reads and writes nothing", () => {
+  // À la souris comme au doigt (Écart §8.1, JOURNAL 2026-10-12) : l'état ne connaît pas l'écran, les trois mêmes gestes le ferment
+  it("opens and counts the same three steps with a mouse as with a finger, the state not knowing the screen", () => {
     const storage = createFakeStorage();
-    const getItem = vi.spyOn(storage, "getItem");
-    const hint = visit(storage, false);
+    const hint = visit(storage);
 
     hint.record("zoom");
 
-    expect(hint.getView()).toEqual({ status: "off" });
-    expect(getItem).not.toHaveBeenCalled();
-    expect(storage.entries.size).toBe(0);
+    expect(hint.getView()).toEqual({ status: "open", done: ["zoom"] });
+    expect(storage.entries.get("liveplace:first-hint-steps")).toBe("zoom");
+    hint.record("pan");
+    hint.record("inspect");
+    expect(hint.getView()).toEqual({ status: "done" });
   });
 
   // Chaque geste réussi s'ajoute dans l'ordre où il est fait, et prévient qui écoute
@@ -150,7 +147,7 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
   // Quand le stockage refuse d'écrire, il se retire pour la visite plutôt que de revenir sans mémoire
   it("steps aside for the visit when the storage refuses to write", () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const lockedStorage: BubbleStorage = { getItem: () => null, setItem: refusing().setItem };
+    const lockedStorage: BubbleStorage = { ...refusing(), getItem: () => null };
     const hint = visit(lockedStorage);
     const listener = vi.fn();
     hint.subscribe(listener);
@@ -171,5 +168,67 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
     hint.record("pan");
 
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-12) : rejouer le tutoriel remet le conseil à zéro, une fois ses bulles oubliées
+describe("rejouer le conseil de première visite (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // Les gestes et la fin sont oubliés : le conseil se rouvre sans geste fait, et prévient qui écoute
+  it("opens again with no step done once its seen mark and its steps are forgotten", () => {
+    const storage = createFakeStorage();
+    const seen = createSeenBubbles(() => storage);
+    const hint = createFirstHint({ seen, getStorage: () => storage });
+    for (const step of ["pan", "zoom", "inspect"] as const) hint.record(step);
+    const listener = vi.fn();
+    hint.subscribe(listener);
+    expect(hint.getView()).toEqual({ status: "done" });
+
+    seen.forget([FIRST_HINT_KEY]);
+    hint.restart();
+
+    expect(hint.getView()).toEqual({ status: "open", done: [] });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(storage.entries.has("liveplace:first-hint-steps")).toBe(false);
+    expect(visit(storage).getView()).toEqual({ status: "open", done: [] });
+  });
+
+  // Une progression à moitié faite repart de zéro, elle aussi
+  it("forgets a half-done progress", () => {
+    const storage = createFakeStorage();
+    const hint = visit(storage);
+    hint.record("zoom");
+    hint.record("pan");
+
+    hint.restart();
+
+    expect(hint.getView()).toEqual({ status: "open", done: [] });
+    expect(visit(storage).getView()).toEqual({ status: "open", done: [] });
+  });
+
+  // La bulle encore marquée vue (l'oubli n'a pas eu lieu) : le conseil reste fermé, il ne revient pas par la porte de derrière
+  it("stays closed while its seen mark is still there", () => {
+    const storage = createFakeStorage();
+    const hint = visit(storage);
+    for (const step of ["pan", "zoom", "inspect"] as const) hint.record(step);
+
+    hint.restart();
+
+    expect(hint.getView()).toEqual({ status: "off" });
+  });
+
+  // Un stockage qui refuse d'effacer ne casse rien : le conseil se relit tel qu'il est, et le dit en console
+  it("rereads itself and warns when the storage refuses to erase the steps", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const storage = createFakeStorage();
+    storage.setItem("liveplace:first-hint-steps", "pan");
+    const locked: BubbleStorage = { ...storage, removeItem: refusing().removeItem };
+    const hint = createFirstHint({ seen: createSeenBubbles(() => locked), getStorage: () => locked });
+
+    hint.restart();
+
+    expect(hint.getView()).toEqual({ status: "open", done: ["pan"] });
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

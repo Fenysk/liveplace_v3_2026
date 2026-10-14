@@ -134,15 +134,21 @@ const followTarget = (
   let settling: ReturnType<typeof setTimeout> | undefined;
   let scrolling: number | undefined;
   let observed: HTMLElement | null = null;
+  let watched: Element[] = [];
   const resizing = new ResizeObserver(() => settle());
+  // Ce qui se suit : la cible, et dans une fenêtre dont la hauteur suit son contenu (la feuille du mobile) la fenêtre qui l'abrite :
+  // changer de section déplace la cible sans la redimensionner (Écart §8.1, JOURNAL 2026-10-12).
+  const watch = (aimed: HTMLElement) => {
+    for (const element of watched) resizing.unobserve(element);
+    const dialog = isOverWindow ? aimed.closest(WINDOW_SELECTOR) : null;
+    watched = dialog ? [aimed, dialog] : [aimed];
+    for (const element of watched) resizing.observe(element);
+  };
   // La cible se monte parfois après la bulle : elle ne se suit qu'à partir du moment où on la trouve.
   const observe = (aimed: HTMLElement) => {
     if (aimed === observed) return;
-    if (observed) {
-      resizing.unobserve(observed);
-      observed.removeAttribute(AIMED_ATTRIBUTE);
-    }
-    resizing.observe(aimed);
+    if (observed) observed.removeAttribute(AIMED_ATTRIBUTE);
+    watch(aimed);
     aimed.setAttribute(AIMED_ATTRIBUTE, "");
     observed = aimed;
   };

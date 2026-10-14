@@ -75,11 +75,13 @@ const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", 
 // Du store du canvas, ce que le brouillon lit et appelle : un ajout au store n'a pas à toucher ses tests.
 export type DraftCanvas = Pick<CanvasStore, "subscribe" | "getView" | "placeBatch">;
 
+// `onPlaced` : tout le brouillon vient d'être posé (Écart §8.1, JOURNAL 2026-10-12), de quoi compter les dessins de l'appareil.
 export function createDraftStore(
   canvasId: string,
   canvas: DraftCanvas,
   getStorage: () => DraftStorage,
   clock: DraftClock,
+  onPlaced?: () => void,
 ): DraftStore {
   let view: DraftView = {
     mode: "view",
@@ -234,7 +236,10 @@ export function createDraftStore(
       publish({ isSending: false });
     }
     // Tout est posé : retour en Vue (CDC 2026). Des refus restent, ils restent visibles en Dessin.
-    if (view.draft.size === 0) leaveDraftMode();
+    if (view.draft.size === 0) {
+      leaveDraftMode();
+      onPlaced?.();
+    }
   };
 
   return {

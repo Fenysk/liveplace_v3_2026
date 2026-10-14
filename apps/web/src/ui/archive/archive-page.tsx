@@ -19,6 +19,7 @@ import { PixelCanvas } from "../canvas/pixel-canvas";
 import { ToastProvider, useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { browserClock, getBrowserStorage } from "../draft/browser-draft";
+import { restartDeviceTutorial } from "../help/tutorial";
 import { InspectionPill } from "../inspection/inspection-pill";
 import { useInspectionPillProps } from "../inspection/use-inspection-pill";
 import { useLocale, useTexts } from "../locale/use-locale";
@@ -64,6 +65,7 @@ const ArchiveAccount = ({
           signOutHref={signOutHref}
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
+          onRestartTutorial={restartDeviceTutorial}
         />
       )}
       <InspectionPill {...inspection} />

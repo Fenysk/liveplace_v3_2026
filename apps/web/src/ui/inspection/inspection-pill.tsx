@@ -17,9 +17,11 @@ import { SkeletonBar, SkeletonBlock, SkeletonProfile, SkeletonSlot } from "../de
 import { TwitchGlyph } from "../design/twitch";
 import { useAfterDelay } from "../design/use-after-delay";
 import { SKELETON_DELAY_MS } from "../design/use-skeleton-phase";
+import { BubbleTarget } from "../help/bubble-target";
 import { formatDateTime } from "../locale/locale";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { canBan } from "../moderation/can-ban";
+import { moderableUserId } from "../moderation/moderable-user";
 import type { ModeratedAuthor } from "../moderation/moderation-window";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { INSPECTION_TEXTS } from "./inspection-texts";
@@ -100,17 +102,20 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
   );
 };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant. Écart §5.4 (JOURNAL
-// 2026-10-08) : pas de Bannir sur un modérateur nommé ici.
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant (`moderableUserId`). Écart §5.4
+// (JOURNAL 2026-10-08) : pas de Bannir sur un modérateur nommé ici. Retirer ses pixels est la cible de la bulle des actions de
+// modération (Écart §8.1, JOURNAL 2026-10-12).
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const t = useTexts(INSPECTION_TEXTS);
-  const { userId } = author;
-  if (!userId || moderation.isProtected(userId)) return null;
+  const userId = moderableUserId(moderation, author);
+  if (!userId) return null;
   const moderated = { ...author, userId };
   return (
     <>
       <div className="lp-row lp-row--ruled">
-        <Button label={t.clearTheirPixels} onPress={() => moderation.onModerate("clear", moderated)} />
+        <BubbleTarget name="clear">
+          <Button label={t.clearTheirPixels} onPress={() => moderation.onModerate("clear", moderated)} />
+        </BubbleTarget>
         {canBan(moderated) && (
           <Button label={t.ban} variant="danger" onPress={() => moderation.onModerate("ban", moderated)} />
         )}

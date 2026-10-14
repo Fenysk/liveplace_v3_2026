@@ -3,7 +3,7 @@
 // le focus, ou par Entrée : un réglage sans bouton Enregistrer. `isLoading` : sa valeur arrive, un squelette de champ prend
 // la place du champ, sous son libellé.
 
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import { SkeletonBlock, SkeletonSwap } from "./skeleton";
 
 type TextFieldProps = {
@@ -15,6 +15,7 @@ type TextFieldProps = {
   isDisabled?: boolean;
   isLoading?: boolean;
   onCommit?: () => void;
+  wrapInput?: ((input: ReactNode) => ReactNode) | undefined; // le champ seul, sans son libellé : une bulle d'aide le vise (JOURNAL 2026-10-12)
 };
 
 export const TextField = ({
@@ -26,6 +27,7 @@ export const TextField = ({
   isDisabled = false,
   isLoading = false,
   onCommit,
+  wrapInput = (input) => input,
 }: TextFieldProps) => {
   const id = useId();
   return (
@@ -34,23 +36,25 @@ export const TextField = ({
         {label}
       </label>
       <SkeletonSwap isLoading={isLoading} skeleton={<SkeletonBlock shape="field" />}>
-        <input
-          id={id}
-          className="lp-input lp-type-body"
-          type="text"
-          value={value}
-          placeholder={placeholder}
-          maxLength={maxLength}
-          disabled={isDisabled}
-          autoComplete="off"
-          onChange={(event) => onInput(event.target.value)}
-          onBlur={onCommit}
-          onKeyDown={(event) => {
-            // Pendant une composition (IME), Entrée choisit le mot : il ne valide pas le champ.
-            if (onCommit && event.key === "Enter" && !event.nativeEvent.isComposing)
-              event.currentTarget.blur();
-          }}
-        />
+        {wrapInput(
+          <input
+            id={id}
+            className="lp-input lp-type-body"
+            type="text"
+            value={value}
+            placeholder={placeholder}
+            maxLength={maxLength}
+            disabled={isDisabled}
+            autoComplete="off"
+            onChange={(event) => onInput(event.target.value)}
+            onBlur={onCommit}
+            onKeyDown={(event) => {
+              // Pendant une composition (IME), Entrée choisit le mot : il ne valide pas le champ.
+              if (onCommit && event.key === "Enter" && !event.nativeEvent.isComposing)
+                event.currentTarget.blur();
+            }}
+          />,
+        )}
       </SkeletonSwap>
     </div>
   );

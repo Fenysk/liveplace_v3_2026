@@ -18,6 +18,19 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
     expect(markup.match(/<svg/g)).toHaveLength(2);
   });
 
+  // À la souris (Écart §8.1, JOURNAL 2026-10-12) : la molette et le clic, avec leurs icônes et les mêmes trois points
+  it("says the wheel and the click with a mouse, with the same three dots", () => {
+    const markup = renderToStaticMarkup(
+      createElement(FirstHint, { doneCount: 1, isVisible: true, isDocked: false, isTouchScreen: false }),
+    );
+
+    expect(markup).toContain("<span>Molette pour zoomer</span>");
+    expect(markup).toContain("<span>Clique sur un pixel pour voir qui l&#x27;a posé</span>");
+    expect(markup).not.toContain("Pince");
+    expect(markup.match(/<svg/g)).toHaveLength(2);
+    expect(markup.match(/lp-hint-dot is-filled/g)).toHaveLength(1);
+  });
+
   // Trois points sous les lignes, autant de remplis que de gestes faits
   it("shows three dots under the lines, as many filled as steps done", () => {
     for (const doneCount of [0, 1, 2, 3]) {

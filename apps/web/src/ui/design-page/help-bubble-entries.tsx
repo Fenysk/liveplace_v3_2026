@@ -2,12 +2,14 @@
 // sa flèche, puis les côtés d'où une bulle vise sa cible. Les mêmes textes et les mêmes cibles que dans le jeu. Les deux de la
 // chaîne OBS vivent dans la fenêtre (JOURNAL 2026-10-09) : leur bloc montre l'onglet et l'adresse tels que la fenêtre les pose.
 
-import { Eraser, MonitorPlay, Pipette, Scaling, Trash, User } from "lucide-react";
+import { PALETTE } from "@liveplace/domain";
+import { Eraser, MonitorPlay, Pipette, Scaling, Shield, Trash, User } from "lucide-react";
 import { type ReactNode, type RefObject, useRef } from "react";
 import type { Refill } from "../../state/gauge";
 import type { HelpBubble } from "../../state/help-bubbles";
 import { AccountPill } from "../account/account-pill";
-import { wrapObsTab } from "../account/account-window";
+import { wrapBubbleTab } from "../account/account-window";
+import { ThemeSettings } from "../canvas/canvas-settings";
 import { Bubble, BubbleLine } from "../design/bubble";
 import type { BubbleSide } from "../design/bubble-position";
 import { Button } from "../design/button";
@@ -18,8 +20,9 @@ import { WindowNav } from "../design/window";
 import { DraftPill, type DraftPillState } from "../draft/draft-pill";
 import { BubbleTargetsContext, useBubbleTargets } from "../help/bubble-target";
 import { HelpBubbleLine, helpTargetOf } from "../help/help-bubbles";
+import { InspectionPill } from "../inspection/inspection-pill";
 import { ObsAddress } from "../obs/obs-settings";
-import { noop } from "./design-fixtures";
+import { noop, SAMPLE_PLACEMENT_ID } from "./design-fixtures";
 import { Block, InPhone, StateRow, useNowMs } from "./entry-layout";
 import { DRAFT_ACTIONS, draftState, gaugeAt, SIGNED_IN } from "./game-entries";
 
@@ -46,8 +49,9 @@ const Aimed = ({
   children,
 }: AimedProps) => {
   const targets = useBubbleTargets();
+  const target = helpTargetOf(bubble);
   const line = (
-    <Bubble isVisible isDocked={false} side={side} target={targets[helpTargetOf(bubble)]}>
+    <Bubble isVisible isDocked={false} side={side} target={target && targets[target]}>
       <HelpBubbleLine bubble={bubble} isTouchScreen={isTouchScreen} refill={refill} />
     </Bubble>
   );
@@ -74,6 +78,30 @@ const Aimed = ({
     </BubbleTargetsContext>
   );
 };
+
+// La pose d'un autre compte, inspectée par qui modère : sa pill porte « Retirer ses pixels » et Bannir.
+const InspectedPose = ({ nowMs }: { nowMs: number }) => (
+  <InspectionPill
+    inspection={{
+      status: "found",
+      x: 122,
+      y: 82,
+      entry: {
+        userId: "3",
+        login: "troll42",
+        displayName: "Troll42",
+        colorIndex: 5,
+        placedAt: nowMs - 60_000,
+        placementId: SAMPLE_PLACEMENT_ID,
+      },
+    }}
+    palette={PALETTE}
+    nowMs={nowMs}
+    onClose={noop}
+    moderation={{ isProtected: () => false, onModerate: noop }}
+    isDocked={false}
+  />
+);
 
 type AccountScene = { hasSettings?: boolean; hasModeration?: boolean; pendingReports?: number };
 
@@ -133,6 +161,15 @@ const HELP_SCENES: readonly HelpScene[] = [
     content: () => <Account hasSettings pendingReports={1} />,
   },
   {
+    name: "Qui modère sans être le streamer",
+    detail:
+      "En Vue, une fois par appareil : flèche sur Modération. Elle s'efface quand la fenêtre s'ouvre sur Modération ; un signalement en attente passe avant elle, et ouvrir Modération les fait trouver tous les deux.",
+    bubble: "moderator-welcome",
+    side: "below",
+    align: "end",
+    content: () => <Account hasModeration />,
+  },
+  {
     name: "Le streamer sur sa fresque",
     detail: "Flèche sur Réglages. Elle s'efface quand il ouvre Réglages.",
     bubble: "obs-settings",
@@ -145,6 +182,14 @@ const HELP_SCENES: readonly HelpScene[] = [
     detail: "Flèche sur le +1. Elle s'efface quand on le touche, ou à l'action suivante.",
     bubble: "first-reward",
     content: viewBar(7, true),
+  },
+  {
+    name: "Inspecter la pose d'un autre compte, pour qui modère",
+    detail:
+      "La seule bulle montrée pendant une inspection, la première fois : flèche sur « Retirer ses pixels », où Bannir attend à côté. Elle s'efface à la fermeture de l'inspection ou à l'action suivante. Jamais sur les poses du streamer ni sur les siennes, qui n'ont pas d'actions.",
+    bubble: "moderation-actions",
+    align: "end",
+    content: (nowMs) => <InspectedPose nowMs={nowMs} />,
   },
   {
     name: "Jauge vide, la première fois",
@@ -189,27 +234,69 @@ const HELP_SCENES: readonly HelpScene[] = [
     isTouchScreen: false,
     content: (nowMs) => bar(draftState(nowMs, { canSubmit: false, canDiscard: false }), false),
   },
+  {
+    name: "Un dessin posé, au doigt : la palette",
+    detail:
+      "Écran tactile, une fois un premier dessin posé sur l'appareil, en Dessin : flèche sur la couleur actuelle, qui ouvre la palette complète. Elle s'efface quand la palette s'ouvre, ou en sortant du Dessin.",
+    bubble: "palette",
+    align: "start",
+    isPhone: true,
+    content: (nowMs) => bar(draftState(nowMs, { isTouchScreen: true }), true),
+  },
+  {
+    name: "Un pixel au brouillon, à la souris : Ctrl+Z",
+    detail:
+      "Une fois un premier dessin posé sur l'appareil. Une ligne, sans flèche : au-dessus de la barre du bas, comme le conseil de première visite. Elle paraît dès le premier pixel du brouillon, jamais devant un brouillon vide. Elle reste deux secondes après l'action suivante, ou en Dessin tant qu'on n'en sort pas.",
+    bubble: "keys",
+    isTouchScreen: false,
+    content: (nowMs) => bar(draftState(nowMs, { draftSize: 1 }), false),
+  },
+  {
+    name: "Trois dessins posés, à la souris : la pipette",
+    detail:
+      "Flèche sur la pipette. Elle s'efface quand on la touche, à l'action suivante, ou en sortant du Dessin, et reste deux secondes.",
+    bubble: "eyedropper",
+    align: "center",
+    isTouchScreen: false,
+    content: (nowMs) => bar(draftState(nowMs), false),
+  },
+  {
+    name: "Trois dessins posés, au doigt : la pipette",
+    detail: "La même, sur la feuille Dessin : flèche sur la pipette de la rangée d'outils.",
+    bubble: "eyedropper",
+    align: "center",
+    isPhone: true,
+    content: (nowMs) => bar(draftState(nowMs, { isTouchScreen: true }), true),
+  },
 ];
 
-// Trois sections de la barre latérale : Vue OBS, celle que la bulle désigne, est au milieu, où la bulle se centre sur elle.
-const OBS_SECTIONS = [
-  { id: "canvas", label: "Fresque", icon: Scaling },
-  { id: "obs", label: "Vue OBS", icon: MonitorPlay },
-  { id: "account", label: "Mon compte", icon: User },
-] as const;
+// Quatre sections de la barre latérale : celle que la bulle désigne, Vue OBS ou Modération, est au milieu, où la bulle se centre sur elle.
+const TAB_SECTIONS = {
+  "obs-tab": [
+    { id: "canvas", label: "Fresque", icon: Scaling },
+    { id: "obs", label: "Vue OBS", icon: MonitorPlay },
+    { id: "account", label: "Mon compte", icon: User },
+  ],
+  "twitch-sync": [
+    { id: "canvas", label: "Fresque", icon: Scaling },
+    { id: "moderation", label: "Modération", icon: Shield },
+    { id: "account", label: "Mon compte", icon: User },
+  ],
+} as const;
 
-// L'onglet Vue OBS, dans la barre latérale (PC : la bulle à sa gauche, sur le voile) ou la rangée d'onglets de la feuille (la bulle
-// dessous, par-dessus le contenu). Le vrai composant des onglets, et la vraie cible.
-const TabScene = ({ side }: { side: "left" | "below" }) => {
+// L'onglet visé, dans la barre latérale (PC : la bulle à sa gauche, sur le voile) ou la rangée d'onglets de la feuille (la bulle
+// dessous, par-dessus le contenu) : Vue OBS ou Modération. Le vrai composant des onglets, et la vraie cible.
+const TabScene = ({ side, bubble }: { side: "left" | "below"; bubble: keyof typeof TAB_SECTIONS }) => {
   const targets = useBubbleTargets();
+  const target = helpTargetOf(bubble);
   const nav = (
     <div className={classNames("lp-pill", side === "left" ? "design-nav-column" : "design-nav-row")}>
-      <WindowNav sections={OBS_SECTIONS} currentId="canvas" onSelect={noop} wrapTab={wrapObsTab} />
+      <WindowNav sections={TAB_SECTIONS[bubble]} currentId="canvas" onSelect={noop} wrapTab={wrapBubbleTab} />
     </div>
   );
   const line = (
-    <Bubble isVisible isDocked={false} side={side} target={targets["obs-tab"]}>
-      <HelpBubbleLine bubble="obs-tab" isTouchScreen={false} refill={REFILL} />
+    <Bubble isVisible isDocked={false} side={side} target={target && targets[target]}>
+      <HelpBubbleLine bubble={bubble} isTouchScreen={false} refill={REFILL} />
     </Bubble>
   );
   return (
@@ -229,13 +316,22 @@ const TabScene = ({ side }: { side: "left" | "below" }) => {
   );
 };
 
-// L'adresse à coller dans OBS, dans la section Vue OBS : la bulle au-dessus du champ qui se copie.
-const AddressScene = () => (
-  <Aimed bubble="obs-address">
+// Le lien de Vue OBS, à coller dans OBS et à partager : le même champ porte la bulle de l'adresse, puis celle du partage.
+const AddressScene = ({ bubble }: { bubble: "obs-address" | "invite-link" }) => (
+  <Aimed bubble={bubble}>
     <div className="lp-pill design-in-window">
       <div className="lp-setting">
         <ObsAddress address="liveplace.tv/kalyss" url="https://liveplace.tv/kalyss" />
       </div>
+    </div>
+  </Aimed>
+);
+
+// Le thème de la fresque, dans la section Fresque : la bulle au-dessus du champ, sans son libellé.
+const ThemeScene = () => (
+  <Aimed bubble="theme">
+    <div className="lp-pill design-in-window">
+      <ThemeSettings theme={{ status: "ready", value: "", isSaving: false, onInput: noop, onCommit: noop }} />
     </div>
   </Aimed>
 );
@@ -320,33 +416,57 @@ export const HelpBubbleBlocks = () => {
     <>
       <Block
         title="Bulles d'aide"
-        note="Huit conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément. Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Deux restent deux secondes après l'action qui les ferme (la jauge vide, le premier passage en Dessin) tant que leur cible est à l'écran ; les six autres partent aussitôt. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf les deux de la chaîne OBS, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent. La flèche s'arrête contre la pill, à la colonne ou à la rangée du bouton : l'anneau du focus entoure le bouton visé tant que la bulle est montrée. Sans côté qui tienne à la largeur du texte (un téléphone couché étroit, un pliable), la bulle se resserre à la place d'un côté et son texte passe à la ligne."
+        note="Seize conseils, chacun montré une seule fois par appareil, au moment où il sert, avec une flèche sur son élément (Ctrl+Z, sans). Une seule bulle à la fois, la plus prioritaire (dans l'ordre ci-dessous), conseil de première visite compris ; une bulle qui attend vient plus tard si sa condition tient encore. Les trois derniers viennent avec les dessins posés sur l'appareil : la palette dès le premier, Ctrl+Z dès le premier aussi, une fois un pixel au brouillon, la pipette au troisième. Quatre restent deux secondes après l'action qui les ferme (la jauge vide, le premier passage en Dessin, Ctrl+Z, la pipette) tant que leur cible est à l'écran ; les douze autres partent aussitôt. Une inspection ouverte les fait taire toutes, sauf celle des actions de modération, qui vit dans l'inspection. Jamais en vue OBS, ni pendant qu'une fenêtre est ouverte, sauf celles de la chaîne du streamer, qui vivent dans la fenêtre ; jamais par-dessus la pill qu'elles désignent. La flèche s'arrête contre la pill, à la colonne ou à la rangée du bouton : l'anneau du focus entoure le bouton visé tant que la bulle est montrée. Sans côté qui tienne à la largeur du texte (un téléphone couché étroit, un pliable), la bulle se resserre à la place d'un côté et son texte passe à la ligne."
       >
         {HELP_SCENES.map((scene) => (
           <HelpSceneRow key={scene.name} scene={scene} nowMs={nowMs} />
         ))}
       </Block>
       <Block
-        title="La chaîne OBS, dans la fenêtre"
-        note="Après Réglages, le streamer est guidé jusqu'à l'adresse, une fois par appareil. La fenêtre ouverte sur une autre section que Vue OBS : une bulle à gauche de l'onglet, montrée une seule fois : elle s'efface quand il l'ouvre ou ferme la fenêtre, et ne revient pas (un streamer qui y va directement la saute). Dans Vue OBS : une bulle sur l'adresse, qui s'efface quand il la copie, ou quand il quitte l'onglet après l'avoir vue. Copier l'adresse finit toute la chaîne. Ces bulles passent par-dessus la fenêtre, suivent son ouverture et son défilement, et se taisent si une petite fenêtre s'ouvre par-dessus."
+        title="La chaîne du streamer, dans la fenêtre"
+        note="Après Réglages, le streamer est guidé dans la fenêtre, une fois par appareil, dans cet ordre : l'onglet Vue OBS, l'adresse, le lien à partager, le thème, la synchronisation Twitch. La fenêtre ouverte sur une autre section que Vue OBS : une bulle à gauche de l'onglet, montrée une seule fois : elle s'efface quand il l'ouvre ou ferme la fenêtre, et ne revient pas (un streamer qui y va directement la saute). Dans Vue OBS : une bulle sur le lien, qui s'efface quand il le copie, ou quand il quitte l'onglet après l'avoir vue ; copier finit la chaîne OBS, et la même case porte alors la bulle du partage aux viewers, jusqu'à la copie suivante. Dans Fresque : le thème, tant que la fresque n'en a pas. Ailleurs que dans Modération : la synchronisation Twitch, tant qu'elle n'a jamais été faite. Chacune s'efface en quittant sa section ou en fermant la fenêtre, et ne revient pas. Ces bulles passent par-dessus la fenêtre, suivent son ouverture et son défilement, et se taisent si une petite fenêtre s'ouvre par-dessus."
       >
         <StateRow
           name="À gauche de l'onglet Vue OBS"
           detail="PC : la barre latérale est au bord de la fenêtre, la bulle se pose sur le voile, flèche vers l'onglet. Sans place à gauche (un écran étroit, le paysage), elle passe à sa droite, par-dessus le contenu."
         >
-          <TabScene side="left" />
+          <TabScene side="left" bubble="obs-tab" />
         </StateRow>
         <StateRow
           name="Sous l'onglet Vue OBS"
           detail="Mobile : les onglets sont une rangée qui défile en largeur ; l'onglet visé revient à la vue, et la bulle se pose dessous, par-dessus le contenu."
         >
-          <TabScene side="below" />
+          <TabScene side="below" bubble="obs-tab" />
         </StateRow>
         <StateRow
           name="Sur l'adresse à copier"
           detail="Flèche sur le champ qui se copie, que le bouton Copier valide."
         >
-          <AddressScene />
+          <AddressScene bubble="obs-address" />
+        </StateRow>
+        <StateRow
+          name="Sur le même bouton, pour le partager"
+          detail="Dans Vue OBS, une fois l'adresse copiée : la bulle du partage prend la place de celle de l'adresse, sur le même bouton. Elle s'efface à la copie suivante, en quittant l'onglet ou à la fermeture de la fenêtre."
+        >
+          <AddressScene bubble="invite-link" />
+        </StateRow>
+        <StateRow
+          name="Sur le champ du thème"
+          detail="Dans Fresque, tant que la fresque n'a pas de thème : flèche sur le champ, sans son libellé. Elle s'efface quand un thème est enregistré, ou en quittant la section."
+        >
+          <ThemeScene />
+        </StateRow>
+        <StateRow
+          name="À gauche de l'onglet Modération"
+          detail="La fenêtre ouverte ailleurs que sur Modération, la synchronisation Twitch jamais faite : flèche sur l'onglet, à sa gauche sur PC. Elle s'efface quand il ouvre Modération."
+        >
+          <TabScene side="left" bubble="twitch-sync" />
+        </StateRow>
+        <StateRow
+          name="Sous l'onglet Modération"
+          detail="Mobile : la même, sous l'onglet, par-dessus le contenu."
+        >
+          <TabScene side="below" bubble="twitch-sync" />
         </StateRow>
       </Block>
       <Block title="Côtés de la cible">

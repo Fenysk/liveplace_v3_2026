@@ -328,12 +328,12 @@ export const ObsSettingsEntry = () => (
     slug="vue-obs"
     components={["ObsSettings"]}
     file="ui/obs/obs-settings.tsx"
-    note="Pour le streamer : l'adresse, la marche à suivre et le délai. Le fond de la vue se règle dans la section Fresque."
+    note="Pour le streamer : son lien, à coller dans OBS et à partager à ses viewers (la même page, qui se reconnaît d'elle-même dans OBS, d'où un seul bouton), la marche à suivre et le délai. Le fond de la vue se règle dans la section Fresque."
   >
     <Block title="États">
       <StateRow
-        name="L'adresse, la marche à suivre et le délai"
-        detail="Un réglage, la valeur actuelle est toujours choisie."
+        name="Le lien, la marche à suivre et le délai"
+        detail="Un seul champ à copier, dont le libellé dit les deux usages : il lit l'adresse sans protocole et copie l'adresse complète. La marche à suivre OBS est dessous. Le délai est un réglage, la valeur actuelle est toujours choisie."
       >
         <ObsSettingsScene />
       </StateRow>

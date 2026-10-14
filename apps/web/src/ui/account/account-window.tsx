@@ -2,7 +2,17 @@
 // OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, l'apparence,
 // la langue, Se déconnecter.
 
-import { Layers, LogOut, type LucideIcon, MonitorPlay, Scaling, Shield, Trophy, User } from "lucide-react";
+import {
+  Layers,
+  LogOut,
+  type LucideIcon,
+  MonitorPlay,
+  RotateCcw,
+  Scaling,
+  Shield,
+  Trophy,
+  User,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import type { AppearanceChoice } from "../design/appearance";
 import { AppearancePicker } from "../design/appearance-controls";
@@ -10,8 +20,9 @@ import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { LocalePicker } from "../design/locale-controls";
 import { Profile, type ProfileUser } from "../design/profile";
+import { useToast } from "../design/toast";
 import { Window, WindowRow } from "../design/window";
-import { BubbleTarget } from "../help/bubble-target";
+import { BubbleTarget, type BubbleTargetName } from "../help/bubble-target";
 import { useTexts } from "../locale/use-locale";
 import { ACCOUNT_TEXTS } from "./account-texts";
 
@@ -31,9 +42,17 @@ const SECTION_ICONS = {
   account: User,
 } as const satisfies Record<AccountSection, LucideIcon>;
 
-// Écart §8.1 (JOURNAL 2026-10-09) : l'onglet Vue OBS est la cible de la bulle qui invite le streamer à l'ouvrir.
-export const wrapObsTab = (id: string, tab: ReactNode): ReactNode =>
-  id === "obs" ? <BubbleTarget name="obs-tab">{tab}</BubbleTarget> : tab;
+// Écart §8.1 (JOURNAL 2026-10-09 et 2026-10-12) : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à
+// les ouvrir.
+const TAB_TARGETS: Partial<Record<string, BubbleTargetName>> = {
+  obs: "obs-tab",
+  moderation: "moderation-tab",
+};
+
+export const wrapBubbleTab = (id: string, tab: ReactNode): ReactNode => {
+  const name = TAB_TARGETS[id];
+  return name ? <BubbleTarget name={name}>{tab}</BubbleTarget> : tab;
+};
 
 type AccountWindowProps = {
   isOpen: boolean;
@@ -44,6 +63,7 @@ type AccountWindowProps = {
   signOutHref: string;
   appearanceChoice: AppearanceChoice;
   onPickAppearance: (choice: AppearanceChoice) => void;
+  onRestartTutorial: () => void; // « Revoir le tuto » : le tutoriel repart de zéro sur cet appareil (Écart §8.1, JOURNAL 2026-10-12)
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
   canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
@@ -60,6 +80,7 @@ export const AccountWindow = ({
   signOutHref,
   appearanceChoice,
   onPickAppearance,
+  onRestartTutorial,
   moderationTab,
   obsTab,
   canvasTab,
@@ -68,6 +89,7 @@ export const AccountWindow = ({
 }: AccountWindowProps) => {
   const t = useTexts(ACCOUNT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
+  const toast = useToast();
   const section = (id: AccountSection, label: string) => ({ id, label, icon: SECTION_ICONS[id] });
   const sections = [
     ...(canvasTab ? [section("canvas", t.canvas)] : []),
@@ -86,7 +108,7 @@ export const AccountWindow = ({
       sectionId={sectionId}
       onSelect={onSelect}
       onClose={onClose}
-      wrapTab={wrapObsTab}
+      wrapTab={wrapBubbleTab}
     >
       {shownId === "canvas" && canvasTab}
       {shownId === "canvases" && canvasesTab}
@@ -103,6 +125,16 @@ export const AccountWindow = ({
           </WindowRow>
           <WindowRow label={design.language}>
             <LocalePicker />
+          </WindowRow>
+          <WindowRow label={t.tutorial}>
+            <Button
+              label={t.tutorialRestart}
+              icon={RotateCcw}
+              onPress={() => {
+                onRestartTutorial();
+                toast("success", t.tutorialRestarted);
+              }}
+            />
           </WindowRow>
         </>
       )}

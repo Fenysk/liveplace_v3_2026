@@ -11,13 +11,18 @@ export type BubbleTargetName =
   | "settings"
   | "reports"
   | "obs-tab"
-  | "obs-address";
+  | "obs-address"
+  | "palette"
+  | "eyedropper"
+  | "clear"
+  | "theme"
+  | "moderation-tab";
 
 export type BubbleTargets = Record<BubbleTargetName, RefObject<HTMLSpanElement | null>>;
 
 export const BubbleTargetsContext = createContext<BubbleTargets | undefined>(undefined);
 
-const createTargets = (): BubbleTargets => ({
+export const createBubbleTargets = (): BubbleTargets => ({
   trace: createRef(),
   submit: createRef(),
   gauge: createRef(),
@@ -26,10 +31,15 @@ const createTargets = (): BubbleTargets => ({
   reports: createRef(),
   "obs-tab": createRef(),
   "obs-address": createRef(),
+  palette: createRef(),
+  eyedropper: createRef(),
+  clear: createRef(),
+  theme: createRef(),
+  "moderation-tab": createRef(),
 });
 
 // Une fois par page : les refs ne changent pas, ni le contexte qui les porte.
-export const useBubbleTargets = (): BubbleTargets => useState(createTargets)[0];
+export const useBubbleTargets = (): BubbleTargets => useState(createBubbleTargets)[0];
 
 export const BubbleTarget = ({ name, children }: { name: BubbleTargetName; children: ReactNode }) => {
   const targets = useContext(BubbleTargetsContext);

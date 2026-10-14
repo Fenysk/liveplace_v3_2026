@@ -8,18 +8,14 @@ import type { DraftStore } from "../../state/draft-store";
 import { createFirstHint, type FirstHintView, type HintStep } from "../../state/first-hint";
 import { BUBBLE_LINGER_MS } from "../../state/help-bubbles";
 import { useAfterDelay } from "../design/use-after-delay";
-import { TOUCH_SCREEN_QUERY } from "../design/use-media-query";
 import { seenBubbles } from "../design/use-seen-bubble";
 import type { FirstHintProps } from "./first-hint";
 import { HINT_SHOW_DELAY_MS, isHintBeating, toFirstHintProps } from "./first-hint-props";
 
-const firstHint = createFirstHint({
-  seen: seenBubbles,
-  getStorage: () => window.localStorage,
-  isTouchScreen: () => window.matchMedia(TOUCH_SCREEN_QUERY).matches,
-});
+const firstHint = createFirstHint({ seen: seenBubbles, getStorage: () => window.localStorage });
 
 export const recordFirstHintStep: (step: HintStep) => void = firstHint.record;
+export const restartFirstHint: () => void = firstHint.restart; // rejouer le tutoriel (JOURNAL 2026-10-12)
 
 const getServerView = (): FirstHintView => ({ status: "off" });
 

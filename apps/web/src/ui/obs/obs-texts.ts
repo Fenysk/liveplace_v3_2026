@@ -14,7 +14,11 @@ export const OBS_TEXTS = defineTexts({
     en: (delay) => `Delay saved: ${delay}`,
   }),
 
-  address: { fr: "Adresse à coller dans OBS", en: "Address to paste into OBS" },
+  // Le même bouton pour OBS et pour les viewers : l'adresse de la fresque est la même page (Écart §8.1, JOURNAL 2026-10-12).
+  address: {
+    fr: "Ton lien : à coller dans OBS, à partager à tes viewers",
+    en: "Your link: paste it into OBS, share it with your viewers",
+  },
   howTo: {
     fr: "Dans OBS Studio ou Streamlabs : Sources, +, Navigateur. Colle l'adresse, choisis une taille aux proportions de ta fresque (1080 × 1080 pour un carré, 1920 × 1080 pour un 16:9). C'est tout.",
     en: "In OBS Studio or Streamlabs: Sources, +, Browser. Paste the address, pick a size that matches your canvas proportions (1080 × 1080 for a square, 1920 × 1080 for 16:9). That's it.",

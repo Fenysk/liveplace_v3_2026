@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { type BubbleTargets, BubbleTargetsContext } from "../help/bubble-target";
+import { BubbleTargetsContext, createBubbleTargets } from "../help/bubble-target";
 import { ObsSettings } from "./obs-settings";
 
 const doNothing = (): void => undefined;
@@ -86,16 +86,7 @@ describe("the OBS section of the settings no longer holds the background (Écart
 
 // Écart §8.1 (JOURNAL 2026-10-09) : le champ qui copie l'adresse est la cible de la dernière bulle de la chaîne OBS
 describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09)", () => {
-  const refs: BubbleTargets = {
-    trace: { current: null },
-    submit: { current: null },
-    gauge: { current: null },
-    claim: { current: null },
-    settings: { current: null },
-    reports: { current: null },
-    "obs-tab": { current: null },
-    "obs-address": { current: null },
-  };
+  const refs = createBubbleTargets();
   const props = {
     address: "liveplace.test/kalyss",
     url: "https://liveplace.test/kalyss",
@@ -103,8 +94,8 @@ describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2
     onPickDelay: doNothing,
   } as const;
 
-  // Dans la page de jeu : un `<span>` entoure le champ, et lui seul, que la bulle vise
-  it("wraps the copy field, and only it, in a span the bubble can aim at, in the game page", () => {
+  // Dans la page de jeu : un `<span>` entoure le champ, et lui seul, que les bulles de l'adresse puis du partage visent (JOURNAL 2026-10-12)
+  it("wraps the copy field, and only it, in a span the bubbles can aim at, in the game page", () => {
     const html = renderToString(
       createElement(BubbleTargetsContext, { value: refs }, createElement(ObsSettings, props)),
     );
@@ -116,5 +107,30 @@ describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2
   // Hors de la page de jeu (/design), le champ reste seul
   it("leaves the field alone outside the game page", () => {
     expect(settingsHtml()).not.toContain("lp-bubble-target");
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-12) : le lien de la fresque sert à OBS et aux viewers, c'est la même page : un seul bouton
+describe("le lien de Vue OBS, à coller dans OBS et à partager (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  // Un libellé qui dit les deux usages, puis un seul champ à copier, qui lit l'adresse sans protocole
+  it("shows one label saying both uses, then one copy field with the address without protocol", () => {
+    const html = settingsHtml();
+    const fields = [...html.matchAll(/<button[^>]*class="lp-btn lp-copy lp-type-body"[^>]*>/g)];
+
+    expect(html).toContain("Ton lien : à coller dans OBS, à partager à tes viewers");
+    expect(fields).toHaveLength(1);
+    expect(html.match(/<span class="lp-copy-value">liveplace\.test\/kalyss<\/span>/g)).toHaveLength(1);
+    expect(html).not.toContain("https://liveplace.test/kalyss</span>");
+  });
+
+  // La marche à suivre OBS reste dessous, avant le délai ; plus de second libellé ni de second champ
+  it("keeps the OBS walkthrough under the field, before the delay, with no second label", () => {
+    const html = settingsHtml();
+    const order = ["Ton lien", "Dans OBS Studio", "Délai"].map((text) => html.indexOf(text));
+
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect([...order].sort((first, second) => first - second)).toEqual(order);
+    expect(html).not.toContain("Lien à partager");
+    expect(html).not.toContain("Adresse à coller");
   });
 });

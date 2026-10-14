@@ -36,6 +36,7 @@ import { useDraftPillProps } from "../ui/draft/use-draft-pill";
 import { useDraftingAttribute } from "../ui/draft/use-drafting-attribute";
 import { BubbleTargetsContext, useBubbleTargets } from "../ui/help/bubble-target";
 import { HelpBubbles } from "../ui/help/help-bubbles";
+import { placementCount, restartDeviceTutorial } from "../ui/help/tutorial";
 import { recordDraftPan, useHelpBubbles } from "../ui/help/use-help-bubbles";
 import { FirstHint } from "../ui/hint/first-hint";
 import { recordFirstHintStep, useFirstHintProps } from "../ui/hint/use-first-hint";
@@ -105,9 +106,10 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
   const draft = useDraftPillProps(stores, login, signingIn);
   const bubbleTargets = useBubbleTargets();
   const [windowState, setWindowState] = useState<WindowState>({ isOpen: false, sectionId: "account" });
-  const help = useHelpBubbles(stores, draft.state, shownSection(windowState)); // Écart §8.1 (JOURNAL 2026-10-08) : les bulles d'aide, une à la fois
-  useDraftingAttribute(stores.draft); // Écart §8.1 (JOURNAL 2026-10-08) : en Dessin sur mobile, seule la bande Thème reste en haut
   const moderation = useModeration(stores.canvas);
+  // Écart §8.1 (JOURNAL 2026-10-08) : les bulles d'aide, une à la fois
+  const help = useHelpBubbles(stores, draft.state, shownSection(windowState), moderation.controls);
+  useDraftingAttribute(stores.draft); // Écart §8.1 (JOURNAL 2026-10-08) : en Dessin sur mobile, seule la bande Thème reste en haut
   const reporting = useReport(stores.canvas);
   useCanvasToasts(stores, switchTracker, owner.displayName);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
@@ -171,6 +173,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
           signOutHref={signOutHref}
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
+          onRestartTutorial={restartDeviceTutorial}
           moderationTab={
             moderation.controls && (
               <ModerationTab
@@ -183,7 +186,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
           }
           obsTab={
             isOwner ? (
-              <ObsTab canvas={stores.canvas} login={login} onCopy={help.onObsAddressCopied} />
+              <ObsTab canvas={stores.canvas} login={login} onCopy={help.onObsLinkCopied} />
             ) : undefined
           }
           canvasTab={
@@ -213,8 +216,13 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
           onToggle={scoreboardCollapse.toggle}
         />
       )}
-      <DraftPill {...draft} isCompact={isCompact} isSidePanel={isSidePanel} />
-      {firstHint && <FirstHint {...firstHint} />}
+      <DraftPill
+        {...draft}
+        actions={{ ...draft.actions, onOpenPalette: help.onPaletteOpened }}
+        isCompact={isCompact}
+        isSidePanel={isSidePanel}
+      />
+      {firstHint && <FirstHint {...firstHint} isTouchScreen={help.isTouchScreen} />}
       <HelpBubbles shown={help.shown} isTouchScreen={help.isTouchScreen} refill={help.refill} />
       <ModerationWindow {...moderation.window} />
       <ModerationWindow {...reporting.window} />
@@ -256,7 +264,7 @@ const GamePage = () => {
     // Dans OBS, la page bascule juste après l'hydratation : le jeu n'ouvre rien.
     if (isObsView()) return;
     const canvas = openCanvas(canvasId, "ui");
-    const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock);
+    const draft = createDraftStore(canvasId, canvas, getBrowserStorage, browserClock, placementCount.record);
     setStores({ canvasId, canvas, draft });
     return () => {
       draft.dispose();

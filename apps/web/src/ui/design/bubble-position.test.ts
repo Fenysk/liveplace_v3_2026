@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  type BubblePlacement,
   isInsideClips,
   MIN_SQUEEZED_WIDTH,
   placeBubble,
   positionBubble,
   squeezedWidth,
+  type TargetRect,
 } from "./bubble-position";
 
 const screen = { width: 375, height: 812 };
@@ -127,6 +129,67 @@ describe("où poser une bulle d'aide contre la pill de sa cible (Écart §8.1, J
     expect(placeBubble(anchor, anchor, pill, tiny, margin, arrowSpace).side).toBe("above");
     expect(placeBubble(anchor, { ...anchor, top: 50 }, pill, tiny, margin, arrowSpace).side).toBe("above");
     expect(placeBubble(anchor, { ...anchor, top: 20 }, pill, tiny, margin, arrowSpace).side).toBe("below");
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-13, qui défait l'entrée du même jour sur la flèche au centre de la pill) : la bulle se pose contre la
+// pill qui porte le bouton, et sa flèche en vise le centre le long de ce bord, jamais le centre de la pill ; l'anneau en plus
+describe("la flèche vise le centre du bouton, pas celui de la pill (Écart §8.1, JOURNAL 2026-10-13)", () => {
+  const centerX = (rect: TargetRect): number => rect.left + rect.width / 2;
+  const centerY = (rect: TargetRect): number => rect.top + rect.height / 2;
+  // Où la flèche pointe dans l'écran : son abscisse dessus et dessous, son ordonnée à gauche et à droite
+  const aimedAt = (placement: BubblePlacement): number =>
+    placement.side === "above" || placement.side === "below"
+      ? placement.left + placement.arrow
+      : placement.top + placement.arrow;
+
+  // La barre du bas d'un PC : un bouton à chaque bout de la pill, la flèche suit chacun, la bulle reste contre la pill
+  it("aims at each button of the bottom bar of a PC, not at the middle of the bar", () => {
+    const desktop = { width: 1440, height: 900 };
+    const bar = { left: 560, top: 828, width: 320, height: 64 };
+    const first = { left: 572, top: 838, width: 44, height: 44 };
+    const last = { left: 824, top: 838, width: 44, height: 44 };
+
+    for (const button of [first, last]) {
+      const placement = placeBubble(button, bar, pill, desktop, margin, arrowSpace);
+
+      expect(placement.side).toBe("above");
+      expect(aimedAt(placement)).toBe(centerX(button));
+      expect(aimedAt(placement)).not.toBe(centerX(bar));
+      expect(placement.top + pill.height + arrowSpace).toBe(bar.top);
+    }
+  });
+
+  // La colonne à droite d'un écran couché : la bulle à sa gauche, contre elle, la flèche à la hauteur de chaque bouton
+  it("aims at each button of the column of a landscape screen, not at the middle of the column", () => {
+    const column = { left: 740, top: 30, width: 60, height: 300 };
+    const high = { left: 748, top: 40, width: 44, height: 44 };
+    const low = { left: 748, top: 276, width: 44, height: 44 };
+
+    for (const button of [high, low]) {
+      const placement = placeBubble(button, column, pill, landscape, margin, arrowSpace);
+
+      expect(placement.side).toBe("left");
+      expect(aimedAt(placement)).toBe(centerY(button));
+      expect(aimedAt(placement)).not.toBe(centerY(column));
+      expect(placement.left + pill.width + arrowSpace).toBe(column.left);
+    }
+  });
+
+  // La colonne haute d'un pliable déplié : le panneau couvre la hauteur, un bouton tout en haut et un tout en bas
+  it("aims at a button high or low in the tall column of an unfolded foldable, not at its middle", () => {
+    const foldable = { width: 700, height: 820 };
+    const panel = { left: 372, top: 8, width: 320, height: 804 };
+    const high = { left: 384, top: 40, width: 296, height: 44 };
+    const low = { left: 384, top: 700, width: 296, height: 44 };
+
+    for (const button of [high, low]) {
+      const placement = placeBubble(button, panel, pill, foldable, margin, arrowSpace);
+
+      expect(placement.side).toBe("left");
+      expect(aimedAt(placement)).toBe(centerY(button));
+      expect(aimedAt(placement)).not.toBe(centerY(panel));
+    }
   });
 });
 

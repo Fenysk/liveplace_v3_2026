@@ -1,5 +1,6 @@
 // Le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08) : les gestes que l'appareil a déjà faits, retenus dans son navigateur.
-// Trois gestes distincts ; le troisième ferme le conseil pour de bon. Sans écran tactile ni stockage lisible, il ne s'ouvre jamais.
+// Trois gestes distincts ; le troisième ferme le conseil pour de bon. Au doigt comme à la souris (JOURNAL 2026-10-12) : seul son
+// texte change. Sans stockage lisible, il ne s'ouvre jamais.
 
 import type { BubbleStorage, SeenBubbles } from "./seen-bubbles";
 
@@ -7,7 +8,7 @@ export const HINT_STEPS = ["pan", "zoom", "inspect"] as const;
 export type HintStep = (typeof HINT_STEPS)[number];
 
 // `open` : 0 à 2 gestes faits. `done` : le dernier vient d'être fait, la page ferme la bulle après un temps.
-// `off` : rien à montrer (PC, déjà vu, stockage refusé).
+// `off` : rien à montrer (déjà vu, stockage refusé).
 export type FirstHintView =
   | { status: "off" }
   | { status: "open"; done: readonly HintStep[] }
@@ -16,13 +17,13 @@ export type FirstHintView =
 export type FirstHintDeps = {
   seen: SeenBubbles;
   getStorage: () => BubbleStorage;
-  isTouchScreen: () => boolean;
 };
 
 export type FirstHint = {
   subscribe(listener: () => void): () => void;
   getView(): FirstHintView;
   record(step: HintStep): void;
+  restart(): void; // rejouer le tutoriel (JOURNAL 2026-10-12) : les gestes repartent de zéro, une fois la bulle oubliée de `seen`
 };
 
 // La fin est la bulle vue (`seen`) ; la progression, elle, ne sert qu'à reprendre là où l'appareil s'était arrêté.
@@ -38,7 +39,7 @@ const parseSteps = (stored: string | null): HintStep[] => [
   ...new Set((stored ?? "").split(",").filter(isHintStep)),
 ];
 
-export function createFirstHint({ seen, getStorage, isTouchScreen }: FirstHintDeps): FirstHint {
+export function createFirstHint({ seen, getStorage }: FirstHintDeps): FirstHint {
   const listeners = new Set<() => void>();
   let view: FirstHintView | undefined;
 
@@ -47,9 +48,9 @@ export function createFirstHint({ seen, getStorage, isTouchScreen }: FirstHintDe
     for (const listener of listeners) listener();
   };
 
-  // Lue au premier accès, dans le navigateur seulement : l'écran et le stockage n'existent pas sur le serveur.
+  // Lue au premier accès, dans le navigateur seulement : le stockage n'existe pas sur le serveur.
   const load = (): FirstHintView => {
-    if (!isTouchScreen() || seen.isSeen(FIRST_HINT_KEY)) return OFF;
+    if (seen.isSeen(FIRST_HINT_KEY)) return OFF;
     try {
       return { status: "open", done: parseSteps(getStorage().getItem(STEPS_STORAGE_KEY)) };
     } catch (error) {
@@ -86,6 +87,14 @@ export function createFirstHint({ seen, getStorage, isTouchScreen }: FirstHintDe
         return;
       }
       setView({ status: "open", done });
+    },
+    restart() {
+      try {
+        getStorage().removeItem(STEPS_STORAGE_KEY);
+      } catch (error) {
+        console.warn("conseil de première visite : gestes non effacés, stockage refusé", error);
+      }
+      setView(load());
     },
   };
 }

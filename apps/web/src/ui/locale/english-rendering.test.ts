@@ -107,6 +107,7 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
         signOutHref: "#",
         appearanceChoice: "dark",
         onPickAppearance: doNothing,
+        onRestartTutorial: doNothing,
         canvasTab: tab("a"),
         canvasesTab: tab("b"),
         obsTab: tab("c"),
@@ -127,6 +128,8 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
       "My account",
     ]);
     expect(markup).toContain("Sign out");
+    expect(markup).toContain("Tutorial");
+    expect(markup).toContain("Replay the tutorial");
     expect(markup).toMatch(/aria-label="Appearance"/);
     expect(markup).toContain("Light");
     expect(markup).toContain("Dark");
@@ -529,7 +532,8 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
       }),
     );
 
-    expect(markup).toContain("Address to paste into OBS");
+    expect(markup).toContain("Your link: paste it into OBS, share it with your viewers");
+    expect(markup).not.toContain("Link to share");
     expect(markup).toContain("In OBS Studio or Streamlabs: Sources, +, Browser.");
     expect(markup).toContain(">Delay</label>");
     expect(markup).toContain(">None</span>");
@@ -564,6 +568,18 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     expect(markup).toContain('aria-label="2 of 3"');
   });
 
+  // À la souris (Écart §8.1, JOURNAL 2026-10-12) : les mêmes deux gestes, à la molette et au clic
+  it("says the first-visit hint with a mouse in English", () => {
+    const markup = inEnglish(
+      createElement(FirstHint, { doneCount: 1, isVisible: true, isDocked: false, isTouchScreen: false }),
+    );
+
+    expect(markup).toContain("Scroll to zoom");
+    expect(markup).toContain("Click a pixel to see who placed it");
+    expect(markup).not.toContain("Pinch");
+    expect(markup).toContain('aria-label="1 of 3"');
+  });
+
   // Chaque bulle d'aide a sa phrase anglaise : aucun mot français ne reste
   it("says every help bubble in English", () => {
     const lines = HELP_BUBBLES.map((bubble) =>
@@ -580,6 +596,15 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     expect(lines).toContain("Your gauge refills on its own: 1 pixel every 10 s");
     expect(lines).toContain("Tap the canvas to prepare your drawing, then Confirm to send it");
     expect(lines).toContain("Turn on Trace to draw by dragging");
+    expect(lines).toContain("Share this link with your viewers too");
+    expect(lines).toContain("Give your canvas a theme");
+    expect(lines).toContain("Import your Twitch moderators here");
+    expect(lines).toContain("You moderate this canvas: everything is here");
+    expect(lines).toContain("Clear their pixels or ban this viewer here");
+    expect(lines).toContain("Tap your color to open the palette");
+    expect(lines).not.toContain("1 to 5");
+    expect(lines).toContain("Ctrl+Z: undo your last stroke");
+    expect(lines).toContain("The eyedropper picks up a color from the canvas");
     expect(lines).not.toMatch(/Ajoute|Copie|Active|récompense|jauge/);
   });
 

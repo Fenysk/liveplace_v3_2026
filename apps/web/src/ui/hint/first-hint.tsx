@@ -1,7 +1,8 @@
 // Le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08), dans une bulle : deux gestes à connaître, et trois points,
-// un par geste distinct réussi. L'affichage seul, nourri par `useFirstHintProps`.
+// un par geste distinct réussi. Au doigt ou à la souris (JOURNAL 2026-10-12) : les mêmes gestes, dits autrement. L'affichage
+// seul, nourri par `useFirstHintProps`.
 
-import { Minimize2, Pointer } from "lucide-react";
+import { Minimize2, Mouse, MousePointerClick, Pointer } from "lucide-react";
 import { useState } from "react";
 import { HINT_STEPS } from "../../state/first-hint";
 import { Bubble, BubbleLine } from "../design/bubble";
@@ -13,12 +14,19 @@ export type FirstHintProps = {
   doneCount: number; // 0 à 3 : les points remplis
   isVisible: boolean;
   isDocked?: boolean;
+  isTouchScreen?: boolean; // absent : au doigt
 };
 
-const HINT_LINES = [
-  { icon: Minimize2, key: "pinch" },
-  { icon: Pointer, key: "tapPixel" },
-] as const;
+const HINT_LINES = {
+  touch: [
+    { icon: Minimize2, key: "pinch" },
+    { icon: Pointer, key: "tapPixel" },
+  ],
+  mouse: [
+    { icon: Mouse, key: "scroll" },
+    { icon: MousePointerClick, key: "clickPixel" },
+  ],
+} as const;
 
 const HintDots = ({ count }: { count: number }) => {
   const t = useTexts(HINT_TEXTS);
@@ -31,14 +39,19 @@ const HintDots = ({ count }: { count: number }) => {
   );
 };
 
-export const FirstHint = ({ doneCount, isVisible, isDocked = true }: FirstHintProps) => {
+export const FirstHint = ({
+  doneCount,
+  isVisible,
+  isDocked = true,
+  isTouchScreen = true,
+}: FirstHintProps) => {
   // Un point gagné pendant que la bulle est cachée (la feuille d'inspection) se remplit à son retour, sous les yeux.
   const t = useTexts(HINT_TEXTS);
   const [shownCount, setShownCount] = useState(doneCount);
   if (isVisible && shownCount !== doneCount) setShownCount(doneCount);
   return (
     <Bubble isVisible={isVisible} isDocked={isDocked}>
-      {HINT_LINES.map(({ icon, key }) => (
+      {HINT_LINES[isTouchScreen ? "touch" : "mouse"].map(({ icon, key }) => (
         <BubbleLine key={key} icon={icon}>
           {t[key]}
         </BubbleLine>

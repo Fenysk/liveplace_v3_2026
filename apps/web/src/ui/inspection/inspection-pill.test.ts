@@ -3,6 +3,7 @@ import type { InspectEntry } from "@liveplace/domain/ports";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { BubbleTargetsContext, createBubbleTargets } from "../help/bubble-target";
 import type { ModerationControls } from "../moderation/use-moderation";
 import { InspectionPill } from "./inspection-pill";
 
@@ -119,5 +120,40 @@ describe("the Inspection pill while its pixel loads", () => {
     expect(html).not.toContain("aria-busy");
     expect(html).not.toContain("lp-skeleton");
     expect(html).toContain("Troll42");
+  });
+});
+
+// Écart §8.1 (JOURNAL 2026-10-12) : « Retirer ses pixels » est la cible de la bulle des actions de modération
+describe("Retirer ses pixels, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  const renderInGame = (moderation?: ModerationControls) =>
+    renderToStaticMarkup(
+      createElement(
+        BubbleTargetsContext,
+        { value: createBubbleTargets() },
+        createElement(InspectionPill, {
+          inspection: { status: "found", x: 1, y: 2, entry },
+          palette: PALETTE,
+          nowMs: now,
+          onClose: noop,
+          moderation,
+          isDocked: false,
+        }),
+      ),
+    );
+
+  // Dans la page de jeu, un `<span>` entoure ce bouton, et lui seul, que la bulle vise ; Bannir reste hors de la cible
+  it("wraps the clear button, and only it, in a span the bubble can aim at, in the game page", () => {
+    const html = renderInGame(moderating);
+    const [, target = ""] = /<span class="lp-bubble-target">(<button.*?<\/button>)<\/span>/.exec(html) ?? [];
+
+    expect([...html.matchAll(/<span class="lp-bubble-target">/g)]).toHaveLength(1);
+    expect(target).toContain("Retirer ses pixels");
+    expect(target).not.toContain("Bannir");
+  });
+
+  // Hors de la page de jeu (/design), le bouton reste seul ; sans droit de modérer, il n'y a pas de cible du tout
+  it("leaves the button alone outside the game page, and has no target without the right to moderate", () => {
+    expect(render(entry, moderating)).not.toContain("lp-bubble-target");
+    expect(renderInGame()).not.toContain("lp-bubble-target");
   });
 });

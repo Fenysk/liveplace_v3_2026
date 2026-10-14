@@ -1,7 +1,23 @@
 // Les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08), l'une sur la cible qu'elle désigne : l'affichage seul, nourri par
 // `useHelpBubbles`. Une seule est visible à la fois ; les autres attendent dans la page, invisibles, pour paraître en fondu.
 
-import { Brush, Copy, Flag, Gift, Hourglass, MonitorPlay, Pointer } from "lucide-react";
+import {
+  Ban,
+  Brush,
+  Copy,
+  Flag,
+  Gift,
+  Hourglass,
+  Link,
+  MonitorPlay,
+  Palette as PaletteIcon,
+  Pipette,
+  Pointer,
+  RefreshCw,
+  Shield,
+  Tag,
+  Undo2,
+} from "lucide-react";
 import { useContext } from "react";
 import type { Refill } from "../../state/gauge";
 import { HELP_BUBBLES, type HelpBubble, isInWindow } from "../../state/help-bubbles";
@@ -19,7 +35,7 @@ type HelpTexts = (typeof HELP_TEXTS)["fr"];
 
 // Les côtés d'où une bulle de la fenêtre vise sa cible (Écart §8.1, JOURNAL 2026-10-09), des constantes : la bulle suit ce qui
 // change. L'onglet d'une barre latérale (PC) se vise de la gauche, sur le voile, puis de la droite, par-dessus le contenu ; celui
-// d'une rangée d'onglets (la feuille), de dessous, par-dessus le contenu.
+// d'une rangée d'onglets (la feuille), de dessous, par-dessus le contenu. Vue OBS comme Modération (JOURNAL 2026-10-12).
 const TAB_SIDES: Record<"wide" | "sheet", readonly BubbleSide[]> = {
   wide: ["left", "right"],
   sheet: ["below", "above"],
@@ -27,7 +43,7 @@ const TAB_SIDES: Record<"wide" | "sheet", readonly BubbleSide[]> = {
 
 type HelpBubbleSpec = {
   icon: ButtonIcon;
-  target: BubbleTargetName;
+  target?: BubbleTargetName; // absent : la bulle se pose au-dessus de la barre du bas, sans flèche
   text: (t: HelpTexts, context: HelpTextContext) => string;
   sides?: Record<"wide" | "sheet", readonly BubbleSide[]>; // absent : la bulle se pose où elle tient
 };
@@ -38,13 +54,23 @@ const SPECS: Record<HelpBubble, HelpBubbleSpec> = {
   "obs-settings": { icon: MonitorPlay, target: "settings", text: (t) => t.obs },
   "obs-tab": { icon: MonitorPlay, target: "obs-tab", text: (t) => t.obsTab, sides: TAB_SIDES },
   "obs-address": { icon: Copy, target: "obs-address", text: (t) => t.obsAddress },
+  // Le même bouton que l'adresse OBS : il porte les deux bulles, l'une après l'autre.
+  "invite-link": { icon: Link, target: "obs-address", text: (t) => t.inviteLink },
+  theme: { icon: Tag, target: "theme", text: (t) => t.theme },
+  "twitch-sync": { icon: RefreshCw, target: "moderation-tab", text: (t) => t.twitchSync, sides: TAB_SIDES },
   "first-reward": { icon: Gift, target: "claim", text: (t) => t.reward },
+  // La pill Modération porte la cible des signalements : la bulle d'accueil vise le même bouton.
+  "moderator-welcome": { icon: Shield, target: "reports", text: (t) => t.moderatorWelcome },
+  "moderation-actions": { icon: Ban, target: "clear", text: (t) => t.moderationActions },
   "empty-gauge": { icon: Hourglass, target: "gauge", text: (t, { refill }) => t.gauge(refill) },
   "draft-trace": { icon: Brush, target: "trace", text: (t) => t.trace },
   "first-draft": { icon: Pointer, target: "submit", text: (t, { isTouchScreen }) => t.draft(isTouchScreen) },
+  palette: { icon: PaletteIcon, target: "palette", text: (t) => t.palette },
+  keys: { icon: Undo2, text: (t) => t.keys },
+  eyedropper: { icon: Pipette, target: "eyedropper", text: (t) => t.eyedropper },
 };
 
-export const helpTargetOf = (bubble: HelpBubble): BubbleTargetName => SPECS[bubble].target;
+export const helpTargetOf = (bubble: HelpBubble): BubbleTargetName | undefined => SPECS[bubble].target;
 
 // Le contenu d'une bulle d'aide : sur le jeu comme sur /design, le même.
 export const HelpBubbleLine = ({ bubble, ...context }: HelpTextContext & { bubble: HelpBubble }) => {
@@ -60,12 +86,13 @@ export const HelpBubbles = ({ shown, ...context }: HelpBubblesProps) => {
   const isSheet = useMediaQuery(WINDOW_SHEET_QUERY);
   if (!targets) return null;
   return HELP_BUBBLES.map((bubble) => {
-    const sides = SPECS[bubble].sides?.[isSheet ? "sheet" : "wide"];
+    const { target, sides: sidesByWidth } = SPECS[bubble];
+    const sides = sidesByWidth?.[isSheet ? "sheet" : "wide"];
     return (
       <Bubble
         key={bubble}
         isVisible={shown === bubble}
-        target={targets[helpTargetOf(bubble)]}
+        target={target && targets[target]}
         isOverWindow={isInWindow(bubble)}
         {...(sides ? { sides } : {})}
       >

@@ -1,6 +1,6 @@
-// La section Vue OBS de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-25), pour le streamer : l'adresse à copier, la
-// marche à suivre, et le délai. Le fond est dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10). L'affichage seul, nourri
-// par `ObsTab`.
+// La section Vue OBS de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-25), pour le streamer : son lien, à coller dans OBS et à
+// partager aux viewers (Écart §8.1, JOURNAL 2026-10-12), la marche à suivre, et le délai. Le fond est dans la section Fresque
+// (Écart §9.1, JOURNAL 2026-10-10). L'affichage seul, nourri par `ObsTab`.
 
 import { OBS_DELAY_STEPS_MS } from "@liveplace/domain";
 import { useMemo } from "react";
@@ -14,10 +14,11 @@ import { OBS_TEXTS } from "./obs-texts";
 type ObsAddressProps = {
   address: string; // sans le protocole : ce que le streamer lit
   url: string; // ce qu'il colle dans OBS
-  onCopy?: (() => void) | undefined; // l'adresse est copiée (Écart §8.1, JOURNAL 2026-10-09)
+  onCopy?: (() => void) | undefined; // le lien est copié (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12)
 };
 
-// L'adresse à coller dans OBS : le champ qui la copie est la cible de la dernière bulle de la chaîne OBS.
+// Le lien de la fresque, à coller dans OBS et à partager : la même page, qui se reconnaît d'elle-même dans OBS. Le champ qui le
+// copie est la cible des deux dernières bulles de la chaîne : l'adresse OBS, puis le partage aux viewers.
 export const ObsAddress = ({ address, url, onCopy }: ObsAddressProps) => (
   <>
     <span className="lp-type-body">{useTexts(OBS_TEXTS).address}</span>

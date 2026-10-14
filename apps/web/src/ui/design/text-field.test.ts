@@ -28,3 +28,35 @@ describe("le champ de texte qui charge", () => {
     expect(html).not.toContain("lp-skeleton");
   });
 });
+
+describe("le champ de texte dont une bulle vise le champ (Écart §8.1, JOURNAL 2026-10-12)", () => {
+  const wrapped = (isLoading: boolean): string =>
+    renderToStaticMarkup(
+      createElement(TextField, {
+        label: "Thème",
+        value: "",
+        onInput: noop,
+        isLoading,
+        wrapInput: (input) => createElement("span", { className: "target" }, input),
+      }),
+    );
+
+  // Le champ seul est enveloppé : le libellé reste au-dessus, hors de la cible
+  it("wraps the input alone, the label staying out of the wrapper", () => {
+    const html = wrapped(false);
+
+    expect(html).toMatch(/<span class="target"><input[^>]*\/><\/span>/);
+    expect(html.indexOf("Thème")).toBeLessThan(html.indexOf('<span class="target">'));
+    expect(html.match(/class="target"/g)).toHaveLength(1);
+  });
+
+  // Tant que la valeur arrive, il n'y a pas de champ à viser : le squelette n'est pas enveloppé
+  it("has nothing to wrap while the value loads", () => {
+    expect(wrapped(true)).not.toContain('class="target"');
+  });
+
+  // Sans enveloppe, le champ est celui d'avant
+  it("is the same input without a wrapper", () => {
+    expect(render(false)).toMatch(/<div class="lp-field"><label[^>]*>Thème<\/label><input/);
+  });
+});

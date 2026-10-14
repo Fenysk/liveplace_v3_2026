@@ -1,7 +1,7 @@
 import { PALETTE, toCellKey } from "@liveplace/domain";
 import type { Transport, TransportListeners } from "@liveplace/domain/ports";
 import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type CanvasView, createCanvasStore, type Pixel, type PlaceResult } from "./canvas-store";
 import { createDraftStore, type DraftCanvas, type DraftClock } from "./draft-store";
 import type { DraftStorage } from "./saved-draft";
@@ -54,6 +54,7 @@ type Setup = {
   onPlace?: () => void;
   entries?: Map<string, string>;
   isStorageRefused?: boolean;
+  onPlaced?: () => void; // tout le brouillon vient d'être posé (Écart §8.1, JOURNAL 2026-10-12)
 };
 
 const setup = ({
@@ -63,6 +64,7 @@ const setup = ({
   onPlace,
   entries = new Map<string, string>(),
   isStorageRefused = false,
+  onPlaced,
 }: Setup = {}) => {
   let canvasView = view;
   const canvasListeners = new Set<() => void>();
@@ -101,7 +103,7 @@ const setup = ({
     if (isStorageRefused) throw new Error("stockage refusé");
     return storage;
   };
-  const store = createDraftStore("canvas-1", canvas, getStorage, draftClock);
+  const store = createDraftStore("canvas-1", canvas, getStorage, draftClock, onPlaced);
   const setCanvasView = (next: CanvasView) => {
     canvasView = next;
     for (const listener of canvasListeners) listener();
@@ -480,6 +482,43 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
 
     expect(cells()).toEqual([]);
     expect(store.getView().mode).toBe("view");
+  });
+
+  // Un dessin posé en entier se compte une fois, qu'il parte en un lot ou en plusieurs (Écart §8.1, JOURNAL 2026-10-12)
+  it("tells once that a whole draft is placed, in one batch or in several", async () => {
+    const onPlaced = vi.fn();
+    const { store } = setup({ onPlaced });
+    fill(store, 3);
+    await store.submit();
+    expect(onPlaced).toHaveBeenCalledTimes(1);
+
+    fill(store, 130);
+    await store.submit();
+    expect(onPlaced).toHaveBeenCalledTimes(2);
+  });
+
+  // Rien n'est compté tant que le brouillon n'est pas posé en entier : un refus, une coupure, ou rien à envoyer
+  it("counts no placement while some of the draft stays: a refusal, a drop, or nothing to send", async () => {
+    const onPlaced = vi.fn();
+    const refused = {
+      ...acceptAll([]),
+      accepted: 1,
+      rejected: [{ index: 1, reason: "gauge" }],
+    };
+    const { store } = setup({
+      onPlaced,
+      results: [
+        { ok: true, value: refused },
+        { ok: false, error: "closed" },
+      ],
+    });
+    fill(store, 2);
+    await store.submit();
+    await store.submit();
+    const empty = setup({ onPlaced });
+    await empty.store.submit();
+
+    expect(onPlaced).not.toHaveBeenCalled();
   });
 
   // S'arrête quand la connexion tombe, et garde tout ce qui n'est pas confirmé
