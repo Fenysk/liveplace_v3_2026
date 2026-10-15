@@ -1,6 +1,6 @@
-// La section Tout LivePlace de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : les
-// chiffres de l'instant, l'audience, les canvas, puis l'historique. L'audience et les canvas se mettent côte à côte quand
-// la place le permet. L'affichage seul : `LiveActivitySection` la branche sur le store.
+// La section Tout LivePlace de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : le choix
+// du jour (JOURNAL 2026-10-14), les chiffres de l'instant, l'audience, les canvas, puis l'historique. L'audience et les canvas se
+// mettent côte à côte quand la place le permet. L'affichage seul : `LiveActivitySection` la branche sur le store.
 
 import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
 import { useState } from "react";
@@ -17,12 +17,16 @@ import {
   toCanvasActivityCard,
 } from "./activity-labels";
 import { chartLinesFor, toActivitySlots } from "./activity-slots";
+import { toDayChoice } from "./day-choice";
+import { DaySwitch } from "./day-switch";
 import { HistoryBlock, type ShownChart, type ShownHistory } from "./history-block";
+import { PastActivityDay } from "./past-activity-day";
 
 export type ActivitySectionProps = {
   view: ActivityWatchView;
   nowMs: Timestamp; // « depuis 12 min »
   onSelectPeriod: (period: ActivityPeriod) => void;
+  onSelectDay: (dayAt: Timestamp | undefined) => void; // `undefined` : aujourd'hui
 };
 
 const NowBlock = ({ view }: { view: ActivityWatchView }) => (
@@ -89,8 +93,9 @@ const toChart = ({ points, period }: ShownHistory): ShownChart => ({
   slots: toActivitySlots(points, period, Date.now()),
 });
 
-export const ActivitySection = ({ view, nowMs, onSelectPeriod }: ActivitySectionProps) => (
-  <div className="lp-window-layout">
+// Aujourd'hui, en direct : les chiffres de l'instant, l'audience, les canvas, et les courbes de la période choisie.
+const TodayBlocks = ({ view, nowMs, onSelectPeriod }: Omit<ActivitySectionProps, "onSelectDay">) => (
+  <>
     <section className="lp-setting">
       <h3 className="lp-type-title lp-window-subhead">Maintenant</h3>
       <NowBlock view={view} />
@@ -115,5 +120,17 @@ export const ActivitySection = ({ view, nowMs, onSelectPeriod }: ActivitySection
         unavailableText="L'historique n'est pas disponible."
       />
     </section>
+  </>
+);
+
+// JOURNAL 2026-10-14 : le choix du jour en tête ; un jour passé remplace l'instant et ses courbes glissantes.
+export const ActivitySection = ({ view, nowMs, onSelectPeriod, onSelectDay }: ActivitySectionProps) => (
+  <div className="lp-window-layout">
+    <DaySwitch choice={toDayChoice(view.past?.dayAt, view.firstDayAt, nowMs)} onSelect={onSelectDay} />
+    {view.past ? (
+      <PastActivityDay past={view.past} nowMs={nowMs} />
+    ) : (
+      <TodayBlocks view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
+    )}
   </div>
 );

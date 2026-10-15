@@ -3,6 +3,7 @@
 // courbe y fait un trou. Pour un canvas, il vaut zéro : le gateway n'écrit un point que s'il s'y passe quelque chose.
 
 import {
+  type ActivityDayGrain,
   type ActivityPeriod,
   HOUR_MS,
   MINUTE_MS,
@@ -10,6 +11,7 @@ import {
   toActivityPointStarts,
   toHourStart,
   toMinuteStart,
+  toNextDayStart,
 } from "@liveplace/domain";
 import type { ActivityPoint, CanvasActivityPoint } from "@liveplace/domain/ports";
 import type { ChartSlot, TimeChartLine } from "../design/time-charts";
@@ -115,7 +117,11 @@ export function toActivitySlots(
   const first = points[0];
   const last = points.at(-1);
   const axis = toTimeAxis(first && last ? { firstAt: first.at, lastAt: last.at } : null, period, nowMs);
-  if (!axis) return [];
+  return axis ? fillSlots(axis, points, period) : [];
+}
+
+// Chaque point dans son créneau ; un créneau sans point reste vide.
+function fillSlots(axis: TimeAxis, points: readonly ActivityPoint[], period: ActivityPeriod): ChartSlot[] {
   const slots: ChartSlot[] = Array.from({ length: axis.count }, () => null);
   for (const point of points) {
     const { at, people, streamed, pixels, signups, visits, visitMinutes } = point;
@@ -128,6 +134,19 @@ export function toActivitySlots(
   }
   return slots;
 }
+
+// Un jour passé (JOURNAL 2026-10-14), de minuit à minuit à Paris : à la minute ou à l'heure, 23, 24 ou 25 h. Sans courbes gardées,
+// aucun créneau.
+const toDayAxis = (grain: Exclude<ActivityDayGrain, "none">, dayAt: Timestamp): TimeAxis => {
+  const stepMs = grain === "minute" ? MINUTE_MS : HOUR_MS;
+  return { firstAt: dayAt, stepMs, count: Math.round((toNextDayStart(dayAt) - dayAt) / stepMs) };
+};
+
+export const toDaySlots = (
+  points: readonly ActivityPoint[],
+  grain: ActivityDayGrain,
+  dayAt: Timestamp,
+): ChartSlot[] => (grain === "none" ? [] : fillSlots(toDayAxis(grain, dayAt), points, "day"));
 
 // Les valeurs d'un créneau d'un canvas, dans l'ordre de ses courbes : les joueurs actifs sur Tout seulement.
 const toCanvasValues = (
@@ -154,7 +173,14 @@ export function toCanvasSlots(
   if (!first) return [];
   const today = toActivityPointStarts(nowMs).day;
   const axis = toTimeAxis({ firstAt: first.at, lastAt: Math.max(first.at, today) }, period, nowMs);
-  if (!axis) return [];
+  return axis ? fillCanvasSlots(axis, points, period) : [];
+}
+
+function fillCanvasSlots(
+  axis: TimeAxis,
+  points: readonly CanvasActivityPoint[],
+  period: ActivityPeriod,
+): ChartSlot[] {
   const noon = period === "all" ? DAY_MS / 2 : 0;
   const slots: ChartSlot[] = Array.from({ length: axis.count }, (_, index) => ({
     title: slotTitle(axis.firstAt + index * axis.stepMs + noon, period),
@@ -167,3 +193,11 @@ export function toCanvasSlots(
   }
   return slots;
 }
+
+// Un jour passé d'un canvas : un créneau sans point vaut zéro, et sans aucun point, aucun créneau.
+export const toCanvasDaySlots = (
+  points: readonly CanvasActivityPoint[],
+  grain: ActivityDayGrain,
+  dayAt: Timestamp,
+): ChartSlot[] =>
+  grain === "none" || points.length === 0 ? [] : fillCanvasSlots(toDayAxis(grain, dayAt), points, "day");

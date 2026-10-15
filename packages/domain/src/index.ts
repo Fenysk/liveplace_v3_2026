@@ -60,6 +60,10 @@ export function isDeveloper(userId: string | undefined): boolean {
 export const ACTIVITY_PERIODS = ["day", "month", "all"] as const;
 export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];
 
+// Écart §4.2 (JOURNAL 2026-10-14) : le détail des courbes d'un jour passé, selon ce que la rétention en garde.
+export const ACTIVITY_DAY_GRAINS = ["minute", "hour", "none"] as const;
+export type ActivityDayGrain = (typeof ACTIVITY_DAY_GRAINS)[number];
+
 // L'appareil d'une page, lu au `User-Agent` de son WebSocket.
 export const DEVICES = ["desktop", "phone"] as const;
 export type Device = (typeof DEVICES)[number];
@@ -319,6 +323,16 @@ export function toAudienceDays(nowMs: Timestamp): AudienceDay[] {
   for (let at = toParisDayStart(nowMs); days.length < AUDIENCE_DAYS; at = toParisDayStart(at - 1))
     days.unshift({ at, day: toParisDay(at) });
   return days;
+}
+
+// JOURNAL 2026-10-14 : le jour de Paris d'avant et d'après celui qui commence à `dayAt`. 36 h après son début tombe toujours
+// dans le jour suivant, qui fait 23, 24 ou 25 h.
+export function toPreviousDayStart(dayAt: Timestamp): Timestamp {
+  return toParisDayStart(dayAt - 1);
+}
+
+export function toNextDayStart(dayAt: Timestamp): Timestamp {
+  return toParisDayStart(dayAt + 36 * HOUR_MS);
 }
 
 // Ce que le plafond laisse encore réclamer, parmi les récompenses gagnées.

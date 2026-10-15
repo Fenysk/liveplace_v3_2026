@@ -1,6 +1,7 @@
 // Frames client ↔ serveur, schémas Zod, version du protocole (§4).
 
 import {
+  ACTIVITY_DAY_GRAINS,
   ACTIVITY_PERIODS,
   CANVAS_STATUSES,
   DEVICES,
@@ -39,7 +40,9 @@ import { z } from "zod";
 // 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (Écart §4.3, JOURNAL 2026-10-08).
 // 20 : l'image du fond de la fresque, dans le `welcome` et dans la frame `backgroundImage`, et son opacité, `setBackgroundImageOpacity`
 // et `backgroundImageOpacity` (Écart §4.3, JOURNAL 2026-10-10).
-export const PROTOCOL_VERSION = 20;
+// 21 : le développeur relit un jour passé, `listActivityDay` et `activityDay`, et `firstDayAt` dans `activityHistory`
+// (Écart §4.2 et §4.3, JOURNAL 2026-10-14).
+export const PROTOCOL_VERSION = 21;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -326,6 +329,15 @@ const ListActivityHistoryFrameSchema = z.strictObject({
   period: z.enum(ACTIVITY_PERIODS),
 });
 
+// Écart §4.2 (JOURNAL 2026-10-14) : un jour passé, lu une fois. `dayAt` : un instant de ce jour de Paris, que le gateway
+// ramène à son début ; au-delà du dernier instant d'une `Date` (ECMA-262), `Intl` lève une erreur au lieu d'un refus.
+const LAST_DATE_MS = 8_640_000_000_000_000;
+const ListActivityDayFrameSchema = z.strictObject({
+  t: z.literal("listActivityDay"),
+  requestId: RequestIdSchema,
+  dayAt: TimestampSchema.int().nonnegative().max(LAST_DATE_MS),
+});
+
 // Écart §4.2 (JOURNAL 2026-10-07) : la capacité, comme l'activité, pour le développeur seul.
 const WatchCapacityFrameSchema = z.strictObject({ t: z.literal("watchCapacity"), isWatching: z.boolean() });
 
@@ -357,6 +369,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetGaugeLimitsFrameSchema,
   WatchActivityFrameSchema,
   ListActivityHistoryFrameSchema,
+  ListActivityDayFrameSchema,
   WatchCapacityFrameSchema,
   ListCapacityHistoryFrameSchema,
   PingFrameSchema,
@@ -711,11 +724,44 @@ const CanvasPointSchema = z.object({
 });
 
 // `canvasPoints` : ceux du canvas de la socket, sur la même période ; un point absent vaut zéro. Absent : un gateway d'avant.
+// `firstDayAt` : le début du plus ancien jour gardé (Écart §4.3, JOURNAL 2026-10-14) ; absent, aucun jour n'est gardé.
 const ActivityHistoryFrameSchema = z.object({
   t: z.literal("activityHistory"),
   requestId: RequestIdSchema,
   points: z.array(ActivityPointSchema),
   canvasPoints: z.array(CanvasPointSchema).optional(),
+  firstDayAt: TimestampSchema.optional(),
+});
+
+// Écart §4.3 (JOURNAL 2026-10-14) : un jour passé d'un canvas, avec ses visites au téléphone, que ses courbes ne gardent pas.
+const CanvasDayPointSchema = CanvasPointSchema.extend({ phoneVisits: CountSchema });
+
+// `owner` absent : le canvas, ou le miroir `user:` de son streamer, est introuvable. Le streamer ne vient jamais de l'historique.
+const ActivityDayCanvasSchema = z.object({
+  canvasId: CanvasIdSchema,
+  owner: ActivityUserSchema.optional(),
+  point: CanvasDayPointSchema,
+});
+
+// Le canvas de la socket : son point du jour, absent sans activité, et ses courbes à son propre `grain` (sa rétention est plus courte).
+const ActivityDayHereSchema = z.object({
+  canvasId: CanvasIdSchema,
+  grain: z.enum(ACTIVITY_DAY_GRAINS),
+  point: CanvasDayPointSchema.optional(),
+  points: z.array(CanvasPointSchema),
+});
+
+// `dayAt` : le début du jour de Paris. `day` : son point pour tout LivePlace, absent si aucun n'a été écrit. `points` : ses courbes,
+// à la minute, à l'heure ou aucune, selon `grain`. `canvases` : ceux qui ont un point ce jour-là, sans ordre.
+const ActivityDayFrameSchema = z.object({
+  t: z.literal("activityDay"),
+  requestId: RequestIdSchema,
+  dayAt: TimestampSchema,
+  grain: z.enum(ACTIVITY_DAY_GRAINS),
+  day: ActivityPointSchema.optional(),
+  points: z.array(ActivityPointSchema),
+  canvases: z.array(ActivityDayCanvasSchema),
+  here: ActivityDayHereSchema,
 });
 
 // Écart §4.3 (JOURNAL 2026-10-07) : la capacité, pour le développeur seul. Un taux est un pourcentage de son plafond.
@@ -820,6 +866,7 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   TwitchLiveFrameSchema,
   ActivityFrameSchema,
   ActivityHistoryFrameSchema,
+  ActivityDayFrameSchema,
   CapacityFrameSchema,
   CapacityHistoryFrameSchema,
   ErrorFrameSchema,

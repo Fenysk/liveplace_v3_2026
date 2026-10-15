@@ -1,6 +1,7 @@
 // La section Ce canvas de la fenêtre Développeur (cahier des charges du suivi d'activité, §3 ; JOURNAL 2026-10-07) : le canvas
-// de la socket, ou son archive. En tête son streamer, puis les chiffres de l'instant, l'audience, qui est là, et l'historique.
-// L'affichage seul : `LiveActivitySection` la branche sur le store. Le web affiche, le gateway décide.
+// de la socket, ou son archive. En tête le choix du jour (JOURNAL 2026-10-14) et son streamer, puis les chiffres de l'instant,
+// l'audience, qui est là, et l'historique. L'affichage seul : `LiveActivitySection` la branche sur le store. Le web affiche, le
+// gateway décide.
 
 import type { ActivityPeriod, Timestamp } from "@liveplace/domain";
 import type { ActivityHere } from "@liveplace/domain/ports";
@@ -18,12 +19,16 @@ import {
   toGuestsLine,
 } from "./activity-labels";
 import { canvasChartLinesFor, toCanvasSlots } from "./activity-slots";
+import { toDayChoice } from "./day-choice";
+import { DaySwitch } from "./day-switch";
 import { HistoryBlock, type ShownChart, type ShownHistory } from "./history-block";
+import { PastCanvasDay } from "./past-canvas-day";
 
 export type CanvasSectionProps = {
   view: ActivityWatchView;
   nowMs: Timestamp; // « depuis 12 min »
   onSelectPeriod: (period: ActivityPeriod) => void;
+  onSelectDay: (dayAt: Timestamp | undefined) => void; // `undefined` : aujourd'hui
 };
 
 const NowBlock = ({ here }: { here: ActivityHere }) => (
@@ -41,7 +46,9 @@ const toChart = ({ canvasPoints, period }: ShownHistory): ShownChart | null =>
     ? { lines: canvasChartLinesFor(period), slots: toCanvasSlots(canvasPoints, period, Date.now()) }
     : null;
 
-const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & { here: ActivityHere }) => (
+type TodayProps = Omit<CanvasSectionProps, "onSelectDay">;
+
+const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: TodayProps & { here: ActivityHere }) => (
   <>
     <CanvasActivityOwner owner={here.owner} />
     <section className="lp-setting">
@@ -79,25 +86,40 @@ const HereBlocks = ({ here, view, nowMs, onSelectPeriod }: CanvasSectionProps & 
   </>
 );
 
-export const CanvasSection = ({ view, nowMs, onSelectPeriod }: CanvasSectionProps) => (
+// Aujourd'hui, en direct.
+const TodayBlocks = ({ view, nowMs, onSelectPeriod }: TodayProps) => (
+  <SkeletonSwap
+    isLoading={!view.activity}
+    skeleton={
+      <>
+        <SkeletonTiles />
+        <SkeletonBlock shape="area" />
+      </>
+    }
+  >
+    {view.activity && !view.activity.here && (
+      <span className="lp-type-body lp-muted">
+        Les chiffres de cette fresque ne sont pas disponibles pour l'instant.
+      </span>
+    )}
+    {view.activity?.here && (
+      <HereBlocks here={view.activity.here} view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
+    )}
+  </SkeletonSwap>
+);
+
+// JOURNAL 2026-10-14 : le choix du jour en tête ; un jour passé garde son streamer, tel qu'il est à l'instant, et remplace le
+// reste par les chiffres de ce jour-là.
+export const CanvasSection = ({ view, nowMs, onSelectPeriod, onSelectDay }: CanvasSectionProps) => (
   <div className="lp-window-layout">
-    <SkeletonSwap
-      isLoading={!view.activity}
-      skeleton={
-        <>
-          <SkeletonTiles />
-          <SkeletonBlock shape="area" />
-        </>
-      }
-    >
-      {view.activity && !view.activity.here && (
-        <span className="lp-type-body lp-muted">
-          Les chiffres de cette fresque ne sont pas disponibles pour l'instant.
-        </span>
-      )}
-      {view.activity?.here && (
-        <HereBlocks here={view.activity.here} view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
-      )}
-    </SkeletonSwap>
+    <DaySwitch choice={toDayChoice(view.past?.dayAt, view.firstDayAt, nowMs)} onSelect={onSelectDay} />
+    {view.past ? (
+      <>
+        {view.activity?.here && <CanvasActivityOwner owner={view.activity.here.owner} />}
+        <PastCanvasDay past={view.past} nowMs={nowMs} />
+      </>
+    ) : (
+      <TodayBlocks view={view} nowMs={nowMs} onSelectPeriod={onSelectPeriod} />
+    )}
   </div>
 );

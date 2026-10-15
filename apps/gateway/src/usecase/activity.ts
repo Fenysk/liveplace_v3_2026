@@ -14,6 +14,7 @@ import {
   type Session,
   STREAM_GRACE_MS,
   type Timestamp,
+  toActivityPointStarts,
   toGapMinutes,
   toHourStart,
   toMinuteStart,
@@ -21,6 +22,8 @@ import {
 import type {
   ActivityAudience,
   ActivityCanvas,
+  ActivityDay,
+  ActivityDayCanvas,
   ActivityFrame,
   ActivityGap,
   ActivityHere,
@@ -32,9 +35,11 @@ import type {
   CanvasPixelsMinute,
   ClientSocket,
   ConnectedAccount,
+  DayCanvasPoint,
   DaySignups,
   TwitchLive,
 } from "@liveplace/domain/ports";
+import type { Result } from "@liveplace/shared";
 import { addTo, createCanvasCounts, createRecentPixels } from "./canvas-activity";
 
 // §3 du cahier des charges : la frame part toutes les 2 s, tant que le développeur regarde.
@@ -75,6 +80,12 @@ export interface Activity {
     period: ActivityPeriod,
     canvasId: string,
   ): Promise<ActivityHistory | null>; // `null` : refusé
+  // JOURNAL 2026-10-14 : un jour passé, `dayAt` ramené au début de son jour de Paris ; `null` : refusé, `future` : pas encore venu.
+  listDay(
+    session: Session | null,
+    dayAt: Timestamp,
+    canvasId: string,
+  ): Promise<Result<ActivityDay, "future"> | null>;
   tick(): Promise<void>; // toutes les 2 s : la minute écoulée part dans Redis, la frame aux sockets qui regardent
   start(): Promise<void>; // au démarrage : la température d'avant, les heures vues, et l'élagage
 }
@@ -325,6 +336,14 @@ export function createActivity(deps: ActivityDeps): Activity {
     };
     owners.set(ownerId, { user, readAt: nowMs });
     return user;
+  };
+
+  // JOURNAL 2026-10-14 : le streamer d'un canvas d'un jour passé, sans live ni repli sur son identifiant : un canvas supprimé ou un
+  // miroir `user:` perdu le laisse absent, et la ligne le dit.
+  const getDayCanvas = async ({ canvasId, point }: DayCanvasPoint): Promise<ActivityDayCanvas> => {
+    const ownerId = await getOwnerId(canvasId);
+    const owner = ownerId ? await deps.store.getUser(ownerId) : null;
+    return { canvasId, ...(owner ? { owner } : {}), point };
   };
 
   // Écart §4 (JOURNAL 2026-10-07) : le streamer porte son live Twitch, lu à chaque frame (le miroir `user:` est gardé, pas le live).
@@ -617,11 +636,26 @@ export function createActivity(deps: ActivityDeps): Activity {
     async listHistory(session, period, canvasId) {
       if (!isDeveloper(session?.userId)) return null;
       const nowMs = deps.now();
-      const [points, canvasPoints] = await Promise.all([
+      const [points, canvasPoints, firstDayAt] = await Promise.all([
         deps.store.listActivityHistory(period, nowMs),
         deps.store.listCanvasHistory(canvasId, period, nowMs),
+        deps.store.getFirstDayAt(),
       ]);
-      return { points, canvasPoints };
+      return { points, canvasPoints, ...(firstDayAt === null ? {} : { firstDayAt }) };
+    },
+
+    async listDay(session, dayAt, canvasId) {
+      if (!isDeveloper(session?.userId)) return null;
+      const nowMs = deps.now();
+      const day = toActivityPointStarts(dayAt).day;
+      if (day > toActivityPointStarts(nowMs).day) return { ok: false, error: "future" };
+      const [read, here, listed] = await Promise.all([
+        deps.store.listActivityDay(day, nowMs),
+        deps.store.listCanvasDay(canvasId, day, nowMs),
+        deps.store.listDayCanvases(day),
+      ]);
+      const canvases = await Promise.all(listed.map(getDayCanvas));
+      return { ok: true, value: { dayAt: day, ...read, canvases, here: { canvasId, ...here } } };
     },
 
     // Un tic à la fois : deux écritures d'une même minute en doubleraient les pixels.

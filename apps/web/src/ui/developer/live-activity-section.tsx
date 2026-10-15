@@ -22,7 +22,14 @@ type WatchedSectionProps = { watch: ActivityWatch; sectionId: ActivitySectionId 
 const WatchedSection = ({ watch, sectionId }: WatchedSectionProps) => {
   const view = useSyncExternalStore(watch.subscribe, watch.getView, watch.getView);
   const Section = sectionId === "here" ? CanvasSection : ActivitySection;
-  return <Section view={view} nowMs={Date.now()} onSelectPeriod={watch.selectPeriod} />;
+  return (
+    <Section
+      view={view}
+      nowMs={Date.now()}
+      onSelectPeriod={watch.selectPeriod}
+      onSelectDay={watch.selectDay}
+    />
+  );
 };
 
 type LiveActivitySectionProps = { canvas: CanvasStore; isOpen: boolean; sectionId: ActivitySectionId };

@@ -1,4 +1,4 @@
-import { HOUR_MS, MINUTE_MS, toActivityPointStarts } from "@liveplace/domain";
+import { HOUR_MS, MINUTE_MS, toActivityPointStarts, toNextDayStart } from "@liveplace/domain";
 import type { ActivityPoint, CanvasActivityPoint } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { slotTitle } from "./activity-labels";
@@ -7,7 +7,9 @@ import {
   canvasChartLinesFor,
   chartLinesFor,
   toActivitySlots,
+  toCanvasDaySlots,
   toCanvasSlots,
+  toDaySlots,
 } from "./activity-slots";
 
 const now = Date.UTC(2026, 9, 6, 12, 30, 20);
@@ -179,5 +181,76 @@ describe("the time axis of the history of a canvas (JOURNAL 2026-10-07)", () => 
     ]);
     expect(canvasChartLinesFor("day")).toBe(canvasChartLinesFor("month"));
     expect(titles("all")).toEqual([...titles("day"), "Joueurs actifs"]);
+  });
+});
+
+// JOURNAL 2026-10-14 : un jour passé, de minuit à minuit à Paris.
+describe("the time axis of a past day (JOURNAL 2026-10-14)", () => {
+  const dayAt = toActivityPointStarts(Date.UTC(2026, 9, 5, 12)).day; // le 5/10 : 24 h
+  const longDayAt = toActivityPointStarts(Date.UTC(2026, 9, 25, 12)).day; // le 25/10 : 25 h
+  const shortDayAt = toActivityPointStarts(Date.UTC(2026, 2, 29, 12)).day; // le 29/03 : 23 h
+  const canvasPoint = (at: number): CanvasActivityPoint => ({
+    at,
+    people: 2,
+    streamedMinutes: 1,
+    pixels: 3,
+    visits: 5,
+    visitMinutes: 30,
+    signups: 4,
+  });
+
+  // Tient 1 440 minutes, de minuit à minuit, et laisse vide le créneau d'un point absent
+  it("holds 1,440 minutes, midnight to midnight, and leaves empty the slot of a missing point", () => {
+    const slots = toDaySlots([point(dayAt), point(dayAt + 600 * MINUTE_MS, 7)], "minute", dayAt);
+
+    expect(slots).toHaveLength(1440);
+    expect(slots[0]?.values).toEqual([1, 5, 30, 2, 3, 4]);
+    expect(slots[600]?.values).toEqual([7, 5, 30, 2, 3, 4]);
+    expect(slots[600]?.title).toBe(slotTitle(dayAt + 600 * MINUTE_MS, "day"));
+    expect(slots.filter((slot) => slot !== null)).toHaveLength(2);
+    expect(slots.at(-1)).toBeNull();
+  });
+
+  // Tient 24 créneaux à l'heure, et ignore un point d'un autre jour
+  it("holds 24 slots by the hour, and ignores a point of another day", () => {
+    const slots = toDaySlots(
+      [point(dayAt + 5 * HOUR_MS), point(dayAt + 24 * HOUR_MS), point(dayAt - HOUR_MS)],
+      "hour",
+      dayAt,
+    );
+
+    expect(slots).toHaveLength(24);
+    expect(slots.filter((slot) => slot !== null)).toHaveLength(1);
+    expect(slots[5]).not.toBeNull();
+  });
+
+  // Tient 25 heures ou 1 500 minutes un jour de retour à l'heure d'hiver, 23 heures ou 1 380 minutes l'autre
+  it("holds 25 hours or 1,500 minutes on a day the clocks go back, 23 hours or 1,380 minutes on the other", () => {
+    expect(toDaySlots([], "hour", longDayAt)).toHaveLength(25);
+    expect(toDaySlots([], "minute", longDayAt)).toHaveLength(1500);
+    expect(toDaySlots([], "hour", shortDayAt)).toHaveLength(23);
+    expect(toDaySlots([], "minute", shortDayAt)).toHaveLength(1380);
+    const last = toDaySlots([point(toNextDayStart(longDayAt) - HOUR_MS)], "hour", longDayAt);
+    expect(last.at(-1)).not.toBeNull();
+    expect(
+      toDaySlots([point(toNextDayStart(longDayAt))], "hour", longDayAt).every((slot) => slot === null),
+    ).toBe(true);
+  });
+
+  // Ne donne aucun créneau quand les courbes du jour ne sont plus gardées, même avec des points
+  it("gives no slot when the curves of the day are no longer kept, even with points", () => {
+    expect(toDaySlots([point(dayAt)], "none", dayAt)).toEqual([]);
+    expect(toCanvasDaySlots([canvasPoint(dayAt)], "none", dayAt)).toEqual([]);
+  });
+
+  // Donne zéro à un créneau d'un canvas sans point, de minuit à minuit, et aucun créneau sans aucun point
+  it("gives zero to the slot of a canvas without a point, midnight to midnight, and no slot without any point", () => {
+    const slots = toCanvasDaySlots([canvasPoint(dayAt + 30 * MINUTE_MS)], "minute", dayAt);
+
+    expect(slots).toHaveLength(1440);
+    expect(slots[0]?.values).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(slots[30]?.values).toEqual([2, 5, 30, 1, 3, 4]);
+    expect(toCanvasDaySlots([], "minute", dayAt)).toEqual([]);
+    expect(toCanvasDaySlots([canvasPoint(dayAt + 2 * HOUR_MS)], "hour", longDayAt)).toHaveLength(25);
   });
 });

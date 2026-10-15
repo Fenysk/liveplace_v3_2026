@@ -56,3 +56,8 @@
     padding-left: var(--space-2);
   }
 }
+
+/* Une seule colonne (un jour passé) : le libellé prend la place que la seconde colonne laissait, sur PC comme sur mobile */
+.lp-stat-table--single thead th:first-child {
+  width: 50%;
+}

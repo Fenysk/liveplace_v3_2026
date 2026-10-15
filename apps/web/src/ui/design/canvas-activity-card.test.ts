@@ -54,4 +54,27 @@ describe("the owner of a canvas in the developer's activity (Écart §4, JOURNAL
     expect(row).not.toContain("Streamé");
     expect(row).not.toContain("OBS");
   });
+
+  // Une ligne d'un jour passé n'a pas de chevron : personne n'est gardé ; ses chiffres et son streamer restent (JOURNAL 2026-10-14)
+  it("gives the row of a past day no chevron, nobody being kept: its figures and owner stay", () => {
+    const row = renderToString(
+      createElement(CanvasActivityCard, { owner, facts: ["3 h 35 min streamées", "9 personnes au pic"] }),
+    );
+
+    expect(row).toContain("Kalyss");
+    expect(row).toContain("3 h 35 min streamées");
+    expect(row).not.toContain("lp-canvas-activity-toggle");
+    expect(row).not.toContain("Qui est dessus");
+    expect(row).not.toContain("lp-canvas-activity-accounts");
+  });
+
+  // Dit « Streamer inconnu » quand le streamer est introuvable, sans profil ni lien à suivre
+  it("says Streamer inconnu when the owner cannot be found, with no profile or link to follow", () => {
+    const row = renderToString(createElement(CanvasActivityCard, { owner: null, facts: ["12 visites"] }));
+
+    expect(row).toContain("Streamer inconnu");
+    expect(row).toContain("12 visites");
+    expect(row).not.toContain("<a ");
+    expect(row).not.toContain("lp-profile");
+  });
 });

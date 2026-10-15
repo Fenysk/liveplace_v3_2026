@@ -1224,3 +1224,105 @@ describe("the origin of a moderator, for whoever moderates", () => {
     expect(decodeServerFrame(reportsWith({})).ok).toBe(false);
   });
 });
+
+// Protocole 21 (écart §4.2 et §4.3, JOURNAL 2026-10-14) : le développeur relit un jour passé.
+describe("past day frames", () => {
+  const listDay = { t: "listActivityDay", requestId: "day-1", dayAt: 1_759_615_200_000 };
+  const point = {
+    at: listDay.dayAt,
+    people: 9,
+    streamed: 2,
+    pixels: 50,
+    signups: 1,
+    visits: 5,
+    phoneVisits: 1,
+    visitMinutes: 17,
+    activeAccounts: 3,
+    activePlayers: 1,
+    activeStreamers: 1,
+  };
+  // Un point de courbe d'un canvas, et son point du jour, qui porte aussi ses visites au téléphone
+  const curvePoint = {
+    at: listDay.dayAt,
+    people: 3,
+    streamedMinutes: 90,
+    pixels: 12,
+    visits: 2,
+    visitMinutes: 6,
+    signups: 0,
+    activePlayers: 1,
+  };
+  const canvasPoint = { ...curvePoint, phoneVisits: 1 };
+  const activityDay = {
+    t: "activityDay",
+    requestId: "day-1",
+    dayAt: listDay.dayAt,
+    grain: "minute",
+    day: point,
+    points: [point],
+    canvases: [
+      {
+        canvasId: "c1",
+        owner: { userId: "68710381", login: "fenysk", displayName: "Fenysk" },
+        point: canvasPoint,
+      },
+      { canvasId: "c2", point: canvasPoint },
+    ],
+    here: { canvasId: "c1", grain: "hour", point: canvasPoint, points: [curvePoint] },
+  };
+
+  // Passe au protocole 21 : une page en 20 se recharge
+  it("is protocol 21 or later: a page in 20 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(21);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 20, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Demande un jour par un instant de ce jour et sa requête, entier et dans ce qu'une Date accepte, rien d'autre dans la frame
+  it("asks a day by an instant of it and its request, whole and within what a Date accepts, nothing else in the frame", () => {
+    expect(decodeClientFrame(listDay)).toEqual({ ok: true, value: listDay });
+    expect(decodeClientFrame({ ...listDay, dayAt: 0 }).ok).toBe(true);
+    expect(decodeClientFrame({ ...listDay, dayAt: 8_640_000_000_000_000 }).ok).toBe(true);
+    for (const dayAt of [-1, 1.5, 8_640_000_000_000_001, "2026-10-13", Number.NaN, null])
+      expect(decodeClientFrame({ ...listDay, dayAt }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "listActivityDay", dayAt: 1 }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "listActivityDay", requestId: "r" }).ok).toBe(false);
+    expect(decodeClientFrame({ ...listDay, period: "day" }).ok).toBe(false);
+  });
+
+  // Rend le jour avec sa requête : son point, ses courbes, ses canvas avec leur streamer, et le canvas de la socket
+  it("answers the day with its request: its point, its curves, its canvases with their owner, and the socket's canvas", () => {
+    expect(decodeServerFrame(activityDay)).toEqual({ ok: true, value: activityDay });
+    expect(decodeServerFrame({ ...activityDay, day: undefined }).ok).toBe(true);
+    expect(decodeServerFrame({ ...activityDay, here: { ...activityDay.here, point: undefined } }).ok).toBe(
+      true,
+    );
+    expect(decodeServerFrame({ ...activityDay, requestId: undefined }).ok).toBe(false);
+  });
+
+  // Refuse un jour sans canvas de la socket, un détail inconnu, et un nombre négatif, à virgule ou manquant
+  it("refuses a day without the socket's canvas, an unknown grain, and a negative, fractional or missing number", () => {
+    const withCanvasPoint = (changes: object) => ({
+      ...activityDay,
+      canvases: [{ canvasId: "c1", point: { ...canvasPoint, ...changes } }],
+    });
+
+    expect(decodeServerFrame({ ...activityDay, here: undefined }).ok).toBe(false);
+    expect(decodeServerFrame({ ...activityDay, grain: "week" }).ok).toBe(false);
+    for (const grain of ["minute", "hour", "none"])
+      expect(decodeServerFrame({ ...activityDay, grain }).ok).toBe(true);
+    expect(decodeServerFrame(withCanvasPoint({ pixels: -1 })).ok).toBe(false);
+    expect(decodeServerFrame(withCanvasPoint({ phoneVisits: 0.5 })).ok).toBe(false);
+    expect(decodeServerFrame(withCanvasPoint({ phoneVisits: undefined })).ok).toBe(false);
+  });
+
+  // Porte avec l'historique d'une période le plus ancien jour gardé, et s'en passe quand aucun jour n'est gardé
+  it("carries the oldest kept day with the history of a period, and does without it when no day is kept", () => {
+    const history = { t: "activityHistory", requestId: "r", points: [] };
+
+    expect(decodeServerFrame({ ...history, firstDayAt: listDay.dayAt })).toEqual({
+      ok: true,
+      value: { ...history, firstDayAt: listDay.dayAt },
+    });
+    expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
+  });
+});

@@ -1,11 +1,22 @@
 // Les mots de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07) : des nombres au format français,
 // des textes courts.
 
-import { type ActivityPeriod, MINUTE_MS, type Role, type Timestamp } from "@liveplace/domain";
+import {
+  type ActivityPeriod,
+  MINUTE_MS,
+  type Role,
+  type Timestamp,
+  toActivityPointStarts,
+  toParisDay,
+  toPreviousDayStart,
+} from "@liveplace/domain";
 import type {
   ActivityAudience,
   ActivityCanvas,
+  ActivityDayCanvas,
+  ActivityPoint,
   CanvasAudience,
+  CanvasDayPoint,
   ConnectedAccount,
 } from "@liveplace/domain/ports";
 import type { CanvasActivityAccount, CanvasActivityCardProps } from "../design/canvas-activity-card";
@@ -139,6 +150,54 @@ export function toCanvasAudienceRows(audience: CanvasAudience): StatTableRow[] {
   ];
 }
 
+// Un jour passé (JOURNAL 2026-10-14) : le même tableau, réduit à une colonne, celle du jour.
+const firstColumn = (rows: StatTableRow[]): StatTableRow[] =>
+  rows.map(({ label, cells }) => ({ label, cells: cells.slice(0, 1) }));
+
+// Un jour sans point vaut zéro, comme un canvas sans point.
+export function toDayAudienceRows(day: ActivityPoint | undefined): StatTableRow[] {
+  const counts = {
+    visits: day?.visits ?? 0,
+    phoneVisits: day?.phoneVisits ?? 0,
+    visitMinutes: day?.visitMinutes ?? 0,
+    activeAccounts: day?.activeAccounts ?? 0,
+    activePlayers: day?.activePlayers ?? 0,
+    activeStreamers: day?.activeStreamers ?? 0,
+  };
+  return firstColumn(toAudienceRows({ today: counts, month: counts }));
+}
+
+export function toCanvasDayAudienceRows(point: CanvasDayPoint): StatTableRow[] {
+  const { visits, phoneVisits, visitMinutes, activePlayers = 0, signups } = point;
+  const counts = { visits, phoneVisits, visitMinutes, activePlayers, signups };
+  return firstColumn(toCanvasAudienceRows({ today: counts, month: counts }));
+}
+
+// Les fresques d'un jour : celles qui ont le plus streamé d'abord, puis le plus de monde, puis le plus de pixels.
+export const sortDayCanvases = (canvases: readonly ActivityDayCanvas[]): ActivityDayCanvas[] =>
+  [...canvases].sort(
+    (left, right) =>
+      right.point.streamedMinutes - left.point.streamedMinutes ||
+      right.point.people - left.point.people ||
+      right.point.pixels - left.point.pixels ||
+      (left.canvasId < right.canvasId ? -1 : 1),
+  );
+
+// Une fresque d'un jour passé : son streamer, sans live, et ses chiffres du jour.
+export const toDayCanvasCard = ({
+  owner,
+  point,
+}: ActivityDayCanvas): Pick<CanvasActivityCardProps, "owner" | "facts"> => ({
+  owner: owner ?? null,
+  facts: [
+    `${formatDuration(point.streamedMinutes)} streamées`,
+    `${counted(point.people, "personne", "personnes")} au pic`,
+    placedPixelsLabel(point.pixels),
+    visitsLabel(point.visits),
+    signupsLabel(point.signups),
+  ],
+});
+
 const ROLE_LABELS: Record<Role, string> = {
   owner: "Streamer",
   moderator: "Modérateur",
@@ -183,6 +242,26 @@ const DAY_TITLE = new Intl.DateTimeFormat("fr-FR", {
 
 export const slotTitle = (at: Timestamp, period: ActivityPeriod): string =>
   (period === "all" ? DAY_TITLE : MOMENT_TITLE).format(at);
+
+// Un jour passé (JOURNAL 2026-10-14) : « lun. 13 oct. », l'année seulement hors de l'année en cours.
+const DAY_DATE = new Intl.DateTimeFormat("fr-FR", {
+  timeZone: "Europe/Paris",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
+export const formatDayDate = (dayAt: Timestamp, nowMs: Timestamp): string =>
+  (toParisDay(dayAt).slice(0, 4) === toParisDay(nowMs).slice(0, 4) ? DAY_DATE : DAY_TITLE).format(dayAt);
+
+// Le jour choisi dans la fenêtre : « Aujourd'hui », « Hier », sinon sa date.
+export function formatDayLabel(dayAt: Timestamp, nowMs: Timestamp): string {
+  const todayAt = toActivityPointStarts(nowMs).day;
+  if (dayAt >= todayAt) return "Aujourd'hui";
+  return dayAt === toPreviousDayStart(todayAt) ? "Hier" : formatDayDate(dayAt, nowMs);
+}
+
+export const DAY_CURVES_GONE = "Les courbes de ce jour ne sont plus gardées, seulement ses totaux.";
 
 // Chaque compte connecté, avec son rôle et depuis quand.
 export const toActivityAccounts = (

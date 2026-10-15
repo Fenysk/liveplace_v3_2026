@@ -3,7 +3,7 @@
 
 import type { ActivityPeriod } from "@liveplace/domain";
 import type { ActivityHere } from "@liveplace/domain/ports";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import type { CapacityWatchView } from "../../state/capacity-watch";
 import { ActivitySection } from "../developer/activity-section";
@@ -14,6 +14,7 @@ import {
   DeveloperWindow,
   FIRST_DEVELOPER_SECTION,
 } from "../developer/developer-window";
+import { dayStartAgo, type SampleDayVariant, sampleDay } from "./activity-day-samples";
 import { quietHere, sampleCanvasPoints, sampleFrame, sampleHere, samplePoints } from "./activity-samples";
 import { type CapacityVariant, sampleCapacityFrame, sampleCapacityPoints } from "./capacity-samples";
 import { noop } from "./design-fixtures";
@@ -28,15 +29,53 @@ import {
   useNowMs,
 } from "./entry-layout";
 
+// Le plus ancien jour gardé des exemples : les flèches ne s'arrêtent qu'à lui.
+const FIRST_DAY_AGO = 400;
+const DAY_LOAD_MS = 900; // le temps que prend un jour à se charger dans l'exemple
+
+// Un jour passé choisi dans l'exemple, et s'il est encore en lecture.
+type DaySelection = { dayAt: number; isLoading: boolean } | undefined;
+
+// `daysAgo` : la scène s'ouvre sur ce jour passé, absent sur aujourd'hui. `pending` : `first`, le premier jour ne finit jamais de
+// charger ; `next`, un autre jour qu'il remplace ne finit jamais de charger, le premier reste grisé. Sinon, chaque jour choisi
+// charge un instant, puis se montre.
 type SectionSceneProps = {
   nowMs: number;
   sectionId: Exclude<DeveloperSectionId, "capacity">;
   here?: ActivityHere;
+  daysAgo?: number;
+  dayVariant?: SampleDayVariant;
+  pending?: "first" | "next";
 };
 
-// La section telle que le développeur la voit, la période choisie redonnant ses courbes. `here` : le canvas de la socket.
-const SectionScene = ({ nowMs, sectionId, here }: SectionSceneProps) => {
+// La section telle que le développeur la voit, la période choisie redonnant ses courbes, et les flèches un autre jour.
+// `here` : le canvas de la socket.
+const SectionScene = ({
+  nowMs,
+  sectionId,
+  here,
+  daysAgo,
+  dayVariant = "busy",
+  pending,
+}: SectionSceneProps) => {
   const [period, setPeriod] = useState<ActivityPeriod>("day");
+  const [selection, setSelection] = useState<DaySelection>(() =>
+    daysAgo === undefined
+      ? undefined
+      : { dayAt: dayStartAgo(nowMs, daysAgo), isLoading: pending === "first" },
+  );
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const selectDay = (dayAt: number | undefined) => {
+    clearTimeout(timer.current);
+    setSelection(dayAt === undefined ? undefined : { dayAt, isLoading: true });
+    if (dayAt !== undefined && !pending)
+      timer.current = setTimeout(() => setSelection({ dayAt, isLoading: false }), DAY_LOAD_MS);
+  };
+  // `next` : dès l'ouverture, on choisit le jour d'avant, qui ne se charge pas.
+  useEffect(() => {
+    if (pending === "next") setSelection({ dayAt: dayStartAgo(nowMs, (daysAgo ?? 0) + 1), isLoading: true });
+  }, [pending, nowMs, daysAgo]);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const view = useMemo<ActivityWatchView>(
     () => ({
       activity: sampleFrame(nowMs, here),
@@ -46,11 +85,18 @@ const SectionScene = ({ nowMs, sectionId, here }: SectionSceneProps) => {
         points: samplePoints(period, nowMs),
         canvasPoints: sampleCanvasPoints(period, nowMs),
       },
+      firstDayAt: dayStartAgo(nowMs, FIRST_DAY_AGO),
+      past: selection && {
+        dayAt: selection.dayAt,
+        day: selection.isLoading
+          ? { status: "loading" }
+          : { status: "ready", ...sampleDay(selection.dayAt, nowMs, dayVariant) },
+      },
     }),
-    [period, nowMs, here],
+    [period, nowMs, here, selection, dayVariant],
   );
   const Section = sectionId === "here" ? CanvasSection : ActivitySection;
-  return <Section view={view} nowMs={nowMs} onSelectPeriod={setPeriod} />;
+  return <Section view={view} nowMs={nowMs} onSelectPeriod={setPeriod} onSelectDay={selectDay} />;
 };
 
 type CapacitySceneProps = { nowMs: number; variant: CapacityVariant; initialPeriod?: ActivityPeriod };
@@ -103,9 +149,9 @@ export const DeveloperEntry = () => {
   return (
     <Entry
       slug="developpeur"
-      components={["DeveloperWindow", "CanvasSection", "ActivitySection", "CapacitySection"]}
-      file="ui/developer/{developer-window,canvas-section,activity-section,capacity-section}.tsx"
-      note="Ses trois sections à lui : Cette fresque, où elle s'ouvre, Tout LivePlace et Capacité. Les chiffres bougent toutes les 2 s dans le jeu."
+      components={["DeveloperWindow", "CanvasSection", "ActivitySection", "CapacitySection", "DaySwitch"]}
+      file="ui/developer/{developer-window,canvas-section,activity-section,capacity-section,day-switch,past-day}.tsx"
+      note="Ses trois sections à lui : Cette fresque, où elle s'ouvre, Tout LivePlace et Capacité. Les chiffres bougent toutes les 2 s dans le jeu ; les flèches de la date, en tête de Cette fresque et de Tout LivePlace, relisent un jour passé."
     >
       <Block title="La fenêtre">
         <StateRow
@@ -142,12 +188,82 @@ export const DeveloperEntry = () => {
           detail="La section le dit simplement."
         >
           <InWindow>
-            <CanvasSection view={noCanvas} nowMs={nowMs} onSelectPeriod={noop} />
+            <CanvasSection view={noCanvas} nowMs={nowMs} onSelectPeriod={noop} onSelectDay={noop} />
           </InWindow>
         </StateRow>
         <StateRow name="Cette fresque avant la première frame et le premier historique">
           <InWindow>
-            <CanvasSection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} />
+            <CanvasSection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} onSelectDay={noop} />
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Cette fresque, un jour passé"
+        note="Les flèches de part et d'autre de la date, en tête des deux sections : le même jour pour Cette fresque et Tout LivePlace, remis à aujourd'hui à la fermeture de la fenêtre. Un jour passé se lit une fois à son choix. Pas de Qui est là : la liste des connectés n'est jamais gardée."
+      >
+        <StateRow
+          name="Cette fresque hier"
+          detail="Son streamer en tête, les chiffres du jour, l'audience en une colonne, les courbes de minuit à minuit. Les flèches choisissent un autre jour : il charge un instant, l'ancien reste grisé."
+          isDemo
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={1} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque hier, à la largeur de la grande fenêtre"
+          detail="L'audience au même endroit qu'aujourd'hui."
+        >
+          <InLargeWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={1} />
+          </InLargeWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque hier sur mobile"
+          detail="Les tuiles par deux, la date entre ses flèches."
+        >
+          <InPhone isWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={1} />
+          </InPhone>
+        </StateRow>
+        <StateRow
+          name="Cette fresque il y a 20 jours"
+          detail="Hors des 2 jours de minutes d'une fresque : les courbes sont à l'heure."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={20} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque le plus ancien jour gardé"
+          detail="La flèche précédente est grisée. Les courbes ne sont plus gardées, seulement les totaux."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={FIRST_DAY_AGO} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque un jour sans activité"
+          detail="« Aucune activité sur cette fresque ce jour-là »."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={3} dayVariant="quiet" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque, premier chargement d'un jour"
+          detail="Les tuiles et la zone, en gris, après 200 ms."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={1} pending="first" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Cette fresque, un autre jour se charge"
+          detail="Le jour d'avant reste, grisé : rien ne saute."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="here" here={here} daysAgo={1} pending="next" />
           </InWindow>
         </StateRow>
       </Block>
@@ -170,7 +286,7 @@ export const DeveloperEntry = () => {
           detail="Les tuiles de chiffres et les zones, en gris, après 200 ms."
         >
           <InWindow>
-            <ActivitySection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} />
+            <ActivitySection view={WAITING} nowMs={nowMs} onSelectPeriod={noop} onSelectDay={noop} />
           </InWindow>
         </StateRow>
         <StateRow name="Personne nulle part, l'historique en échec">
@@ -183,7 +299,78 @@ export const DeveloperEntry = () => {
               }}
               nowMs={nowMs}
               onSelectPeriod={noop}
+              onSelectDay={noop}
             />
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Tout LivePlace, un jour passé"
+        note="Les chiffres du jour à la place de Maintenant, l'audience en une colonne titrée par la date, les fresques actives ce jour-là avec leur streamer (sans son live de l'instant), puis les courbes de minuit à minuit. Pas de choix de période."
+      >
+        <StateRow
+          name="Tout LivePlace hier"
+          detail="Les fresques par minutes streamées, puis personnes, puis pixels. Une fresque archivée depuis y figure aussi ; sans streamer retrouvé, la ligne dit « Streamer inconnu »."
+          isDemo
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={1} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace hier, à la largeur de la grande fenêtre"
+          detail="L'audience et les fresques côte à côte."
+        >
+          <InLargeWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={1} />
+          </InLargeWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace hier sur mobile"
+          detail="Les fresques en cartes, leurs chiffres sous le streamer."
+        >
+          <InPhone isWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={1} />
+          </InPhone>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace il y a 20 jours"
+          detail="Hors des 7 jours de minutes : les courbes sont à l'heure."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={20} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace le plus ancien jour gardé"
+          detail="La flèche précédente est grisée. Les courbes ne sont plus gardées, seulement les totaux."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={FIRST_DAY_AGO} />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace un jour sans fresque active"
+          detail="« Aucune fresque active ce jour-là »."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={3} dayVariant="quiet" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace, premier chargement d'un jour"
+          detail="Les tuiles et les zones, en gris, après 200 ms."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={1} pending="first" />
+          </InWindow>
+        </StateRow>
+        <StateRow
+          name="Tout LivePlace, un autre jour se charge"
+          detail="Le jour d'avant reste, grisé : rien ne saute."
+        >
+          <InWindow>
+            <SectionScene nowMs={nowMs} sectionId="all" here={here} daysAgo={1} pending="next" />
           </InWindow>
         </StateRow>
       </Block>

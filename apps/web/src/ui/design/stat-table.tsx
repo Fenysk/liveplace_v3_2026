@@ -1,6 +1,7 @@
 // Un tableau de chiffres (l'audience de la section Activité, JOURNAL 2026-10-07) : une ligne par chiffre, une colonne par
 // période, et sous une valeur une précision facultative. Sur mobile, il garde ses colonnes.
 
+import { classNames } from "./class-names";
 import { RollingNumber } from "./rolling-number";
 
 export type StatTableCell = { value: string; note?: string | undefined };
@@ -14,7 +15,7 @@ type StatTableProps = {
 };
 
 export const StatTable = ({ caption, columns, rows }: StatTableProps) => (
-  <table className="lp-stat-table">
+  <table className={classNames("lp-stat-table", columns.length === 1 && "lp-stat-table--single")}>
     <caption className="lp-visually-hidden">{caption}</caption>
     <thead>
       <tr>

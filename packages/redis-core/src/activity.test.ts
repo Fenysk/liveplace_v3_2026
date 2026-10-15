@@ -1045,3 +1045,259 @@ describe("the time a canvas was seen streamed, in Redis (écart §5.1, JOURNAL 2
     expect(await redis.hgetall(keys.seen)).toEqual({ "canvas-4242": String(now) });
   });
 });
+
+// JOURNAL 2026-10-14 : un jour passé se lit dans ce qui est déjà gardé, rien de plus.
+describe("a past day in Redis (écart §4.2, JOURNAL 2026-10-14)", () => {
+  const pastDayAt = toActivityPointStarts(now - 2 * DAY_MS).day; // le 4/10 à Paris
+  const at = pastDayAt + 10 * HOUR_MS + 5 * MINUTE_MS; // 10 h 05 ce jour-là
+  // Par ordre des caractères, que SCAN ne garantit pas : la langue du poste n'y change rien.
+  const byCanvasId = (left: { canvasId: string }, right: { canvasId: string }) =>
+    left.canvasId < right.canvasId ? -1 : 1;
+
+  // Rend le point du jour de tout LivePlace avec ses distincts, et ses courbes minute par minute, tout le jour étant dans la rétention
+  it("gives the day's point for the whole with its distinct counts, and its curves minute by minute", async () => {
+    const { store, signups } = stores();
+    await store.storeActivityMinute(
+      minute(at, {
+        people: 7,
+        streamed: 1,
+        pixels: 40,
+        visits: 3,
+        phoneVisits: 1,
+        visitMinutes: 12,
+        ...ids(["a1", "a2"], ["p1"], ["c1"]),
+      }),
+    );
+    await store.storeActivityMinute(
+      minute(at + MINUTE_MS, { people: 9, pixels: 10, visits: 2, visitMinutes: 5, ...ids(["a2", "a3"]) }),
+    );
+    await signups.storeSignup({ nowMs: at });
+
+    expect(await store.listActivityDay(pastDayAt, now)).toEqual({
+      grain: "minute",
+      day: {
+        at: pastDayAt,
+        people: 9,
+        streamed: 1,
+        pixels: 50,
+        signups: 1,
+        visits: 5,
+        phoneVisits: 1,
+        visitMinutes: 17,
+        activeAccounts: 3,
+        activePlayers: 1,
+        activeStreamers: 1,
+      },
+      points: [
+        { at, people: 7, streamed: 1, pixels: 40, signups: 1, visits: 3, phoneVisits: 1, visitMinutes: 12 },
+        {
+          at: at + MINUTE_MS,
+          people: 9,
+          streamed: 0,
+          pixels: 10,
+          signups: 0,
+          visits: 2,
+          phoneVisits: 0,
+          visitMinutes: 5,
+        },
+      ],
+    });
+  });
+
+  // Rend un jour sans point comme tel : aucun point, aucune courbe, et surtout aucun zéro inventé
+  it("gives a day without a point as it is: no point, no curve, no zero made up", async () => {
+    const { store } = stores();
+    await store.storeActivityMinute(minute(at, { people: 2 }));
+
+    expect(await store.listActivityDay(toActivityPointStarts(pastDayAt - 1).day, now)).toEqual({
+      grain: "minute",
+      points: [],
+    });
+  });
+
+  // Passe aux heures quand le jour sort de la rétention des minutes, et à rien quand il sort de celle des heures
+  it("falls back to hours when the day leaves the minutes' retention, and to nothing past the hours' one", async () => {
+    const { store } = stores();
+    const tenDaysAgo = toActivityPointStarts(now - 10 * DAY_MS).day;
+    const longAgo = toActivityPointStarts(now - 400 * DAY_MS).day;
+    for (const dayStart of [tenDaysAgo, longAgo])
+      await store.storeActivityMinute(
+        minute(dayStart + 10 * HOUR_MS + 5 * MINUTE_MS, { people: 4, pixels: 6 }),
+      );
+
+    const hourly = await store.listActivityDay(tenDaysAgo, now);
+    expect(hourly.grain).toBe("hour");
+    expect(hourly.points).toEqual([
+      expect.objectContaining({ at: tenDaysAgo + 10 * HOUR_MS, people: 4, pixels: 6 }),
+    ]);
+    expect(hourly.day).toMatchObject({ at: tenDaysAgo, people: 4, pixels: 6 });
+    const beyond = await store.listActivityDay(longAgo, now);
+    expect(beyond).toMatchObject({ grain: "none", points: [], day: { at: longAgo, people: 4, pixels: 6 } });
+  });
+
+  // Tranche aux bornes exactes des rétentions : le premier instant gardé est encore gardé
+  it("cuts at the exact bounds of the retentions: the first kept instant is still kept", async () => {
+    const { store } = stores();
+
+    expect((await store.listActivityDay(pastDayAt, pastDayAt + ACTIVITY_MINUTES_RETENTION_MS)).grain).toBe(
+      "minute",
+    );
+    expect(
+      (await store.listActivityDay(pastDayAt, pastDayAt + ACTIVITY_MINUTES_RETENTION_MS + 1)).grain,
+    ).toBe("hour");
+    expect((await store.listActivityDay(pastDayAt, pastDayAt + ACTIVITY_HOURS_RETENTION_MS)).grain).toBe(
+      "hour",
+    );
+    expect((await store.listActivityDay(pastDayAt, pastDayAt + ACTIVITY_HOURS_RETENTION_MS + 1)).grain).toBe(
+      "none",
+    );
+    expect(
+      (await store.listCanvasDay("c1", pastDayAt, pastDayAt + ACTIVITY_CANVAS_MINUTES_RETENTION_MS)).grain,
+    ).toBe("minute");
+    expect(
+      (await store.listCanvasDay("c1", pastDayAt, pastDayAt + ACTIVITY_CANVAS_MINUTES_RETENTION_MS + 1))
+        .grain,
+    ).toBe("hour");
+  });
+
+  // Un jour de changement d'heure compte ses 25 ou ses 23 heures, ni plus ni moins, à la minute comme à l'heure
+  it("counts the 25 or 23 hours of a clock-change day, no more, no less, by minute and by hour", async () => {
+    const { store } = stores();
+    const longDay = toActivityPointStarts(Date.UTC(2026, 9, 25, 12)).day; // le 25/10 : 25 h
+    const shortDay = toActivityPointStarts(Date.UTC(2026, 2, 29, 12)).day; // le 29/03 : 23 h
+    const lastMinuteOf = (dayStart: number, hours: number) => dayStart + hours * HOUR_MS - MINUTE_MS;
+    for (const [dayStart, hours] of [
+      [longDay, 25],
+      [shortDay, 23],
+    ] as const)
+      for (const written of [
+        dayStart,
+        lastMinuteOf(dayStart, hours),
+        lastMinuteOf(dayStart, hours) + MINUTE_MS,
+      ])
+        await store.storeActivityMinute(minute(written, { people: 1 }));
+
+    const longMinutes = await store.listActivityDay(longDay, longDay + HOUR_MS);
+    const shortMinutes = await store.listActivityDay(shortDay, shortDay + HOUR_MS);
+    expect(longMinutes.points.map(({ at: start }) => start)).toEqual([longDay, lastMinuteOf(longDay, 25)]);
+    expect(shortMinutes.points.map(({ at: start }) => start)).toEqual([shortDay, lastMinuteOf(shortDay, 23)]);
+    const longHours = await store.listActivityDay(longDay, longDay + 30 * DAY_MS);
+    const shortHours = await store.listActivityDay(shortDay, shortDay + 30 * DAY_MS);
+    expect(longHours.points.map(({ at: start }) => start)).toEqual([longDay, longDay + 24 * HOUR_MS]);
+    expect(shortHours.points.map(({ at: start }) => start)).toEqual([shortDay, shortDay + 22 * HOUR_MS]);
+  });
+
+  // Rend le point d'un canvas pour le jour avec ses visites au téléphone et ses joueurs actifs, et ses courbes à sa propre rétention
+  it("gives a canvas's point for the day with its phone visits and active players, and its curves at its own retention", async () => {
+    const { store } = stores();
+    const dayBefore = toActivityPointStarts(now - DAY_MS).day;
+    const dayBeforeAt = dayBefore + 9 * HOUR_MS + 30 * MINUTE_MS;
+    await store.storeActivityMinute(
+      inMinute(dayBeforeAt, {
+        c1: canvasMinute({
+          people: 5,
+          pixels: 30,
+          visits: 3,
+          phoneVisits: 2,
+          visitMinutes: 12,
+          streamedMinutes: 1,
+          playerIds: new Set(["p1", "p2"]),
+        }),
+      }),
+    );
+    await store.storeActivityMinute(
+      inMinute(dayBeforeAt + MINUTE_MS, {
+        c1: canvasMinute({
+          people: 3,
+          pixels: 4,
+          visits: 1,
+          visitMinutes: 2,
+          playerIds: new Set(["p2", "p3"]),
+        }),
+      }),
+    );
+
+    const point = {
+      at: dayBefore,
+      people: 5,
+      streamedMinutes: 1,
+      pixels: 34,
+      visits: 4,
+      phoneVisits: 2,
+      visitMinutes: 14,
+      signups: 0,
+      activePlayers: 3,
+    };
+    const minutes = await store.listCanvasDay("c1", dayBefore, now);
+    expect(minutes.grain).toBe("minute");
+    expect(minutes.point).toEqual(point);
+    expect(minutes.points.map((canvasPoint) => canvasPoint.at)).toEqual([
+      dayBeforeAt,
+      dayBeforeAt + MINUTE_MS,
+    ]);
+    const threeDaysAgo = toActivityPointStarts(now - 3 * DAY_MS).day; // au-delà des 2 jours de minutes du canvas
+    expect(await store.listCanvasDay("c1", threeDaysAgo, now)).toEqual({ grain: "hour", points: [] });
+  });
+
+  // Rend un canvas sans rien ce jour-là sans point, et lui donne un point dès qu'un nouveau compte y est venu
+  it("gives a canvas with nothing that day no point, and one as soon as a new account came to it", async () => {
+    const { keys, store, signups } = stores();
+
+    expect(await store.listCanvasDay("c-quiet", pastDayAt, now)).toEqual({ grain: "hour", points: [] });
+    await signups.storeSignup({ nowMs: at, discoveredViaUserId: "owner-1", discoveredViaCanvasId: "c-new" });
+
+    expect((await store.listCanvasDay("c-new", pastDayAt, now)).point).toEqual({
+      at: pastDayAt,
+      people: 0,
+      streamedMinutes: 0,
+      pixels: 0,
+      visits: 0,
+      phoneVisits: 0,
+      visitMinutes: 0,
+      signups: 1,
+      activePlayers: 0,
+    });
+    expect(await redis.exists(keys.canvas("c-quiet").days, keys.canvas("c-quiet").minutes)).toBe(0);
+  });
+
+  // Liste les canvas qui ont un point ce jour-là par un balayage, un identifiant avec « : » comme un autre, sans toucher aux autres jours ni aux autres préfixes
+  it("lists the canvases that have a point that day by a scan, a colon in an id like any other, leaving other days and prefixes alone", async () => {
+    const { store, signups } = stores();
+    const other = stores();
+    const nextDay = toActivityPointStarts(pastDayAt + 30 * HOUR_MS).day;
+    await store.storeActivityMinute(
+      inMinute(at, {
+        c1: canvasMinute({ people: 2, pixels: 8, streamedMinutes: 1 }),
+        "c:2": canvasMinute({ people: 1 }),
+      }),
+    );
+    await store.storeActivityMinute(inMinute(nextDay + HOUR_MS, { c3: canvasMinute({ people: 6 }) }));
+    await signups.storeSignup({ nowMs: at, discoveredViaCanvasId: "c-signup" });
+    await other.store.storeActivityMinute(inMinute(at, { c9: canvasMinute({ people: 1 }) }));
+
+    const listed = (await store.listDayCanvases(pastDayAt)).sort(byCanvasId);
+
+    expect(listed.map(({ canvasId }) => canvasId)).toEqual(["c-signup", "c1", "c:2"]);
+    expect(listed.find(({ canvasId }) => canvasId === "c1")?.point).toMatchObject({
+      at: pastDayAt,
+      people: 2,
+      pixels: 8,
+      streamedMinutes: 1,
+    });
+    expect(listed.find(({ canvasId }) => canvasId === "c-signup")?.point).toMatchObject({ signups: 1 });
+    expect((await store.listDayCanvases(nextDay)).map(({ canvasId }) => canvasId)).toEqual(["c3"]);
+    expect(await store.listDayCanvases(pastDayAt - DAY_MS)).toEqual([]);
+  });
+
+  // Rend le début du plus ancien jour qui a un point, ni celui d'un jour qui n'a que ses distincts, ni rien quand il n'y en a pas
+  it("gives the start of the oldest day with a point, not a day with only its distinct counts, and nothing when there is none", async () => {
+    const { keys, store } = stores();
+    expect(await store.getFirstDayAt()).toBeNull();
+
+    await store.storeActivityMinute(minute(now - 40 * DAY_MS, { people: 1 }));
+    await store.storeActivityMinute(minute(now - 2 * MINUTE_MS, { people: 1 }));
+    await redis.hset(keys.days, toActiveField(toActivityPointStarts(now - 90 * DAY_MS).day), "1,1,1");
+
+    expect(await store.getFirstDayAt()).toBe(toActivityPointStarts(now - 40 * DAY_MS).day);
+  });
+});

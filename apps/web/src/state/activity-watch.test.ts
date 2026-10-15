@@ -1,5 +1,6 @@
 import type { ActivityPeriod } from "@liveplace/domain";
 import type {
+  ActivityDay,
   ActivityFrame,
   ActivityHistory,
   ActivityPoint,
@@ -47,16 +48,28 @@ const frame: ActivityFrame = {
 };
 
 type Asked = { period: ActivityPeriod; answer: (result: RequestResult<ActivityHistory>) => void };
+type AskedDay = { dayAt: number; answer: (result: RequestResult<ActivityDay>) => void };
+
+// Un jour passé (JOURNAL 2026-10-14), tel que le gateway le rend.
+const dayAnswer = (dayAt: number): ActivityDay => ({
+  dayAt,
+  grain: "minute",
+  points: [],
+  canvases: [],
+  here: { canvasId: "c1", grain: "minute", points: [] },
+});
 
 const setup = () => {
   const isWatchingSent: boolean[] = [];
   const asked: Asked[] = [];
+  const askedDays: AskedDay[] = [];
   const listening: { listener: ((heard: ActivityFrame) => void) | null } = { listener: null };
   const canvas: ActivityWatchCanvas = {
     watchActivity: (isWatching) => {
       isWatchingSent.push(isWatching);
     },
     listActivityHistory: (period) => new Promise((answer) => asked.push({ period, answer })),
+    listActivityDay: (dayAt) => new Promise((answer) => askedDays.push({ dayAt, answer })),
     listenActivity: (listener) => {
       listening.listener = listener;
       return () => {
@@ -80,7 +93,11 @@ const setup = () => {
     asked[index]?.answer(result);
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { watch, isWatchingSent, asked, timers, listening, answered };
+  const answeredDay = async (index: number, result: RequestResult<ActivityDay>) => {
+    askedDays[index]?.answer(result);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  return { watch, isWatchingSent, asked, askedDays, timers, listening, answered, answeredDay };
 };
 
 describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", () => {
@@ -174,6 +191,20 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
     expect(seen).toContain(2);
   });
 
+  // Connaît le plus ancien jour gardé avec le premier historique, et le garde, hors des courbes montrées
+  it("knows the oldest kept day with the first history, keeps it, and leaves it out of the shown curves (JOURNAL 2026-10-14)", async () => {
+    const { watch, timers, answered } = setup();
+    watch.open();
+    expect(watch.getView().firstDayAt).toBeUndefined();
+
+    await answered(0, { ok: true, value: { points: [point(1)], firstDayAt: 5 } });
+    timers[0]?.run();
+    await answered(1, { ok: true, value: { points: [point(2)] } });
+
+    expect(watch.getView().firstDayAt).toBe(5);
+    expect(watch.getView().history).toEqual({ status: "ready", points: [point(2)] });
+  });
+
   // Arrête tout en partant : ne regarde plus, ne relit plus, n'écoute plus
   it("stops everything when leaving: no more watching, refreshing or listening", () => {
     const { watch, isWatchingSent, timers, listening } = setup();
@@ -184,5 +215,99 @@ describe("the developer's activity section (écart §4.2, JOURNAL 2026-10-06)", 
     expect(isWatchingSent).toEqual([true, false]);
     expect(timers[0]?.isStopped).toBe(true);
     expect(listening.listener).toBeNull();
+  });
+});
+
+// JOURNAL 2026-10-14 : un jour passé se lit une fois à son choix, partagé par les deux sections.
+describe("the past day of the developer's window (JOURNAL 2026-10-14)", () => {
+  const DAY_A = 1_000_000;
+  const DAY_B = 2_000_000;
+
+  // Lit un jour passé une fois à son choix, le montre, et ne le relit pas à la minute comme l'historique
+  it("reads a past day once at its choice and shows it, without reading it every minute like the history", async () => {
+    const { watch, asked, askedDays, timers, answeredDay } = setup();
+    watch.open();
+    expect(watch.getView().past).toBeUndefined();
+
+    watch.selectDay(DAY_A);
+    expect(watch.getView().past).toEqual({ dayAt: DAY_A, day: { status: "loading" } });
+    await answeredDay(0, { ok: true, value: dayAnswer(DAY_A) });
+    timers[0]?.run();
+
+    expect(watch.getView().past).toEqual({ dayAt: DAY_A, day: { status: "ready", ...dayAnswer(DAY_A) } });
+    expect(askedDays.map(({ dayAt }) => dayAt)).toEqual([DAY_A]);
+    expect(asked).toHaveLength(2);
+  });
+
+  // Ignore la réponse d'un jour dépassé quand un autre est choisi entre-temps
+  it("ignores the answer for a day that was left behind when another is chosen meanwhile", async () => {
+    const { watch, askedDays, answeredDay } = setup();
+    watch.open();
+
+    watch.selectDay(DAY_A);
+    watch.selectDay(DAY_B);
+    await answeredDay(0, { ok: true, value: dayAnswer(DAY_A) });
+    expect(watch.getView().past).toEqual({ dayAt: DAY_B, day: { status: "loading" } });
+    await answeredDay(1, { ok: true, value: dayAnswer(DAY_B) });
+
+    expect(askedDays.map(({ dayAt }) => dayAt)).toEqual([DAY_A, DAY_B]);
+    expect(watch.getView().past).toMatchObject({ dayAt: DAY_B, day: { status: "ready", dayAt: DAY_B } });
+  });
+
+  // Relit un jour où l'on revient, et dit l'échec d'une lecture
+  it("reads again a day we come back to, and tells the failure of a read", async () => {
+    const { watch, askedDays, answeredDay } = setup();
+    watch.open();
+
+    watch.selectDay(DAY_A);
+    await answeredDay(0, { ok: true, value: dayAnswer(DAY_A) });
+    watch.selectDay(DAY_B);
+    await answeredDay(1, { ok: false, error: "closed" });
+    expect(watch.getView().past).toEqual({ dayAt: DAY_B, day: { status: "failed" } });
+    watch.selectDay(DAY_A);
+    await answeredDay(2, { ok: true, value: dayAnswer(DAY_A) });
+
+    expect(askedDays.map(({ dayAt }) => dayAt)).toEqual([DAY_A, DAY_B, DAY_A]);
+    expect(watch.getView().past?.day.status).toBe("ready");
+  });
+
+  // Revient à aujourd'hui sans rien lire, et la réponse d'un jour qu'on quitte ne revient pas le montrer
+  it("goes back to today without reading anything, and the answer of a day we leave does not show it again", async () => {
+    const { watch, askedDays, answeredDay } = setup();
+    watch.open();
+    watch.selectDay(DAY_A);
+
+    watch.selectDay(undefined);
+    await answeredDay(0, { ok: true, value: dayAnswer(DAY_A) });
+
+    expect(watch.getView().past).toBeUndefined();
+    expect(askedDays).toHaveLength(1);
+  });
+
+  // Revient à aujourd'hui à la fermeture de la fenêtre, et la rouvre sur aujourd'hui sans relire le jour quitté
+  it("goes back to today when the window closes, and reopens on today without reading the day left", async () => {
+    const { watch, askedDays, answeredDay } = setup();
+    watch.open();
+    watch.selectDay(DAY_A);
+    await answeredDay(0, { ok: true, value: dayAnswer(DAY_A) });
+
+    watch.close();
+    expect(watch.getView().past).toBeUndefined();
+    watch.open();
+
+    expect(watch.getView().past).toBeUndefined();
+    expect(askedDays).toHaveLength(1);
+  });
+
+  // Ne lit un jour choisi avant l'ouverture qu'à l'ouverture
+  it("reads a day chosen before the opening only at the opening", () => {
+    const { watch, askedDays } = setup();
+
+    watch.selectDay(DAY_A);
+    expect(askedDays).toHaveLength(0);
+    watch.open();
+
+    expect(askedDays.map(({ dayAt }) => dayAt)).toEqual([DAY_A]);
+    expect(watch.getView().past).toEqual({ dayAt: DAY_A, day: { status: "loading" } });
   });
 });

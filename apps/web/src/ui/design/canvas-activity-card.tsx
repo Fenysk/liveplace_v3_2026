@@ -18,13 +18,15 @@ export type CanvasActivityAccount = {
   devices: readonly Device[];
 };
 
+// `owner` à `null` : le streamer est introuvable, dans un jour passé. Sans `onToggle`, la ligne n'a pas de chevron : personne n'est
+// gardé d'un jour passé (JOURNAL 2026-10-14), ni `accounts`, ni `guestsLine`, ni `isOpen`.
 export type CanvasActivityCardProps = {
-  owner: ProfileUser;
+  owner: ProfileUser | null;
   facts: readonly string[]; // personnes, température, nouveaux comptes
-  accounts: readonly CanvasActivityAccount[];
-  guestsLine: string | null; // « + 2 invités », après les comptes
-  isOpen: boolean;
-  onToggle: () => void;
+  accounts?: readonly CanvasActivityAccount[];
+  guestsLine?: string | null; // « + 2 invités », après les comptes
+  isOpen?: boolean;
+  onToggle?: (() => void) | undefined;
 };
 
 const DEVICE_ICONS = {
@@ -44,14 +46,16 @@ const DeviceIcon = ({ device }: { device: Device }) => {
 
 type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner">;
 
-// Le streamer d'un canvas : le bouton Twitch de son profil dit s'il est en live.
+// Le streamer d'un canvas : le bouton Twitch de son profil dit s'il est en live. Introuvable, la ligne le dit.
 export const CanvasActivityOwner = ({ owner }: CanvasActivityOwnerProps) => (
   <span className="lp-canvas-activity-owner">
-    <Profile user={owner} />
+    {owner ? <Profile user={owner} /> : <span className="lp-type-title lp-muted">Streamer inconnu</span>}
   </span>
 );
 
-type ConnectedAccountsProps = Pick<CanvasActivityCardProps, "accounts" | "guestsLine"> & {
+type ConnectedAccountsProps = {
+  accounts: readonly CanvasActivityAccount[];
+  guestsLine: string | null;
   emptyText: string; // ni compte ni invité
 };
 
@@ -85,9 +89,9 @@ export const ConnectedAccounts = ({ accounts, guestsLine, emptyText }: Connected
 export const CanvasActivityCard = ({
   owner,
   facts,
-  accounts,
-  guestsLine,
-  isOpen,
+  accounts = [],
+  guestsLine = null,
+  isOpen = false,
   onToggle,
 }: CanvasActivityCardProps) => (
   <article className={classNames("lp-canvas-activity lp-arrives", isOpen && "is-open")}>
@@ -103,15 +107,17 @@ export const CanvasActivityCard = ({
           ))}
         </span>
       </span>
-      <span className="lp-canvas-activity-toggle">
-        <Button
-          icon={ChevronDown}
-          variant="ghost"
-          title={isOpen ? "Replier" : "Qui est dessus"}
-          isPressed={isOpen}
-          onPress={onToggle}
-        />
-      </span>
+      {onToggle && (
+        <span className="lp-canvas-activity-toggle">
+          <Button
+            icon={ChevronDown}
+            variant="ghost"
+            title={isOpen ? "Replier" : "Qui est dessus"}
+            isPressed={isOpen}
+            onPress={onToggle}
+          />
+        </span>
+      )}
     </div>
     {isOpen && (
       <div className="lp-canvas-activity-accounts">

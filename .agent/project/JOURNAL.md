@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-14 — Écart §4.2 et §4.3 : le développeur relit un jour passé, frames `listActivityDay` et `activityDay`, protocole 21
+
+**Contexte.** La fenêtre Développeur ne montre que l'instant et des courbes glissantes ; Alexis veut revoir un jour passé, par exemple qui a streamé hier. L'historique garde déjà, sous `activity:`, le point de chaque jour de Paris (global et par canvas) et les minutes et heures dans leur rétention (7 jours, 2 jours par canvas, 366 jours pour les heures).
+**Décision.** Rien de neuf n'est stocké. `listActivityDay` (`requestId`, `dayAt`), du développeur seul et ignorée venant d'un autre, rend `activityDay` : le point du jour global avec son audience, ses courbes (`grain` : à la minute si tout le jour est dans la rétention, sinon à l'heure, sinon aucune), les canvas qui ont un point ce jour-là (SCAN de `activity:cv:*:day`, leur streamer lu dans `meta` puis le miroir `user:`, absent si introuvable) et le point et les courbes du canvas de la socket. Le gateway ramène `dayAt` au début du jour de Paris et refuse un jour futur (`invalid_frame` avec le `requestId`). `activityHistory` porte `firstDayAt`, le plus ancien jour gardé, qui désactive la flèche précédente. `PROTOCOL_VERSION` passe à 21.
+**Renoncement.** Un index des canvas par jour, ou un nom gardé dans l'historique (le cahier des charges du suivi l'interdit) ; « Qui est là » d'un jour passé (la liste des connectés n'est jamais gardée) ; relire un jour passé à chaque minute (ses nombres ne bougent plus) ; `firstDayAt` dans la frame `activity` (une lecture de `activity:day` toutes les 2 s).
+
 ## 2026-10-14 — Écart §8.1 (amende les entrées du 08/10 et du 12/10 sur le Tracé) : à la souris, une bulle dit une fois de tenir Espace pour tracer
 
 **Contexte.** À la souris, glisser en Dessin déplace la vue ; pour tracer, il faut tenir Espace en bougeant (`use-draft-keys.ts`), et rien ne le dit à l'écran. Au doigt, la bulle `draft-trace` (« Active le tracé pour dessiner en glissant ») répond au premier glissement en Dessin ; à la souris, le même geste restait muet.

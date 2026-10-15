@@ -4,8 +4,12 @@ import {
   type Device,
   defaultCanvasMeta,
   type GaugeLimits,
+  HOUR_MS,
   type ObsBackground,
   type Session,
+  toActivityPointStarts,
+  toNextDayStart,
+  toPreviousDayStart,
 } from "@liveplace/domain";
 import type {
   AckFrame,
@@ -79,6 +83,10 @@ const activityStore: ActivityStore = {
   listCanvasHistory: async () => [],
   getCanvasAudience: async () => ({ today: noCanvasAudience, month: noCanvasAudience }),
   getUser: async (userId) => ({ userId, login: userId, displayName: userId }),
+  getFirstDayAt: async () => null,
+  listActivityDay: async () => ({ grain: "minute", points: [] }),
+  listCanvasDay: async () => ({ grain: "minute", points: [] }),
+  listDayCanvases: async () => [],
   storeActivityGap: async () => undefined,
   storeSeen: async () => undefined,
   listSeen: async () => new Map(),
@@ -2060,6 +2068,57 @@ describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", ()
       t: "activity",
       here: { canvasId, people: 1, owner: { userId: meta.ownerId } },
     });
+  });
+
+  const todayAt = toActivityPointStarts(now).day;
+  const yesterdayAt = toPreviousDayStart(todayAt);
+  const listDay = (dayAt: number) => JSON.stringify({ t: "listActivityDay", requestId: "day-1", dayAt });
+  const answeredDay = {
+    t: "activityDay",
+    requestId: "day-1",
+    dayAt: yesterdayAt,
+    grain: "minute",
+    points: [],
+    canvases: [],
+    here: { canvasId, grain: "minute", points: [] },
+  };
+
+  // Ignore la demande d'un jour passé d'une session qui n'est pas celle du développeur, et d'un invité, sans fermer
+  it("ignores the past day asked by a session that is not the developer's, without closing (JOURNAL 2026-10-14)", async () => {
+    for (const opened of [setup(), setup({ session: null })]) {
+      await opened.connection.receive(hello());
+      const before = opened.sent.length;
+
+      await opened.connection.receive(listDay(yesterdayAt));
+
+      expect(opened.sent).toHaveLength(before);
+      expect(opened.closed).toEqual([]);
+    }
+  });
+
+  // Rend un jour passé au développeur, avec sa requête, pour le canvas de sa socket, une archive comprise
+  it("answers a past day to the developer, with its request, for his socket's canvas, an archive included", async () => {
+    for (const opened of [setup({ session: developer }), setup({ session: developer, archivedAt: now })]) {
+      await opened.connection.receive(hello());
+
+      await opened.connection.receive(listDay(yesterdayAt + 5 * HOUR_MS));
+
+      expect(opened.sent.at(-1)).toEqual(answeredDay);
+      expect(opened.closed).toEqual([]);
+    }
+  });
+
+  // Refuse un jour futur pour cette requête seule : le développeur garde sa connexion et peut en demander un autre
+  it("refuses a future day for that request alone: the developer keeps his connection and can ask another", async () => {
+    const { connection, sent, closed } = setup({ session: developer });
+    await connection.receive(hello());
+
+    await connection.receive(listDay(toNextDayStart(todayAt)));
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "invalid_frame", requestId: "day-1" });
+    expect(closed).toEqual([]);
+    await connection.receive(listDay(yesterdayAt));
+    expect(sent.at(-1)).toEqual(answeredDay);
   });
 
   // Met la page dans l'activité au hello, avec son appareil et ses pixels acceptés, et l'en retire à sa fermeture

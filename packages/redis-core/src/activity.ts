@@ -4,12 +4,14 @@
 
 import { readFileSync } from "node:fs";
 import {
+  type ActivityDayGrain,
   type ActivityPointStarts,
   HOUR_MS,
   MINUTE_MS,
   type Timestamp,
   toActivityPointStarts,
   toAudienceDays,
+  toNextDayStart,
   toParisDay,
 } from "@liveplace/domain";
 import type {
@@ -19,6 +21,8 @@ import type {
   ActivityStore,
   CanvasActivityPoint,
   CanvasAudience,
+  CanvasDayPoint,
+  DayCanvasPoint,
   SignupWrites,
 } from "@liveplace/domain/ports";
 import type { ChainableCommander, Redis, Result as RedisResult } from "ioredis";
@@ -107,6 +111,36 @@ const toCanvasPoint = (
   return { at, people, streamedMinutes, pixels, visits, visitMinutes, signups: Number(signups ?? 0) };
 };
 
+// Le point d'un canvas pour un jour passé (JOURNAL 2026-10-14) : ses visites au téléphone, que les courbes ne portent pas, et ses
+// joueurs actifs, `active` étant le champ du jour.
+const toCanvasDayPoint = (
+  at: Timestamp,
+  stored: string,
+  signups: string | null | undefined,
+  active: string | null | undefined,
+): CanvasDayPoint => ({
+  ...toCanvasPoint(at, stored, signups),
+  phoneVisits: toFields(stored).phoneVisits,
+  activePlayers: Number(active ?? 0),
+});
+
+// Le détail des courbes d'un jour (JOURNAL 2026-10-14) : à la minute si tout le jour est dans la rétention des minutes, à l'heure
+// s'il est dans celle des heures, sinon aucun.
+const toDayGrain = (dayAt: Timestamp, nowMs: Timestamp, minutesRetentionMs: number): ActivityDayGrain => {
+  if (dayAt >= nowMs - minutesRetentionMs) return "minute";
+  return dayAt >= nowMs - ACTIVITY_HOURS_RETENTION_MS ? "hour" : "none";
+};
+
+// Les débuts des points d'un jour de Paris : 1 380, 1 440 ou 1 500 minutes, 23, 24 ou 25 heures.
+const toDayStarts = (dayAt: Timestamp, grain: ActivityDayGrain): Timestamp[] => {
+  if (grain === "none") return [];
+  const stepMs = grain === "minute" ? MINUTE_MS : HOUR_MS;
+  const endAt = toNextDayStart(dayAt);
+  return pointStarts(endAt - stepMs, stepMs, (endAt - dayAt) / stepMs);
+};
+
+const DAY_SCAN_COUNT = 1000;
+
 // Les trois HASH d'un historique, celui du global ou celui d'un canvas.
 type PointHashes = { minutes: string; hours: string; days: string };
 
@@ -187,6 +221,7 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
   });
 
   const getStoredPoints = async (hash: string, ats: Timestamp[]): Promise<StoredPoint[]> => {
+    if (ats.length === 0) return []; // un HMGET sans champ est refusé (un jour sans courbes)
     const values = await redis.hmget(hash, ...ats.flatMap((at) => [String(at), toSignupsField(at)]));
     return ats.map((at, index) => ({ at, stored: values[2 * index], signups: values[2 * index + 1] }));
   };
@@ -214,6 +249,17 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
         ...toCanvasPoint(at, fields[String(at)] ?? "", fields[toSignupsField(at)]),
         activePlayers: Number(fields[toActiveField(at)] ?? 0),
       }));
+  };
+
+  // Le point d'un jour d'un canvas, sans ses courbes. Il existe dès qu'une minute ou un nouveau compte l'a écrit.
+  const getCanvasDayPoint = async (hash: string, dayAt: Timestamp): Promise<CanvasDayPoint | undefined> => {
+    const [stored, signups, active] = await redis.hmget(
+      hash,
+      String(dayAt),
+      toSignupsField(dayAt),
+      toActiveField(dayAt),
+    );
+    return stored || signups ? toCanvasDayPoint(dayAt, stored ?? "", signups, active) : undefined;
   };
 
   // Les comptes, joueurs et streamers : la clé d'un jour de chacun, et ce que `ids` y verse.
@@ -429,6 +475,56 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
         ),
         month: toCanvasAudienceCounts(points, monthPlayers),
       };
+    },
+
+    // Le plus ancien jour gardé : le premier point de `activity:day`, jamais le champ d'un jour sans point.
+    async getFirstDayAt() {
+      const dayAts = (await redis.hkeys(keys.days)).filter((field) => POINT_FIELD.test(field)).map(Number);
+      return dayAts.length === 0 ? null : Math.min(...dayAts);
+    },
+
+    // Le point du jour, avec ses distincts, et ses courbes : un jour sans point n'en a pas, un point absent le reste.
+    async listActivityDay(dayAt, nowMs) {
+      const grain = toDayGrain(dayAt, nowMs, ACTIVITY_MINUTES_RETENTION_MS);
+      const [[stored, signups, active], points] = await Promise.all([
+        redis.hmget(keys.days, String(dayAt), toSignupsField(dayAt), toActiveField(dayAt)),
+        listPoints(grain === "minute" ? keys.minutes : keys.hours, toDayStarts(dayAt, grain)),
+      ]);
+      return {
+        grain,
+        ...(stored
+          ? { day: { ...toPoint(dayAt, stored, signups), ...toActiveCounts(active ?? undefined) } }
+          : {}),
+        points,
+      };
+    },
+
+    // Comme `listActivityDay`, pour un canvas : ses minutes ne vivent que 2 jours.
+    async listCanvasDay(canvasId, dayAt, nowMs) {
+      const { minutes, hours, days } = keys.canvas(canvasId);
+      const grain = toDayGrain(dayAt, nowMs, ACTIVITY_CANVAS_MINUTES_RETENTION_MS);
+      const [point, points] = await Promise.all([
+        getCanvasDayPoint(days, dayAt),
+        listCanvasPoints(grain === "minute" ? minutes : hours, toDayStarts(dayAt, grain)),
+      ]);
+      return { grain, ...(point ? { point } : {}), points };
+    },
+
+    // Un balayage par pages (jamais KEYS, qui bloquerait Redis) des clés de jours des canvas : aucun index, aucun identifiant de
+    // plus. L'identifiant est ce qui reste entre le préfixe et le suffixe, quoi qu'il contienne.
+    async listDayCanvases(dayAt) {
+      const pattern = keys.canvas("*").days;
+      const [head = "", tail = ""] = pattern.split("*");
+      const names = new Set<string>();
+      for await (const found of redis.scanStream({ match: pattern, count: DAY_SCAN_COUNT }))
+        for (const name of found) names.add(name);
+      const canvases = await Promise.all(
+        [...names].map(async (name): Promise<DayCanvasPoint[]> => {
+          const point = await getCanvasDayPoint(name, dayAt);
+          return point ? [{ canvasId: name.slice(head.length, name.length - tail.length), point }] : [];
+        }),
+      );
+      return canvases.flat();
     },
 
     // Lu au démarrage du gateway seulement : les commandes partent ensemble sur la connexion.

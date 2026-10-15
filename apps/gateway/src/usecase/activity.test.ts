@@ -7,18 +7,23 @@ import {
   MINUTE_MS,
   type Session,
   toActivityPointStarts,
+  toNextDayStart,
+  toPreviousDayStart,
 } from "@liveplace/domain";
 import type {
   ActiveIds,
   ActivityAudience,
+  ActivityDayRead,
   ActivityFrame,
   ActivityGap,
   ActivityMinute,
   ActivityStore,
   CanvasActivityPoint,
   CanvasAudience,
+  CanvasDayRead,
   CanvasPixelsMinute,
   ClientSocket,
+  DayCanvasPoint,
   DaySignups,
   TwitchLive,
 } from "@liveplace/domain/ports";
@@ -68,6 +73,11 @@ type SetupOptions = {
   canvasAudience?: CanvasAudience; // ce que rend `getCanvasAudience`, sans la minute en cours
   canvasPoints?: CanvasActivityPoint[]; // ce que rend `listCanvasHistory`
   lives?: Record<string, TwitchLive>; // le live de chaque streamer, par `listTwitchLives` (Écart §4, JOURNAL 2026-10-07)
+  firstDayAt?: number; // ce que rend `getFirstDayAt` (JOURNAL 2026-10-14)
+  activityDay?: ActivityDayRead; // ce que rend `listActivityDay`
+  canvasDay?: CanvasDayRead; // ce que rend `listCanvasDay`
+  dayCanvases?: DayCanvasPoint[]; // ce que rend `listDayCanvases`
+  lostUserIds?: string[]; // les streamers dont le miroir `user:` est perdu
 };
 
 const setup = (options: SetupOptions = {}) => {
@@ -81,6 +91,9 @@ const setup = (options: SetupOptions = {}) => {
   const audienceReads: ActiveIds[] = []; // les identifiants que la minute en cours a donnés à chaque lecture
   const canvasAudienceReads: { canvasId: string; playerIds: Set<string> }[] = [];
   const canvasHistoryReads: { canvasId: string; period: ActivityPeriod }[] = [];
+  const dayReads: { dayAt: number; nowMs: number }[] = []; // les jours lus pour tout LivePlace (JOURNAL 2026-10-14)
+  const canvasDayReads: { canvasId: string; dayAt: number }[] = [];
+  const dayCanvasReads: number[] = [];
   const gaps: ActivityGap[] = []; // les coupures comblées (Écart §5.1, JOURNAL 2026-10-08)
   const savedSeen = new Map<string, number>(); // ce que `activity:seen` garde, relu par un nouveau gateway
   const prunedSeenAt: number[] = [];
@@ -133,7 +146,23 @@ const setup = (options: SetupOptions = {}) => {
     },
     async getUser(userId) {
       userReads.push(userId);
+      if (options.lostUserIds?.includes(userId)) return null;
       return { userId, login: `login-${userId}`, displayName: `Name ${userId}` };
+    },
+    async getFirstDayAt() {
+      return options.firstDayAt ?? null;
+    },
+    async listActivityDay(dayAt, nowMs) {
+      dayReads.push({ dayAt, nowMs });
+      return options.activityDay ?? { grain: "minute", points: [] };
+    },
+    async listCanvasDay(canvasId, dayAt) {
+      canvasDayReads.push({ canvasId, dayAt });
+      return options.canvasDay ?? { grain: "minute", points: [] };
+    },
+    async listDayCanvases(dayAt) {
+      dayCanvasReads.push(dayAt);
+      return options.dayCanvases ?? [];
     },
     async storeActivityGap(gap) {
       gaps.push(gap);
@@ -225,6 +254,9 @@ const setup = (options: SetupOptions = {}) => {
     audienceReads,
     canvasAudienceReads,
     canvasHistoryReads,
+    dayReads,
+    canvasDayReads,
+    dayCanvasReads,
     gaps,
     savedSeen,
     prunedSeenAt,
@@ -1403,5 +1435,129 @@ describe("the streamed state and the gaps of a stream in the gateway (écart §5
       ["canvas-b", true],
     ]);
     expect(moment).toMatchObject({ streamed: 1 });
+  });
+});
+
+// JOURNAL 2026-10-14 : le développeur relit un jour passé, dans ce qui est déjà gardé.
+describe("a past day in the gateway (écart §4.2, JOURNAL 2026-10-14)", () => {
+  const todayAt = toActivityPointStarts(now).day;
+  const yesterdayAt = toPreviousDayStart(todayAt);
+  const dayPoint = {
+    at: yesterdayAt,
+    people: 4,
+    streamed: 1,
+    pixels: 20,
+    signups: 1,
+    visits: 3,
+    phoneVisits: 1,
+    visitMinutes: 9,
+    activeAccounts: 2,
+    activePlayers: 1,
+    activeStreamers: 1,
+  };
+  const canvasDayPoint = {
+    at: yesterdayAt,
+    people: 3,
+    streamedMinutes: 90,
+    pixels: 12,
+    visits: 2,
+    phoneVisits: 1,
+    visitMinutes: 6,
+    signups: 0,
+    activePlayers: 1,
+  };
+
+  // Ne rend un jour passé qu'au développeur : pour toute autre session, rien, et rien n'est lu
+  it("gives a past day to the developer only: nothing for any other session, and nothing read", async () => {
+    const { activity, dayReads, canvasDayReads, dayCanvasReads } = setup();
+
+    expect(await activity.listDay(viewer, yesterdayAt, "canvas-a")).toBeNull();
+    expect(await activity.listDay(null, yesterdayAt, "canvas-a")).toBeNull();
+
+    expect([dayReads, canvasDayReads, dayCanvasReads]).toEqual([[], [], []]);
+    expect(await activity.listDay(developer, yesterdayAt, "canvas-a")).toMatchObject({ ok: true });
+  });
+
+  // Ramène l'instant demandé au début de son jour de Paris, et lit tout ce jour-là pour lui
+  it("brings the asked instant back to the start of its Paris day, and reads that whole day", async () => {
+    const { activity, dayReads, canvasDayReads, dayCanvasReads } = setup();
+
+    const result = await activity.listDay(developer, yesterdayAt + 15 * HOUR_MS + 7 * MINUTE_MS, "canvas-a");
+
+    expect(result).toMatchObject({ ok: true, value: { dayAt: yesterdayAt, here: { canvasId: "canvas-a" } } });
+    expect(dayReads).toEqual([{ dayAt: yesterdayAt, nowMs: now }]);
+    expect(canvasDayReads).toEqual([{ canvasId: "canvas-a", dayAt: yesterdayAt }]);
+    expect(dayCanvasReads).toEqual([yesterdayAt]);
+  });
+
+  // Accepte aujourd'hui et refuse un jour futur, sans rien lire, y compris un instant que Date accepte à peine
+  it("accepts today and refuses a future day without reading anything, even an instant Date barely accepts", async () => {
+    const { activity, dayReads } = setup();
+
+    expect(await activity.listDay(developer, todayAt, "canvas-a")).toMatchObject({ ok: true });
+    expect(dayReads).toHaveLength(1);
+    for (const futureAt of [toNextDayStart(todayAt), Date.UTC(2100, 0, 1), 8_640_000_000_000_000])
+      expect(await activity.listDay(developer, futureAt, "canvas-a")).toEqual({ ok: false, error: "future" });
+    expect(dayReads).toHaveLength(1);
+  });
+
+  // Dit le streamer de chaque canvas du jour, lu dans `meta` puis le miroir `user:`, sans live ; absent si l'un des deux manque
+  it("gives the owner of each canvas of the day, read in meta then in the user: mirror, no live, none when either is missing", async () => {
+    const { activity, liveReads } = setup({
+      lostUserIds: ["owner-b"],
+      lives: { "owner-a": art },
+      dayCanvases: [
+        { canvasId: "canvas-a", point: canvasDayPoint },
+        { canvasId: "canvas-gone", point: canvasDayPoint },
+        { canvasId: "canvas-b", point: canvasDayPoint },
+      ],
+    });
+
+    const result = await activity.listDay(developer, yesterdayAt, "canvas-a");
+
+    const canvases = result?.ok ? result.value.canvases : [];
+    expect(canvases).toEqual([
+      {
+        canvasId: "canvas-a",
+        owner: { userId: "owner-a", login: "login-owner-a", displayName: "Name owner-a" },
+        point: canvasDayPoint,
+      },
+      { canvasId: "canvas-gone", point: canvasDayPoint },
+      { canvasId: "canvas-b", point: canvasDayPoint },
+    ]);
+    expect(canvases.map((canvas) => "owner" in canvas)).toEqual([true, false, false]);
+    expect(liveReads).toEqual([]);
+  });
+
+  // Rend, avec le jour de tout LivePlace, le point et les courbes du canvas de la socket, chacun à son détail
+  it("gives, with the day of the whole, the point and curves of the socket's canvas, each at its own detail", async () => {
+    const canvasPoints = [{ ...canvasDayPoint, at: yesterdayAt + HOUR_MS }];
+    const { activity } = setup({
+      activityDay: { grain: "hour", day: dayPoint, points: [{ ...dayPoint, at: yesterdayAt + HOUR_MS }] },
+      canvasDay: { grain: "minute", point: canvasDayPoint, points: canvasPoints },
+    });
+
+    expect(await activity.listDay(developer, yesterdayAt, "canvas-a")).toEqual({
+      ok: true,
+      value: {
+        dayAt: yesterdayAt,
+        grain: "hour",
+        day: dayPoint,
+        points: [{ ...dayPoint, at: yesterdayAt + HOUR_MS }],
+        canvases: [],
+        here: { canvasId: "canvas-a", grain: "minute", point: canvasDayPoint, points: canvasPoints },
+      },
+    });
+  });
+
+  // Joint au résultat d'une période le plus ancien jour gardé, et rien quand aucun jour n'est gardé
+  it("adds the oldest kept day to the result of a period, and nothing when no day is kept", async () => {
+    const withDays = setup({ firstDayAt: yesterdayAt });
+    const without = setup();
+
+    expect(await withDays.activity.listHistory(developer, "day", "canvas-a")).toMatchObject({
+      firstDayAt: yesterdayAt,
+    });
+    expect(await without.activity.listHistory(developer, "day", "canvas-a")).not.toHaveProperty("firstDayAt");
   });
 });

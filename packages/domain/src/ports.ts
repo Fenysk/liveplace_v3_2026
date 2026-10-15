@@ -259,8 +259,20 @@ export type ActivityAudience = ActivityFrame["audience"];
 export type ActivityHere = NonNullable<ActivityFrame["here"]>;
 export type CanvasAudience = ActivityHere["audience"];
 export type CanvasActivityPoint = NonNullable<ActivityHistoryFrame["canvasPoints"]>[number];
-// L'historique d'une période : tout LivePlace, et le canvas de la socket (absent d'un gateway d'avant).
-export type ActivityHistory = Pick<ActivityHistoryFrame, "points" | "canvasPoints">;
+// L'historique d'une période : tout LivePlace, et le canvas de la socket (absent d'un gateway d'avant). `firstDayAt` : le plus
+// ancien jour gardé (JOURNAL 2026-10-14).
+export type ActivityHistory = Pick<ActivityHistoryFrame, "points" | "canvasPoints" | "firstDayAt">;
+
+// JOURNAL 2026-10-14 : un jour passé tel que le gateway le rend, la frame `activityDay` sans sa requête.
+export type ActivityDayFrame = Extract<ServerFrame, { t: "activityDay" }>;
+export type ActivityDay = Omit<ActivityDayFrame, "t" | "requestId">;
+export type ActivityDayCanvas = ActivityDay["canvases"][number];
+export type ActivityDayHere = ActivityDay["here"];
+export type CanvasDayPoint = ActivityDayCanvas["point"];
+// Ce que le magasin lit pour un jour : sans les streamers, que le gateway ajoute.
+export type ActivityDayRead = Pick<ActivityDay, "grain" | "day" | "points">;
+export type CanvasDayRead = Pick<ActivityDayHere, "grain" | "point" | "points">;
+export type DayCanvasPoint = Pick<ActivityDayCanvas, "canvasId" | "point">;
 
 // Les identifiants que la minute a vus : de quoi compter les distincts d'un jour, jamais gardés tels quels.
 export type ActiveIds = {
@@ -335,6 +347,16 @@ export interface ActivityStore {
     openedPlayerIds: ReadonlySet<string>,
   ): Promise<CanvasAudience>;
   getUser(userId: string): Promise<ActivityUser | null>; // le miroir `user:` du streamer d'un canvas
+  // JOURNAL 2026-10-14 : un jour passé, lu dans ce qui est déjà gardé, rien de plus. `dayAt` : le début d'un jour de Paris.
+  // Le plus ancien jour gardé, le premier point de `activity:day` ; `null` : aucun.
+  getFirstDayAt(): Promise<Timestamp | null>;
+  // Le point du jour de tout LivePlace, avec son audience, et ses courbes : à la minute si tout le jour est dans la rétention
+  // des minutes, sinon à l'heure, sinon aucune. Un point absent le reste.
+  listActivityDay(dayAt: Timestamp, nowMs: Timestamp): Promise<ActivityDayRead>;
+  // Le point du jour d'un canvas et ses courbes, avec la rétention (plus courte) de ses minutes ; seuls les points qui existent.
+  listCanvasDay(canvasId: string, dayAt: Timestamp, nowMs: Timestamp): Promise<CanvasDayRead>;
+  // Les canvas qui ont un point ce jour-là, par un balayage des clés `activity:cv:*:day` : aucun index.
+  listDayCanvases(dayAt: Timestamp): Promise<DayCanvasPoint[]>;
   // Écart §5.1 (JOURNAL 2026-10-08) : compte un canvas comme streamé dans les minutes d'une coupure, pour lui seul et pour tout
   // LivePlace là où la minute existe. Atomique, et sans effet pour une minute déjà comptée : on le rejoue sans dégât.
   storeActivityGap(gap: ActivityGap): Promise<void>;

@@ -1,4 +1,4 @@
-import { HOUR_MS, MINUTE_MS } from "@liveplace/domain";
+import { HOUR_MS, MINUTE_MS, toActivityPointStarts } from "@liveplace/domain";
 import type { ActivityCanvas } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import {
@@ -10,6 +10,8 @@ import {
   connectedPeopleLabel,
   connectedSince,
   formatCount,
+  formatDayDate,
+  formatDayLabel,
   formatDuration,
   guestsNote,
   heatLabel,
@@ -20,11 +22,15 @@ import {
   roleLabel,
   signupsLabel,
   slotTitle,
+  sortDayCanvases,
   streamedCanvasesLabel,
   streamedMinutesLabel,
   toAudienceRows,
   toCanvasActivityCard,
   toCanvasAudienceRows,
+  toCanvasDayAudienceRows,
+  toDayAudienceRows,
+  toDayCanvasCard,
   visitMinutesLabel,
   visitsLabel,
 } from "./activity-labels";
@@ -310,5 +316,155 @@ describe("the words of the canvas section (JOURNAL 2026-10-07)", () => {
 
     expect(visits?.cells).toEqual([{ value: "0" }, { value: "0" }]);
     expect(average?.cells).toEqual([{ value: "—" }, { value: "—" }]);
+  });
+});
+
+// JOURNAL 2026-10-14 : les mots d'un jour passé.
+describe("the words of a past day (JOURNAL 2026-10-14)", () => {
+  const todayAt = toActivityPointStarts(now).day;
+  const dayAgo = (days: number) => toActivityPointStarts(now - days * 24 * HOUR_MS).day;
+
+  // Nomme le jour choisi : Aujourd'hui, Hier, sinon sa date, l'année seulement hors de l'année en cours
+  it("names the chosen day: Aujourd'hui, Hier, else its date, the year only outside the current year", () => {
+    expect(formatDayLabel(todayAt, now)).toBe("Aujourd'hui");
+    expect(formatDayLabel(dayAgo(1), now)).toBe("Hier");
+    expect(formatDayLabel(dayAgo(3), now)).toBe("sam. 3 oct.");
+    expect(formatDayLabel(toActivityPointStarts(Date.UTC(2026, 0, 2, 12)).day, now)).toBe("ven. 2 janv.");
+    expect(formatDayLabel(toActivityPointStarts(Date.UTC(2025, 11, 31, 12)).day, now)).toBe(
+      "mer. 31 déc. 2025",
+    );
+  });
+
+  // Nomme un jour de Paris par sa date, aux premières minutes du jour comme aux dernières
+  it("names a Paris day by its date, in the first minutes of the day as in the last ones", () => {
+    expect(formatDayDate(dayAgo(1), now)).toBe("lun. 5 oct.");
+    expect(formatDayDate(dayAgo(1) + 23 * HOUR_MS + 59 * MINUTE_MS, now)).toBe("lun. 5 oct.");
+    expect(formatDayDate(dayAgo(1), Date.UTC(2027, 0, 5))).toBe("lun. 5 oct. 2026");
+  });
+
+  const audienceDay = {
+    at: dayAgo(1),
+    people: 9,
+    streamed: 2,
+    pixels: 50,
+    signups: 1,
+    visits: 38,
+    phoneVisits: 19,
+    visitMinutes: 200,
+    activeAccounts: 14,
+    activePlayers: 9,
+    activeStreamers: 3,
+  };
+
+  // Réduit l'audience d'un jour à une colonne, les six mêmes chiffres qu'aujourd'hui
+  it("narrows the audience of a day to one column, the same six figures as today's", () => {
+    const rows = toDayAudienceRows(audienceDay);
+
+    expect(rows.map(({ label }) => label)).toEqual([
+      "Visites",
+      "Temps passé",
+      "Durée moyenne d'une visite",
+      "Comptes actifs",
+      "Joueurs actifs",
+      "Streamers actifs",
+    ]);
+    expect(rows.every(({ cells }) => cells.length === 1)).toBe(true);
+    expect(rows[0]?.cells).toEqual([{ value: "38", note: "dont 50 % au téléphone" }]);
+    expect(rows[1]?.cells).toEqual([{ value: "3 h 20 min" }]);
+    expect(rows[3]?.cells).toEqual([{ value: "14" }]);
+  });
+
+  // Donne zéro à un jour sans point, avec un tiret pour la durée moyenne que rien ne définit
+  it("gives zero to a day without a point, with a dash for the average nothing defines", () => {
+    const rows = toDayAudienceRows(undefined);
+
+    expect(rows.map(({ cells }) => cells[0]?.value)).toEqual(["0", "0 min", "—", "0", "0", "0"]);
+  });
+
+  const canvasDay = {
+    at: dayAgo(1),
+    people: 9,
+    streamedMinutes: 215,
+    pixels: 1840,
+    visits: 23,
+    phoneVisits: 9,
+    visitMinutes: 330,
+    signups: 3,
+    activePlayers: 11,
+  };
+
+  // Réduit l'audience d'une fresque à une colonne : ses visites, son temps, ses joueurs et les comptes venus de sa page
+  it("narrows the audience of a canvas to one column: its visits, time, players and the signups from its page", () => {
+    const rows = toCanvasDayAudienceRows(canvasDay);
+
+    expect(rows.map(({ label }) => label)).toEqual([
+      "Visites",
+      "Temps passé",
+      "Durée moyenne d'une visite",
+      "Joueurs actifs",
+      "Nouveaux comptes venus de sa page",
+    ]);
+    expect(rows[0]?.cells).toEqual([{ value: "23", note: "dont 39 % au téléphone" }]);
+    expect(rows[3]?.cells).toEqual([{ value: "11" }]);
+    expect(rows[4]?.cells).toEqual([{ value: "3" }]);
+    expect(toCanvasDayAudienceRows({ ...canvasDay, activePlayers: undefined })[3]?.cells).toEqual([
+      { value: "0" },
+    ]);
+  });
+
+  const canvasOf = (canvasId: string, point: Partial<typeof canvasDay>) => ({
+    canvasId,
+    point: { ...canvasDay, ...point },
+  });
+
+  // Trie les fresques par minutes streamées, puis par personnes, puis par pixels, puis par identifiant
+  it("sorts the canvases by streamed minutes, then people, then pixels, then id", () => {
+    const sorted = sortDayCanvases([
+      canvasOf("d", { streamedMinutes: 0, people: 2, pixels: 9 }),
+      canvasOf("b", { streamedMinutes: 90, people: 3, pixels: 1 }),
+      canvasOf("a", { streamedMinutes: 90, people: 3, pixels: 1 }),
+      canvasOf("c", { streamedMinutes: 90, people: 3, pixels: 5 }),
+      canvasOf("e", { streamedMinutes: 0, people: 7, pixels: 0 }),
+      canvasOf("f", { streamedMinutes: 300, people: 0, pixels: 0 }),
+    ]);
+
+    expect(sorted.map(({ canvasId }) => canvasId)).toEqual(["f", "c", "a", "b", "e", "d"]);
+  });
+
+  // Ne change pas l'ordre de ce qu'on lui donne
+  it("leaves alone the order of what it is given", () => {
+    const given = [canvasOf("b", { people: 1 }), canvasOf("a", { people: 2 })];
+
+    sortDayCanvases(given);
+
+    expect(given.map(({ canvasId }) => canvasId)).toEqual(["b", "a"]);
+  });
+
+  // Dit de chaque fresque son streamer et ses cinq chiffres du jour, ou « inconnu » faute de streamer
+  it("tells of each canvas its owner and its five figures of the day, or an unknown owner", () => {
+    const owner = { userId: "1", login: "kalyss", displayName: "Kalyss" };
+
+    expect(toDayCanvasCard({ canvasId: "c1", owner, point: canvasDay })).toEqual({
+      owner,
+      facts: [
+        "3 h 35 min streamées",
+        "9 personnes au pic",
+        `${formatCount(1840)} pixels posés`,
+        "23 visites",
+        "3 nouveaux comptes",
+      ],
+    });
+    expect(
+      toDayCanvasCard({ canvasId: "c2", point: { ...canvasDay, streamedMinutes: 0, people: 1 } }),
+    ).toEqual({
+      owner: null,
+      facts: [
+        "0 min streamées",
+        "1 personne au pic",
+        `${formatCount(1840)} pixels posés`,
+        "23 visites",
+        "3 nouveaux comptes",
+      ],
+    });
   });
 });

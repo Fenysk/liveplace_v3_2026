@@ -20,6 +20,7 @@ import {
   GAUGE_MAX_START,
   type GaugeParams,
   generateLinkCode,
+  HOUR_MS,
   isBackgroundImageOpacity,
   isCanvasSize,
   isDeveloper,
@@ -51,7 +52,9 @@ import {
   toCell,
   toCellKey,
   toGapMinutes,
+  toNextDayStart,
   toParisDay,
+  toPreviousDayStart,
   toSession,
   toSessionClaims,
   toStateOffset,
@@ -522,6 +525,39 @@ describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
     expect(after.some(({ day }) => day === "2026-10-25")).toBe(true);
     expect(before.at(-1)?.day).toBe("2026-03-30");
     expect(before.some(({ day }) => day === "2026-03-29")).toBe(true);
+  });
+});
+
+// JOURNAL 2026-10-14 : le développeur passe d'un jour de Paris à l'autre, que le jour fasse 23, 24 ou 25 h.
+describe("the Paris day before and after another (JOURNAL 2026-10-14)", () => {
+  const dayAt = (month: number, date: number) => toActivityPointStarts(Date.UTC(2026, month, date, 12)).day;
+
+  // Rend le début du jour d'avant et celui du jour d'après, un jour ordinaire
+  it("gives the start of the day before and the start of the day after, for an ordinary day", () => {
+    const day = dayAt(9, 13); // 13/10, heure d'été
+
+    expect(toPreviousDayStart(day)).toBe(Date.UTC(2026, 9, 11, 22));
+    expect(toNextDayStart(day)).toBe(Date.UTC(2026, 9, 13, 22));
+    expect(toNextDayStart(toPreviousDayStart(day))).toBe(day);
+    expect(toPreviousDayStart(toNextDayStart(day))).toBe(day);
+  });
+
+  // Traverse les jours de 25 h et de 23 h sans en sauter ni en répéter un
+  it("crosses the days of 25 h and 23 h without skipping or repeating one", () => {
+    const longDay = dayAt(9, 25); // 25/10 : 25 h, le retour à l'heure d'hiver
+    const shortDay = dayAt(2, 29); // 29/03 : 23 h, le passage à l'heure d'été
+
+    expect(toNextDayStart(longDay) - longDay).toBe(25 * HOUR_MS);
+    expect(toNextDayStart(shortDay) - shortDay).toBe(23 * HOUR_MS);
+    for (const day of [longDay, shortDay]) {
+      expect(toParisDay(toNextDayStart(day))).not.toBe(toParisDay(day));
+      expect(toParisDay(toPreviousDayStart(day))).not.toBe(toParisDay(day));
+      expect(toNextDayStart(toPreviousDayStart(day))).toBe(day);
+      expect(toPreviousDayStart(toNextDayStart(day))).toBe(day);
+    }
+    expect(toParisDay(toNextDayStart(longDay))).toBe("2026-10-26");
+    expect(toParisDay(toPreviousDayStart(dayAt(9, 26)))).toBe("2026-10-25");
+    expect(toParisDay(toPreviousDayStart(dayAt(2, 30)))).toBe("2026-03-29");
   });
 });
 

@@ -1,0 +1,23 @@
+/* Le choix du jour de la fenêtre Développeur : une flèche, la date, une flèche. */
+
+.lp-day-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* La date a une largeur fixe : « Aujourd'hui » et « lun. 13 oct. 2025 » ne déplacent pas les flèches */
+.lp-day-switch-label {
+  min-width: 9.5em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Le jour montré pendant que le suivant se charge : grisé, comme les courbes qui attendent leur période */
+.lp-day-content {
+  transition: opacity var(--lp-dur-fast) ease;
+}
+
+.lp-day-content.is-stale {
+  opacity: 0.5;
+}

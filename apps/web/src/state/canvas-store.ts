@@ -12,6 +12,7 @@ import {
 } from "@liveplace/domain";
 import type {
   AckFrame,
+  ActivityDay,
   ActivityFrame,
   ActivityHistory,
   AuthoredPixel,
@@ -156,6 +157,8 @@ export type CanvasStore = {
   // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul, le gateway décide. Redit à chaque reprise de la socket.
   watchActivity(isWatching: boolean): void;
   listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityHistory>>;
+  // Écart §4.2 (JOURNAL 2026-10-14) : un jour passé, `dayAt` étant le début de son jour de Paris, lu une fois.
+  listActivityDay(dayAt: Timestamp): Promise<RequestResult<ActivityDay>>;
   listenActivity(listener: (frame: ActivityFrame) => void): () => void;
   // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, avec ses propres frames.
   watchCapacity(isWatching: boolean): void;
@@ -190,6 +193,7 @@ type ReplyFrame = Extract<
       | "authorPixels"
       | "resized"
       | "activityHistory"
+      | "activityDay"
       | "capacityHistory";
   }
 >;
@@ -563,6 +567,7 @@ export function createCanvasStore(
       case "authorPixels":
       case "resized":
       case "activityHistory":
+      case "activityDay":
       case "capacityHistory":
         answer(frame);
         break;
@@ -761,9 +766,15 @@ export function createCanvasStore(
     listActivityHistory: (period) =>
       request({ t: "listActivityHistory", requestId: crypto.randomUUID(), period }, (reply) =>
         reply.t === "activityHistory"
-          ? { points: reply.points, canvasPoints: reply.canvasPoints }
+          ? { points: reply.points, canvasPoints: reply.canvasPoints, firstDayAt: reply.firstDayAt }
           : undefined,
       ),
+    listActivityDay: (dayAt) =>
+      request({ t: "listActivityDay", requestId: crypto.randomUUID(), dayAt }, (reply) => {
+        if (reply.t !== "activityDay") return undefined;
+        const { t, requestId, ...day } = reply;
+        return day;
+      }),
     listenActivity(listener) {
       activityListeners.add(listener);
       return () => activityListeners.delete(listener);

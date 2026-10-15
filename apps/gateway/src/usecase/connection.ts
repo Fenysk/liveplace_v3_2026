@@ -80,6 +80,7 @@ type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" }>;
+type ListActivityDayFrame = Extract<ClientFrame, { t: "listActivityDay" }>;
 type ListCapacityHistoryFrame = Extract<ClientFrame, { t: "listCapacityHistory" }>;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
@@ -795,6 +796,17 @@ export function createConnection(
     if (history) socket.sendFrame({ t: "activityHistory", requestId, ...history });
   };
 
+  // Écart §4.2 (JOURNAL 2026-10-14) : de même pour un jour passé. Un jour futur est refusé pour cette requête seule.
+  const listActivityDay = async (
+    { requestId, dayAt }: ListActivityDayFrame,
+    ready: ReadyState,
+  ): Promise<void> => {
+    const result = await deps.activity.listDay(session, dayAt, ready.canvasId);
+    if (!result) return;
+    if (!result.ok) return socket.sendFrame({ t: "error", code: "invalid_frame", requestId });
+    socket.sendFrame({ t: "activityDay", requestId, ...result.value });
+  };
+
   // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, qui n'a rien de propre au canvas de la socket.
   const listCapacityHistory = async ({ requestId, period }: ListCapacityHistoryFrame): Promise<void> => {
     const history = await deps.capacity.listHistory(session, period);
@@ -811,6 +823,7 @@ export function createConnection(
       frame.t !== "ping" &&
       frame.t !== "watchActivity" &&
       frame.t !== "listActivityHistory" &&
+      frame.t !== "listActivityDay" &&
       frame.t !== "watchCapacity" &&
       frame.t !== "listCapacityHistory"
     )
@@ -852,6 +865,8 @@ export function createConnection(
         return deps.activity.watch(socket, session, frame.isWatching, ready.canvasId);
       case "listActivityHistory":
         return listActivityHistory(frame, ready);
+      case "listActivityDay":
+        return listActivityDay(frame, ready);
       case "watchCapacity":
         return deps.capacity.watch(socket, session, frame.isWatching);
       case "listCapacityHistory":

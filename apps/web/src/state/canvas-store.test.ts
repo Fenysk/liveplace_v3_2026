@@ -1561,6 +1561,68 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
     expect(await listed).toEqual({ ok: true, value: { points: [], canvasPoints: [canvasPoint] } });
   });
 
+  // Rend avec l'historique le plus ancien jour gardé quand le gateway le dit (JOURNAL 2026-10-14)
+  it("gives with the history the oldest kept day when the gateway says it", async () => {
+    const { store, sent, receive } = setup();
+
+    const listed = store.listActivityHistory("month");
+    const asked = sent.at(-1);
+    if (asked?.t !== "listActivityHistory") throw new Error("aucune frame listActivityHistory");
+    receive({ t: "activityHistory", requestId: asked.requestId, points: [], firstDayAt: 1_759_615_200_000 });
+
+    expect(await listed).toEqual({ ok: true, value: { points: [], firstDayAt: 1_759_615_200_000 } });
+  });
+
+  // Demande un jour passé par son début, le rend sans sa requête, réglé par la réponse, ou par la coupure (JOURNAL 2026-10-14)
+  it("asks a past day by its start, gives it without its request, settled by the answer or by the drop", async () => {
+    const { store, sent, receive, close } = setup();
+    const dayAt = 1_759_615_200_000;
+    const day = {
+      dayAt,
+      grain: "hour" as const,
+      points: [],
+      canvases: [
+        {
+          canvasId: "c1",
+          point: {
+            at: dayAt,
+            people: 1,
+            streamedMinutes: 2,
+            pixels: 3,
+            visits: 4,
+            phoneVisits: 1,
+            visitMinutes: 5,
+            signups: 0,
+          },
+        },
+      ],
+      here: { canvasId: "c1", grain: "hour" as const, points: [] },
+    };
+
+    const listed = store.listActivityDay(dayAt);
+    const asked = sent.at(-1);
+    if (asked?.t !== "listActivityDay") throw new Error("aucune frame listActivityDay");
+    receive({ t: "activityDay", requestId: asked.requestId, ...day });
+    const dropped = store.listActivityDay(dayAt - 86_400_000);
+    close();
+
+    expect(asked.dayAt).toBe(dayAt);
+    expect(await listed).toEqual({ ok: true, value: day });
+    expect(await dropped).toEqual({ ok: false, error: "closed" });
+  });
+
+  // Rend le refus d'un jour futur à sa seule requête : la connexion reste ouverte
+  it("gives the refusal of a future day to its own request alone: the connection stays open", async () => {
+    const { store, sent, receive } = setup();
+
+    const refused = store.listActivityDay(Date.UTC(2100, 0, 1));
+    const asked = sent.at(-1);
+    if (asked?.t !== "listActivityDay") throw new Error("aucune frame listActivityDay");
+    receive({ t: "error", code: "invalid_frame", requestId: asked.requestId });
+
+    expect(await refused).toEqual({ ok: false, error: "invalid_frame" });
+  });
+
   // Donne chaque frame activity à qui écoute, jusqu'à ce qu'il se retire
   it("hands each activity frame to its listeners, until they stop listening", () => {
     const { store, receive } = setup();
