@@ -1,4 +1,4 @@
-// `/confidentialite` : une page vide, en attendant le texte (JOURNAL 2026-09-27).
+// `/confidentialite` : le titre et une ligne qui dit la page en chantier, en attendant le texte (JOURNAL 2026-09-27).
 
 import { useEffect } from "react";
 import { NoticePill } from "../design/pill";
@@ -13,7 +13,9 @@ export const PrivacyPage = () => {
   }, [t]);
   return (
     <main>
-      <NoticePill title={t.title} />
+      <NoticePill title={t.title}>
+        <p className="lp-type-body lp-muted lp-prompt">{t.underConstruction}</p>
+      </NoticePill>
     </main>
   );
 };

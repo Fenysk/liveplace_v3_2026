@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-22 — Écart §14 (amende l'entrée du 07/10 sur le choix de la langue) : l'accueil `/` laisse choisir la langue et l'apparence
+
+**Contexte.** L'entrée du 07/10 réservait le choix de la langue à Mon compte, et un invité gardait la langue de son navigateur. L'accueil est la page que découvre un streamer, sans compte : Alexis veut y choisir la langue et l'apparence (demande du 22/10).
+**Décision.** L'accueil montre en haut à droite, en face du mot-symbole, la langue (les deux choix côte à côte, ou sur un écran étroit un bouton « FR » qui passe à la suivante) et le bouton d'apparence de la pill Compte. Le choix écrit le même cookie `lp_locale` et le même `localStorage`, sans requête ; le titre de l'onglet et la description de `/` suivent la langue sans recharger. La pill Compte ne porte toujours pas la langue.
+**Renoncement.** Pas de langue ajoutée à la pill Compte ni à un pied de page. Pas les deux choix côte à côte sur un téléphone : à 375 px ils prennent 218 px et le mot-symbole 146 px, pour 343 px de place.
+
 ## 2026-10-22 — Écart §9.1 : `/` devient la page d'accueil, avec une démo jouable qui reste dans le navigateur
 
 **Contexte.** `/` est la seule page indexée et n'affiche qu'un bouton : le streamer qui découvre LivePlace n'y apprend rien (analyse du 22/10 : 16 visites par jour, 58 comptes sur 68 venus de la page d'un streamer). Alexis a retenu la piste B3 : un écran montre un faux stream, un téléphone devant lui l'interface mobile, et chaque pixel envoyé s'envole vers sa case de la fresque du stream.

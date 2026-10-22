@@ -72,10 +72,39 @@
   }
 }
 
-/* Le mot-symbole : « LivePlace » en lettres, en haut à gauche comme l'en-tête d'un site. Sans pill, sans icône, sans forme. */
+/* L'en-tête d'un site : le mot-symbole à gauche, les réglages à droite, sur la même ligne */
+.lp-home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Le mot-symbole : « LivePlace » en lettres. Sans pill, sans icône, sans forme. */
 .lp-home-wordmark {
   margin: 0;
   color: var(--ink);
+}
+
+.lp-home-settings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* La langue : les deux choix côte à côte ; sur un écran étroit, ils ne tiennent pas à côté du mot-symbole, un bouton les remplace */
+.lp-home-locale--cycle {
+  display: none;
+}
+
+@container lp-home (max-width: 640px) {
+  .lp-home-locale--choices {
+    display: none;
+  }
+
+  .lp-home-locale--cycle {
+    display: block;
+  }
 }
 
 .lp-home-layout {

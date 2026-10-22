@@ -26,4 +26,19 @@ describe("la page Confidentialité dans les deux langues (Écart §14, JOURNAL 2
       renderToStaticMarkup(createElement(LocaleProvider, { initial: "en" }, createElement(PrivacyPage))),
     ).toContain("Privacy policy");
   });
+
+  // Tant que le texte n'est pas écrit, la page le dit sur un ton léger, dans la langue du visiteur, sous le titre (React écrit l'apostrophe `&#x27;`)
+  it("says the policy is not written yet, with a joke, in the language of the visitor, under the title", () => {
+    const french = renderToStaticMarkup(createElement(PrivacyPage));
+    const english = renderToStaticMarkup(
+      createElement(LocaleProvider, { initial: "en" }, createElement(PrivacyPage)),
+    );
+
+    expect(french).toContain(
+      "Notre politique de confidentialité est tellement confidentielle qu&#x27;on ne l&#x27;a pas encore écrite.",
+    );
+    expect(english).toContain("Our privacy policy is so private we haven&#x27;t even written it yet.");
+    expect(french.indexOf("Politique de confidentialité")).toBeLessThan(french.indexOf("Notre politique"));
+    expect(english).not.toContain("tellement");
+  });
 });

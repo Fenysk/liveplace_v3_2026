@@ -815,7 +815,7 @@ export const ChoicesEntry = () => {
       slug="choix"
       components={["ChoiceList", "AppearancePicker", "AppearanceButton", "LocalePicker", "SwatchChoice"]}
       file="ui/design/{choice-list,appearance-controls,locale-controls,palette}.tsx"
-      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; la langue se choisit dans Mon compte."
+      note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; la langue se choisit dans Mon compte et sur l'accueil."
     >
       <Block title="Choix exclusif">
         <StateRow name="Choix exclusif" detail="Aucune option présélectionnée.">
@@ -853,13 +853,16 @@ export const ChoicesEntry = () => {
         </StateRow>
         <StateRow
           name="Apparence, comme dans la pill Compte"
-          detail="Au PC seulement : sur mobile, elle vit dans Mon compte."
+          detail="Au PC seulement : sur mobile, elle vit dans Mon compte. Sur l'accueil, le même bouton est en haut à droite, au PC comme sur mobile."
         >
           <AppearanceButton choice={appearanceChoice} onPick={pickAppearance} />
         </StateRow>
       </Block>
       <Block title="Langue">
-        <StateRow name="Langue, comme dans Mon compte" detail="Elle ne se choisit qu'ici.">
+        <StateRow
+          name="Langue, comme dans Mon compte"
+          detail="Dans Mon compte et sur l'accueil, jamais dans la pill Compte. Sur l'accueil, un écran étroit la remplace par un bouton « FR » qui passe à la langue suivante."
+        >
           <LocalePicker />
         </StateRow>
       </Block>

@@ -1,12 +1,15 @@
-// La page d'accueil `/` (Écart §9.1, JOURNAL 2026-10-22) : « LivePlace » en haut à gauche, puis à gauche une phrase et « Lancer ma
-// fresque », à droite la scène. Sur un écran étroit, la phrase et le bouton, puis l'écran du stream, la fresque et la feuille. Le
-// serveur écrit le mot-symbole, la phrase, le bouton et le stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
+// La page d'accueil `/` (Écart §9.1, JOURNAL 2026-10-22) : « LivePlace » en haut à gauche et les réglages (langue, apparence) en haut
+// à droite, puis à gauche une phrase et « Lancer ma fresque », à droite la scène. Sur un écran étroit, la phrase et le bouton, puis
+// l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le stream ; le
+// téléphone se monte dans le navigateur (phone-screen.tsx).
 
 import { SignInButton, SignInNote } from "../design/twitch";
 import { useMediaQuery } from "../design/use-media-query";
 import { useTexts } from "../locale/use-locale";
 import { HomeScene } from "./home-scene";
+import { HomeSettings } from "./home-settings";
 import { HOME_TEXTS } from "./home-texts";
+import { useHomeHead } from "./use-home-head";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -28,7 +31,10 @@ export const HomeContent = ({ isMotionReduced }: { isMotionReduced?: boolean }) 
   const prefersReducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
   return (
     <div className="lp-home">
-      <p className="lp-type-display lp-home-wordmark">LivePlace</p>
+      <div className="lp-home-header">
+        <p className="lp-type-display lp-home-wordmark">LivePlace</p>
+        <HomeSettings />
+      </div>
       <div className="lp-home-layout">
         <HomeIntro />
         <HomeScene isMotionReduced={isMotionReduced ?? prefersReducedMotion} />
@@ -37,9 +43,12 @@ export const HomeContent = ({ isMotionReduced }: { isMotionReduced?: boolean }) 
   );
 };
 
-export const HomePage = () => (
-  <main className="lp-home-page">
-    <div className="lp-void" aria-hidden="true" />
-    <HomeContent />
-  </main>
-);
+export const HomePage = () => {
+  useHomeHead();
+  return (
+    <main className="lp-home-page">
+      <div className="lp-void" aria-hidden="true" />
+      <HomeContent />
+    </main>
+  );
+};

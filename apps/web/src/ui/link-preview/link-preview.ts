@@ -24,7 +24,28 @@ export const PREVIEW_SLICE_SECONDS = 300;
 export const previewImageVersion = (nowMs: number): string =>
   `${PREVIEW_LAYOUT_VERSION}-${Math.floor(nowMs / (PREVIEW_SLICE_SECONDS * 1000))}`;
 
-const SITE_NAME = "LivePlace";
+export const SITE_NAME = "LivePlace";
+
+// Ce que dit la carte d'une page : son adresse, ses textes, et son image de 1200×630 avec sa description.
+export type PageCard = { url: string; title: string; description: string; image: string; imageAlt: string };
+
+// Les `meta` Open Graph et Twitter : celles de la page d'un canvas (ci-dessous) et celles de l'accueil (`home-head.ts`).
+export const pageCardMeta = ({ url, title, description, image, imageAlt }: PageCard): PreviewMeta[] => [
+  { property: "og:type", content: "website" },
+  { property: "og:site_name", content: SITE_NAME },
+  { property: "og:url", content: url },
+  { property: "og:title", content: title },
+  { property: "og:description", content: description },
+  { property: "og:image", content: image },
+  { property: "og:image:type", content: "image/png" },
+  { property: "og:image:width", content: String(PREVIEW_IMAGE_WIDTH) },
+  { property: "og:image:height", content: String(PREVIEW_IMAGE_HEIGHT) },
+  { property: "og:image:alt", content: imageAlt },
+  { name: "twitter:card", content: "summary_large_image" },
+  { name: "twitter:title", content: title },
+  { name: "twitter:description", content: description },
+  { name: "twitter:image", content: image },
+];
 
 export const linkPreviewMeta = (
   { publicUrl, owner, theme, imageVersion }: LinkPreviewPage,
@@ -32,22 +53,12 @@ export const linkPreviewMeta = (
 ): PreviewMeta[] => {
   const texts = LINK_PREVIEW_TEXTS[locale];
   const title = texts.title(owner.displayName);
-  const description = theme ?? texts.description;
-  const image = `${publicUrl}/${encodeURIComponent(owner.login)}/preview.png?v=${imageVersion}`;
-  return [
-    { property: "og:type", content: "website" },
-    { property: "og:site_name", content: SITE_NAME },
-    { property: "og:url", content: `${publicUrl}/${encodeURIComponent(owner.login)}` },
-    { property: "og:title", content: title },
-    { property: "og:description", content: description },
-    { property: "og:image", content: image },
-    { property: "og:image:type", content: "image/png" },
-    { property: "og:image:width", content: String(PREVIEW_IMAGE_WIDTH) },
-    { property: "og:image:height", content: String(PREVIEW_IMAGE_HEIGHT) },
-    { property: "og:image:alt", content: title },
-    { name: "twitter:card", content: "summary_large_image" },
-    { name: "twitter:title", content: title },
-    { name: "twitter:description", content: description },
-    { name: "twitter:image", content: image },
-  ];
+  const address = `${publicUrl}/${encodeURIComponent(owner.login)}`;
+  return pageCardMeta({
+    url: address,
+    title,
+    description: theme ?? texts.description,
+    image: `${address}/preview.png?v=${imageVersion}`,
+    imageAlt: title,
+  });
 };

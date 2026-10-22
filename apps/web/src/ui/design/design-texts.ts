@@ -13,6 +13,10 @@ export const DESIGN_TEXTS = defineTexts({
   sections: { fr: "Sections", en: "Sections" },
 
   language: { fr: "Langue", en: "Language" },
+  localeTip: localized({
+    fr: (choice: string) => `Langue : ${choice}`,
+    en: (choice) => `Language: ${choice}`,
+  }),
   appearance: { fr: "Apparence", en: "Appearance" },
   appearanceAuto: { fr: "Auto", en: "Auto" },
   appearanceLight: { fr: "Clair", en: "Light" },

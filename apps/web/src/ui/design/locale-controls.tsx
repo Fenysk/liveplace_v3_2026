@@ -1,4 +1,4 @@
-// Choisir la langue (Écart §14, JOURNAL 2026-10-07) : les langues côte à côte, dans Mon compte et sur /design. Comme
+// Choisir la langue (Écart §14, JOURNAL 2026-10-07) : les langues côte à côte, dans Mon compte, sur l'accueil et sur /design. Comme
 // l'apparence, mais la langue vit dans le contexte de la page, pas dans ce composant.
 
 import { LOCALE_NAMES, LOCALES, type Locale } from "../locale/locale";

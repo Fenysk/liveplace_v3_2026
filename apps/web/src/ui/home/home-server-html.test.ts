@@ -74,12 +74,34 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
   // « LivePlace » est un mot-symbole : du texte en haut à gauche, avant la phrase, sans pill, sans icône, sans aucune forme
   it("writes LivePlace as a plain wordmark at the top, with no pill, no icon and no shape", () => {
     const html = serverHtml();
-    const block = html.slice(html.indexOf('<div class="lp-home">'), html.indexOf("<h1"));
+    const wordmarkStart = html.indexOf('<p class="lp-type-display lp-home-wordmark">');
+    const block = html.slice(wordmarkStart, html.indexOf("</p>", wordmarkStart));
 
     expect(html).toContain('<p class="lp-type-display lp-home-wordmark">LivePlace</p>');
     expect(block.replace(/<[^>]*>/g, "").trim()).toBe("LivePlace");
     expect(block).not.toMatch(/lp-pill|<svg|<i[ >]|lp-home-logo|lp-home-mark/);
     expect(html.indexOf("lp-home-wordmark")).toBeLessThan(html.indexOf("lp-home-monitor"));
+  });
+
+  // En haut à droite, en face du mot-symbole : la langue (les deux choix, et un bouton qui les remplace sur un téléphone) et l'apparence
+  it("writes the language and the appearance across from the wordmark, before the sentence", () => {
+    for (const [locale, words] of [
+      ["fr", { picker: "Langue", tip: "Langue : Français", code: "FR", appearance: "Apparence : Auto" }],
+      ["en", { picker: "Language", tip: "Language: English", code: "EN", appearance: "Appearance: Auto" }],
+    ] as const) {
+      const html = serverHtml(locale);
+      const settings = html.slice(html.indexOf('<div class="lp-home-settings">'), html.indexOf("<h1"));
+
+      expect(html.indexOf("lp-home-wordmark")).toBeLessThan(html.indexOf("lp-home-settings"));
+      expect(settings).toContain(`role="radiogroup" aria-label="${words.picker}"`);
+      expect(settings).toContain("Français");
+      expect(settings).toContain("English");
+      expect(settings).toMatch(new RegExp(`checked=""[^>]*value="${locale}"`));
+      expect(settings).toContain(`title="${words.tip}"`);
+      expect(settings).toContain(`<span>${words.code}</span>`);
+      expect(settings).toContain(`title="${words.appearance}"`);
+      expect(settings.match(/<button/g)).toHaveLength(2);
+    }
   });
 
   // Le lecteur : un fond uni et un streamer filmé en silhouette, une tête ronde et des épaules, rien d'autre (ni décor, ni visage)

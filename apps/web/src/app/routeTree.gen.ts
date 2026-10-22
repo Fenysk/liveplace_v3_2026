@@ -15,6 +15,7 @@ import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
 import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
+import { Route as SitemapDotxmlRouteImport } from './../routes/sitemap[.]xml'
 import { Route as LoginBackgroundRouteImport } from './../routes/$login_.background'
 import { Route as LoginManifestDotwebmanifestRouteImport } from './../routes/$login_.manifest[.]webmanifest'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
@@ -54,6 +55,11 @@ const DesignRoute = DesignRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginBackgroundRoute = LoginBackgroundRouteImport.update({
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login/background': typeof LoginBackgroundRoute
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login/background': typeof LoginBackgroundRoute
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login_/background': typeof LoginBackgroundRoute
   '/$login_/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login_/obs': typeof LoginObsRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/sitemap.xml'
     | '/$login/background'
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/sitemap.xml'
     | '/$login/background'
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/robots.txt'
+    | '/sitemap.xml'
     | '/$login_/background'
     | '/$login_/manifest.webmanifest'
     | '/$login_/obs'
@@ -227,6 +239,7 @@ export interface RootRouteChildren {
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   LoginBackgroundRoute: typeof LoginBackgroundRoute
   LoginManifestDotwebmanifestRoute: typeof LoginManifestDotwebmanifestRoute
   LoginObsRoute: typeof LoginObsRoute
@@ -280,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$login_/background': {
@@ -374,6 +394,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   LoginBackgroundRoute: LoginBackgroundRoute,
   LoginManifestDotwebmanifestRoute: LoginManifestDotwebmanifestRoute,
   LoginObsRoute: LoginObsRoute,
