@@ -1,7 +1,7 @@
 // Une fresque de 12 cases sur 12, celle du téléphone ou celle du stream. La couleur d'une case est une classe
 // `lp-home-tone-N` (home.css), jamais un `style` : le HTML du serveur n'en porte aucun (CSP de production).
 
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { classNames } from "../design/class-names";
 import { GRID_SIDE } from "./home-art";
 import type { CellSwatches } from "./home-demo";
@@ -22,6 +22,10 @@ const cellOf = (target: EventTarget | null): number | null => {
   const cell = target instanceof HTMLElement ? target.dataset.cell : undefined;
   return cell === undefined ? null : Number(cell);
 };
+
+// La case visée : à la souris et au stylet seulement. Au doigt, le survol resterait collé (CDC 2026, §8 Rendu).
+export const targetOf = (pointerType: string, cell: number | null): number | null =>
+  pointerType === "touch" ? null : cell;
 
 // Une seule écoute pour les 144 cases, posée comme celle de la fresque du jeu : la fresque est une image, pas un contrôle.
 const useCellTouch = (grid: RefObject<HTMLDivElement | null>, onTouch: PixelGridProps["onTouch"]): void => {
@@ -46,9 +50,29 @@ const useCellTouch = (grid: RefObject<HTMLDivElement | null>, onTouch: PixelGrid
   }, [grid, isTouchable]);
 };
 
+// La case sous la souris d'une fresque qui se touche. Le survol n'agit sur rien : seul un toucher de case lance l'action.
+const useCellTarget = (grid: RefObject<HTMLDivElement | null>, isTouchable: boolean): number | null => {
+  const [target, setTarget] = useState<number | null>(null);
+  useEffect(() => {
+    const element = grid.current;
+    if (!element || !isTouchable) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    element.addEventListener(
+      "pointermove",
+      (event) => setTarget(targetOf(event.pointerType, cellOf(event.target))),
+      { signal },
+    );
+    element.addEventListener("pointerleave", () => setTarget(null), { signal });
+    return () => controller.abort();
+  }, [grid, isTouchable]);
+  return target;
+};
+
 export const PixelGrid = ({ name, cells, draft, onTouch, label }: PixelGridProps) => {
   const grid = useRef<HTMLDivElement>(null);
   useCellTouch(grid, onTouch);
+  const target = useCellTarget(grid, onTouch !== undefined);
   return (
     <div
       ref={grid}
@@ -67,6 +91,7 @@ export const PixelGrid = ({ name, cells, draft, onTouch, label }: PixelGridProps
               "lp-home-cell",
               colorIndex !== undefined && `lp-home-tone-${colorIndex}`,
               draftColor !== undefined && "is-draft",
+              target === cell && "is-target",
             )}
           />
         );

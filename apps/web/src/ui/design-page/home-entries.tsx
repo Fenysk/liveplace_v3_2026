@@ -19,7 +19,7 @@ export const HomeEntry = () => {
       slug="accueil"
       components={["HomeContent"]}
       file="ui/home/home-page.tsx"
-      note="La page d'accueil `/` : « LivePlace » en lettres en haut à gauche, une phrase, « Lancer ma fresque », et une scène. Un écran montre un faux stream (des formes et des squelettes, un streamer en silhouette, aucun texte), et devant lui un téléphone montre la vraie interface mobile. Chaque pixel envoyé s'envole de sa case à SA case sur le stream. Tout reste dans la page : aucune connexion, aucune requête."
+      note="La page d'accueil `/` : « LivePlace » en lettres en haut à gauche, une phrase, « Lancer ma fresque », et une scène. Un écran montre un faux stream (des formes et des squelettes, un streamer en silhouette, la fresque du stream cernée d'un trait fin, aucun texte), et devant lui un téléphone montre la vraie interface mobile. Au PC, le téléphone est un iPhone simple : un îlot, une barre d'état, une barre d'accueil, un écran uni, et l'interface commence sous la barre d'état. À la souris, la case visée sur sa fresque prend le trait double du jeu. Chaque pixel envoyé s'envole de sa case à SA case sur le stream. Tout reste dans la page : aucune connexion, aucune requête."
     >
       <Block title="Rejouer" hasCount={false}>
         <StateRow
@@ -33,7 +33,7 @@ export const HomeEntry = () => {
       <Block title="Au PC">
         <StateRow
           name="Large"
-          detail="À partir de 840 px de large : la phrase à gauche, la scène à droite. Le téléphone ne cache jamais la fresque du stream."
+          detail="À partir de 840 px de large : la phrase à gauche, la scène à droite. Le téléphone ne cache jamais la fresque du stream ni la tête du streamer, qui se tient au plus près de lui. Passe la souris sur la fresque du téléphone : la case visée est cernée."
           isDemo
         >
           <InHome width="pc">

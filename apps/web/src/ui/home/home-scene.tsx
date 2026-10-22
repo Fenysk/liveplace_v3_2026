@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { FakeStream } from "./fake-stream";
 import type { LaunchedPixel } from "./home-demo";
 import { motionPlan } from "./home-script";
+import { PhoneChrome } from "./phone-chrome";
 import { PhoneScreen } from "./phone-screen";
 import { createSceneEffects, type SceneEffects, stepTarget } from "./scene-effects";
 import { useAutoplay } from "./use-autoplay";
@@ -63,6 +64,7 @@ export const HomeScene = ({ isMotionReduced }: { isMotionReduced: boolean }) => 
       <FakeStream streamed={state.streamed} chat={chat} />
       <div className="lp-home-phone">
         <div className="lp-home-screen">
+          <PhoneChrome />
           {isMounted && (
             <PhoneScreen
               state={state}

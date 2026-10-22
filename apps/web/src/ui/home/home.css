@@ -209,6 +209,7 @@
   --lp-home-ink-dim: #26262b;
   --lp-home-backdrop: #4b5568;
   --lp-home-person: #262b36;
+  --lp-home-outline: #f6e8e0;
   width: 94%;
   margin-left: auto;
 }
@@ -314,7 +315,8 @@
 }
 
 /* Le lecteur : un fond uni, un streamer filmé à gauche (une silhouette en buste d'une seule teinte, posée en bas : une tête
-   ronde, des épaules arrondies, rien d'autre), et la fresque du stream à droite, entièrement visible */
+   ronde, des épaules arrondies, rien d'autre), et la fresque du stream à droite, entièrement visible. La silhouette est
+   grande (le haut de la tête à un tiers du lecteur) et la tête fait la moitié des épaules. */
 .lp-home-player {
   position: relative;
   flex: none;
@@ -325,17 +327,30 @@
 
 .lp-home-person {
   position: absolute;
-  left: 33%;
+  left: 22%;
   bottom: 0;
-  width: 23%;
-  aspect-ratio: 1 / 1.05;
+  width: 34%;
+  aspect-ratio: 1 / 1.1;
+}
+
+/* Au PC, la silhouette se tient au plus près du téléphone, à qui elle s'accorde : la tête commence 2,5 cqw (8 px au moins) après
+   son bord droit, les épaules passent derrière lui, et rétrécissent quand la place manque entre le téléphone et la fresque (6 px
+   de marge). Le lecteur commence à 12,383 cqw + 7,9 px du bord gauche de la scène (écran à 94 % de la scène, cadre de 7 px,
+   colonne des chaînes à 6 %) ; la fresque du stream, à 59 % du lecteur (68 % de l'écran), soit 40,12 cqw. */
+@container lp-home (min-width: 641px) {
+  .lp-home-person {
+    --lp-home-head-left: calc(var(--lp-home-phone-w) - 12.383cqw - 7.9px + max(8px, 2.5cqw));
+    --lp-home-person-w: min(23.12cqw, max(0px, calc((40.12cqw - 6px - var(--lp-home-head-left)) / 0.75)));
+    left: calc(var(--lp-home-head-left) - var(--lp-home-person-w) / 4);
+    width: var(--lp-home-person-w);
+  }
 }
 
 .lp-home-person-head {
   position: absolute;
-  left: 29%;
-  top: 10%;
-  width: 42%;
+  left: 25%;
+  top: 0;
+  width: 50%;
   aspect-ratio: 1;
   border-radius: 50%;
   background: var(--lp-home-person);
@@ -351,7 +366,8 @@
   background: var(--lp-home-person);
 }
 
-/* Les pixels seuls, sur le jeu : comme la vue OBS, ni vide, ni damier, ni bordure */
+/* Les pixels seuls, sur le jeu, comme la vue OBS : ni vide, ni damier. Un contour fin les cerne, comme celui de la fresque du
+   jeu (--canvas-border) ; l'écran n'a pas d'apparence, le trait est clair en clair comme en sombre. */
 .lp-home-grid--stream {
   position: absolute;
   top: 9%;
@@ -361,6 +377,7 @@
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   grid-template-rows: repeat(12, 1fr);
+  outline: 1px solid var(--lp-home-outline);
 }
 
 /* La ligne de la chaîne sous le lecteur : un rond, deux barres, deux boutons */
@@ -478,57 +495,112 @@
   width: 13cqw;
 }
 
-/* Le téléphone : l'écran est construit à une vraie largeur de téléphone, avec les vrais composants à leur taille réelle, puis
-   réduit par `scale`. La boîte du cadre a la taille réduite, `transform` ne touchant pas la mise en page. Il grandit avec la
-   scène, par paliers de sa largeur ; il reste loin de la fresque du stream, qui est à l'autre bout du lecteur. */
+/* Le téléphone : un iPhone simple (cadre noir, coins très arrondis, îlot, barre d'état, barre d'accueil). L'écran est construit à
+   une vraie largeur de téléphone, avec les vrais composants à leur taille réelle, puis réduit par `scale`. La boîte du cadre a la
+   taille réduite, `transform` ne touchant pas la mise en page. Il grandit avec la scène, par paliers de sa largeur ; l'écran du
+   stream reçoit les mêmes variables : la silhouette du lecteur s'y règle sur la largeur du téléphone. Les zones sûres
+   (`--lp-home-safe-top` et `-bottom`, en pixels de l'écran non réduit) gardent l'interface sous la barre d'état et au-dessus de
+   la barre d'accueil. */
+.lp-home-monitor,
 .lp-home-phone {
   --lp-home-screen-w: 330px;
-  --lp-home-screen-h: 580px;
   --lp-home-scale: 0.85;
-  --lp-home-bezel: 8px;
-  --lp-home-radius: 34px;
+  --lp-home-bezel: 7px;
+  --lp-home-phone-w: calc(var(--lp-home-screen-w) * var(--lp-home-scale) + 2 * var(--lp-home-bezel));
+}
+
+.lp-home-phone {
+  --lp-home-screen-h: 580px;
+  --lp-home-radius: 44px;
+  --lp-home-safe-top: 52px;
+  --lp-home-safe-bottom: 20px;
+  --lp-phone-frame: #05060a;
+  --lp-phone-rim: #3a3d4a;
   position: absolute;
   left: 0;
   bottom: 0;
   z-index: 2;
   box-sizing: border-box;
-  width: calc(var(--lp-home-screen-w) * var(--lp-home-scale) + 2 * var(--lp-home-bezel));
+  width: var(--lp-home-phone-w);
   height: calc(var(--lp-home-screen-h) * var(--lp-home-scale) + 2 * var(--lp-home-bezel));
   padding: var(--lp-home-bezel);
   border-radius: var(--lp-home-radius);
-  background: #10121c;
+  background: var(--lp-phone-frame);
   box-shadow:
-    0 0 0 1px var(--pill-border),
-    0 8px 20px rgba(16, 18, 28, 0.35);
+    0 0 0 1px var(--lp-phone-rim),
+    0 8px 20px rgba(16, 18, 28, 0.35),
+    inset 0 0 0 1px #232532;
+}
+
+/* Les boutons du côté : deux de volume à gauche (le second est l'ombre du premier, décalée), celui d'allumage à droite */
+.lp-home-phone::before,
+.lp-home-phone::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  background: var(--lp-phone-rim);
+}
+
+.lp-home-phone::before {
+  --lp-home-button-h: calc(var(--lp-home-screen-h) * var(--lp-home-scale) * 0.07);
+  left: -3px;
+  top: calc(var(--lp-home-screen-h) * var(--lp-home-scale) * 0.2);
+  height: var(--lp-home-button-h);
+  border-radius: 2px 0 0 2px;
+  box-shadow: 0 calc(var(--lp-home-button-h) * 1.5) 0 0 var(--lp-phone-rim);
+}
+
+.lp-home-phone::after {
+  right: -3px;
+  top: calc(var(--lp-home-screen-h) * var(--lp-home-scale) * 0.26);
+  height: calc(var(--lp-home-screen-h) * var(--lp-home-scale) * 0.11);
+  border-radius: 0 2px 2px 0;
 }
 
 @container lp-scene (max-width: 999px) {
+  .lp-home-monitor,
   .lp-home-phone {
     --lp-home-scale: 0.75;
-    --lp-home-bezel: 7px;
-    --lp-home-radius: 30px;
+    --lp-home-bezel: 6px;
+  }
+
+  .lp-home-phone {
+    --lp-home-radius: 39px;
   }
 }
 
 @container lp-scene (max-width: 799px) {
+  .lp-home-monitor,
   .lp-home-phone {
     --lp-home-scale: 0.62;
-    --lp-home-bezel: 6px;
-    --lp-home-radius: 26px;
+    --lp-home-bezel: 5px;
+  }
+
+  .lp-home-phone {
+    --lp-home-radius: 32px;
   }
 }
 
 @container lp-scene (max-width: 659px) {
+  .lp-home-monitor,
   .lp-home-phone {
     --lp-home-scale: 0.5;
+    --lp-home-bezel: 4px;
+  }
+
+  .lp-home-phone {
+    --lp-home-radius: 26px;
   }
 }
 
 @container lp-scene (max-width: 519px) {
+  .lp-home-monitor,
   .lp-home-phone {
     --lp-home-scale: 0.42;
-    --lp-home-bezel: 5px;
-    --lp-home-radius: 20px;
+  }
+
+  .lp-home-phone {
+    --lp-home-radius: 22px;
   }
 }
 
@@ -545,14 +617,83 @@
   transform: scale(var(--lp-home-scale));
   transform-origin: 0 0;
   border-radius: calc((var(--lp-home-radius) - var(--lp-home-bezel)) / var(--lp-home-scale));
-  background:
-    radial-gradient(circle, var(--void-dot) 0 1px, transparent 1.5px) 50% 50% / 24px 24px,
-    var(--void);
+  /* Un fond uni, la couleur du fond du jeu sans ses points */
+  background: var(--void);
+}
+
+/* Le décor d'iPhone, par-dessus l'interface : l'îlot (une pilule noire centrée), la barre d'état (l'heure à gauche, le réseau, le
+   wifi et la batterie à droite) sur la hauteur de la zone sûre du haut, et la barre d'accueil en bas au centre */
+.lp-home-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.lp-home-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 104px;
+  height: 30px;
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  background: #000000;
+}
+
+.lp-home-statusbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--lp-home-safe-top);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 34px;
+  color: var(--ink);
+}
+
+.lp-home-time {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-home-status-icons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lp-home-signal,
+.lp-home-wifi {
+  width: 16px;
+  height: 11px;
+}
+
+.lp-home-battery {
+  width: 25px;
+  height: 12px;
+}
+
+.lp-home-homebar {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  width: 112px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
 }
 
 .lp-home-identity {
   flex: none;
-  padding: var(--space-2) 0 0 var(--space-2);
+  padding: var(--lp-home-safe-top) 0 0 var(--space-3);
 }
 
 .lp-home-canvas {
@@ -600,10 +741,21 @@
     0 0 0 2px var(--draft-outline-out);
 }
 
-/* La feuille du bas : la barre du jeu sur mobile, pleine largeur ; sa poignée ne bouge pas, la démo ne déplie rien */
+/* La case visée par la souris, comme dans le jeu (render-scene.ts) : un trait double, blanc contre la case, noir autour. Par-dessus
+   le brouillon : la case garde sa couleur. */
+.lp-home-cell.is-target {
+  position: relative;
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px var(--draft-outline-in),
+    0 0 0 2px var(--draft-outline-out);
+}
+
+/* La feuille du bas : la barre du jeu sur mobile, pleine largeur ; sa poignée ne bouge pas, la démo ne déplie rien. Au PC, elle
+   s'arrête au-dessus de la barre d'accueil. */
 .lp-home-sheet {
   flex: none;
-  padding: 0 var(--space-2) var(--space-2);
+  padding: 0 var(--space-2) var(--lp-home-safe-bottom);
 }
 
 .lp-home-sheet .lp-pill,
@@ -673,6 +825,12 @@
     border-radius: 0;
     background: none;
     box-shadow: none;
+  }
+
+  .lp-home-phone::before,
+  .lp-home-phone::after,
+  .lp-home-chrome {
+    display: none;
   }
 
   /* La hauteur de la fresque et de la feuille (414 px) est gardée avant que le téléphone se monte : la page ne saute pas */
