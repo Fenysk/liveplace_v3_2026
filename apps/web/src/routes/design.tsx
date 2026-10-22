@@ -3,6 +3,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { DesignPage } from "../ui/design-page/design-page";
 import designPageCss from "../ui/design-page/design-page.css?url";
+import homeCss from "../ui/home/home.css?url";
 
 export const Route = createFileRoute("/design")({
   beforeLoad: () => {
@@ -10,7 +11,11 @@ export const Route = createFileRoute("/design")({
   },
   head: () => ({
     meta: [{ title: "Design system · LivePlace" }, { name: "robots", content: "noindex" }],
-    links: [{ rel: "stylesheet", href: designPageCss }],
+    links: [
+      { rel: "stylesheet", href: designPageCss },
+      // L'entrée Accueil montre la vraie page : ses classes (Écart §9.1, JOURNAL 2026-10-22).
+      { rel: "stylesheet", href: homeCss },
+    ],
   }),
   component: DesignPage,
 });

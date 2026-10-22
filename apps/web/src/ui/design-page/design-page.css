@@ -797,13 +797,45 @@
 }
 
 /* Un exemple de la largeur d'une grande fenêtre : le nom passe au-dessus, la scène prend toute la largeur */
-.design-state:has(.design-in-large-window) {
+.design-state:has(.design-in-large-window),
+.design-state:has(.design-in-home) {
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
-.design-state:has(.design-in-large-window) .design-state-label {
+.design-state:has(.design-in-large-window) .design-state-label,
+.design-state:has(.design-in-home) .design-state-label {
   padding-top: 0;
+}
+
+/* La page d'accueil (home.css) à la largeur d'une fenêtre, les marges de la page comprises : sa mise en page suit la largeur de
+   son conteneur, pas celle de /design. Elle garde sa largeur : la scène défile plutôt que de passer à la mise en page étroite. */
+.design-in-home {
+  box-sizing: border-box;
+  flex: none;
+  padding: 32px;
+}
+
+.design-in-home--pc {
+  width: 960px;
+}
+
+.design-in-home--tablet {
+  width: 768px;
+}
+
+.design-in-home--phone,
+.design-in-home--narrow {
+  max-width: 100%;
+  padding: var(--space-4);
+}
+
+.design-in-home--phone {
+  width: 375px;
+}
+
+.design-in-home--narrow {
+  width: 320px;
 }
 
 /* Une zone où passer la souris pour voir le vrai curseur de la fresque (cursor-block.tsx) : l'image de l'outil, en grand */

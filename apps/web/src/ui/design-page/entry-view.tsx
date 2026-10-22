@@ -45,6 +45,7 @@ import {
   ViewportPillEntry,
 } from "./game-entries";
 import { GaugeEntry } from "./gauge-entry";
+import { HomeEntry } from "./home-entries";
 import {
   AccountWindowEntry,
   PaletteEntry,
@@ -113,6 +114,8 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "archiver-ou-rouvrir": SwitchWindowEntry,
   "supprimer-une-archive": DiscardWindowEntry,
   "telecharger-en-png": DownloadWindowEntry,
+
+  accueil: HomeEntry,
 };
 
 export const EntryView = ({ slug }: { slug: EntrySlug }) => {

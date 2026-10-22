@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-22 — Écart §9.1 : `/` devient la page d'accueil, avec une démo jouable qui reste dans le navigateur
+
+**Contexte.** `/` est la seule page indexée et n'affiche qu'un bouton : le streamer qui découvre LivePlace n'y apprend rien (analyse du 22/10 : 16 visites par jour, 58 comptes sur 68 venus de la page d'un streamer). Alexis a retenu la piste B3 : un écran montre un faux stream, un téléphone devant lui l'interface mobile, et chaque pixel envoyé s'envole vers sa case de la fresque du stream.
+**Décision.** `/` montre une phrase, « Lancer ma fresque » (le bouton Twitch vers `/auth/twitch`) et cette scène, construite dans le navigateur : aucun WebSocket, aucune requête, aucune donnée réelle. La démo joue seule jusqu'au premier geste ; en mouvement réduit, ni démo seule ni vol. Son bouton dit « Dessiner · n », le jeu garde « Valider ». Sur un écran étroit, le cadre du téléphone disparaît.
+**Renoncement.** La vitrine des fresques en live (vide à 16 visites par jour), une fresque partagée entre visiteurs (des pixels anonymes à modérer sur la seule page indexée), les dispositions « moitié-moitié » et « dessiner sur le stream » (on croirait dessiner sur le stream).
+
 ## 2026-10-14 — Écart §4.2 et §4.3 : le développeur relit un jour passé, frames `listActivityDay` et `activityDay`, protocole 21
 
 **Contexte.** La fenêtre Développeur ne montre que l'instant et des courbes glissantes ; Alexis veut revoir un jour passé, par exemple qui a streamé hier. L'historique garde déjà, sous `activity:`, le point de chaque jour de Paris (global et par canvas) et les minutes et heures dans leur rétention (7 jours, 2 jours par canvas, 366 jours pour les heures).

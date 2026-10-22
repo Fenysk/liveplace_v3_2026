@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronUp,
   Gamepad2,
+  LayoutTemplate,
   MessageSquareWarning,
   Palette,
 } from "lucide-react";
@@ -43,6 +44,7 @@ const CHAPTER_ICONS: Record<DesignChapterId, LucideIcon> = {
   game: Gamepad2,
   window: AppWindow,
   dialogs: MessageSquareWarning,
+  pages: LayoutTemplate,
 };
 
 type ChapterNavProps = {

@@ -1,0 +1,700 @@
+/* L'accueil `/` (Écart §9.1, JOURNAL 2026-10-22). Le serveur écrit la phrase, le bouton et le stream ; le téléphone arrive à
+   l'hydratation. Aucun attribut `style` dans ce que le serveur écrit (CSP de production) : formes, tailles et teintes sont des classes.
+   La mise en page suit la largeur du conteneur, pas celle de la fenêtre : /design montre la même page à 375 px dans un PC. */
+
+/* Les six teintes de la démo : celles de DEMO_PALETTE (home-demo.ts), tirées de la palette de `domain` ; home-tones.test.ts les
+   compare. Le cœur, le soleil et l'herbe, les cases du brouillon et les pixels en vol les prennent. */
+.lp-home-tone-1 {
+  --lp-tone: #10121c;
+  background: var(--lp-tone);
+}
+
+.lp-home-tone-2 {
+  --lp-tone: #ec273f;
+  background: var(--lp-tone);
+}
+
+.lp-home-tone-3 {
+  --lp-tone: #f3a833;
+  background: var(--lp-tone);
+}
+
+.lp-home-tone-4 {
+  --lp-tone: #5ab552;
+  background: var(--lp-tone);
+}
+
+.lp-home-tone-5 {
+  --lp-tone: #3388de;
+  background: var(--lp-tone);
+}
+
+.lp-home-tone-6 {
+  --lp-tone: #ffffff;
+  background: var(--lp-tone);
+}
+
+/* La page : le fond du jeu (.lp-void, fixe à l'écran) derrière, la page par-dessus. Au PC, le bloc prend presque toute la
+   largeur (1600 px au plus) : le mot-symbole en haut, la phrase et la scène centrées dans la hauteur qui reste. */
+.lp-home-page {
+  position: relative;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+@media (min-width: 641px) {
+  .lp-home-page {
+    padding: clamp(24px, 2.5vw, 40px);
+  }
+}
+
+.lp-home {
+  position: relative;
+  container: lp-home / inline-size;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 1600px;
+}
+
+/* La page seule remplit la hauteur de la fenêtre ; sur /design, le bloc garde la sienne */
+.lp-home-page .lp-home {
+  min-height: calc(100dvh - 2 * var(--space-4));
+}
+
+@media (min-width: 641px) {
+  .lp-home-page .lp-home {
+    min-height: calc(100dvh - 2 * clamp(24px, 2.5vw, 40px));
+  }
+}
+
+/* Le mot-symbole : « LivePlace » en lettres, en haut à gauche comme l'en-tête d'un site. Sans pill, sans icône, sans forme. */
+.lp-home-wordmark {
+  margin: 0;
+  color: var(--ink);
+}
+
+.lp-home-layout {
+  display: grid;
+  gap: 32px;
+  align-items: center;
+  justify-items: start;
+}
+
+/* Large : la phrase à gauche, la scène à droite, l'écran du stream autour de 60 % de la fenêtre. Entre deux : la phrase
+   au-dessus, la scène dessous. */
+@container lp-home (min-width: 840px) {
+  .lp-home-layout {
+    grid-template-columns: minmax(260px, 0.3fr) minmax(0, 0.7fr);
+    gap: clamp(32px, 3.5cqw, 56px);
+  }
+}
+
+.lp-home-intro {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.lp-home-headline {
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* La ligne sous le bouton suit le texte, à gauche : elle est centrée là où elle accompagne une pill */
+.lp-home-intro .lp-sign-in-note {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: start;
+  text-wrap: pretty;
+}
+
+/* Au PC, la phrase grandit avec la fenêtre (le mobile garde la taille du design system), et le bouton avec elle : le design system
+   n'a pas de grand bouton, la hauteur de celui-ci vient de la phrase. */
+@container lp-home (min-width: 641px) {
+  .lp-home-intro {
+    --lp-home-cta: clamp(46px, 3.6cqw, 62px);
+    gap: clamp(16px, 1.6cqw, 28px);
+  }
+
+  .lp-home-headline {
+    font-size: clamp(34px, 4cqw, 68px);
+    line-height: 1.08;
+  }
+
+  .lp-home-intro .lp-btn {
+    height: var(--lp-home-cta);
+    padding-inline: calc(var(--lp-home-cta) * 0.5);
+    gap: calc(var(--lp-home-cta) * 0.18);
+    font-size: calc(var(--lp-home-cta) * 0.36);
+    line-height: 1.2;
+  }
+
+  .lp-home-intro .lp-btn svg {
+    width: calc(var(--lp-home-cta) * 0.42);
+    height: calc(var(--lp-home-cta) * 0.42);
+  }
+
+  .lp-home-intro .lp-sign-in-note {
+    font-size: clamp(13px, 1cqw, 16px);
+    line-height: 1.4;
+  }
+}
+
+/* La scène : l'écran du stream, et devant lui, en bas à gauche, le téléphone. Il laisse la fresque du stream, à droite du
+   lecteur, entièrement visible : le cadre du téléphone ne passe que sur la colonne des chaînes et le bas-gauche du lecteur.
+   Au PC, sa largeur suit aussi la hauteur de la fenêtre : l'écran et son pied tiennent sous le mot-symbole sans défilement. */
+.lp-home-scene {
+  position: relative;
+  container: lp-scene / inline-size;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  padding-bottom: 36px;
+  justify-self: center;
+}
+
+@container lp-home (min-width: 641px) {
+  .lp-home-scene {
+    max-width: min(1120px, calc((100dvh - 210px) * 1.85));
+  }
+}
+
+/* Au-dessus de tout : l'onde du doigt et les pixels en vol (scene-effects.ts) */
+.lp-home-effects {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.lp-home-wave {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pill-surface) 55%, transparent);
+}
+
+/* Un carré de 1 px, que `scale` agrandit à la taille de la case (home-flight.ts) */
+.lp-home-fly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  transform-origin: 0 0;
+}
+
+/* Le faux stream : des formes et des squelettes, des gris sombres, rien qui nomme un stream. Un écran n'a pas d'apparence :
+   les mêmes teintes en clair et en sombre. */
+.lp-home-monitor {
+  --lp-home-frame: #1f1f23;
+  --lp-home-top: #18181b;
+  --lp-home-side: #121214;
+  --lp-home-main: #0e0e10;
+  --lp-home-ink: #3a3a40;
+  --lp-home-ink-dim: #26262b;
+  --lp-home-backdrop: #4b5568;
+  --lp-home-person: #262b36;
+  width: 94%;
+  margin-left: auto;
+}
+
+.lp-home-bezel {
+  box-sizing: border-box;
+  padding: 7px;
+  border-radius: 12px;
+  background: var(--lp-home-frame);
+  box-shadow:
+    0 0 0 1px var(--pill-border),
+    var(--pill-shadow);
+}
+
+.lp-home-stand {
+  position: relative;
+  width: 14%;
+  height: 16px;
+  margin: 0 auto;
+  background: var(--lp-home-frame);
+}
+
+.lp-home-stand::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 220%;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 3px;
+  background: var(--lp-home-frame);
+}
+
+/* Une page de stream : la barre du haut, la colonne des chaînes, le lecteur et la ligne de la chaîne, le tchat. Les tailles
+   sont en `cqw` de l'écran : tout suit sa largeur. */
+.lp-home-stream {
+  container: lp-stream / inline-size;
+  position: relative;
+  display: grid;
+  grid-template-columns: 6% minmax(0, 1fr) 26%;
+  grid-template-rows: 8% minmax(0, 1fr);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--lp-home-main);
+}
+
+.lp-home-dot {
+  flex: none;
+  width: 2.6cqw;
+  height: 2.6cqw;
+  border-radius: 50%;
+  background: var(--lp-home-ink);
+}
+
+.lp-home-bar {
+  flex: none;
+  height: 1.1cqw;
+  border-radius: var(--radius-pill);
+  background: var(--lp-home-ink);
+}
+
+.lp-home-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1.6cqw;
+  padding-inline: 1.8cqw;
+  background: var(--lp-home-top);
+}
+
+.lp-home-bar--nav {
+  width: 5cqw;
+}
+
+.lp-home-bar--search {
+  width: 18cqw;
+  height: 2.2cqw;
+  margin-inline: auto;
+  background: var(--lp-home-ink-dim);
+}
+
+.lp-home-channels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4cqw;
+  padding-top: 1.6cqw;
+  background: var(--lp-home-side);
+}
+
+.lp-home-channels .lp-home-dot {
+  width: 3cqw;
+  height: 3cqw;
+}
+
+.lp-home-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--lp-home-main);
+}
+
+/* Le lecteur : un fond uni, un streamer filmé à gauche (une silhouette en buste d'une seule teinte, posée en bas : une tête
+   ronde, des épaules arrondies, rien d'autre), et la fresque du stream à droite, entièrement visible */
+.lp-home-player {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--lp-home-backdrop);
+}
+
+.lp-home-person {
+  position: absolute;
+  left: 33%;
+  bottom: 0;
+  width: 23%;
+  aspect-ratio: 1 / 1.05;
+}
+
+.lp-home-person-head {
+  position: absolute;
+  left: 29%;
+  top: 10%;
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--lp-home-person);
+}
+
+.lp-home-person-shoulders {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52%;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: var(--lp-home-person);
+}
+
+/* Les pixels seuls, sur le jeu : comme la vue OBS, ni vide, ni damier, ni bordure */
+.lp-home-grid--stream {
+  position: absolute;
+  top: 9%;
+  right: 5%;
+  width: 36%;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(12, 1fr);
+}
+
+/* La ligne de la chaîne sous le lecteur : un rond, deux barres, deux boutons */
+.lp-home-channel-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1.6cqw;
+  padding-inline: 1.8cqw;
+}
+
+.lp-home-dot--channel {
+  width: 4.4cqw;
+  height: 4.4cqw;
+}
+
+.lp-home-channel-text {
+  flex: 1;
+  display: grid;
+  gap: 0.9cqw;
+}
+
+.lp-home-channel-row .lp-home-bar--title {
+  width: 13cqw;
+}
+
+.lp-home-bar--subtitle {
+  width: 8cqw;
+  background: var(--lp-home-ink-dim);
+}
+
+.lp-home-bar--button {
+  width: 6cqw;
+  height: 2.6cqw;
+}
+
+/* Le tchat : un squelette qui avance comme un vrai (fake-stream.tsx). Les lignes se posent en bas, la liste les pousse vers le haut. */
+.lp-home-chat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--lp-home-ink-dim);
+  background: var(--lp-home-side);
+}
+
+.lp-home-chat-head {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 4cqw;
+  border-bottom: 1px solid var(--lp-home-ink-dim);
+}
+
+.lp-home-chat-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-inline: 1.6cqw;
+}
+
+.lp-home-chat-input {
+  flex: none;
+  height: 3.4cqw;
+  margin: 1.4cqw;
+  border-radius: 1cqw;
+  background: var(--lp-home-ink-dim);
+}
+
+.lp-home-line {
+  flex: none;
+  display: grid;
+  gap: 0.7cqw;
+  padding-top: 1.5cqw;
+}
+
+.lp-home-line-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqw;
+}
+
+.lp-home-bar--name {
+  width: 5cqw;
+}
+
+.lp-home-bar--text,
+.lp-home-bar--more {
+  background: var(--lp-home-ink-dim);
+}
+
+.lp-home-bar--more {
+  width: 7cqw;
+}
+
+.lp-home-line--xs .lp-home-bar--text {
+  width: 3cqw;
+}
+
+.lp-home-line--s .lp-home-bar--text {
+  width: 5.5cqw;
+}
+
+.lp-home-line--m .lp-home-bar--text {
+  width: 8cqw;
+}
+
+.lp-home-line--l .lp-home-bar--text {
+  width: 10.5cqw;
+}
+
+.lp-home-line--xl .lp-home-bar--text {
+  width: 13cqw;
+}
+
+/* Le téléphone : l'écran est construit à une vraie largeur de téléphone, avec les vrais composants à leur taille réelle, puis
+   réduit par `scale`. La boîte du cadre a la taille réduite, `transform` ne touchant pas la mise en page. Il grandit avec la
+   scène, par paliers de sa largeur ; il reste loin de la fresque du stream, qui est à l'autre bout du lecteur. */
+.lp-home-phone {
+  --lp-home-screen-w: 330px;
+  --lp-home-screen-h: 580px;
+  --lp-home-scale: 0.85;
+  --lp-home-bezel: 8px;
+  --lp-home-radius: 34px;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  width: calc(var(--lp-home-screen-w) * var(--lp-home-scale) + 2 * var(--lp-home-bezel));
+  height: calc(var(--lp-home-screen-h) * var(--lp-home-scale) + 2 * var(--lp-home-bezel));
+  padding: var(--lp-home-bezel);
+  border-radius: var(--lp-home-radius);
+  background: #10121c;
+  box-shadow:
+    0 0 0 1px var(--pill-border),
+    0 8px 20px rgba(16, 18, 28, 0.35);
+}
+
+@container lp-scene (max-width: 999px) {
+  .lp-home-phone {
+    --lp-home-scale: 0.75;
+    --lp-home-bezel: 7px;
+    --lp-home-radius: 30px;
+  }
+}
+
+@container lp-scene (max-width: 799px) {
+  .lp-home-phone {
+    --lp-home-scale: 0.62;
+    --lp-home-bezel: 6px;
+    --lp-home-radius: 26px;
+  }
+}
+
+@container lp-scene (max-width: 659px) {
+  .lp-home-phone {
+    --lp-home-scale: 0.5;
+  }
+}
+
+@container lp-scene (max-width: 519px) {
+  .lp-home-phone {
+    --lp-home-scale: 0.42;
+    --lp-home-bezel: 5px;
+    --lp-home-radius: 20px;
+  }
+}
+
+.lp-home-screen {
+  /* Un téléphone, c'est le doigt : des contrôles de 44 px, quel que soit le pointeur de celui qui regarde */
+  --control-size: var(--control-size-touch);
+  position: relative;
+  box-sizing: border-box;
+  width: var(--lp-home-screen-w);
+  height: var(--lp-home-screen-h);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(var(--lp-home-scale));
+  transform-origin: 0 0;
+  border-radius: calc((var(--lp-home-radius) - var(--lp-home-bezel)) / var(--lp-home-scale));
+  background:
+    radial-gradient(circle, var(--void-dot) 0 1px, transparent 1.5px) 50% 50% / 24px 24px,
+    var(--void);
+}
+
+.lp-home-identity {
+  flex: none;
+  padding: var(--space-2) 0 0 var(--space-2);
+}
+
+.lp-home-canvas {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* La fresque du téléphone : 21 px la case (le jeu, sur un téléphone), le damier des cases vides et la grille du jeu */
+.lp-home-grid--phone {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 21px);
+  grid-template-rows: repeat(12, 21px);
+  border: 1px solid var(--canvas-border);
+  background:
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0) 0
+    0 / 16px 16px;
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.lp-home-grid--phone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px) 0 0 / calc(100% / 12) 100%,
+    linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px) 0 0 / 100% calc(100% / 12);
+}
+
+.lp-home-cell {
+  display: block;
+}
+
+/* Une case du brouillon : sa couleur à 60 %, cerclée comme dans le jeu (--draft-outline-in dedans, --draft-outline-out dehors) */
+.lp-home-cell.is-draft {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--lp-tone) 60%, transparent);
+  box-shadow:
+    0 0 0 1px var(--draft-outline-in),
+    0 0 0 2px var(--draft-outline-out);
+}
+
+/* La feuille du bas : la barre du jeu sur mobile, pleine largeur ; sa poignée ne bouge pas, la démo ne déplie rien */
+.lp-home-sheet {
+  flex: none;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.lp-home-sheet .lp-pill,
+.lp-home-sheet .lp-pill-content {
+  width: 100%;
+  max-width: none;
+}
+
+.lp-home-sheet .lp-grabber {
+  cursor: default;
+}
+
+/* Six pastilles de 44 px tiennent dans un téléphone de 320 px : sans espace fixe, l'espace restant se répartit entre elles */
+.lp-home-sheet .lp-palette--touch {
+  gap: 0;
+}
+
+/* Sur un écran étroit, le cadre du téléphone disparaît : le vrai téléphone du visiteur en tient lieu. Le stream n'a plus que son
+   lecteur (ni pied, ni colonne des chaînes, ni tchat), puis viennent la fresque et la feuille, sans pill d'identité. */
+@container lp-home (max-width: 640px) {
+  .lp-home-layout {
+    gap: var(--space-4);
+  }
+
+  .lp-home-intro .lp-btn {
+    align-self: stretch;
+  }
+
+  .lp-home-scene {
+    display: grid;
+    gap: var(--space-4);
+    padding-bottom: 0;
+  }
+
+  .lp-home-monitor {
+    width: 100%;
+  }
+
+  .lp-home-bezel {
+    padding: 5px;
+    border-radius: 9px;
+  }
+
+  .lp-home-stand,
+  .lp-home-top,
+  .lp-home-channels,
+  .lp-home-channel-row,
+  .lp-home-chat {
+    display: none;
+  }
+
+  .lp-home-stream {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .lp-home-player {
+    flex: 1;
+    aspect-ratio: auto;
+  }
+
+  .lp-home-phone {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  /* La hauteur de la fresque et de la feuille (414 px) est gardée avant que le téléphone se monte : la page ne saute pas */
+  .lp-home-screen {
+    width: auto;
+    height: auto;
+    min-height: 414px;
+    overflow: visible;
+    transform: none;
+    border-radius: 0;
+    background: none;
+  }
+
+  .lp-home-identity {
+    display: none;
+  }
+
+  .lp-home-canvas {
+    padding-bottom: var(--space-4);
+  }
+
+  .lp-home-sheet {
+    padding: 0;
+  }
+}

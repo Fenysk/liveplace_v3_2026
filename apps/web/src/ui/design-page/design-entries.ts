@@ -1,6 +1,6 @@
-// Le sommaire de /design : cinq chapitres, une entrée à la fois. Des données pures, sans React.
+// Le sommaire de /design : six chapitres, une entrée à la fois. Des données pures, sans React.
 
-export type DesignChapterId = "foundations" | "components" | "game" | "window" | "dialogs";
+export type DesignChapterId = "foundations" | "components" | "game" | "window" | "dialogs" | "pages";
 
 export type DesignChapter = { id: DesignChapterId; title: string };
 
@@ -18,6 +18,7 @@ export const DESIGN_CHAPTERS: readonly DesignChapter[] = [
   { id: "game", title: "L'écran de jeu" },
   { id: "window", title: "La fenêtre" },
   { id: "dialogs", title: "Les petites fenêtres" },
+  { id: "pages", title: "Les pages" },
 ];
 
 // Une entrée par slug : la clé est l'adresse (`/design#dessin`), l'ordre est celui du sommaire.
@@ -72,6 +73,8 @@ const ENTRIES_BY_SLUG = {
   "archiver-ou-rouvrir": { title: "Archiver ou rouvrir", chapterId: "dialogs" },
   "supprimer-une-archive": { title: "Supprimer une archive", chapterId: "dialogs" },
   "telecharger-en-png": { title: "Télécharger en PNG", chapterId: "dialogs" },
+
+  accueil: { title: "Accueil", chapterId: "pages" },
 } as const satisfies Record<string, Omit<DesignEntry, "slug">>;
 
 export type EntrySlug = keyof typeof ENTRIES_BY_SLUG;

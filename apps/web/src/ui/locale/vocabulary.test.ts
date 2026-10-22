@@ -9,6 +9,7 @@ import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { HELP_TEXTS } from "../help/help-texts";
 import { HINT_TEXTS } from "../hint/hint-texts";
+import { HOME_TEXTS } from "../home/home-texts";
 import { INSPECTION_TEXTS } from "../inspection/inspection-texts";
 import { LINK_PREVIEW_TEXTS } from "../link-preview/link-preview-texts";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -22,6 +23,7 @@ const MODULES = {
   design: DESIGN_TEXTS,
   help: HELP_TEXTS,
   hint: HINT_TEXTS,
+  home: HOME_TEXTS,
   inspection: INSPECTION_TEXTS,
   linkPreview: LINK_PREVIEW_TEXTS,
   moderation: MODERATION_TEXTS,
