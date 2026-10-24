@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-24 — Écart §5.3 : réduire une fresque rapproche ses dessins avant de couper
+
+**Contexte.** Réduire coupait depuis le coin haut-gauche (entrée du 2026-09-29, bloc 1) : un dessin à droite ou en bas disparaissait, même entouré de vide. Alexis veut garder le plus de dessins possible (exemples validés le 22/10).
+**Décision.** Le domain calcule un plan pur : retirer des colonnes (des lignes en hauteur) entièrement vides, d'abord au bord droit (bas), puis le plus grand vide d'abord ; au moins 1 case vide reste entre deux dessins, un bord peut tomber à 0. Si ça ne suffit pas, chaque bande séparée des autres par une ligne (colonne) vide se rapproche de son côté ; ensuite seulement, on coupe ce qui dépasse, gardé hors du cadre comme avant. `resize.lua` applique le plan d'un coup (`hist:`, `cells:`, `clearing:`, `state`). Un brouillon est effacé quand des pixels ont bougé. Protocole 22 : `movedAtVersion` dans le `welcome`.
+**Renoncement.** Les preuves de ban, `cleared:recent:` et les chunks gardent les positions de l'époque ; les pixels déjà cachés par une réduction d'avant ne bougent pas. Un dessin ne glisse jamais seul hors de ces bandes.
+
 ## 2026-10-22 — Écart §14 (amende l'entrée du 07/10 sur le choix de la langue) : l'accueil `/` laisse choisir la langue et l'apparence
 
 **Contexte.** L'entrée du 07/10 réservait le choix de la langue à Mon compte, et un invité gardait la langue de son navigateur. L'accueil est la page que découvre un streamer, sans compte : Alexis veut y choisir la langue et l'apparence (demande du 22/10).

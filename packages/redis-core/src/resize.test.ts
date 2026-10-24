@@ -37,11 +37,13 @@ const resize = async (canvasId: string, width: number, height: number, by = OWNE
   core.resizeCanvas(canvasId, { by, width, height });
 
 describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
-  // Rétrécir garde les pixels hors du cadre, invisibles ; ré-agrandir les rend, là où ils étaient
-  it("shrinking keeps the pixels outside the frame, invisible; growing again brings them back where they were", async () => {
+  // Rétrécir rapproche les dessins ; ce qui ne tient toujours pas sort du cadre, invisible, et revient à l'agrandissement
+  it("shrinking brings drawings closer, and what still does not fit stays outside the frame, invisible; growing again brings it back where it was", async () => {
     const { canvasId, keys } = await readyCanvas();
+    // Une ligne de 60 pixels ne tient pas dans 50 colonnes ; les deux autres pixels se rapprochent (Écart §5.3, JOURNAL 2026-10-24).
+    const wide = Array.from({ length: 60 }, (_, x) => ({ x, y: 10, colorIndex: 5 }));
     await placeAs(canvasId, "author-a", [
-      { x: 10, y: 10, colorIndex: 5 },
+      ...wide,
       { x: 80, y: 20, colorIndex: 6 },
       { x: 20, y: 70, colorIndex: 7 },
     ]);
@@ -49,16 +51,16 @@ describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
     expect(await resize(canvasId, 50, 50)).toEqual({ ok: true, value: undefined });
     expect(await redis.strlen(keys.state)).toBe(2500);
     expect(await colorAt(canvasId, 10, 10, 50)).toBe(5);
-    expect(await core.listPixels(canvasId, "author-a")).toEqual([
-      expect.objectContaining({ x: 10, y: 10, colorIndex: 5 }),
-    ]);
+    const visible = await core.listPixels(canvasId, "author-a");
+    expect(visible).toHaveLength(52);
+    expect(visible).toContainEqual(expect.objectContaining({ x: 10, y: 10, colorIndex: 5 }));
 
     await resize(canvasId, 100, 100);
 
     expect(await redis.strlen(keys.state)).toBe(10_000);
-    expect(await colorAt(canvasId, 10, 10, 100)).toBe(5);
-    expect(await colorAt(canvasId, 80, 20, 100)).toBe(6);
-    expect(await colorAt(canvasId, 20, 70, 100)).toBe(7);
+    expect(await colorAt(canvasId, 55, 10, 100)).toBe(5);
+    expect(await colorAt(canvasId, 49, 20, 100)).toBe(6);
+    expect(await colorAt(canvasId, 20, 49, 100)).toBe(7);
   });
 
   // Refuse une pose hors du cadre, et un autre que le streamer
@@ -100,10 +102,15 @@ describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
   it("a clear that reaches a cell outside the frame neither writes nor sends it: `state` stays intact", async () => {
     const { canvasId, keys } = await readyCanvas();
     await placeAs(canvasId, "troll", [
-      { x: 1, y: 0, colorIndex: 5 },
+      { x: 0, y: 0, colorIndex: 5 },
       { x: 60, y: 0, colorIndex: 6 },
     ]);
-    await placeAs(canvasId, "author-a", [{ x: 10, y: 1, colorIndex: 9 }]);
+    // Une ligne sans vide sous le troll : rien ne se rapproche, la case en (60, 0) sort du cadre (Écart §5.3, JOURNAL 2026-10-24).
+    await placeAs(
+      canvasId,
+      "author-a",
+      Array.from({ length: 59 }, (_, index) => ({ x: 1 + index, y: 1, colorIndex: 9 })),
+    );
     await resize(canvasId, 50, 50);
     const before = await redis.getBuffer(keys.state);
 
@@ -119,10 +126,10 @@ describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
     });
 
     const after = await redis.getBuffer(keys.state);
-    expect(after?.[toStateOffset(1, 0, 50)]).toBe(0);
+    expect(after?.[toStateOffset(0, 0, 50)]).toBe(0);
     expect(after?.[toStateOffset(10, 1, 50)]).toBe(9);
-    expect(before?.filter((_, offset) => offset !== toStateOffset(1, 0, 50))).toEqual(
-      after?.filter((_, offset) => offset !== toStateOffset(1, 0, 50)),
+    expect(before?.filter((_, offset) => offset !== toStateOffset(0, 0, 50))).toEqual(
+      after?.filter((_, offset) => offset !== toStateOffset(0, 0, 50)),
     );
   });
 });

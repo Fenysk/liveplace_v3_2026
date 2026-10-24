@@ -214,11 +214,12 @@ export interface CanvasCore {
   listScoreboard(canvasId: string): Promise<ScoreboardEntry[]>;
   listScoreboardRanks(canvasId: string, userIds: readonly string[]): Promise<Map<string, ScoreboardRank>>;
   listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
-  // §5.3 : le streamer seul. Publie le `ctl` `resize`.
+  // §5.3 : le streamer seul. Publie le `ctl` `resize`. Écart §5.3 (JOURNAL 2026-10-24) : `busy`, des poses ont couru pendant
+  // chaque essai du plan, qui n'a pas pu s'appliquer ; rien n'a bougé.
   resizeCanvas(
     canvasId: string,
     resize: CanvasSize & { by: string },
-  ): Promise<Result<void, CanvasRefusal | "forbidden">>;
+  ): Promise<Result<void, CanvasRefusal | "forbidden" | "busy">>;
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
   listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;
   // Le `recent` de la vue OBS (§9.5) : les événements depuis `sinceMs`, du plus ancien au plus récent, 2000 au plus.

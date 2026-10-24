@@ -397,6 +397,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
       createElement(ResizeWindow, {
         next: { width: 64, height: 36 },
         outside: [{ x: 40, y: 3, colorIndex: 4 }],
+        hasMovedPixels: true,
         status: "idle",
         canvas: { width: 64, height: 36, palette: PALETTE },
         onConfirm: doNothing,

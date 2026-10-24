@@ -74,6 +74,11 @@ export const CANVAS_TEXTS = defineTexts({
         ? `${ownerName} switched canvas: your draft stays on the old one.`
         : `${ownerName} switched canvas.`,
   }),
+  // Écart §5.3 (JOURNAL 2026-10-24) : la fresque a rapproché ses dessins, le brouillon parlait d'un autre dessin.
+  draftWiped: {
+    fr: "La fresque a été réduite : ton brouillon a été effacé.",
+    en: "The canvas was shrunk: your draft was cleared.",
+  },
   refused: localized({
     fr: (count: number) =>
       isSingular(count, "fr")
@@ -198,9 +203,9 @@ export const CANVAS_TEXTS = defineTexts({
   }),
   chosenSize: localized({
     fr: ({ format, size }: { format: string; size: string }) =>
-      `${format}, ${size}. Rien ne se perd : ce qui sort du cadre revient quand la fresque s'agrandit.`,
+      `${format}, ${size}. Rien ne se perd : ce qui sort du cadre revient quand la fresque s'agrandit. Réduire rapproche d'abord les dessins.`,
     en: ({ format, size }) =>
-      `${format}, ${size}. Nothing is lost: whatever falls outside the frame comes back when the canvas grows.`,
+      `${format}, ${size}. Nothing is lost: whatever falls outside the frame comes back when the canvas grows. Shrinking brings drawings closer first.`,
   }),
   changeSize: { fr: "Changer la taille", en: "Change size" },
   resizeTitle: localized({
@@ -217,6 +222,11 @@ export const CANVAS_TEXTS = defineTexts({
   nothingOutside: {
     fr: "Aucun pixel posé ne sort du cadre.",
     en: "No placed pixel falls outside the frame.",
+  },
+  // Écart §5.3 (JOURNAL 2026-10-24) : réduire rapproche les dessins avant de couper, et efface les brouillons qui en parlaient.
+  closerSentence: {
+    fr: "Les dessins se rapprochent pour en garder le plus. Les brouillons en cours sont effacés.",
+    en: "Drawings are brought closer to keep as many as possible. Drafts in progress are cleared.",
   },
 
   // Les jauges des viewers (JOURNAL 2026-09-30), montrées dans `/design` pour l'instant.

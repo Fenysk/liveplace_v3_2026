@@ -19,6 +19,7 @@ import type {
   ModerationWindowProps,
 } from "./moderation-window";
 import { usePixelListing } from "./pixel-listing";
+import { useCloseOnMove } from "./use-close-on-move";
 
 // Ce que propose qui modère : retirer ses pixels, ou le bannir.
 type ModeratorKind = "clear" | "ban" | "banAfterClear";
@@ -64,6 +65,9 @@ export function useModeration(canvas: CanvasStore): {
     setScope(PLACEMENT_ONLY);
     list(canvas.listPixels(author.userId), () => setStatus("failed"));
   };
+
+  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, l'aperçu de la fenêtre est faux ; une action qui part est laissée.
+  useCloseOnMove(view.movedAtVersion, request !== null && status !== "running", () => show(null));
 
   // Pas d'étape « après » un ban : la fenêtre et l'inspection se ferment, les pixels partent par le flux.
   const finish = (): void => {

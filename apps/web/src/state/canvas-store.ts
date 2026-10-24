@@ -106,6 +106,9 @@ export type CanvasView = {
   // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, et celui de la personne connectée. Absent : hors live.
   ownerTwitchLive?: TwitchLive | undefined;
   twitchLive?: TwitchLive | undefined;
+  // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Elle change : tout x, y
+  // d'avant (brouillon, inspection, lot en vol, cible de signalement) est périmé. Absent : aucun n'en a déplacé.
+  movedAtVersion?: number | undefined;
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
@@ -417,6 +420,7 @@ export function createCanvasStore(
       isArchived: frame.canvas.archivedAt !== undefined,
       ownerTwitchLive: frame.canvas.ownerTwitchLive,
       twitchLive: frame.you.twitchLive,
+      movedAtVersion: frame.canvas.movedAtVersion,
       params: frame.params,
       gauge: frame.gauge ?? null,
       ...(userId ? { userId } : {}),
@@ -428,12 +432,25 @@ export function createCanvasStore(
     };
   };
 
+  // Écart §5.3 (JOURNAL 2026-10-24) : le welcome dit que des pixels ont changé de case depuis le dernier. Un lot en vol ne se
+  // rejoue jamais à ses anciennes positions, l'inspection (case et réponse attendue) est périmée ; le snapshot qui suit remet l'image.
+  const dropOnMove = (frame: WelcomeFrame): Partial<CanvasView> => {
+    if ((frame.canvas.movedAtVersion ?? 0) === (view.movedAtVersion ?? 0)) return {};
+    settleAllPending({ ok: false, error: "closed" });
+    inspectRequestId = null;
+    return { inspection: null };
+  };
+
   const welcome = (frame: WelcomeFrame): void => {
     heldRecent = frame.recent ?? null;
     missingAsk += 1;
     // Le canvas existe : un `welcome` démentit `canvas_not_found` et `canvas_recovering`, les autres refus restent.
     const isDisproved = view.lastError === "canvas_not_found" || view.lastError === "canvas_recovering";
-    publish({ ...welcomeView(frame), ...(isDisproved ? { lastError: null } : {}) });
+    publish({
+      ...dropOnMove(frame),
+      ...welcomeView(frame),
+      ...(isDisproved ? { lastError: null } : {}),
+    });
     if (hasWelcomed) {
       resendPending();
       // Pendant la coupure, rien n'a dit ce qui a bougé.

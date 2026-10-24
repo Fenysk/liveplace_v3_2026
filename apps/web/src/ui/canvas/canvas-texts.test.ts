@@ -32,6 +32,16 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(en.refused(1200)).toBe("1,200 pixels refused: they stay in the draft.");
   });
 
+  // Une réduction qui rapproche les dessins efface le brouillon des viewers, et la confirmation du streamer le dit (Écart §5.3, JOURNAL 2026-10-24)
+  it("says a shrink wipes the drafts, to the viewer who loses one and to the streamer who confirms", () => {
+    expect(fr.draftWiped).toBe("La fresque a été réduite : ton brouillon a été effacé.");
+    expect(en.draftWiped).toBe("The canvas was shrunk: your draft was cleared.");
+    expect(fr.closerSentence).toContain("Les dessins se rapprochent");
+    expect(fr.closerSentence).toContain("brouillons en cours sont effacés");
+    expect(en.closerSentence).toContain("Drawings are brought closer");
+    expect(en.closerSentence).toContain("Drafts in progress are cleared");
+  });
+
   // Le streamer change de canvas : avec un brouillon, la phrase le dit
   it("says the streamer switched canvas, and that a draft stays on the old one", () => {
     expect(fr.switched({ ownerName: "Kalyss", hasDraft: false })).toBe("Kalyss a changé de fresque.");

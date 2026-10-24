@@ -229,6 +229,9 @@ type SetupOptions = {
   backgroundImageOpacity?: number; // l'opacité de cette image lue dans `meta` (Écart §9.1, JOURNAL 2026-10-10)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   isForbiddenByScripts?: boolean; // les scripts répondent `forbidden`, comme après un rôle perdu que le gateway ignore encore
+  movedAtVersion?: number; // la version du dernier rapprochement qui a déplacé des pixels, lue dans `meta` (Écart §5.3, JOURNAL 2026-10-24)
+  movedOnResize?: number; // la version que pose un rapprochement qui déplace des pixels, comme resize.lua
+  isBusyResizing?: boolean; // resizeCanvas rend `busy` : des poses ont couru pendant chaque essai (Écart §5.3, JOURNAL 2026-10-24)
   isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
   isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
@@ -262,6 +265,7 @@ const setup = (options: SetupOptions = {}) => {
     ...meta,
     ...(options.archivedAt === undefined ? {} : { archivedAt: options.archivedAt }),
     ...(options.theme === undefined ? {} : { theme: options.theme }),
+    ...(options.movedAtVersion === undefined ? {} : { movedAtVersion: options.movedAtVersion }),
     ...(options.backgroundImageAt === undefined ? {} : { backgroundImageAt: options.backgroundImageAt }),
     ...(options.backgroundImageOpacity === undefined
       ? {}
@@ -384,7 +388,13 @@ const setup = (options: SetupOptions = {}) => {
     },
     async resizeCanvas(_asked: string, { width, height }: { width: number; height: number }) {
       if (options.isRefusedByScripts) return archivedRefusal;
-      currentMeta = { ...currentMeta, width, height };
+      if (options.isBusyResizing) return { ok: false as const, error: "busy" as const };
+      currentMeta = {
+        ...currentMeta,
+        width,
+        height,
+        ...(options.movedOnResize === undefined ? {} : { movedAtVersion: options.movedOnResize }),
+      };
       return { ok: true as const, value: undefined };
     },
     async listAuthorPixels(_asked: string, x: number, y: number) {
@@ -1742,6 +1752,45 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
 
     expect(byOwner.sent.at(-1)).toEqual({ t: "resized", requestId: "resize-1" });
     expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "resize-1" });
+  });
+
+  // Dit dans le welcome la version du dernier rapprochement qui a déplacé des pixels, et rien avant le premier
+  it("tells the welcome the version of the last move of pixels, and nothing before the first (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+    const never = setup();
+    const moved = setup({ movedAtVersion: 7 });
+    for (const { connection } of [never, moved]) await connection.receive(hello());
+
+    const welcomeOf = ({ sent }: { sent: readonly unknown[] }) =>
+      sent.find((frame) => hasFrame(frame, "welcome"));
+    expect(welcomeOf(never)).not.toMatchObject({ canvas: { movedAtVersion: expect.anything() } });
+    expect(welcomeOf(moved)).toMatchObject({ canvas: { movedAtVersion: 7 } });
+  });
+
+  // Un rapprochement qui déplace des pixels : le nouveau welcome de chaque page en porte la version
+  it("at a resize that moves pixels, the new welcome of each page carries its version (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+    const context = setup({ session: owner, movedOnResize: 9 });
+    const other = context.open(session);
+    for (const opened of [context, other]) await opened.connection.receive(hello());
+
+    await context.connection.receive(resize(64, 36));
+    context.control({ t: "resize" });
+    await flush();
+
+    for (const opened of [context, other]) {
+      const welcomes = opened.sent.filter((frame) => hasFrame(frame, "welcome"));
+      expect(welcomes.at(-1)).toMatchObject({ canvas: { width: 64, height: 36, movedAtVersion: 9 } });
+    }
+  });
+
+  // Des poses ont couru pendant chaque essai : le streamer l'apprend comme d'un débit dépassé, la page ne change pas
+  it("answers a resize that stayed busy as a rate limit, and leaves the page as it is (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+    const context = setup({ session: owner, isBusyResizing: true });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(resize(64, 36));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "resize-1" });
+    expect(context.closed).toEqual([]);
   });
 
   // À une nouvelle taille, chaque page reprend un welcome et un snapshot, sans se reconnecter

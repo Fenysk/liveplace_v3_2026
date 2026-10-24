@@ -42,7 +42,8 @@ import { z } from "zod";
 // et `backgroundImageOpacity` (Écart §4.3, JOURNAL 2026-10-10).
 // 21 : le développeur relit un jour passé, `listActivityDay` et `activityDay`, et `firstDayAt` dans `activityHistory`
 // (Écart §4.2 et §4.3, JOURNAL 2026-10-14).
-export const PROTOCOL_VERSION = 21;
+// 22 : le `welcome` dit la version du dernier rapprochement qui a déplacé des pixels, `movedAtVersion` (Écart §5.3, JOURNAL 2026-10-24).
+export const PROTOCOL_VERSION = 22;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -397,6 +398,7 @@ const WelcomeFrameSchema = z.object({
     ownerId: UserIdSchema,
     archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
     ownerTwitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : le streamer est en live
+    movedAtVersion: VersionSchema.optional(), // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a déplacé de pixel
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`

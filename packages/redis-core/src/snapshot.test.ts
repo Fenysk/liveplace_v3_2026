@@ -146,8 +146,12 @@ describe("getCanvasSnapshot: the pixels (Écart §7.2, JOURNAL 2026-10-06)", () 
   // Une case hors du cadre garde sa pile : le snapshot la porte, et l'état refait ne l'écrit pas (§5.7)
   it("carries a cell outside the frame after a shrink, and leaves it out of the rebuilt state", async () => {
     const { canvasId } = await readyCanvas({ width: 100, height: 100 });
-    await placeAs(canvasId, "author-a", "pinside001", [{ x: 10, y: 10, colorIndex: 3 }]);
-    await placeAs(canvasId, "author-a", "poutside01", [{ x: 80, y: 90, colorIndex: 4 }]);
+    // Une ligne de 60 pixels ne tient pas dans 50 colonnes : rien ne peut se rapprocher, les 10 derniers sortent du cadre
+    // (Écart §5.3, JOURNAL 2026-10-24).
+    const inside = Array.from({ length: 50 }, (_, x) => ({ x, y: 10, colorIndex: 3 }));
+    const outside = Array.from({ length: 10 }, (_, index) => ({ x: 50 + index, y: 10, colorIndex: 4 }));
+    await placeAs(canvasId, "author-a", "pinside001", inside);
+    await placeAs(canvasId, "author-a", "poutside01", outside);
     const shrunk = await core.resizeCanvas(canvasId, { by: OWNER, width: 50, height: 50 });
     expect(shrunk).toEqual({ ok: true, value: undefined });
 
@@ -157,7 +161,7 @@ describe("getCanvasSnapshot: the pixels (Écart §7.2, JOURNAL 2026-10-06)", () 
       cellsOf(snapshot)
         .map(({ cellKey }) => cellKey)
         .sort(),
-    ).toEqual([toCellKey(10, 10), toCellKey(80, 90)].sort());
+    ).toEqual([...inside, ...outside].map(({ x, y }) => toCellKey(x, y)).sort());
     expect(snapshot.meta).toMatchObject({ width: "50", height: "50" });
     expect(Array.from(restoreState({ width: 50, height: 50 }, snapshot.cells))).toEqual(
       Array.from(await stateOf(canvasId)),

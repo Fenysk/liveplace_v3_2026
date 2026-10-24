@@ -5,6 +5,7 @@ import { Layers, LocateFixed, Minus, Plus, RotateCcw, Scaling, User } from "luci
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
+import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import { switchToast } from "../canvas/switch-toast";
 import { AppearancePicker } from "../design/appearance-controls";
 import { Button } from "../design/button";
@@ -351,6 +352,7 @@ const GAME_TOASTS = [
   { name: "Le lien d'une archive est copié", text: "Lien copié" },
   { name: "Ses viewers, sans brouillon", text: viewerToast(0) },
   { name: "Ses viewers, avec un brouillon non vide", text: viewerToast(3) },
+  { name: "Ses viewers, quand une réduction rapproche les dessins", text: CANVAS_TEXTS.fr.draftWiped },
 ] as const;
 
 // Les deux régions d'un toast sont invisibles dans le jeu : ici elles se montrent, avec ce qu'elles diraient.
@@ -411,7 +413,7 @@ export const ToastEntry = () => (
     </Block>
     <Block
       title="Dans le jeu"
-      note="Le streamer qui agit sait où sont ses viewers. Ses viewers lisent qu'il a changé de fresque, pour un archivage comme pour une réouverture, et où reste leur brouillon s'ils en avaient un."
+      note="Le streamer qui agit sait où sont ses viewers. Ses viewers lisent qu'il a changé de fresque, pour un archivage comme pour une réouverture, et où reste leur brouillon s'ils en avaient un. Quand il réduit sa fresque et que des dessins se rapprochent, leur brouillon non vide est effacé, et le toast le dit."
     >
       {GAME_TOASTS.map(({ name, text }) => (
         <StateRow key={name} name={name}>

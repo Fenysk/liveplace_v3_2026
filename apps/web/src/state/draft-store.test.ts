@@ -1270,3 +1270,147 @@ describe("createDraftStore — taking a cleared draft back (Écart §9.3, JOURNA
     expect(xs()).toEqual([]);
   });
 });
+
+describe("createDraftStore — pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
+  const key = "liveplace:draft:canvas-1:user-1";
+
+  const drawing = (view = liveView()) => {
+    const context = setup({ view });
+    context.store.enterDraftMode();
+    context.store.toggleCell(1, 1);
+    context.store.toggleCell(2, 1);
+    const wiped = vi.fn();
+    context.store.listenWiped(wiped);
+    return { ...context, wiped };
+  };
+
+  // Efface le brouillon d'un welcome qui dit que des pixels ont bougé : en mémoire, dans le stockage, et dans Annuler
+  it("wipes the draft when the canvas says pixels moved: in memory, in browser storage, and from Annuler", () => {
+    const { store, cells, entries, setCanvasView } = drawing();
+    expect(cells()).toHaveLength(2);
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(cells()).toEqual([]);
+    expect(JSON.parse(entries.get(key) ?? "null")).toEqual({ movedAtVersion: 12, pixels: [] });
+    store.undo();
+    expect(cells()).toEqual([]);
+    store.redo();
+    expect(cells()).toEqual([]);
+    expect(store.getView().mode).toBe("draft");
+  });
+
+  // Le dit une seule fois à qui écoute, et seulement quand le brouillon n'était pas vide
+  it("tells its listeners once, and only when the draft was not empty", () => {
+    const { wiped, setCanvasView, store } = drawing();
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+    setCanvasView(liveView({ movedAtVersion: 12, version: 2 }));
+    expect(wiped).toHaveBeenCalledTimes(1);
+
+    setCanvasView(liveView({ movedAtVersion: 20 }));
+    expect(wiped).toHaveBeenCalledTimes(1);
+    expect(store.getView().draft.size).toBe(0);
+  });
+
+  // Ne propose pas de rétablir ce qui vient d'être effacé : Vider d'avant ne ramène rien non plus
+  it("offers nothing to take back once pixels moved, not even what Vider had cleared before", () => {
+    const { store, cells, setCanvasView } = drawing();
+    const cleared = store.discardDraft();
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+    if (cleared) store.restoreDraft(cleared);
+
+    expect(cells()).toEqual([]);
+  });
+
+  // Une réduction qui ne déplace rien garde le comportement d'avant : seules les cases hors du cadre quittent le brouillon
+  it("keeps the old behavior for a shrink that moved nothing: only the cells outside the frame leave", () => {
+    const { store, cells, wiped, setCanvasView } = drawing();
+    store.toggleCell(5, 1);
+
+    setCanvasView(liveView({ width: 3 }));
+
+    expect(cells().map(({ x }) => x)).toEqual([1, 2]);
+    expect(wiped).not.toHaveBeenCalled();
+  });
+
+  // Le brouillon d'après se sauvegarde sous la nouvelle version, et revient sous elle
+  it("saves the next draft under the new version, and reads it back under it", () => {
+    const { store, entries, setCanvasView } = drawing();
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    store.toggleCell(3, 1);
+
+    expect(JSON.parse(entries.get(key) ?? "null")).toEqual({
+      movedAtVersion: 12,
+      pixels: [{ x: 3, y: 1, colorIndex: store.getView().colorIndex }],
+    });
+    const reloaded = setup({ view: liveView({ movedAtVersion: 12 }), entries });
+    expect(reloaded.cells().map(({ x }) => x)).toEqual([3]);
+  });
+
+  // Un brouillon sauvegardé avant un rapprochement, rechargé après, est jeté, dit à qui écoute, et effacé du stockage
+  it("throws away a draft saved before a move and reloaded after it, tells its listeners, and erases the save", () => {
+    const { entries } = drawing();
+    const wiped = vi.fn();
+    const reloaded = setup({ view: guestView({ status: "connecting", role: "viewer" }), entries });
+    reloaded.store.listenWiped(wiped);
+
+    reloaded.setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(reloaded.cells()).toEqual([]);
+    expect(wiped).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(entries.get(key) ?? "null")).toEqual({ movedAtVersion: 12, pixels: [] });
+    const again = setup({ view: liveView({ movedAtVersion: 12 }), entries });
+    expect(again.cells()).toEqual([]);
+  });
+
+  // Un brouillon sauvegardé sous la version que le canvas connaît revient, sans rien dire
+  it("brings back a draft saved under the version the canvas knows, saying nothing", () => {
+    const { store, entries, setCanvasView } = drawing();
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+    store.toggleCell(3, 1);
+    const wiped = vi.fn();
+    const reloaded = setup({ view: guestView({ status: "connecting", role: "viewer" }), entries });
+    reloaded.store.listenWiped(wiped);
+
+    reloaded.setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(reloaded.cells().map(({ x }) => x)).toEqual([3]);
+    expect(wiped).not.toHaveBeenCalled();
+  });
+
+  // Un envoi en cours quand des pixels bougent ne compte pas comme une pose : rien n'a été posé
+  it("does not count a send cut short by a move as a placement", async () => {
+    const onPlaced = vi.fn();
+    const move: { run?: () => void } = {};
+    const { store, setCanvasView } = setup({
+      onPlaced,
+      results: [{ ok: false, error: "closed" }],
+      onPlace: () => move.run?.(),
+    });
+    move.run = () => setCanvasView(liveView({ movedAtVersion: 12 }));
+    store.enterDraftMode();
+    store.toggleCell(1, 1);
+
+    await store.submit();
+
+    expect(onPlaced).not.toHaveBeenCalled();
+    expect(store.getView().draft.size).toBe(0);
+    expect(store.getView().isSending).toBe(false);
+    expect(store.getView().mode).toBe("draft");
+  });
+
+  // Stoppe d'écouter quand on le demande
+  it("stops telling a listener that left", () => {
+    const { store, setCanvasView } = drawing();
+    const left = vi.fn();
+    const leave = store.listenWiped(left);
+    leave();
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(left).not.toHaveBeenCalled();
+  });
+});

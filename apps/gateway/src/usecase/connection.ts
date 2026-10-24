@@ -208,6 +208,7 @@ const buildWelcome = (
     ownerId: meta.ownerId,
     ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
     ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
+    ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // Écart §5.3 (JOURNAL 2026-10-24)
   },
   params: {
     gaugeMaxStart: meta.gaugeMaxStart,
@@ -744,6 +745,9 @@ export function createConnection(
         ? await deps.core.resizeCanvas(ready.canvasId, { by: session.userId, width, height })
         : null;
     if (result && !result.ok && result.error === "canvas_archived") return refuseArchived(requestId);
+    // Écart §5.3 (JOURNAL 2026-10-24) : des poses ont couru pendant chaque essai, rien n'a bougé ; il suffit de réessayer.
+    if (result && !result.ok && result.error === "busy")
+      return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
     if (!result?.ok) return forbid(requestId);
     socket.sendFrame({ t: "resized", requestId });
   };

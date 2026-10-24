@@ -6,6 +6,7 @@ import {
   GAUGE_MAX_START,
   type GaugeLimits,
   type ObsBackground,
+  toStateOffset,
   toTheme,
 } from "@liveplace/domain";
 import { useState } from "react";
@@ -22,7 +23,7 @@ import {
   type ThemeField,
   ThemeSettings,
 } from "../canvas/canvas-settings";
-import { type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
+import { previewResize, type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
 import { BackgroundPreview } from "../design/background-preview";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { ObsSettings } from "../obs/obs-settings";
@@ -31,6 +32,19 @@ import { Block, DIALOG_NOTE, Entry, InWindow, OpenWindow, StateRow } from "./ent
 import sampleBackgroundUrl from "./sample-background.svg?url";
 
 const LOCKED_MS = 1500; // la démonstration du verrou : l'action, puis la fermeture
+
+// Écart §5.3 (JOURNAL 2026-10-24) : la fresque d'exemple de la confirmation de taille, 256 × 256 : le petit dessin, et une ligne de
+// 90 pixels qu'aucune petite taille ne tient. L'aperçu est le vrai plan : les dessins se rapprochent, la ligne se coupe.
+const RESIZE_SAMPLE = (() => {
+  const state = new Uint8Array(SAMPLE_CANVAS.width * SAMPLE_CANVAS.height);
+  const line = Array.from({ length: 90 }, (_, index) => ({ x: 10 + index, y: 150, colorIndex: 28 }));
+  for (const { x, y, colorIndex } of [...SAMPLE_DRAWING, ...line])
+    state[toStateOffset(x, y, SAMPLE_CANVAS.width)] = colorIndex;
+  return state;
+})();
+
+const previewSampleResize = (next: { width: number; height: number }) =>
+  previewResize(RESIZE_SAMPLE, SAMPLE_CANVAS, next);
 
 // Le champ du thème : on écrit, et en le quittant (ou par Entrée) le thème est nettoyé, comme celui qui s'enregistre.
 const useThemeField = (
@@ -155,7 +169,7 @@ const CanvasSettingsScene = () => {
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const current = { width: 256, height: 256 };
   const chosen = toCanvasSize(choice);
-  const outside = SAMPLE_DRAWING.filter(({ x, y }) => x >= chosen.width || y >= chosen.height);
+  const preview = previewSampleResize(chosen);
   return (
     <>
       <InWindow>
@@ -175,7 +189,8 @@ const CanvasSettingsScene = () => {
       </InWindow>
       <ResizeWindow
         next={isConfirming ? chosen : null}
-        outside={outside}
+        outside={preview.outside}
+        hasMovedPixels={preview.hasMovedPixels}
         status={status}
         canvas={SAMPLE_CANVAS}
         onConfirm={() => {
@@ -347,14 +362,15 @@ type ResizeRowProps = { name: string; detail?: string; size: SizeChoice; isFaili
 const ResizeRow = ({ name, detail, size, isFailing = false }: ResizeRowProps) => {
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const next = toCanvasSize(size);
-  const outside = SAMPLE_DRAWING.filter(({ x, y }) => x >= next.width || y >= next.height);
+  const preview = previewSampleResize(next);
   return (
     <StateRow name={name} detail={detail}>
       <OpenWindow onOpen={() => setStatus(isFailing ? "failed" : "idle")}>
         {({ isOpen, close }) => (
           <ResizeWindow
             next={isOpen ? next : null}
-            outside={outside}
+            outside={preview.outside}
+            hasMovedPixels={preview.hasMovedPixels}
             status={status}
             canvas={SAMPLE_CANVAS}
             onConfirm={() => {
@@ -377,7 +393,16 @@ export const ResizeWindowEntry = () => (
     note={DIALOG_NOTE}
   >
     <Block title="États">
-      <ResizeRow name="Des pixels sortent du cadre" size={{ format: "1:1", sizeIndex: 1 }} />
+      <ResizeRow
+        name="Des dessins se rapprochent, des pixels sortent du cadre"
+        detail="Le petit dessin se rapproche de l'origine, la ligne de 90 pixels ne tient pas dans 50 cases : le reste est gardé, invisible."
+        size={{ format: "1:1", sizeIndex: 0 }}
+      />
+      <ResizeRow
+        name="Des dessins se rapprochent, rien ne sort du cadre"
+        detail="Le petit dessin se rapproche pour tenir ; la phrase dit aussi que les brouillons en cours sont effacés."
+        size={{ format: "1:1", sizeIndex: 1 }}
+      />
       <ResizeRow name="Aucun pixel ne sort du cadre" size={{ format: "1:1", sizeIndex: 2 }} />
       <ResizeRow name="Connexion perdue" size={{ format: "1:1", sizeIndex: 1 }} isFailing />
     </Block>

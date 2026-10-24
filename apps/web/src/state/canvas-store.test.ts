@@ -1854,3 +1854,97 @@ describe("the Twitch live in the canvas view (Écart §4, JOURNAL 2026-10-07)", 
     expect(store.getView().inspection).toEqual({ status: "found", x: 1, y: 2, entry: author });
   });
 });
+
+describe("pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
+  const welcomeMoved = (movedAtVersion?: number): Extract<ServerFrame, { t: "welcome" }> => {
+    if (welcome.t !== "welcome") throw new Error("le welcome de départ n'en est pas un");
+    return {
+      ...welcome,
+      canvas: { ...welcome.canvas, ...(movedAtVersion === undefined ? {} : { movedAtVersion }) },
+    };
+  };
+
+  // Prend du welcome la version du dernier rapprochement, et la perd quand un welcome n'en dit pas
+  it("takes from the welcome the version of the last move, and drops it when a welcome says none", () => {
+    const { store, receive } = setup({ isWelcomed: false });
+
+    receive(welcomeMoved());
+    expect(store.getView().movedAtVersion).toBeUndefined();
+
+    receive(welcomeMoved(12));
+    expect(store.getView().movedAtVersion).toBe(12);
+
+    receive(welcomeMoved());
+    expect(store.getView().movedAtVersion).toBeUndefined();
+  });
+
+  // Un welcome qui dit que des pixels ont bougé ferme l'inspection, et la réponse attendue ne la rouvre pas
+  it("closes the inspection when a welcome says pixels moved, and ignores the answer still expected", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+    const requestId = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+
+    receive(welcomeMoved(12));
+    receive({ t: "inspected", requestId, x: 1, y: 2 });
+
+    expect(store.getView().inspection).toBeNull();
+  });
+
+  // Sans déplacement, un nouveau welcome (coupure, simple coupe) laisse l'inspection ouverte
+  it("leaves the inspection open at a welcome that says nothing moved", () => {
+    const { store, sent, receive } = setup();
+    receive(welcomeMoved(12));
+    store.inspect(1, 2);
+    const requestId = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+
+    receive(welcomeMoved(12));
+    receive({ t: "inspected", requestId, x: 1, y: 2 });
+
+    expect(store.getView().inspection).toEqual({ status: "empty", x: 1, y: 2 });
+  });
+
+  // Un lot en vol n'est jamais rejoué après un rapprochement : ses positions sont celles d'avant, il échoue comme coupé
+  it("never plays an in-flight lot again after a move: it fails, as closed", async () => {
+    const { store, sent, close, open, receive } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    close();
+    open();
+    const placesBefore = sent.filter((frame) => frame.t === "place").length;
+
+    receive(welcomeMoved(12));
+
+    expect(await placing).toEqual({ ok: false, error: "closed" });
+    expect(sent.filter((frame) => frame.t === "place")).toHaveLength(placesBefore);
+  });
+
+  // Un lot en vol d'une page qui voit le rapprochement en direct (sans coupure) échoue aussi, sans être rejoué
+  it("fails an in-flight lot the same way when the page is not cut off, and does not touch the new image", async () => {
+    const { store, sent, receive, snapshot } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const placesBefore = sent.filter((frame) => frame.t === "place").length;
+
+    receive(welcomeMoved(12));
+    snapshot(new Uint8Array(width * 4).fill(3));
+
+    expect(await placing).toEqual({ ok: false, error: "closed" });
+    expect(sent.filter((frame) => frame.t === "place")).toHaveLength(placesBefore);
+    expect([...store.getView().pixels].every((colorIndex) => colorIndex === 3)).toBe(true);
+  });
+
+  // Sans déplacement, un lot en vol est rejoué au welcome d'une reprise, comme avant
+  it("still plays an in-flight lot again at the welcome of a resumption that says nothing moved", async () => {
+    const { store, sent, close, open, receive, lastPlace, ackOf } = setup();
+    receive(welcomeMoved(12));
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const first = lastPlace();
+    close();
+    open();
+
+    receive(welcomeMoved(12));
+
+    expect(sent.at(-1)).toEqual(first);
+    const ack = ackOf(first);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
+  });
+});

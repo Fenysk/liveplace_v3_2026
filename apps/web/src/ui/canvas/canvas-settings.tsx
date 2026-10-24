@@ -259,14 +259,23 @@ export type ResizeStatus = "idle" | "running" | "failed";
 
 type ResizeWindowProps = {
   next: CanvasSize | null; // `null` : fermée
-  outside: readonly Pixel[]; // ce qui sort du cadre, sur le canvas d'aujourd'hui
+  outside: readonly Pixel[]; // ce qui sort du cadre une fois les dessins rapprochés, à leur place d'aujourd'hui
+  hasMovedPixels: boolean; // Écart §5.3 (JOURNAL 2026-10-24) : des dessins se rapprochent, les brouillons sont effacés
   status: ResizeStatus;
   canvas: CanvasPreviewProps;
   onConfirm: () => void;
   onClose: () => void;
 };
 
-export const ResizeWindow = ({ next, outside, status, canvas, onConfirm, onClose }: ResizeWindowProps) => {
+export const ResizeWindow = ({
+  next,
+  outside,
+  hasMovedPixels,
+  status,
+  canvas,
+  onConfirm,
+  onClose,
+}: ResizeWindowProps) => {
   const t = useTexts(CANVAS_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   const moderation = useTexts(MODERATION_TEXTS);
@@ -289,6 +298,7 @@ export const ResizeWindow = ({ next, outside, status, canvas, onConfirm, onClose
       <p className="lp-type-body lp-prompt">
         {outside.length > 0 ? t.outsideSentence(outside.length) : t.nothingOutside}
       </p>
+      {hasMovedPixels && <p className="lp-type-body lp-prompt">{t.closerSentence}</p>}
       {status === "failed" && (
         <p className="lp-type-caption lp-danger lp-prompt">{moderation.connectionLost}</p>
       )}

@@ -1326,3 +1326,42 @@ describe("past day frames", () => {
     expect(decodeServerFrame(history)).toEqual({ ok: true, value: history });
   });
 });
+
+// Protocole 22 (Écart §5.3, JOURNAL 2026-10-24) : le welcome dit la version du dernier rapprochement qui a déplacé des pixels
+describe("protocol 22: pixels moved by a resize", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  };
+
+  // Passe au protocole 22 : une page en 21 se recharge
+  it("is protocol 22 or later: a page in 21 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(22);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 21, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Garde la version du dernier rapprochement dans le welcome, et accepte un welcome sans elle
+  it("keeps the version of the last move in a welcome, and accepts a welcome without one", () => {
+    const moved = { ...welcome, canvas: { ...welcome.canvas, movedAtVersion: 12 } };
+
+    expect(decodeServerFrame(moved)).toEqual({ ok: true, value: moved });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+  });
+
+  // Refuse une version négative, à virgule ou qui n'en est pas une
+  it("refuses a negative, fractional or non-numeric version of the last move", () => {
+    for (const movedAtVersion of [-1, 1.5, "12", null])
+      expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, movedAtVersion } }).ok).toBe(false);
+  });
+});

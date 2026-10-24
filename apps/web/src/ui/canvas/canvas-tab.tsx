@@ -6,7 +6,7 @@ import type { CanvasStore } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import { useTexts } from "../locale/use-locale";
 import { CanvasSettings, type ResizeStatus, ResizeWindow } from "./canvas-settings";
-import { listOutsidePixels, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
+import { previewResize, type SizeChoice, toCanvasSize, toSizeChoice } from "./canvas-size";
 import { CANVAS_TEXTS } from "./canvas-texts";
 import { useBackgroundFields } from "./use-background-fields";
 import { useThemeField } from "./use-theme-field";
@@ -25,6 +25,9 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const chosen = toCanvasSize(choice);
+  const preview = isConfirming
+    ? previewResize(pixels, current, chosen)
+    : { outside: [], hasMovedPixels: false };
   const toast = useToast();
   const t = useTexts(CANVAS_TEXTS);
   const theme = useThemeField();
@@ -57,7 +60,8 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
       />
       <ResizeWindow
         next={isConfirming ? chosen : null}
-        outside={isConfirming ? listOutsidePixels(pixels, current, chosen) : []}
+        outside={preview.outside}
+        hasMovedPixels={preview.hasMovedPixels}
         status={status}
         canvas={{ width, height, palette }}
         onConfirm={confirm}

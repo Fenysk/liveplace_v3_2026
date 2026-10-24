@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import {
   type CanvasMeta,
+  type CanvasSize,
   CELL_STRIDE,
   COUNTED_PIXELS_PER_DAY,
   claimableRewards,
@@ -46,6 +47,7 @@ import type {
   TwitchWrites,
   Unsubscribe,
 } from "@liveplace/domain/ports";
+import { planResize, type ResizePlan } from "@liveplace/domain/resize";
 import { decodeServerFrame, type Event } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
@@ -90,6 +92,9 @@ declare module "ioredis" {
 }
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
+
+// Écart §5.3 (JOURNAL 2026-10-24) : combien de fois resizeCanvas relit et recalcule son plan avant de rendre `busy`.
+const RESIZE_ATTEMPTS = 5;
 
 type PileHead = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
 
@@ -155,6 +160,8 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
     ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
     // Écart §8.1 (JOURNAL 2026-10-07) : un champ vide vaut pas de thème.
     ...(fields.theme ? { theme: fields.theme } : {}),
+    // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a encore déplacé de pixel.
+    ...(fields.movedAtVersion === undefined ? {} : { movedAtVersion: metaNumber(fields, "movedAtVersion") }),
   };
 }
 
@@ -340,6 +347,56 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
     },
   };
 }
+
+// Écart §5.3 (JOURNAL 2026-10-24) : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan de la nouvelle
+// taille. Sans plan (`null`), le canvas n'est pas prêt ou la taille ne change pas : resize.lua le dit avant de le lire.
+const getResizePlan = async (
+  redis: Redis,
+  keys: CanvasKeys,
+  to: CanvasSize,
+): Promise<{ version: number; plan: ResizePlan | null }> => {
+  const results = await redis
+    .multi()
+    .getBuffer(keys.state)
+    .get(keys.version)
+    .hmget(keys.meta, "width", "height")
+    .exec();
+  if (!results) throw new Error(`resizeCanvas ${keys.prefix} : transaction annulée`);
+  const [state, version, size] = results.map(unwrap);
+  const [width, height] = Array.isArray(size) ? size.map(Number) : [];
+  const from = width !== undefined && height !== undefined ? { width, height } : null;
+  const isPlannable =
+    Buffer.isBuffer(state) &&
+    from !== null &&
+    state.length === from.width * from.height &&
+    (from.width !== to.width || from.height !== to.height);
+  return {
+    version: Number(version ?? 0),
+    plan: isPlannable ? planResize(state, from, to) : null,
+  };
+};
+
+// L'ordre des arguments est celui que lit resize.lua. Un essai : lit le plan, puis l'applique. `stale` : une pose a couru entre les deux.
+const tryResize = async (redis: Redis, keys: CanvasKeys, by: string, to: CanvasSize): Promise<string> => {
+  const { version, plan } = await getResizePlan(redis, keys, to);
+  const [status] = await redis.resize(
+    keys.meta,
+    keys.state,
+    keys.version,
+    keys.histPrefix,
+    keys.live,
+    by,
+    to.width,
+    to.height,
+    CELL_STRIDE,
+    keys.cellsPrefix,
+    keys.clearingPrefix,
+    version,
+    plan?.hasMovedPixels ? 1 : 0,
+    JSON.stringify(plan),
+  );
+  return status;
+};
 
 const scriptOf = (name: string): string => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 
@@ -762,23 +819,17 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return entry.placementId === placementId ? listVisiblePixels(keys, entry.authorId) : null;
     },
 
-    // L'ordre des arguments est celui que lit resize.lua.
+    // Écart §5.3 (JOURNAL 2026-10-24) : le plan se calcule ici sur `state`, lu avec la version ; resize.lua le refuse (`stale`)
+    // si une pose a couru depuis, et on le recalcule.
     async resizeCanvas(canvasId, { by, width, height }) {
       const keys = buildCanvasKeys(canvasId);
-      const [status] = await redis.resize(
-        keys.meta,
-        keys.state,
-        keys.version,
-        keys.histPrefix,
-        keys.live,
-        by,
-        width,
-        height,
-        CELL_STRIDE,
-      );
-      if (status === "resized") return { ok: true, value: undefined };
-      if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
-      throw new Error(`resize.lua a renvoyé une réponse invalide : ${status}`);
+      for (let attempt = 0; attempt < RESIZE_ATTEMPTS; attempt++) {
+        const status = await tryResize(redis, keys, by, { width, height });
+        if (status === "resized") return { ok: true, value: undefined };
+        if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
+        if (status !== "stale") throw new Error(`resize.lua a renvoyé une réponse invalide : ${status}`);
+      }
+      return { ok: false, error: "busy" };
     },
 
     async getReportCount(canvasId: string): Promise<number> {

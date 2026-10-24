@@ -11,6 +11,7 @@ import { type ClearScope, listClearedPixels, PLACEMENT_ONLY, toPlacementRange } 
 import { MODERATION_TEXTS } from "./moderation-texts";
 import type { ModerationStatus, ModerationWindowProps, ReportTarget } from "./moderation-window";
 import { usePixelListing } from "./pixel-listing";
+import { useCloseOnMove } from "./use-close-on-move";
 
 type SentReport = Exclude<ReportControl["status"], "available">;
 
@@ -50,6 +51,8 @@ export function useReport(canvas: CanvasStore): {
     setTarget(null);
     drop();
   };
+  // Écart §5.3 (JOURNAL 2026-10-24) : un signalement qui part (`running`) est laissé, la case visée est celle que le serveur relit.
+  useCloseOnMove(view.movedAtVersion, target !== null && status !== "running", close);
 
   // Cette pose seule, ou ses voisines : la plage de l'aperçu, calculée sur les mêmes pixels.
   const rangeOf = ({ placementId }: ReportTarget) =>

@@ -148,6 +148,8 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     successorId?: string;
     // Écart §8.1 (JOURNAL 2026-10-07) : la copie du gateway ; Convex fait foi. Absent : pas de thème.
     theme?: string;
+    // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Absent : jamais.
+    movedAtVersion?: number;
   };
 
 // Écart §15 (JOURNAL 2026-10-06) : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.

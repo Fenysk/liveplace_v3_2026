@@ -25,7 +25,7 @@ import {
 } from "./draft-history";
 import { predictGauge } from "./gauge";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "./recent-color-indexes";
-import { type DraftStorage, getSavedDraft, saveDraft } from "./saved-draft";
+import { type DraftStorage, getSavedDraft, isSavedDraftStale, saveDraft } from "./saved-draft";
 
 export type DraftMode = "view" | "draft";
 
@@ -48,6 +48,8 @@ export type DraftStore = {
   exitDraftMode(): void; // le brouillon est gardé
   discardDraft(): Draft | undefined; // Vider : rend le brouillon vidé (`undefined` s'il n'y avait rien à vider), de quoi le rétablir
   restoreDraft(cleared: Draft): void; // Rétablir, dans le toast de Vider : seulement tant que Vider est la dernière étape
+  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, le brouillon (non vide) est effacé, sans rétablissement possible.
+  listenWiped(listener: () => void): () => void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   selectRecentColor(slot: number): void; // les touches 1 à 5 : la récente de cette place, comme un clic sur elle
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
@@ -104,6 +106,10 @@ export function createDraftStore(
   let history: DraftHistory = EMPTY_DRAFT_HISTORY;
   let isTraceRecorded = false; // l'étape du tracé en cours est déjà dans l'historique
   const listeners = new Set<() => void>();
+  // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement que ce brouillon connaît, et combien de fois il a été effacé.
+  let knownMovedAtVersion = 0;
+  let wipeCount = 0;
+  const wipedListeners = new Set<() => void>();
 
   const publish = (next: Partial<DraftView>): void => {
     view = { ...view, ...next };
@@ -123,14 +129,24 @@ export function createDraftStore(
   const leaveDraftMode = (): void =>
     publish({ mode: "view", isTracing: false, isTouchTracing: false, isPicking: false });
 
+  const notifyWiped = (): void => {
+    for (const listener of wipedListeners) listener();
+  };
+
   // Le brouillon d'un utilisateur ne se lit qu'après le `welcome` : c'est lui qui donne le `userId`.
+  // Écart §5.3 (JOURNAL 2026-10-24) : sauvegardé avant un rapprochement, il est jeté, effacé du stockage, et dit.
   const applySavedDraft = (): void => {
-    const { userId, status, width, height, palette } = canvas.getView();
+    const { userId, status, width, height, palette, movedAtVersion } = canvas.getView();
     if (!userId || status !== "live" || userId === loadedUserId) return;
     loadedUserId = userId;
+    knownMovedAtVersion = movedAtVersion ?? 0;
     forgetHistory();
-    const bounds = { width, height, paletteSize: palette.length };
+    const bounds = { width, height, paletteSize: palette.length, movedAtVersion };
+    const isStale = isSavedDraftStale(getStorage, canvasId, userId, movedAtVersion);
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
+    if (!isStale) return;
+    saveDraft(getStorage, canvasId, userId, EMPTY_DRAFT, knownMovedAtVersion);
+    notifyWiped();
   };
   // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. Écart §15 (JOURNAL 2026-10-06) : une archive aussi,
   // personne n'y pose ; le brouillon reste rangé sous ce canvas et ne suit pas sur le nouveau.
@@ -149,14 +165,28 @@ export function createDraftStore(
   const unsubscribe = canvas.subscribe(() => {
     applySavedDraft();
     leaveIfReadOnly();
-    fitToCanvas();
+    if (!wipeIfMoved()) fitToCanvas();
   });
   applySavedDraft();
 
   const setDraft = (draft: Draft): void => {
     if (draft === view.draft) return;
     publish({ draft });
-    if (loadedUserId) saveDraft(getStorage, canvasId, loadedUserId, draft);
+    if (loadedUserId) saveDraft(getStorage, canvasId, loadedUserId, draft, knownMovedAtVersion);
+  };
+
+  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, ses x, y sont faux, et Annuler parle d'un autre dessin.
+  // Sans étape dans l'historique, rien n'est proposé à Rétablir.
+  const wipeIfMoved = (): boolean => {
+    const moved = canvas.getView().movedAtVersion ?? 0;
+    if (!loadedUserId || moved === knownMovedAtVersion) return false;
+    knownMovedAtVersion = moved;
+    wipeCount += 1;
+    const hadDraft = view.draft.size > 0;
+    forgetHistory();
+    setDraft(EMPTY_DRAFT);
+    if (hadDraft) notifyWiped();
+    return true;
   };
 
   const context = (): DraftContext => {
@@ -230,14 +260,16 @@ export function createDraftStore(
     const { status, isBanned, isArchived } = canvas.getView();
     if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned || isArchived) return;
     forgetHistory(); // CDC 2026, §8 : une vraie pose ne s'annule jamais
+    const wipesBefore = wipeCount;
     publish({ isSending: true });
     try {
       await sendBatches();
     } finally {
       publish({ isSending: false });
     }
-    // Tout est posé : retour en Vue (CDC 2026). Des refus restent, ils restent visibles en Dessin.
-    if (view.draft.size === 0) {
+    // Tout est posé : retour en Vue (CDC 2026). Des refus restent, ils restent visibles en Dessin. Effacé en route par un
+    // rapprochement (Écart §5.3, JOURNAL 2026-10-24), il est vide sans que rien n'ait été posé.
+    if (view.draft.size === 0 && wipeCount === wipesBefore) {
       leaveDraftMode();
       onPlaced?.();
     }
@@ -266,6 +298,10 @@ export function createDraftStore(
     },
     restoreDraft(cleared) {
       if (history.past.at(-1) === cleared) travel(undoDraftStep);
+    },
+    listenWiped(listener) {
+      wipedListeners.add(listener);
+      return () => wipedListeners.delete(listener);
     },
     selectColor,
     selectRecentColor(slot) {

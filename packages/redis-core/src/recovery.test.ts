@@ -1,5 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { type CanvasMeta, defaultCanvasMeta, toCellKey } from "@liveplace/domain";
+import { type CanvasMeta, defaultCanvasMeta, toCellKey, toStateOffset } from "@liveplace/domain";
 import type { Moderation, RestoredUser } from "@liveplace/domain/ports";
 import { type CanvasSnapshot, RECOVERY_VERSION_JUMP } from "@liveplace/domain/snapshot";
 import { afterAll, describe, expect, it } from "vitest";
@@ -404,6 +404,36 @@ describe("restore: a lost canvas comes back as it was saved (Écart §7.2, JOURN
     expect(back.cells).toHaveLength(5000);
     expect(back.cells).toEqual(saved.cells);
     expect(back.cells[0]?.[0]).toBe(toCellKey(0, 0));
+  });
+
+  // Écart §5.3 (JOURNAL 2026-10-24) : la sauvegarde lit les piles là où un rapprochement les a mises, la récupération les y remet
+  it("brings back the pixels where a shrink moved them, and nothing where they were", async () => {
+    const { canvasId, keys } = await readyCanvas();
+    await placeAs(canvasId, A, "pleft00001", [{ x: 5, y: 5 }]);
+    await placeAs(canvasId, B, "pright0001", [{ x: 40, y: 5 }]);
+    expect(await core.resizeCanvas(canvasId, { by: OWNER, width: 30, height: 30 })).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    const saved = await snapshotOf(canvasId, [A, B]);
+    await lose(canvasId, [A, B]);
+    await target.beginRestore(canvasId);
+
+    await target.restore(canvasId, {
+      snapshot: saved,
+      users,
+      version: saved.version + RECOVERY_VERSION_JUMP,
+      at: takenAt,
+    });
+
+    expect(await core.inspect(canvasId, 29, 5)).toEqual(
+      expect.objectContaining({ userId: B, colorIndex: 3 }),
+    );
+    expect(await core.inspect(canvasId, 40, 5)).toBeNull();
+    expect(await core.listPixels(canvasId, B)).toEqual([expect.objectContaining({ x: 29, y: 5 })]);
+    const state = await redis.getBuffer(keys.state);
+    expect(state?.length).toBe(900);
+    expect(state?.[toStateOffset(29, 5, 30)]).toBe(3);
   });
 });
 

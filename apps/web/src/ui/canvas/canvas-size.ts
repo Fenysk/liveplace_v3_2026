@@ -1,8 +1,9 @@
 // La taille du canvas (CDC 2026 §1, JOURNAL 2026-09-29) : où se range une taille dans le tableau des formats, et ce
 // qu'une nouvelle taille laisse hors du cadre. Pur : la section Canvas l'affiche.
 
-import { CANVAS_FORMATS, type CanvasFormat, type CanvasSize, toStateOffset } from "@liveplace/domain";
+import { CANVAS_FORMATS, type CanvasFormat, type CanvasSize } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
+import { listCutPixels, planResize } from "@liveplace/domain/resize";
 
 // Petit, Moyen, Grand : la place d'une taille dans son format.
 export type SizeChoice = { format: CanvasFormat; sizeIndex: number };
@@ -21,13 +22,14 @@ export function toCanvasSize({ format, sizeIndex }: SizeChoice): CanvasSize {
   return sizes[sizeIndex] ?? sizes[0];
 }
 
-// Les pixels posés que la nouvelle taille laisse hors du cadre : gardés, invisibles jusqu'à un agrandissement.
-export function listOutsidePixels(pixels: Uint8Array, current: CanvasSize, next: CanvasSize): Pixel[] {
-  const outside: Pixel[] = [];
-  for (let y = 0; y < current.height; y++)
-    for (let x = 0; x < current.width; x++) {
-      const colorIndex = pixels[toStateOffset(x, y, current.width)] ?? 0;
-      if (colorIndex !== 0 && (x >= next.width || y >= next.height)) outside.push({ x, y, colorIndex });
-    }
-  return outside;
+// Écart §5.3 (JOURNAL 2026-10-24) : ce que montrera une nouvelle taille, du même plan que redis-core applique. `outside` : les
+// pixels posés qu'elle laisse hors du cadre une fois les dessins rapprochés, gardés, invisibles jusqu'à un agrandissement, à leur
+// place d'aujourd'hui. `hasMovedPixels` : au moins un dessin se rapproche.
+export function previewResize(
+  pixels: Uint8Array,
+  current: CanvasSize,
+  next: CanvasSize,
+): { outside: Pixel[]; hasMovedPixels: boolean } {
+  const plan = planResize(pixels, current, next);
+  return { outside: listCutPixels(plan, pixels), hasMovedPixels: plan.hasMovedPixels };
 }

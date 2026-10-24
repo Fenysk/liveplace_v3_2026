@@ -86,14 +86,16 @@ const useModeratorsProps = (canvas: CanvasStore) => {
   return { ...views, removingUserId, failedUserId, onRemove };
 };
 
-// `relist` à l'ouverture de l'onglet, puis à chaque signalement ou décision, ici ou chez un autre modérateur.
+// `relist` à l'ouverture de l'onglet, puis à chaque signalement ou décision, ici ou chez un autre modérateur, et quand des
+// pixels ont changé de case (Écart §5.3, JOURNAL 2026-10-24) : les positions de la liste sont fausses.
 const useRelistOnReports = (canvas: CanvasStore, relist: () => void) => {
   useEffect(() => {
-    let listedCount: number | null = null;
+    let listed: string | null = null;
     const relistIfChanged = () => {
-      const { reportCount } = canvas.getView();
-      if (reportCount === listedCount) return;
-      listedCount = reportCount;
+      const { reportCount, movedAtVersion } = canvas.getView();
+      const now = `${reportCount}:${movedAtVersion ?? 0}`;
+      if (now === listed) return;
+      listed = now;
       relist();
     };
     relistIfChanged();
