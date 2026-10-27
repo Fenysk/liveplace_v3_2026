@@ -15,6 +15,8 @@ const drafting = (isTouchTracing: boolean): Extract<DraftPillState, { kind: "dra
   draftSize: 0,
   canSubmit: false,
   canDiscard: false,
+  canUndo: false,
+  canRedo: false,
   isTouchScreen: true,
   isTouchTracing,
   isPicking: false,

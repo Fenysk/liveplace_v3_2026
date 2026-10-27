@@ -1,13 +1,13 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
 // Vue : la jauge et Dessiner, ou le +1 quand une récompense attend, qui s'étire comme lui (Écart §9.3, JOURNAL 2026-10-09).
-// Dessin : la palette, puis la jauge, Vider (invisible tant que le brouillon est vide), Fermer, Valider (sa taille, ou l'attente d'une charge).
+// Dessin : la palette, puis la jauge, Annuler et Rétablir (grisés sans étape à refaire), Vider (invisible tant que le brouillon est vide), Fermer, Valider (sa taille, ou l'attente d'une charge).
 // Les boutons suivent le brouillon et la jauge, et leur largeur glisse (Écart §9.3, JOURNAL 2026-10-08). Invité : l'invitation.
 // Vider et Fermer gardent leur place, brouillon vide ou non : rien ne bouge sous le pointeur (Écart §9.3, JOURNAL 2026-10-13).
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile). En paysage sur un écran bas,
 // un panneau sur le côté : sans poignée, la palette complète dedans (Écart §8.1, JOURNAL 2026-10-08).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
-import { Brush, Eraser, Pipette, Trash } from "lucide-react";
+import { Brush, Eraser, Pipette, Redo2, Trash, Undo2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
@@ -41,6 +41,8 @@ export type DraftPillState =
       waitSeconds?: number; // plus aucune charge et rien à poser : Valider attend la prochaine
       canSubmit: boolean;
       canDiscard: boolean;
+      canUndo: boolean; // une étape à annuler (CDC 2026, §8 Historique) : sinon Annuler est grisé
+      canRedo: boolean; // une étape à rétablir : sinon Rétablir est grisé
       isTouchScreen: boolean;
       isTouchTracing: boolean;
       isPicking: boolean;
@@ -53,6 +55,8 @@ export type DraftPillActions = {
   onExit: () => void; // Fermer : sort du Dessin, le brouillon est gardé
   onSubmit: () => void;
   onDiscard: () => void;
+  onUndo: () => void; // Annuler, comme Ctrl+Z (CDC 2026, §8 Historique)
+  onRedo: () => void; // Rétablir, comme Ctrl+Maj+Z
   onPickColor: (colorIndex: number) => void; // dans la palette, ou dans la rangée des récentes sur mobile
   onToggleEraser: () => void;
   onTogglePicker: () => void; // la pipette, pour un seul clic (CDC 2026, `I`)
@@ -180,6 +184,27 @@ const PickerButton = ({ state, actions }: { state: DraftModeState; actions: Draf
   );
 };
 
+// Annuler et Rétablir (CDC 2026, §8) : grisés sans étape à refaire, jamais cachés, rien ne bouge sous le pointeur.
+const UndoButton = ({ state, onUndo }: { state: DraftModeState; onUndo: () => void }) => (
+  <Button
+    icon={Undo2}
+    variant="ghost"
+    title={useTexts(DRAFT_TEXTS).undoTip}
+    isDisabled={!state.canUndo}
+    onPress={onUndo}
+  />
+);
+
+const RedoButton = ({ state, onRedo }: { state: DraftModeState; onRedo: () => void }) => (
+  <Button
+    icon={Redo2}
+    variant="ghost"
+    title={useTexts(DRAFT_TEXTS).redoTip}
+    isDisabled={!state.canRedo}
+    onPress={onRedo}
+  />
+);
+
 // La jauge, que la bulle de la jauge vide vise (Écart §8.1, JOURNAL 2026-10-08).
 const PillGauge = ({ gauge, isFill = false }: { gauge: GaugeProps; isFill?: boolean }) => (
   <BubbleTarget name="gauge">
@@ -249,6 +274,10 @@ const DraftSheet = ({ state, actions, isPanel }: DraftSheetProps) => {
         <span className="lp-spacer" />
         <TraceButton state={state} actions={actions} />
         <span className="lp-spacer" />
+        <UndoButton state={state} onUndo={actions.onUndo} />
+        <span className="lp-spacer" />
+        <RedoButton state={state} onRedo={actions.onRedo} />
+        <span className="lp-spacer" />
         <DiscardButton state={state} onDiscard={actions.onDiscard} />
       </div>
       {/* Un clic, Entrée, Espace ou Échap replient la feuille (design system, Mobile) ; une flèche choisit sans la replier. Le panneau reste ouvert. */}
@@ -296,6 +325,8 @@ const draftContent = (
         <span className="lp-spacer" />
         {state.isTouchScreen && <TraceButton state={state} actions={actions} />}
         <PickerButton state={state} actions={actions} />
+        <UndoButton state={state} onUndo={actions.onUndo} />
+        <RedoButton state={state} onRedo={actions.onRedo} />
         <DiscardButton state={state} onDiscard={actions.onDiscard} />
         <CloseButton onExit={actions.onExit} />
         <SubmitButton state={state} onSubmit={actions.onSubmit} />

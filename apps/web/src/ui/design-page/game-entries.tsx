@@ -408,6 +408,8 @@ export const DRAFT_ACTIONS: DraftPillActions = {
   onExit: noop,
   onSubmit: noop,
   onDiscard: noop,
+  onUndo: noop,
+  onRedo: noop,
   onPickColor: noop,
   onToggleEraser: noop,
   onTogglePicker: noop,
@@ -441,6 +443,8 @@ export const draftState = (
     draftSize: 3,
     canSubmit: true,
     canDiscard: true,
+    canUndo: true,
+    canRedo: false,
     isTouchScreen: false,
     isTouchTracing: false,
     isPicking: false,
@@ -518,17 +522,19 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
       {
         name: "Un brouillon de 3",
         detail:
-          "Le nombre de la jauge dit ce que tu as, sa partie claire ce que le brouillon réserve, Valider sa taille.",
+          "Le nombre de la jauge dit ce que tu as, sa partie claire ce que le brouillon réserve, Valider sa taille. Annuler est actif, Rétablir grisé : rien n'a été annulé.",
         state: draftState(nowMs),
       },
       {
         name: "Brouillon vide",
-        detail: "Vider est là, invisible : il paraît au premier pixel, et rien ne bouge.",
+        detail:
+          "Vider est là, invisible : il paraît au premier pixel, et rien ne bouge. Annuler et Rétablir restent là, grisés.",
         state: draftState(nowMs, {
           gauge: gaugeAt(nowMs, 8),
           draftSize: 0,
           canSubmit: false,
           canDiscard: false,
+          canUndo: false,
         }),
       },
       {
@@ -540,12 +546,13 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
           waitSeconds: REFILL_MS / 2 / 1000,
           canSubmit: false,
           canDiscard: false,
+          canUndo: false,
         }),
       },
       {
         name: "Pendant l'envoi",
-        detail: "Verrouillée.",
-        state: draftState(nowMs, { isSending: true }),
+        detail: "Verrouillée, l'historique vidé : Annuler et Rétablir grisés.",
+        state: draftState(nowMs, { isSending: true, canUndo: false }),
       },
       { name: "Pipette armée (I)", state: draftState(nowMs, { isPicking: true }) },
       {
@@ -574,7 +581,11 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         detail: "« Dessiner · 3 », et la partie claire du fluide.",
         state: { kind: "view", gauge: gaugeAt(nowMs, 6, 3), canClaim: false, draftSize: 3 },
       },
-      { name: "Dessin", detail: "La feuille, palette repliée.", state: draftState(nowMs) },
+      {
+        name: "Dessin",
+        detail: "La feuille, palette repliée : Annuler actif, Rétablir grisé.",
+        state: draftState(nowMs),
+      },
       {
         name: "Dessin, brouillon vide",
         detail: "Vider est là, invisible : les outils gardent leur place quand il paraît.",
@@ -583,6 +594,7 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
           draftSize: 0,
           canSubmit: false,
           canDiscard: false,
+          canUndo: false,
         }),
       },
       {
@@ -594,6 +606,7 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
           waitSeconds: REFILL_MS / 2 / 1000,
           canSubmit: false,
           canDiscard: false,
+          canUndo: false,
         }),
       },
       {
@@ -606,6 +619,7 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
           waitSeconds: REFILL_MS / 2 / 1000,
           canSubmit: false,
           canDiscard: false,
+          canUndo: false,
         }),
       },
       {
@@ -710,6 +724,7 @@ const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
               draftSize: 0,
               canSubmit: false,
               canDiscard: false,
+              canUndo: false,
             })}
             actions={DRAFT_ACTIONS}
             isCompact

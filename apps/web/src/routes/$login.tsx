@@ -73,6 +73,8 @@ const CONNECTING_ACTIONS: DraftPillActions = {
   onExit: doNothing,
   onSubmit: doNothing,
   onDiscard: doNothing,
+  onUndo: doNothing,
+  onRedo: doNothing,
   onPickColor: doNothing,
   onToggleEraser: doNothing,
   onTogglePicker: doNothing,

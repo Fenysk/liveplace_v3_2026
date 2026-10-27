@@ -3,7 +3,7 @@ import type { Transport, TransportListeners } from "@liveplace/domain/ports";
 import type { ClientFrame, ServerFrame } from "@liveplace/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { type CanvasView, createCanvasStore, type Pixel, type PlaceResult } from "./canvas-store";
-import { createDraftStore, type DraftCanvas, type DraftClock } from "./draft-store";
+import { createDraftStore, type DraftCanvas, type DraftClock, type DraftStore } from "./draft-store";
 import type { DraftStorage } from "./saved-draft";
 
 const now = 1_700_000_000_000;
@@ -1209,6 +1209,117 @@ describe("createDraftStore — the history (CDC 2026, §8 Historique)", () => {
     store.undo();
 
     expect(xs()).toEqual([]);
+  });
+
+  // La vue dit ce que les boutons Annuler et Rétablir peuvent faire
+  const history = (store: DraftStore) => {
+    const { canUndo, canRedo } = store.getView();
+    return { canUndo, canRedo };
+  };
+
+  // Au départ, rien à annuler ni à rétablir
+  it("has nothing to undo or redo before the first step", () => {
+    const { store } = drawing();
+
+    expect(history(store)).toEqual({ canUndo: false, canRedo: false });
+  });
+
+  // Un clic ou un tracé donnent une étape à annuler, et rien à rétablir
+  it("has a step to undo after a click or a trace, and nothing to redo", () => {
+    const { store, click, trace } = drawing();
+
+    click(1);
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+    trace(3, 4);
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+  });
+
+  // Annuler donne une étape à rétablir ; tout annulé, il ne reste plus rien à annuler ; tout rétabli, plus rien à rétablir
+  it("has a step to redo after an undo, none to undo once all are undone, none to redo once all are redone", () => {
+    const { store, click } = drawing();
+    click(1);
+    click(2);
+
+    store.undo();
+    expect(history(store)).toEqual({ canUndo: true, canRedo: true });
+    store.undo();
+    expect(history(store)).toEqual({ canUndo: false, canRedo: true });
+    store.redo();
+    store.redo();
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+  });
+
+  // Une nouvelle étape après une annulation efface ce qui pouvait être rétabli
+  it("has nothing to redo once a new step comes after an undo", () => {
+    const { store, click } = drawing();
+    click(1);
+    store.undo();
+
+    click(2);
+
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+  });
+
+  // Vider est une étape : on peut l'annuler, puis la rétablir
+  it("counts Vider as a step to undo, then to redo", () => {
+    const { store, click } = drawing();
+    click(1);
+    store.discardDraft();
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+
+    store.undo();
+    store.undo();
+    expect(history(store)).toEqual({ canUndo: false, canRedo: true });
+  });
+
+  // Valider vide l'historique : une vraie pose ne s'annule jamais, ni ce qu'on avait annulé ne se rétablit
+  it("has nothing to undo or redo after the validation", async () => {
+    const { store, click } = drawing();
+    click(1);
+    click(2);
+    store.undo();
+    expect(history(store)).toEqual({ canUndo: true, canRedo: true });
+
+    await store.submit();
+
+    expect(history(store)).toEqual({ canUndo: false, canRedo: false });
+  });
+
+  // Des pixels qui ont bougé effacent l'historique, même quand le brouillon était déjà vide et ne change donc pas
+  it("has nothing to undo or redo once pixels moved, even when the draft was already empty", () => {
+    const { store, click, setCanvasView } = drawing();
+    click(1);
+    store.discardDraft();
+    expect(history(store)).toEqual({ canUndo: true, canRedo: false });
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(history(store)).toEqual({ canUndo: false, canRedo: false });
+  });
+
+  // Un autre compte sur la même page repart sans historique
+  it("has nothing to undo or redo for another user's draft", () => {
+    const { store, click, setCanvasView } = drawing();
+    click(1);
+
+    setCanvasView(liveView({ userId: "user-2" }));
+
+    expect(history(store)).toEqual({ canUndo: false, canRedo: false });
+  });
+
+  // Tout abonné est prévenu du changement des deux boutons, quand le brouillon, lui, ne change pas
+  it("tells its subscribers when the history changes while the draft does not", () => {
+    const { store, click, setCanvasView } = drawing();
+    click(1);
+    store.discardDraft();
+    let calls = 0;
+    store.subscribe(() => {
+      calls += 1;
+    });
+
+    setCanvasView(liveView({ movedAtVersion: 12 }));
+
+    expect(calls).toBe(1);
   });
 });
 

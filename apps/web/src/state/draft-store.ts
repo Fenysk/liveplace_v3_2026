@@ -39,6 +39,8 @@ export type DraftView = {
   isPicking: boolean; // la pipette armée : le prochain clic prend une couleur (CDC 2026, `I`)
   shakeCount: number; // +1 à chaque fois que la jauge doit vibrer
   recentColorIndexes: readonly number[]; // sur mobile, la rangée : cinq couleurs, jamais celle du bouton (design system)
+  canUndo: boolean; // l'historique a une étape à annuler : le bouton Annuler (CDC 2026, §8 Historique)
+  canRedo: boolean; // l'historique a une étape à rétablir : le bouton Rétablir
 };
 
 export type DraftStore = {
@@ -96,6 +98,8 @@ export function createDraftStore(
     isPicking: false,
     shakeCount: 0,
     recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES,
+    canUndo: false,
+    canRedo: false,
   };
   let lastColorIndex = FIRST_COLOR_INDEX;
   // Écart §9.3 (JOURNAL 2026-10-08) : gardé d'un Dessin au suivant, pas au rechargement ; la vue ne le porte qu'en Dessin.
@@ -111,14 +115,16 @@ export function createDraftStore(
   let wipeCount = 0;
   const wipedListeners = new Set<() => void>();
 
+  // Annuler et Rétablir se relisent dans l'historique à chaque publication (CDC 2026, §8 Historique).
   const publish = (next: Partial<DraftView>): void => {
-    view = { ...view, ...next };
+    view = { ...view, ...next, canUndo: history.past.length > 0, canRedo: history.future.length > 0 };
     for (const listener of listeners) listener();
   };
 
   const forgetHistory = (): void => {
     history = EMPTY_DRAFT_HISTORY;
     isTraceRecorded = false;
+    if (view.canUndo || view.canRedo) publish({}); // le brouillon peut ne pas changer : les deux boutons se grisent quand même
   };
 
   // Une étape : le brouillon d'avant entre dans l'historique, et ce qui pouvait être rétabli s'efface.

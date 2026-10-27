@@ -224,7 +224,8 @@ const HELP_SCENES: readonly HelpScene[] = [
       "Après le premier glissement en Dessin à la souris : une ligne, sans flèche (Espace n'a pas de bouton), au-dessus de la barre du bas comme Ctrl+Z. Elle part à l'action suivante, Espace tenu compris, et passe devant le premier passage et Ctrl+Z, qui attendent.",
     bubble: "draft-space",
     isTouchScreen: false,
-    content: (nowMs) => bar(draftState(nowMs, { draftSize: 0, canSubmit: false, canDiscard: false }), false),
+    content: (nowMs) =>
+      bar(draftState(nowMs, { draftSize: 0, canSubmit: false, canDiscard: false, canUndo: false }), false),
   },
   {
     name: "Premier passage en Dessin, au doigt",
@@ -234,7 +235,10 @@ const HELP_SCENES: readonly HelpScene[] = [
     align: "end",
     isPhone: true,
     content: (nowMs) =>
-      bar(draftState(nowMs, { isTouchScreen: true, canSubmit: false, canDiscard: false }), true),
+      bar(
+        draftState(nowMs, { isTouchScreen: true, canSubmit: false, canDiscard: false, canUndo: false }),
+        true,
+      ),
   },
   {
     name: "Premier passage en Dessin, à la souris",
@@ -242,7 +246,8 @@ const HELP_SCENES: readonly HelpScene[] = [
     bubble: "first-draft",
     align: "end",
     isTouchScreen: false,
-    content: (nowMs) => bar(draftState(nowMs, { canSubmit: false, canDiscard: false }), false),
+    content: (nowMs) =>
+      bar(draftState(nowMs, { canSubmit: false, canDiscard: false, canUndo: false }), false),
   },
   {
     name: "Un dessin posé, au doigt : la palette",

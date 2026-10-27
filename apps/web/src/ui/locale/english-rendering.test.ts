@@ -47,6 +47,8 @@ const ACTIONS: DraftPillActions = {
   onExit: doNothing,
   onSubmit: doNothing,
   onDiscard: doNothing,
+  onUndo: doNothing,
+  onRedo: doNothing,
   onPickColor: doNothing,
   onToggleEraser: doNothing,
   onTogglePicker: doNothing,
@@ -183,6 +185,8 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
       draftSize: 3,
       canSubmit: true,
       canDiscard: true,
+      canUndo: true,
+      canRedo: false,
       isTouchScreen: true,
       isTouchTracing: false,
       isPicking: false,
@@ -195,6 +199,8 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
     expect(markup).toContain('title="Close Draw mode: your draft is kept"');
     expect(markup).toContain('title="Trace: one finger draws, two fingers move"');
     expect(markup).toContain('title="Eyedropper (I): picks the color of a placed pixel"');
+    expect(markup).toContain('title="Undo (Ctrl+Z): takes back your last stroke"');
+    expect(markup).toContain('title="Redo (Ctrl+Shift+Z): brings back what was undone"');
     expect(markup).toContain('title="Eraser (E)"');
     expect(markup).toContain("Color #");
   });
@@ -623,6 +629,8 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
       waitSeconds: 12,
       canSubmit: false,
       canDiscard: false,
+      canUndo: false,
+      canRedo: false,
       isTouchScreen: false,
       isTouchTracing: false,
       isPicking: false,

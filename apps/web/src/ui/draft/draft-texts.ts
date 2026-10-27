@@ -41,6 +41,14 @@ export const DRAFT_TEXTS = defineTexts({
     fr: "Pipette (I) : prend la couleur d'un pixel posé",
     en: "Eyedropper (I): picks the color of a placed pixel",
   },
+  undoTip: {
+    fr: "Annuler (Ctrl+Z) : défait ton dernier trait",
+    en: "Undo (Ctrl+Z): takes back your last stroke",
+  },
+  redoTip: {
+    fr: "Rétablir (Ctrl+Maj+Z) : refait ce qui vient d'être annulé",
+    en: "Redo (Ctrl+Shift+Z): brings back what was undone",
+  },
   collapseSheet: { fr: "Réduire la feuille", en: "Collapse the sheet" },
   expandPalette: { fr: "Déplier la palette", en: "Expand the palette" },
 

@@ -23,6 +23,8 @@ const ACTIONS: DraftPillActions = {
   onExit: noop,
   onSubmit: noop,
   onDiscard: noop,
+  onUndo: noop,
+  onRedo: noop,
   onPickColor: noop,
   onToggleEraser: noop,
   onTogglePicker: noop,
@@ -61,6 +63,8 @@ const viewDraft = (keptCells: number): DraftView => ({
   isPicking: false,
   shakeCount: 0,
   recentColorIndexes: [],
+  canUndo: false,
+  canRedo: false,
 });
 
 // La pill telle que la page la rend, de la jauge du canvas et du brouillon gardé
