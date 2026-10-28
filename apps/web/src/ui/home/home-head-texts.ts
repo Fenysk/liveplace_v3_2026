@@ -1,5 +1,5 @@
 // Les phrases que `/` donne aux moteurs de recherche et aux cartes de partage (Écart §9.1, JOURNAL 2026-10-22) : titre, description
-// et texte de l'image. Elles ne s'affichent pas dans la page. Un robot sans cookie ni `Accept-Language` reçoit le français.
+// et texte de l'image. Elles ne s'affichent pas dans la page. Un robot sans cookie ni `Accept-Language` reçoit l'anglais (JOURNAL 2026-10-28).
 
 import { defineTexts } from "../locale/texts";
 

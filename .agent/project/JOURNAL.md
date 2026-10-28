@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-28 — Écart §14 (amende l'entrée du 07/10 sur la langue par défaut) : l'accueil parle anglais à qui ne dit aucune langue
+
+**Contexte.** Le test de découverte du 28/10 : un streamer anglophone a vu le lien de `/` sur X tout en français, image comprise. Un robot d'aperçu ou Googlebot n'envoie ni cookie ni `Accept-Language` ; un navigateur en es, de, ja… recevait aussi le français.
+**Décision.** Le cookie `lp_locale` puis la meilleure langue connue de `Accept-Language` gardent la main. Un `Accept-Language` sans fr ni en rend `en`, sur toutes les pages ; sans `Accept-Language`, `en` sur `/` seulement, `fr` ailleurs (fresques, Confidentialité, retour Twitch). L'image de partage de `/` a sa version anglaise `og-home-en.png`, servie avec la page anglaise ; la française garde `/og-home.png?v=1`.
+**Renoncement.** Une adresse par langue avec `hreflang` (`/en`, ~2 h 30, écartée par Alexis le 28/10) ; l'anglais par défaut sur les pages des fresques, qui se partagent surtout dans une communauté française.
+
 ## 2026-10-24 — Écart §5.3 : réduire une fresque rapproche ses dessins avant de couper
 
 **Contexte.** Réduire coupait depuis le coin haut-gauche (entrée du 2026-09-29, bloc 1) : un dessin à droite ou en bas disparaissait, même entouré de vide. Alexis veut garder le plus de dessins possible (exemples validés le 22/10).

@@ -12,12 +12,12 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Route as HomeRoute } from "../../routes/index";
 import type { Locale } from "../locale/locale";
-import { HOME_IMAGE_PATH, HOME_IMAGE_VERSION, homeHead } from "./home-head";
+import { HOME_IMAGE_PATHS, HOME_IMAGE_VERSION, homeHead } from "./home-head";
 import { HOME_HEAD_TEXTS } from "./home-head-texts";
 
 const PUBLIC_URL = "https://liveplace.example";
 const HOME_URL = `${PUBLIC_URL}/`;
-const IMAGE_URL = `${PUBLIC_URL}/og-home.png?v=1`;
+const IMAGE_URLS = { fr: `${PUBLIC_URL}/og-home.png?v=1`, en: `${PUBLIC_URL}/og-home-en.png?v=1` };
 
 const FRENCH_TITLE = "LivePlace · Une fresque de pixels pour ton stream Twitch";
 const FRENCH_DESCRIPTION =
@@ -91,7 +91,7 @@ describe("la head de la page d'accueil", () => {
       { property: "og:url", content: HOME_URL },
       { property: "og:title", content: FRENCH_TITLE },
       { property: "og:description", content: FRENCH_DESCRIPTION },
-      { property: "og:image", content: IMAGE_URL },
+      { property: "og:image", content: IMAGE_URLS.fr },
       { property: "og:image:type", content: "image/png" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
@@ -99,7 +99,7 @@ describe("la head de la page d'accueil", () => {
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: FRENCH_TITLE },
       { name: "twitter:description", content: FRENCH_DESCRIPTION },
-      { name: "twitter:image", content: IMAGE_URL },
+      { name: "twitter:image", content: IMAGE_URLS.fr },
       { property: "og:locale", content: "fr_FR" },
     ]);
     expect(cardOf("en")).toContainEqual({ property: "og:locale", content: "en_US" });
@@ -109,15 +109,25 @@ describe("la head de la page d'accueil", () => {
     });
   });
 
-  // L'image de la carte est un fichier du dépôt : un PNG de 1200×630, léger, à l'adresse que la carte annonce
-  it("points the card at a light 1200×630 PNG kept in the public folder", () => {
-    const file = readFileSync(new URL(`../../../public${HOME_IMAGE_PATH}`, import.meta.url));
+  // Quand la page est en anglais, le système doit donner la carte avec l'image anglaise, la française gardant son adresse
+  it("posts the English image with the English page, and the French image keeps its address", () => {
+    expect(cardOf("en")).toContainEqual({ property: "og:image", content: IMAGE_URLS.en });
+    expect(cardOf("en")).toContainEqual({ name: "twitter:image", content: IMAGE_URLS.en });
+    expect(cardOf("en")).not.toContainEqual({ property: "og:image", content: IMAGE_URLS.fr });
+    expect(cardOf("fr")).not.toContainEqual({ property: "og:image", content: IMAGE_URLS.en });
+    expect(HOME_IMAGE_PATHS).toEqual({ fr: "/og-home.png", en: "/og-home-en.png" });
+  });
 
-    expect(HOME_IMAGE_PATH).toBe("/og-home.png");
+  // L'image de chaque langue est un fichier du dépôt : un PNG de 1200×630, léger, à l'adresse que la carte annonce
+  it("points the card at a light 1200×630 PNG kept in the public folder, one per language", () => {
     expect(HOME_IMAGE_VERSION).toBe(1);
-    expect(file.subarray(1, 4).toString("latin1")).toBe("PNG");
-    expect([file.readUInt32BE(16), file.readUInt32BE(20)]).toEqual([1200, 630]);
-    expect(file.length).toBeLessThanOrEqual(300 * 1024);
+    for (const locale of ["fr", "en"] as const) {
+      const file = readFileSync(new URL(`../../../public${HOME_IMAGE_PATHS[locale]}`, import.meta.url));
+
+      expect(file.subarray(1, 4).toString("latin1")).toBe("PNG");
+      expect([file.readUInt32BE(16), file.readUInt32BE(20)]).toEqual([1200, 630]);
+      expect(file.length).toBeLessThanOrEqual(300 * 1024);
+    }
   });
 
   // Quand un moteur de recherche lit `/`, le système doit lui donner un site et une application web, en JSON qui se lit

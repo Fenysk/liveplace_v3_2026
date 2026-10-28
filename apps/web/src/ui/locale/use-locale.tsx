@@ -2,8 +2,17 @@
 // d'après le cookie ou `Accept-Language` (`initial`) ; un choix écrit le cookie et change la page sans la recharger.
 // Hors d'un `LocaleProvider` (un test, un composant seul), la langue est le français.
 
-import { createContext, type PropsWithChildren, useCallback, useContext, useMemo, useState } from "react";
-import { DEFAULT_LOCALE, type Locale, localeCookie } from "./locale";
+import { cookieValue } from "@liveplace/shared";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { DEFAULT_LOCALE, LOCALE_COOKIE, type Locale, localeCookie, toLocale } from "./locale";
 import type { Localized } from "./texts";
 
 type LocaleState = { locale: Locale; pick: (locale: Locale) => void };
@@ -20,8 +29,29 @@ export const writeLocaleCookie = (locale: Locale): void => {
   }
 };
 
+export const getLocaleCookie = (): Locale | undefined => {
+  try {
+    return toLocale(cookieValue(document.cookie, LOCALE_COOKIE));
+  } catch (error) {
+    console.warn("use-locale : cookie illisible, la page garde sa langue", error);
+    return undefined;
+  }
+};
+
+// Le cookie fait foi : le HTML repris du cache au retour arrière, ou une page sortie du bfcache, date d'avant le dernier choix.
+export const followLocaleCookie = (onLocale: (locale: Locale) => void): (() => void) => {
+  const follow = () => {
+    const stored = getLocaleCookie();
+    if (stored) onLocale(stored);
+  };
+  follow();
+  window.addEventListener("pageshow", follow);
+  return () => window.removeEventListener("pageshow", follow);
+};
+
 export const LocaleProvider = ({ initial, children }: PropsWithChildren<{ initial: Locale }>) => {
   const [locale, setLocale] = useState(initial);
+  useEffect(() => followLocaleCookie(setLocale), []);
   const pick = useCallback((next: Locale) => {
     writeLocaleCookie(next);
     setLocale(next);

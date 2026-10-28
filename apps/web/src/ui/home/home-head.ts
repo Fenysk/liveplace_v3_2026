@@ -6,7 +6,8 @@ import { pageCardMeta, SITE_NAME } from "../link-preview/link-preview";
 import { INTL_TAGS, type Locale } from "../locale/locale";
 import { HOME_HEAD_TEXTS } from "./home-head-texts";
 
-export const HOME_IMAGE_PATH = "/og-home.png";
+// Écart §14 (JOURNAL 2026-10-28) : l'image de partage de chaque langue ; la française garde son adresse, que Discord et X ont en cache.
+export const HOME_IMAGE_PATHS: Record<Locale, string> = { fr: "/og-home.png", en: "/og-home-en.png" };
 // À incrémenter quand l'image change : Discord et X gardent une image par son adresse.
 export const HOME_IMAGE_VERSION = 1;
 
@@ -39,7 +40,7 @@ export const homeHead = (publicUrl: string, locale: Locale) => {
         url,
         title: texts.title,
         description: texts.description,
-        image: `${publicUrl}${HOME_IMAGE_PATH}?v=${HOME_IMAGE_VERSION}`,
+        image: `${publicUrl}${HOME_IMAGE_PATHS[locale]}?v=${HOME_IMAGE_VERSION}`,
         imageAlt: texts.imageAlt,
       }),
       // `fr-FR` pour `Intl`, `fr_FR` pour Open Graph

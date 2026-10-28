@@ -8,6 +8,7 @@ const OPEN_PATHS = [
   "/sitemap.xml",
   "/assets/", // styles, scripts et polices du build
   "/og-home.png",
+  "/og-home-en.png",
   "/favicon.ico",
   "/icon-192.png",
   "/icon-512.png",

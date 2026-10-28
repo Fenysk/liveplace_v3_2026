@@ -17,6 +17,10 @@ import {
 const resolveFrom = (cookieHeader: string | undefined, preferenceHeader?: string) =>
   resolveLocale({ cookieHeader, preferenceHeader });
 
+// La requête vise `/` : l'accueil parle anglais à qui ne dit aucune langue (Écart §14, JOURNAL 2026-10-28)
+const resolveHome = (cookieHeader: string | undefined, preferenceHeader?: string) =>
+  resolveLocale({ cookieHeader, preferenceHeader, isHome: true });
+
 describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () => {
   // Quand le navigateur préfère l'anglais, le système doit rendre la page en anglais
   it("takes English from a browser that prefers English", () => {
@@ -29,17 +33,31 @@ describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () 
     expect(resolveFrom(undefined, "es,fr;q=0.5")).toBe("fr");
   });
 
-  // Si aucune langue préférée n'est connue, alors le système doit rendre le français
-  it("falls back to French when it knows none of the preferred languages", () => {
-    expect(resolveFrom(undefined, "de-DE,de;q=0.9")).toBe("fr");
-    expect(resolveFrom(undefined, "*")).toBe("fr");
+  // Si aucune langue préférée n'est connue (es, de, ja…), alors le système doit rendre l'anglais, sur toutes les pages
+  it("falls back to English when it knows none of the preferred languages", () => {
+    expect(resolveFrom(undefined, "de-DE,de;q=0.9")).toBe("en");
+    expect(resolveFrom(undefined, "ja")).toBe("en");
+    expect(resolveFrom(undefined, "*")).toBe("en");
+    expect(resolveHome(undefined, "es-ES,es;q=0.9")).toBe("en");
   });
 
-  // Si l'en-tête est absent ou vide, alors le système doit rendre le français
-  it("falls back to French when there is no header at all", () => {
+  // Si l'en-tête est absent ou vide, alors le système doit rendre le français, sauf sur l'accueil qui rend l'anglais
+  it("falls back to French when there is no header at all, except on the home page", () => {
     expect(resolveFrom(undefined)).toBe("fr");
     expect(resolveFrom(undefined, "")).toBe("fr");
+    expect(resolveFrom(undefined, "  ")).toBe("fr");
     expect(resolveFrom("", undefined)).toBe("fr");
+    expect(resolveHome(undefined)).toBe("en");
+    expect(resolveHome(undefined, "")).toBe("en");
+    expect(resolveHome(undefined, "  ")).toBe("en");
+    expect(resolveHome("", undefined)).toBe("en");
+  });
+
+  // Quand l'en-tête nomme le français ou l'anglais, alors l'accueil le suit comme les autres pages
+  it("lets the home page follow the header when it names French or English", () => {
+    expect(resolveHome(undefined, "fr-FR,fr;q=0.9")).toBe("fr");
+    expect(resolveHome(undefined, "de,fr;q=0.5")).toBe("fr");
+    expect(resolveHome(undefined, "en-US")).toBe("en");
   });
 
   // Les poids q font l'ordre : une langue moins pondérée passe après, même écrite avant
@@ -56,13 +74,17 @@ describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () 
     expect(resolveFrom(undefined, "FR-ca")).toBe("fr");
     expect(resolveFrom(undefined, "en;q=0,fr;q=0.1")).toBe("fr");
     expect(resolveFrom(undefined, "en;q=0")).toBe("fr");
+    expect(resolveFrom(undefined, "de,en;q=0")).toBe("fr");
+    expect(resolveHome(undefined, "en;q=0")).toBe("fr");
   });
 
-  // Quand le cookie nomme une langue connue, alors il gagne sur l'en-tête, quel qu'il soit
+  // Quand le cookie nomme une langue connue, alors il gagne sur l'en-tête, quel qu'il soit, et sur l'accueil
   it("lets the cookie win over the header when it names a known language", () => {
     expect(resolveFrom(`${LOCALE_COOKIE}=en`, "fr-FR,fr;q=0.9")).toBe("en");
     expect(resolveFrom(`${LOCALE_COOKIE}=fr`, "en-US")).toBe("fr");
     expect(resolveFrom(`lp_session=abc; ${LOCALE_COOKIE}=en; theme=dark`, "fr")).toBe("en");
+    expect(resolveHome(`${LOCALE_COOKIE}=fr`)).toBe("fr");
+    expect(resolveHome(`${LOCALE_COOKIE}=fr`, "de")).toBe("fr");
   });
 
   // Si le cookie est invalide, alors le système doit l'ignorer et lire l'en-tête
@@ -71,6 +93,8 @@ describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () 
     expect(resolveFrom(`${LOCALE_COOKIE}=`, "en-US")).toBe("en");
     expect(resolveFrom(`${LOCALE_COOKIE}=EN`, "en-US")).toBe("en");
     expect(resolveFrom(`other_${LOCALE_COOKIE}=en`, "fr")).toBe("fr");
+    expect(resolveFrom(`${LOCALE_COOKIE}=de`)).toBe("fr");
+    expect(resolveHome(`${LOCALE_COOKIE}=de`)).toBe("en");
   });
 });
 
@@ -82,6 +106,14 @@ describe("la langue d'une requête et d'une page déjà rendue (Écart §14, JOU
     expect(resolveRequestLocale(request({ "accept-language": "en-GB,en;q=0.8" }))).toBe("en");
     expect(resolveRequestLocale(request({ "accept-language": "en", cookie: "lp_locale=fr" }))).toBe("fr");
     expect(resolveRequestLocale(request({}))).toBe("fr");
+  });
+
+  // Le retour de Twitch suit les mêmes règles que les pages, sauf celle de l'accueil : sans en-tête, le français
+  it("answers in English to a language it does not know, and in French to no language at all", () => {
+    const request = (headers: Record<string, string>) => ({ headers: new Headers(headers) });
+
+    expect(resolveRequestLocale(request({ "accept-language": "de-DE,de;q=0.9" }))).toBe("en");
+    expect(resolveRequestLocale(request({ "accept-language": "" }))).toBe("fr");
   });
 
   // Le titre de l'onglet, écrit par le serveur, suit la langue que la racine a rendue

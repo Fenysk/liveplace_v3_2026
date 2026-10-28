@@ -4,7 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { LocalePicker } from "../design/locale-controls";
 import { LOCALE_COOKIE, type Locale, resolveLocale } from "./locale";
-import { FixedLocale, LocaleProvider, useLocale, useTexts, writeLocaleCookie } from "./use-locale";
+import {
+  FixedLocale,
+  followLocaleCookie,
+  getLocaleCookie,
+  LocaleProvider,
+  useLocale,
+  useTexts,
+  writeLocaleCookie,
+} from "./use-locale";
 
 const inLocale = (initial: Locale, child: ReactNode): string =>
   renderToStaticMarkup(createElement(LocaleProvider, { initial }, child));
@@ -104,5 +112,78 @@ describe("le cookie écrit par la page (Écart §14, JOURNAL 2026-10-07)", () =>
     expect(() => writeLocaleCookie("en")).not.toThrow();
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
+  });
+});
+
+describe("le cookie lu par la page (Écart §14, JOURNAL 2026-10-07)", () => {
+  // Quand le navigateur porte plusieurs cookies, la langue lue est celle de lp_locale
+  it("reads the language of the cookie among the others", () => {
+    vi.stubGlobal("document", { cookie: "lp_session=abc; lp_locale=en; theme=dark" });
+
+    expect(getLocaleCookie()).toBe("en");
+  });
+
+  // Sans cookie de langue, ou avec une langue inconnue, alors la page n'a rien à suivre
+  it("reads nothing when the cookie is missing or holds an unknown language", () => {
+    vi.stubGlobal("document", { cookie: "lp_session=abc" });
+    expect(getLocaleCookie()).toBeUndefined();
+
+    vi.stubGlobal("document", { cookie: "lp_locale=de" });
+    expect(getLocaleCookie()).toBeUndefined();
+  });
+
+  // Si le navigateur refuse de lire le cookie, alors la page ne casse pas : elle garde sa langue
+  it("does not break the page when the browser refuses to read the cookie", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("document", {
+      get cookie(): string {
+        throw new Error("cookie illisible");
+      },
+    });
+
+    expect(getLocaleCookie()).toBeUndefined();
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+});
+
+describe("la page suit le cookie (Écart §14, JOURNAL 2026-10-07)", () => {
+  const plugWindow = () => {
+    const listeners = new Map<string, () => void>();
+    vi.stubGlobal("window", {
+      addEventListener: (name: string, listener: () => void) => listeners.set(name, listener),
+      removeEventListener: (name: string) => listeners.delete(name),
+    });
+    return listeners;
+  };
+
+  // Quand la page est affichée avec une autre langue que le cookie, elle passe à celle du cookie, puis à chaque retour du bfcache
+  it("applies the cookie at once, then at every pageshow, until it is unplugged", () => {
+    const document = { cookie: "lp_locale=en" };
+    vi.stubGlobal("document", document);
+    const listeners = plugWindow();
+    const seen: Locale[] = [];
+
+    const unplug = followLocaleCookie((locale) => seen.push(locale));
+    expect(seen).toEqual(["en"]);
+
+    document.cookie = "lp_locale=fr";
+    listeners.get("pageshow")?.();
+    expect(seen).toEqual(["en", "fr"]);
+
+    unplug();
+    expect(listeners.has("pageshow")).toBe(false);
+  });
+
+  // Sans langue valide dans le cookie, la page garde celle que le serveur a rendue
+  it("keeps the language of the page when the cookie holds none", () => {
+    vi.stubGlobal("document", { cookie: "lp_locale=de" });
+    const listeners = plugWindow();
+    const seen: Locale[] = [];
+
+    followLocaleCookie((locale) => seen.push(locale));
+    listeners.get("pageshow")?.();
+
+    expect(seen).toEqual([]);
   });
 });

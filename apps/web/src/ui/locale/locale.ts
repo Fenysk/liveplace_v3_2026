@@ -27,25 +27,45 @@ const weightOf = (parameters: readonly string[]): number => {
   return weight === undefined ? 1 : Number(weight.slice(2));
 };
 
-// La première langue connue, dans l'ordre des poids puis de l'en-tête ; la région est ignorée (`en-GB` est `en`).
+// La langue d'une étiquette de l'en-tête ; la région est ignorée (`en-GB` est `en`).
+const localeOfTag = (tag: string): Locale | undefined => toLocale(tag.trim().split("-")[0]?.toLowerCase());
+
+// La première langue connue, dans l'ordre des poids puis de l'en-tête.
 const fromPreferenceHeader = (header: string | undefined): Locale | undefined => {
   let best: { locale: Locale; weight: number } | undefined;
   for (const entry of (header ?? "").split(",")) {
     const [tag = "", ...parameters] = entry.split(";");
-    const locale = toLocale(tag.trim().split("-")[0]?.toLowerCase());
+    const locale = localeOfTag(tag);
     const weight = weightOf(parameters);
     if (locale && weight > 0 && (!best || weight > best.weight)) best = { locale, weight };
   }
   return best?.locale;
 };
 
-type LocaleHeaders = { cookieHeader: string | undefined; preferenceHeader: string | undefined };
+const isRefused = (header: string, locale: Locale): boolean =>
+  header.split(",").some((entry) => {
+    const [tag = "", ...parameters] = entry.split(";");
+    return localeOfTag(tag) === locale && weightOf(parameters) === 0;
+  });
 
-// Le cookie d'abord, puis `Accept-Language` (`preferenceHeader`), puis le français.
-export const resolveLocale = ({ cookieHeader, preferenceHeader }: LocaleHeaders): Locale =>
+// Écart §14 (JOURNAL 2026-10-28) : sans langue connue, une langue demandée que le site n'a pas (es, de, ja…) vaut l'anglais, sauf
+// refusé (`en;q=0`). Aucune langue demandée vaut l'anglais sur l'accueil, que lit un robot d'aperçu, et le français ailleurs.
+const fallbackLocale = (header: string | undefined, isHome: boolean): Locale => {
+  if (!header?.trim()) return isHome ? "en" : DEFAULT_LOCALE;
+  return isRefused(header, "en") ? "fr" : "en";
+};
+
+type LocaleHeaders = {
+  cookieHeader: string | undefined;
+  preferenceHeader: string | undefined;
+  isHome?: boolean; // la requête vise `/`
+};
+
+// Le cookie d'abord, puis `Accept-Language` (`preferenceHeader`), puis `fallbackLocale`.
+export const resolveLocale = ({ cookieHeader, preferenceHeader, isHome = false }: LocaleHeaders): Locale =>
   toLocale(cookieValue(cookieHeader, LOCALE_COOKIE)) ??
   fromPreferenceHeader(preferenceHeader) ??
-  DEFAULT_LOCALE;
+  fallbackLocale(preferenceHeader, isHome);
 
 // Pour une route serveur qui répond en texte brut, sans passer par la page.
 export const resolveRequestLocale = ({ headers }: Pick<Request, "headers">): Locale =>

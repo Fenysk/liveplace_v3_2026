@@ -37,6 +37,8 @@ const Probe = () => {
 };
 
 const openHome = (locale: Locale): void => {
+  // L'effet du `LocaleProvider` tourne aussi : il écoute `pageshow` sur la fenêtre.
+  vi.stubGlobal("window", { addEventListener: () => undefined, removeEventListener: () => undefined });
   renderToStaticMarkup(createElement(LocaleProvider, { initial: locale }, createElement(Probe)));
 };
 

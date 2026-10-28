@@ -75,6 +75,7 @@ describe("le fichier robots.txt", () => {
         "Allow: /sitemap.xml",
         "Allow: /assets/",
         "Allow: /og-home.png",
+        "Allow: /og-home-en.png",
         "Allow: /favicon.ico",
         "Allow: /icon-192.png",
         "Allow: /icon-512.png",
@@ -142,6 +143,7 @@ describe("le fichier robots.txt", () => {
     ])
       expect(isAllowed(text, "Googlebot", path)).toBe(true);
     expect(isAllowed(text, "Googlebot", "/og-home.png?v=1")).toBe(true);
+    expect(isAllowed(text, "Googlebot", "/og-home-en.png?v=1")).toBe(true);
     expect(isAllowed(text, "Googlebot", "/sitemap.xml")).toBe(true);
     expect(isAllowed(text, "Bingbot", "/assets/index-a1b2c3.js")).toBe(true);
   });
@@ -152,6 +154,7 @@ describe("le fichier robots.txt", () => {
     const files = readdirSync(new URL("../../../public", import.meta.url));
 
     expect(files).toContain("og-home.png");
+    expect(files).toContain("og-home-en.png");
     for (const file of files) expect(isAllowed(text, "Googlebot", `/${file}`)).toBe(true);
   });
 

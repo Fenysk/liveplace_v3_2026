@@ -2,7 +2,7 @@
 
 import { createRootRouteWithContext, HeadContent, ScriptOnce, Scripts } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
+import { getRequestHeader, getRequestUrl } from "@tanstack/react-start/server";
 import type { ReactNode } from "react";
 import type { CanvasOpener } from "../state/canvas-store";
 import { ADSENSE_CLIENT } from "../ui/ads/adsense";
@@ -18,11 +18,13 @@ export type RouterContext = { openCanvas: CanvasOpener };
 
 // Écart §11.1 (JOURNAL 2026-10-04) : l'étiquette d'un emplacement de bêta, `null` en production.
 // Écart §14 (JOURNAL 2026-10-07) : et la langue de la page, d'après le cookie, sinon `Accept-Language`.
+// Écart §14 (JOURNAL 2026-10-28) : sans l'un ni l'autre, l'accueil `/` parle anglais.
 const getRootPage = createServerFn({ method: "GET" }).handler(({ context }) => ({
   betaLabel: context.deps.betaLabel,
   locale: resolveLocale({
     cookieHeader: getRequestHeader("cookie"),
     preferenceHeader: getRequestHeader("accept-language"),
+    isHome: getRequestUrl().pathname === "/",
   }),
 }));
 
