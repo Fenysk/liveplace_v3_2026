@@ -5,6 +5,7 @@ import {
   BACKGROUND_IMAGE_MAX_SIDE,
   BACKGROUND_IMAGE_OPACITY,
   BACKGROUND_IMAGE_OPACITY_STEPS,
+  birthCanvasMeta,
   CANVAS_FORMATS,
   CANVAS_HEIGHT,
   CANVAS_STATUSES,
@@ -14,8 +15,11 @@ import {
   canModerate,
   claimableRewards,
   DEVELOPER_USER_ID,
+  DYNAMIC_BIRTH_CANVAS_SIZE,
+  DYNAMIC_SIZE_MIN,
   defaultCanvasMeta,
   earnedRewards,
+  FIXED_DEFAULT_CANVAS_SIZE,
   GAUGE_MAX_CEILING,
   GAUGE_MAX_START,
   type GaugeParams,
@@ -282,6 +286,25 @@ describe("defaultCanvasMeta (CDC §1)", () => {
       obsDelayMs: OBS_DELAY_MS,
       obsBackground: "transparent",
     });
+  });
+});
+
+describe("birthCanvasMeta (Écart §5.3, JOURNAL 2026-10-29)", () => {
+  // Fait naître le canvas de la première connexion en taille dynamique et 10 × 10, avec les valeurs par défaut du reste
+  it("makes the canvas of a first sign-in dynamic and 10 × 10, with the game defaults for the rest", () => {
+    expect(birthCanvasMeta("owner-1")).toEqual({
+      ...defaultCanvasMeta("owner-1"),
+      width: 10,
+      height: 10,
+      isDynamicSize: true,
+    });
+  });
+
+  // Laisse le canvas par défaut en taille fixe : il sert de base aux canvas qui existaient avant la naissance dynamique
+  it("leaves the default canvas fixed at 50 × 50, without the setting", () => {
+    expect(defaultCanvasMeta("owner-1")).not.toHaveProperty("isDynamicSize");
+    expect(FIXED_DEFAULT_CANVAS_SIZE).toEqual({ width: 50, height: 50 });
+    expect(DYNAMIC_BIRTH_CANVAS_SIZE).toEqual({ width: DYNAMIC_SIZE_MIN, height: DYNAMIC_SIZE_MIN });
   });
 });
 

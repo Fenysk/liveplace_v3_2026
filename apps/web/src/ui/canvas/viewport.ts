@@ -1,5 +1,7 @@
 // Le cadrage du canvas à l'écran (§9.3), tout en pixels CSS : le devicePixelRatio n'entre jamais ici.
 
+import { type Growth, NO_GROWTH } from "@liveplace/domain/dynamic-size";
+
 export type Size = { width: number; height: number };
 export type ScreenPoint = { x: number; y: number };
 export type Cell = { x: number; y: number };
@@ -79,6 +81,36 @@ export function zoomTowards(
 
 export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
   return { ...viewport, offsetX: viewport.offsetX + dx, offsetY: viewport.offsetY + dy };
+}
+
+// Le rectangle du canvas à l'écran, agrandi de `growth` cases de chaque côté (Écart §9.3, JOURNAL 2026-10-29) : sans elle, le canvas tel qu'il est.
+export type Box = { left: number; top: number; width: number; height: number };
+
+export function frameBox(viewport: Viewport, canvas: Size, growth: Growth = NO_GROWTH): Box {
+  const { scale, offsetX, offsetY } = viewport;
+  return {
+    left: offsetX - growth.left * scale,
+    top: offsetY - growth.top * scale,
+    width: (canvas.width + growth.left + growth.right) * scale,
+    height: (canvas.height + growth.top + growth.bottom) * scale,
+  };
+}
+
+// Le `clip-path` qui découpe une couche de l'écran à `box` : ce que le damier et l'aperçu de la croissance gardent.
+export function insetOf(box: Box, screen: Size): string {
+  const sides = [
+    box.top,
+    screen.width - (box.left + box.width),
+    screen.height - (box.top + box.height),
+    box.left,
+  ];
+  return `inset(${sides.map((side) => `${Math.max(0, side)}px`).join(" ")})`;
+}
+
+// Écart §5.3 (JOURNAL 2026-10-28) : les cases du canvas ont été décalées de `shift` colonnes et lignes (une taille dynamique a grandi à
+// gauche ou en haut, ou s'est resserrée). La vue suit : ce que la personne regardait reste sous ses yeux, sans saut.
+export function shiftViewport(viewport: Viewport, shift: Cell): Viewport {
+  return panBy(viewport, -shift.x * viewport.scale, -shift.y * viewport.scale);
 }
 
 // Le pourcentage de zoom : 100 % au cadrage de l'arrivée (CDC 2026).

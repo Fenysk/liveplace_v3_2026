@@ -1,8 +1,16 @@
 // Le mode Dessin (CDC 2026, écart §9.3, JOURNAL 2026-09-24) : le mode, le brouillon, la couleur active, le tracé et l'envoi.
 // Séparé du store du canvas : la vue OBS partagera celui-là, et elle n'a pas de brouillon.
 
-import { type Timestamp, TRANSPARENT_COLOR_INDEX, toStateOffset } from "@liveplace/domain";
-import type { CanvasStore } from "./canvas-store";
+import {
+  type CanvasOrigin,
+  originShift,
+  START_ORIGIN,
+  type Timestamp,
+  TRANSPARENT_COLOR_INDEX,
+  toCellKey,
+  toStateOffset,
+} from "@liveplace/domain";
+import type { CanvasStore, Pixel } from "./canvas-store";
 import {
   type Draft,
   type DraftContext,
@@ -11,6 +19,8 @@ import {
   EMPTY_DRAFT,
   fitDraft,
   settleBatch,
+  shiftBatch,
+  shiftDraft,
   toBatches,
   toggleDraftCell,
   traceDraftCells,
@@ -51,6 +61,7 @@ export type DraftStore = {
   discardDraft(): Draft | undefined; // Vider : rend le brouillon vidé (`undefined` s'il n'y avait rien à vider), de quoi le rétablir
   restoreDraft(cleared: Draft): void; // Rétablir, dans le toast de Vider : seulement tant que Vider est la dernière étape
   // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, le brouillon (non vide) est effacé, sans rétablissement possible.
+  // Un simple décalage de la fresque (JOURNAL 2026-10-28) ne l'efface pas : ses cases suivent.
   listenWiped(listener: () => void): () => void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   selectRecentColor(slot: number): void; // les touches 1 à 5 : la récente de cette place, comme un clic sur elle
@@ -114,6 +125,10 @@ export function createDraftStore(
   let knownMovedAtVersion = 0;
   let wipeCount = 0;
   const wipedListeners = new Set<() => void>();
+  // Écart §5.3 (JOURNAL 2026-10-28) : le repère que ce brouillon connaît. `successors` : un brouillon décalé prend la place de
+  // celui d'avant (l'historique, le toast de Vider), pour que Rétablir retrouve le sien.
+  let knownOrigin: CanvasOrigin = START_ORIGIN;
+  const successors = new WeakMap<Draft, Draft>();
 
   // Annuler et Rétablir se relisent dans l'historique à chaque publication (CDC 2026, §8 Historique).
   const publish = (next: Partial<DraftView>): void => {
@@ -142,16 +157,17 @@ export function createDraftStore(
   // Le brouillon d'un utilisateur ne se lit qu'après le `welcome` : c'est lui qui donne le `userId`.
   // Écart §5.3 (JOURNAL 2026-10-24) : sauvegardé avant un rapprochement, il est jeté, effacé du stockage, et dit.
   const applySavedDraft = (): void => {
-    const { userId, status, width, height, palette, movedAtVersion } = canvas.getView();
+    const { userId, status, width, height, palette, movedAtVersion, origin } = canvas.getView();
     if (!userId || status !== "live" || userId === loadedUserId) return;
     loadedUserId = userId;
     knownMovedAtVersion = movedAtVersion ?? 0;
+    knownOrigin = origin;
     forgetHistory();
-    const bounds = { width, height, paletteSize: palette.length, movedAtVersion };
+    const bounds = { width, height, paletteSize: palette.length, movedAtVersion, origin };
     const isStale = isSavedDraftStale(getStorage, canvasId, userId, movedAtVersion);
     publish({ draft: getSavedDraft(getStorage, canvasId, userId, bounds) });
     if (!isStale) return;
-    saveDraft(getStorage, canvasId, userId, EMPTY_DRAFT, knownMovedAtVersion);
+    saveDraft(getStorage, canvasId, userId, EMPTY_DRAFT, knownMovedAtVersion, knownOrigin);
     notifyWiped();
   };
   // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. Écart §15 (JOURNAL 2026-10-06) : une archive aussi,
@@ -171,14 +187,16 @@ export function createDraftStore(
   const unsubscribe = canvas.subscribe(() => {
     applySavedDraft();
     leaveIfReadOnly();
-    if (!wipeIfMoved()) fitToCanvas();
+    if (wipeIfMoved()) return;
+    followOrigin();
+    fitToCanvas();
   });
   applySavedDraft();
 
   const setDraft = (draft: Draft): void => {
     if (draft === view.draft) return;
     publish({ draft });
-    if (loadedUserId) saveDraft(getStorage, canvasId, loadedUserId, draft, knownMovedAtVersion);
+    if (loadedUserId) saveDraft(getStorage, canvasId, loadedUserId, draft, knownMovedAtVersion, knownOrigin);
   };
 
   // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, ses x, y sont faux, et Annuler parle d'un autre dessin.
@@ -187,12 +205,36 @@ export function createDraftStore(
     const moved = canvas.getView().movedAtVersion ?? 0;
     if (!loadedUserId || moved === knownMovedAtVersion) return false;
     knownMovedAtVersion = moved;
+    knownOrigin = canvas.getView().origin;
     wipeCount += 1;
     const hadDraft = view.draft.size > 0;
     forgetHistory();
     setDraft(EMPTY_DRAFT);
     if (hadDraft) notifyWiped();
     return true;
+  };
+
+  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque a grandi à gauche ou en haut, ou s'est resserrée : ses cases ont changé de numéro de
+  // colonne ou de ligne, et celles du brouillon, de l'historique comme du toast de Vider suivent. Rien n'est effacé.
+  const followOrigin = (): void => {
+    const { origin } = canvas.getView();
+    const shift = originShift(knownOrigin, origin);
+    if (!loadedUserId || (shift.x === 0 && shift.y === 0)) return;
+    knownOrigin = origin;
+    const follow = (draft: Draft): Draft => {
+      const moved = shiftDraft(draft, shift);
+      successors.set(draft, moved);
+      return moved;
+    };
+    history = { past: history.past.map(follow), future: history.future.map(follow) };
+    setDraft(follow(view.draft));
+  };
+
+  // Le brouillon d'aujourd'hui qui descend de `draft`, décalé autant de fois que la fresque l'a été depuis.
+  const currentOf = (draft: Draft): Draft => {
+    let latest = draft;
+    for (let next = successors.get(latest); next; next = successors.get(latest)) latest = next;
+    return latest;
   };
 
   const context = (): DraftContext => {
@@ -246,19 +288,39 @@ export function createDraftStore(
     setDraft(draft);
   };
 
+  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque peut être décalée pendant l'attente. Un lot prévu dans le repère `plannedOrigin` se redit
+  // dans celui d'aujourd'hui avant de partir, sans les cases que le brouillon a quittées.
+  const batchNow = (planned: readonly Pixel[], plannedOrigin: CanvasOrigin): Pixel[] =>
+    shiftBatch(planned, originShift(plannedOrigin, knownOrigin)).filter(({ x, y }) =>
+      view.draft.has(toCellKey(x, y)),
+    );
+
+  // Envoie un lot et en règle l'ack, avec les cases redites dans le repère d'après l'attente de la réponse. Faux : on s'arrête, ce qui n'est
+  // pas confirmé reste dans le brouillon (coupure ou refus du gateway, banni).
+  const sendBatch = async (
+    planned: readonly Pixel[],
+    plannedOrigin: CanvasOrigin,
+    placementId: string,
+  ): Promise<boolean> => {
+    const sentOrigin = knownOrigin;
+    const batch = batchNow(planned, plannedOrigin);
+    if (batch.length === 0) return true;
+    const result = await canvas.placeBatch(batch, placementId);
+    if (!result.ok) return false;
+    setDraft(settleBatch(view.draft, shiftBatch(batch, originShift(sentOrigin, knownOrigin)), result.value));
+    return !canvas.getView().isBanned;
+  };
+
   // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde. Tous portent la pose de la validation.
   const sendBatches = async (): Promise<void> => {
     const placementId = randomPlacementId();
+    const plannedOrigin = knownOrigin;
     let lastSentAt = Number.NEGATIVE_INFINITY;
-    for (const batch of toBatches(view.draft)) {
+    for (const planned of toBatches(view.draft)) {
       const delay = lastSentAt + SEND_INTERVAL_MS - clock.now();
       if (delay > 0) await clock.wait(delay);
       lastSentAt = clock.now();
-      const result = await canvas.placeBatch(batch, placementId);
-      // Coupure ou refus du gateway : ce qui n'est pas confirmé reste dans le brouillon.
-      if (!result.ok) return;
-      setDraft(settleBatch(view.draft, batch, result.value));
-      if (canvas.getView().isBanned) return;
+      if (!(await sendBatch(planned, plannedOrigin, placementId))) return;
     }
   };
 
@@ -303,7 +365,7 @@ export function createDraftStore(
       return cleared;
     },
     restoreDraft(cleared) {
-      if (history.past.at(-1) === cleared) travel(undoDraftStep);
+      if (history.past.at(-1) === currentOf(cleared)) travel(undoDraftStep);
     },
     listenWiped(listener) {
       wipedListeners.add(listener);

@@ -8,6 +8,7 @@ import { useDraftKeys } from "../draft/use-draft-keys";
 import { useTexts } from "../locale/use-locale";
 import { type CanvasScene, createCanvasScene } from "./canvas-scene";
 import { CANVAS_TEXTS } from "./canvas-texts";
+import { GrowthPreview, type GrowthPreviewRefs } from "./growth-preview-layers";
 import type { Handoff } from "./handoff";
 import type { NavigationKind } from "./navigation-watch";
 import { createViewportSaver, getSavedViewport } from "./saved-viewport";
@@ -52,6 +53,16 @@ export const PixelCanvas = ({
   const surface = useRef<HTMLCanvasElement>(null);
   const checker = useRef<HTMLDivElement>(null);
   const checkerTiles = useRef<HTMLDivElement>(null);
+  const previewRoot = useRef<HTMLDivElement>(null);
+  const previewChecker = useRef<HTMLDivElement>(null);
+  const previewTiles = useRef<HTMLDivElement>(null);
+  const previewOutline = useRef<SVGRectElement>(null);
+  const previewRefs: GrowthPreviewRefs = {
+    root: previewRoot,
+    checker: previewChecker,
+    tiles: previewTiles,
+    outline: previewOutline,
+  };
   const [scene, setScene] = useState<CanvasScene>();
   const [framing, setFraming] = useState<Framing | null>(null);
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
@@ -68,7 +79,22 @@ export const PixelCanvas = ({
 
   // Le viewport sauvegardé se lit ici, jamais pendant le rendu : `localStorage` n'existe pas sur le serveur.
   useEffect(() => {
-    if (!surface.current || !checker.current || !checkerTiles.current) return;
+    const preview = {
+      root: previewRoot.current,
+      checker: previewChecker.current,
+      tiles: previewTiles.current,
+      outline: previewOutline.current,
+    };
+    if (
+      !surface.current ||
+      !checker.current ||
+      !checkerTiles.current ||
+      !preview.root ||
+      !preview.checker ||
+      !preview.tiles ||
+      !preview.outline
+    )
+      return;
     const saver = createViewportSaver(getBrowserStorage, canvasId);
     const created = createCanvasScene(surface.current, store, draftStore, {
       login,
@@ -81,6 +107,12 @@ export const PixelCanvas = ({
       handoff,
       checker: checker.current,
       checkerTiles: checkerTiles.current,
+      preview: {
+        root: preview.root,
+        checker: preview.checker,
+        tiles: preview.tiles,
+        outline: preview.outline,
+      },
     });
     setScene(created);
     return () => {
@@ -91,11 +123,13 @@ export const PixelCanvas = ({
 
   return (
     <>
-      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, le damier, découpé au canvas, puis le canvas. */}
+      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, le damier, découpé au canvas, l'aperçu de la croissance (Écart §9.3,
+          JOURNAL 2026-10-29), puis le canvas. */}
       <div className="lp-void" aria-hidden="true" />
       <div ref={checker} className="lp-checker" aria-hidden="true">
         <div ref={checkerTiles} className="lp-checker-tiles" />
       </div>
+      <GrowthPreview refs={previewRefs} />
       {/* Les zones libres du canvas, que le CSS dessine et que le cadrage d'arrivée mesure (arrival-insets.ts) : à côté de la colonne, au-dessus. */}
       <div className="lp-canvas-zone" aria-hidden="true" />
       <div className="lp-canvas-zone lp-canvas-zone--above" aria-hidden="true" />

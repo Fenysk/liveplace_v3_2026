@@ -42,6 +42,7 @@ type Scenario = {
   active?: ActiveCanvas | null;
   archives?: Archive[];
   activeTheme?: string; // le thème du canvas actif dans la copie de Redis
+  activeMeta?: Partial<CanvasMeta>; // ce qui change la copie de Redis du canvas actif : sa taille, la taille dynamique
   isLocked?: boolean; // un autre changement tient le verrou
   failsAt?: string; // la méthode de Redis qui lève
   convex?: Convex;
@@ -66,7 +67,11 @@ const setup = (scenario: Scenario = {}) => {
   const redis: SwitchDeps["redis"] = {
     getCanvas: async (canvasId) =>
       canvasId === store.active?.canvasId
-        ? { ...metaOfActive, ...(scenario.activeTheme ? { theme: scenario.activeTheme } : {}) }
+        ? {
+            ...metaOfActive,
+            ...scenario.activeMeta,
+            ...(scenario.activeTheme ? { theme: scenario.activeTheme } : {}),
+          }
         : {
             ...metaOfActive,
             archivedAt: 900,
@@ -240,6 +245,30 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
 
     expect(sent.prepared).toEqual(metaOfActive);
     expect(sent.prepared).not.toHaveProperty("archivedAt");
+  });
+
+  // Écart §5.3 (JOURNAL 2026-10-29) : archivé en taille dynamique, le canvas neuf naît dynamique et 10 × 10, pour Redis comme pour Convex
+  it("makes the new canvas dynamic and 10 × 10 when the archived one was dynamic, for Redis and for Convex", async () => {
+    const { deps, sent } = setup({
+      activeMeta: { width: 60, height: 20, isDynamicSize: true, origin: { x: 4, y: 7 } },
+    });
+
+    await archiveCanvas(deps, ownerId, archiveRequest);
+
+    expect(sent.prepared).toEqual({ ...metaOfActive, width: 10, height: 10, isDynamicSize: true });
+    expect(sent.prepared).not.toHaveProperty("origin");
+    expect(sent.archive?.incoming).toEqual({ canvasId: "new-1", width: 10, height: 10 });
+  });
+
+  // Archivé en taille fixe, même d'une taille hors format, le canvas neuf garde la taille du sortant, la taille dynamique retirée
+  it("keeps the size of a fixed archived canvas for the new one, with the dynamic size off", async () => {
+    const { deps, sent } = setup({ activeMeta: { width: 120, height: 90 } });
+
+    await archiveCanvas(deps, ownerId, archiveRequest);
+
+    expect(sent.prepared).toEqual({ ...metaOfActive, width: 120, height: 90 });
+    expect(sent.prepared).not.toHaveProperty("isDynamicSize");
+    expect(sent.archive?.incoming).toEqual({ canvasId: "new-1", width: 120, height: 90 });
   });
 
   // Donne à Convex le thème nettoyé, le code tiré, la date, et le nouveau canvas

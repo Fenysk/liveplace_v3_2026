@@ -47,11 +47,13 @@ export function toPlacementRef(placementKey: string): PlacementRef {
 
 export function buildCanvasKeys(canvasId: string) {
   const prefix = `cv:${canvasId}:`;
-  // Le Lua construit `hist:`, `cells:`, `clearing:` et `reports:` en concaténant ces préfixes.
+  // Le Lua construit `hist:`, `cells:`, `clearing:`, `reports:`, `ban:` et `cleared:recent:` en concaténant ces préfixes.
   const histPrefix = `${prefix}hist:`;
   const cellsPrefix = `${prefix}cells:`;
   const clearingPrefix = `${prefix}clearing:`;
   const reportsPrefix = `${prefix}reports:`;
+  const banPrefix = `${prefix}ban:`;
+  const recentlyClearedPrefix = `${prefix}cleared:recent:`;
   return {
     prefix,
     meta: `${prefix}meta`,
@@ -67,6 +69,8 @@ export function buildCanvasKeys(canvasId: string) {
     approved: `${prefix}approved`, // les poses rétablies : elles ne se signalent plus
     clearingPrefix,
     reportsPrefix,
+    banPrefix,
+    recentlyClearedPrefix,
     bans: `${prefix}bans`,
     bansTwitch: `${prefix}bans:twitch`, // §5.1 : les bans venus de Twitch
     mods: `${prefix}mods`,
@@ -83,9 +87,9 @@ export function buildCanvasKeys(canvasId: string) {
     clearing: (userId: string) => `${clearingPrefix}${userId}`,
     reports: (placementKey: string) => `${reportsPrefix}${placementKey}`, // qui a signalé cette pose
     // §5.1 : la preuve d'un ban, `cellKey` → `colorIndex`. Écrite par ban, supprimée par unban.
-    ban: (userId: string) => `${prefix}ban:${userId}`,
+    ban: (userId: string) => `${banPrefix}${userId}`,
     // §5.4 : ce qu'un retrait vient de lui ôter, `cellKey` → `colorIndex`, pour la preuve d'un ban.
-    recentlyCleared: (userId: string) => `${prefix}cleared:recent:${userId}`,
+    recentlyCleared: (userId: string) => `${recentlyClearedPrefix}${userId}`,
     gauge: (userId: string) => `${prefix}gauge:${userId}`,
     // §5.1 : sans EXPIRE, contrairement à la jauge : une progression ne se perd pas.
     progress: (userId: string) => `${prefix}progress:${userId}`,

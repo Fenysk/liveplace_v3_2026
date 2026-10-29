@@ -23,6 +23,7 @@ import { PixelPreview } from "../design/pixel-preview";
 import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
 import { Reveal } from "../design/reveal";
 import { SaturationFigure } from "../design/saturation-figure";
+import { Segmented, type SegmentedOption } from "../design/segmented";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
@@ -808,13 +809,28 @@ export const StatTilesEntry = () => {
   );
 };
 
+type SegmentedSample = "small" | "medium" | "large";
+
+const SEGMENTED_SAMPLE: readonly SegmentedOption<SegmentedSample>[] = [
+  { value: "small", label: "Petit" },
+  { value: "medium", label: "Moyen" },
+  { value: "large", label: "Grand" },
+];
+
 export const ChoicesEntry = () => {
   const appearanceChoice = useAppearanceChoice();
   return (
     <Entry
       slug="choix"
-      components={["ChoiceList", "AppearancePicker", "AppearanceButton", "LocalePicker", "SwatchChoice"]}
-      file="ui/design/{choice-list,appearance-controls,locale-controls,palette}.tsx"
+      components={[
+        "ChoiceList",
+        "Segmented",
+        "AppearancePicker",
+        "AppearanceButton",
+        "LocalePicker",
+        "SwatchChoice",
+      ]}
+      file="ui/design/{choice-list,segmented,appearance-controls,locale-controls,palette}.tsx"
       note="Un choix exclusif. Le bouton d'apparence fait le cycle auto, clair, sombre ; la langue se choisit dans Mon compte et sur l'accueil."
     >
       <Block title="Choix exclusif">
@@ -841,6 +857,34 @@ export const ChoicesEntry = () => {
               onSelect={noop}
               isDisabled
             />
+          </InSmallWindow>
+        </StateRow>
+        <StateRow
+          name="Choix segmenté"
+          detail="Une option choisie ; le fond de l'option choisie glisse de l'ancienne à la nouvelle."
+        >
+          <InSmallWindow>
+            <WithValue<SegmentedSample> initial="medium">
+              {(size, setSize) => (
+                <Segmented label="Taille" options={SEGMENTED_SAMPLE} value={size} onSelect={setSize} />
+              )}
+            </WithValue>
+          </InSmallWindow>
+        </StateRow>
+        <StateRow
+          name="Choix segmenté désactivé, une option choisie"
+          detail="Grisé comme la case à cocher désactivée : l'option choisie se lit encore, ni clic ni clavier."
+        >
+          <InSmallWindow>
+            <Segmented label="Taille" options={SEGMENTED_SAMPLE} value="medium" onSelect={noop} isDisabled />
+          </InSmallWindow>
+        </StateRow>
+        <StateRow
+          name="Choix segmenté désactivé, aucune option choisie"
+          detail="Une taille dans aucun format : le choix reste grisé et vide."
+        >
+          <InSmallWindow>
+            <Segmented label="Taille" options={SEGMENTED_SAMPLE} value={null} onSelect={noop} isDisabled />
           </InSmallWindow>
         </StateRow>
       </Block>

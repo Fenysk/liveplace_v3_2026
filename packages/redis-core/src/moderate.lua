@@ -1,5 +1,5 @@
 -- Modération d'un canvas (§5.4) : clearUser, clearPlacement, approvePlacement, ban, unban. Ordre des KEYS et ARGV :
--- client.ts. `openPile` et `parseEntry` viennent de pile.lua.
+-- client.ts. `openPile` et `parseEntry` viennent de pile.lua, `planGrowth` et `reframe` de reframe.lua (Écart §5.3, JOURNAL 2026-10-28).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, modsKey, clearedKey, clearingKey, targetCellsKey, banKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8], KEYS[9], KEYS[10]
@@ -21,10 +21,13 @@ local source = ARGV[12]
 -- §5.4 : la pose visée et la plage d'heures qui l'étend, vides sinon.
 local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(ARGV[15])
 local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
+-- Écart §5.3 (JOURNAL 2026-10-28) : ce que reframe.lua décale, et les bornes d'une taille dynamique.
+local banPrefix, recentlyClearedPrefix = ARGV[19], ARGV[20]
+local growthLimits = { margin = tonumber(ARGV[21]), maxWidth = tonumber(ARGV[22]), maxHeight = tonumber(ARGV[23]) }
 local placement = target .. ":" .. placementId
 
 -- 0. Canvas prêt. §5.5, comme place.lua. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
-local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height", "archivedAt")
+local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height", "archivedAt", "dynamicSize", "originX", "originY")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
@@ -281,6 +284,42 @@ end
 if slice == "first" then
   for _, cell in ipairs(pile.listOffStreamCells()) do
     cells[#cells + 1] = cell
+  end
+end
+-- Écart §5.3 (JOURNAL 2026-10-28) : un pixel remis sur une case vide peut rapprocher un dessin du bord d'une taille dynamique. La fresque
+-- grandit avant que l'événement parte : ses cases parlent déjà du nouveau cadre.
+if meta[6] == "1" then
+  local added = {}
+  for _, cell in ipairs(cells) do
+    if cell.previousColorIndex == 0 and cell.colorIndex ~= 0 then
+      added[#added + 1] = cell
+    end
+  end
+  local left, top, grownWidth, grownHeight = planGrowth(added, width, height, growthLimits)
+  if left then
+    reframe({
+      metaKey = metaKey,
+      stateKey = stateKey,
+      versionKey = versionKey,
+      liveChannel = liveChannel,
+      histPrefix = histPrefix,
+      cellsPrefix = cellsPrefix,
+      clearingPrefix = clearingPrefix,
+      banPrefix = banPrefix,
+      recentlyClearedPrefix = recentlyClearedPrefix,
+      bansKey = bansKey,
+      clearedKey = clearedKey,
+      clearedPlacementsKey = clearedPlacementsKey,
+      clearedRangesKey = clearedRangesKey,
+      cellStride = cellStride,
+      width = width,
+      height = height,
+      originX = tonumber(meta[7]) or 0,
+      originY = tonumber(meta[8]) or 0,
+    }, left, top, grownWidth, grownHeight)
+    for _, cell in ipairs(cells) do
+      cell.x, cell.y = cell.x + left, cell.y + top
+    end
   end
 end
 publish(version, cells, "clear")

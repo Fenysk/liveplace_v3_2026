@@ -1,4 +1,4 @@
-import { type CanvasMeta, defaultCanvasMeta } from "@liveplace/domain";
+import { birthCanvasMeta, type CanvasMeta, defaultCanvasMeta } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
 import { createArchiveWrites } from "./archive-writes";
 import { createSignInWrites } from "./client";
@@ -45,6 +45,49 @@ describe("preparing and readying a canvas (Écart §15, JOURNAL 2026-10-06)", ()
     await writes.markReady(canvasId);
 
     expect(await writes.getCanvas(canvasId)).toEqual(meta);
+  });
+});
+
+describe("the dynamic size at birth (Écart §5.3, JOURNAL 2026-10-29)", () => {
+  const birth = birthCanvasMeta("owner-1");
+
+  // Naît en taille dynamique et 10 × 10 : le réglage s'écrit sous son nom dans Redis, jamais sous celui du domaine
+  it("is born dynamic and 10 × 10 at a first sign-in: the setting is written under its Redis name", async () => {
+    const canvasId = uniqueCanvasId();
+    const keys = buildCanvasKeys(canvasId);
+
+    await signIn.createCanvas(canvasId, birth);
+
+    expect(await redis.hmget(keys.meta, "width", "height", "dynamicSize")).toEqual(["10", "10", "1"]);
+    expect(await redis.hexists(keys.meta, "isDynamicSize")).toBe(0);
+    expect(await redis.getBuffer(keys.state)).toEqual(Buffer.alloc(100));
+    expect(await writes.getCanvas(canvasId)).toEqual(birth);
+  });
+
+  // Un canvas qui existe sans le champ reste en taille fixe à la connexion suivante : seule la naissance écrit le réglage
+  it("leaves a canvas that already exists without the field fixed at its next sign-in", async () => {
+    const canvasId = uniqueCanvasId();
+    const keys = buildCanvasKeys(canvasId);
+    await signIn.createCanvas(canvasId, defaultCanvasMeta("owner-1"));
+
+    await signIn.createCanvas(canvasId, birth);
+
+    expect(await redis.hmget(keys.meta, "width", "height")).toEqual(["50", "50"]);
+    expect(await redis.hexists(keys.meta, "dynamicSize")).toBe(0);
+    expect(await redis.getBuffer(keys.state)).toEqual(Buffer.alloc(2500));
+  });
+
+  // Prépare le successeur d'une archive dynamique de la même façon : le réglage sous son nom, la taille de la naissance
+  it("prepares the successor of a dynamic archive the same way: the setting under its Redis name", async () => {
+    const canvasId = uniqueCanvasId();
+    const keys = buildCanvasKeys(canvasId);
+
+    await writes.prepareCanvas(canvasId, birth);
+    await writes.markReady(canvasId);
+
+    expect(await redis.hmget(keys.meta, "width", "height", "dynamicSize")).toEqual(["10", "10", "1"]);
+    expect(await redis.hexists(keys.meta, "isDynamicSize")).toBe(0);
+    expect(await writes.getCanvas(canvasId)).toEqual(birth);
   });
 });
 

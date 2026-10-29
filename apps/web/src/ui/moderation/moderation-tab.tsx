@@ -7,7 +7,7 @@
 // L'affichage est dans `reported-placements.tsx`, `banned-users.tsx`, `moderator-users.tsx` et `twitch-sync.tsx`.
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import type { CanvasStore, StaleList } from "../../state/canvas-store";
+import { type CanvasStore, type StaleList, toMoveKey } from "../../state/canvas-store";
 import { syncHref } from "../account/auth-links";
 import { useToast } from "../design/toast";
 import { useTexts } from "../locale/use-locale";
@@ -92,8 +92,8 @@ const useRelistOnReports = (canvas: CanvasStore, relist: () => void) => {
   useEffect(() => {
     let listed: string | null = null;
     const relistIfChanged = () => {
-      const { reportCount, movedAtVersion } = canvas.getView();
-      const now = `${reportCount}:${movedAtVersion ?? 0}`;
+      const view = canvas.getView();
+      const now = `${view.reportCount}:${toMoveKey(view)}`;
       if (now === listed) return;
       listed = now;
       relist();

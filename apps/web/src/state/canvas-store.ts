@@ -2,10 +2,13 @@
 
 import {
   type ActivityPeriod,
+  type CanvasOrigin,
   type CanvasStatus,
   type GaugeLimits,
   type ObsBackground,
+  originShift,
   type Role,
+  START_ORIGIN,
   type Timestamp,
   TRANSPARENT_COLOR_INDEX,
   toStateOffset,
@@ -109,6 +112,10 @@ export type CanvasView = {
   // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Elle change : tout x, y
   // d'avant (brouillon, inspection, lot en vol, cible de signalement) est périmé. Absent : aucun n'en a déplacé.
   movedAtVersion?: number | undefined;
+  // Écart §5.3 (JOURNAL 2026-10-28) : la taille est dynamique, et le repère de la fresque : la somme des décalages vers la droite et
+  // le bas qu'elle a subis. Quand il change, tout x, y d'avant se décale d'autant (brouillon, vue, inspection, lot en vol).
+  isDynamicSize: boolean;
+  origin: CanvasOrigin;
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
@@ -151,6 +158,8 @@ export type CanvasStore = {
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
   // Le streamer seul ; la nouvelle taille arrive par un `welcome` et un snapshot (JOURNAL 2026-09-29).
   resizeCanvas(width: number, height: number): Promise<RequestResult<true>>;
+  // Écart §5.3 (JOURNAL 2026-10-28) : de même, activée ou retirée ; le `welcome` qui suit porte le réglage.
+  setDynamicSize(isDynamicSize: boolean): Promise<RequestResult<true>>;
   // Les pixels de l'auteur de cette pose, pour choisir la plage à signaler (JOURNAL 2026-09-29).
   listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
   listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
@@ -169,6 +178,12 @@ export type CanvasStore = {
   listenCapacity(listener: (frame: CapacityFrame) => void): () => void;
   close(): void;
 };
+
+// Écart §5.3 (JOURNAL 2026-10-28) : change quand des pixels changent de case, par un rapprochement ou par un décalage de la fresque.
+export const toMoveKey = ({
+  movedAtVersion,
+  origin,
+}: Pick<CanvasView, "movedAtVersion" | "origin">): string => `${movedAtVersion ?? 0}:${origin.x},${origin.y}`;
 
 // Fourni aux routes par le contexte du routeur : `ui/` ouvre un canvas sans connaître `net/`.
 export type CanvasOpener = (canvasId: string, mode: CanvasMode) => CanvasStore;
@@ -242,6 +257,8 @@ export function createCanvasStore(
     height: 0,
     palette: [],
     version: 0,
+    isDynamicSize: false,
+    origin: START_ORIGIN,
     gauge: null,
     reportCount: 0,
     lastError: null,
@@ -421,6 +438,8 @@ export function createCanvasStore(
       ownerTwitchLive: frame.canvas.ownerTwitchLive,
       twitchLive: frame.you.twitchLive,
       movedAtVersion: frame.canvas.movedAtVersion,
+      isDynamicSize: frame.canvas.isDynamicSize === true,
+      origin: frame.canvas.origin ?? START_ORIGIN,
       params: frame.params,
       gauge: frame.gauge ?? null,
       ...(userId ? { userId } : {}),
@@ -441,12 +460,39 @@ export function createCanvasStore(
     return { inspection: null };
   };
 
+  // Écart §5.3 (JOURNAL 2026-10-28) : la taille ou le repère change. Un lot en vol garde sa frame, que le serveur traduit de son origine ;
+  // ses `offsets` parlent de l'ancien tableau, et rien d'avant ne se restaure plus.
+  const forgetPendingOffsets = (): void => {
+    for (const batch of pending.values()) {
+      batch.offsets = [];
+      batch.previousColorIndexes = [];
+    }
+  };
+
+  // Une inspection suit sa case, sauf si sa réponse est encore attendue : elle parlerait d'une case d'avant.
+  const shiftInspection = (shift: CanvasOrigin): Inspection | null => {
+    const { inspection } = view;
+    if (inspection?.status === "loading") inspectRequestId = null;
+    if (!inspection || inspection.status === "loading") return null;
+    return { ...inspection, x: inspection.x + shift.x, y: inspection.y + shift.y };
+  };
+
+  // Un rapprochement (`dropOnMove`) a le dernier mot.
+  const followShift = (frame: WelcomeFrame): Partial<CanvasView> => {
+    const { width, height, origin = START_ORIGIN } = frame.canvas;
+    const shift = originShift(view.origin, origin);
+    const isShifted = shift.x !== 0 || shift.y !== 0;
+    if (isShifted || width !== view.width || height !== view.height) forgetPendingOffsets();
+    return isShifted ? { inspection: shiftInspection(shift) } : {};
+  };
+
   const welcome = (frame: WelcomeFrame): void => {
     heldRecent = frame.recent ?? null;
     missingAsk += 1;
     // Le canvas existe : un `welcome` démentit `canvas_not_found` et `canvas_recovering`, les autres refus restent.
     const isDisproved = view.lastError === "canvas_not_found" || view.lastError === "canvas_recovering";
     publish({
+      ...followShift(frame),
       ...dropOnMove(frame),
       ...welcomeView(frame),
       ...(isDisproved ? { lastError: null } : {}),
@@ -682,7 +728,13 @@ export function createCanvasStore(
         const offset = offsets[index];
         if (offset !== undefined) view.pixels[offset] = colorIndex;
       });
-      const frame: PlaceFrame = { t: "place", requestId, placementId, pixels: [...pixels] };
+      const frame: PlaceFrame = {
+        t: "place",
+        requestId,
+        placementId,
+        origin: view.origin,
+        pixels: [...pixels],
+      };
       const placed = new Promise<PlaceResult>((resolve) => {
         const sentAt = options.now();
         pending.set(requestId, { frame, sentAt, offsets, previousColorIndexes, touched: new Set(), resolve });
@@ -758,6 +810,10 @@ export function createCanvasStore(
       ),
     resizeCanvas: (width, height) =>
       request({ t: "resizeCanvas", requestId: crypto.randomUUID(), width, height }, (reply) =>
+        reply.t === "resized" ? true : undefined,
+      ),
+    setDynamicSize: (isDynamicSize) =>
+      request({ t: "setDynamicSize", requestId: crypto.randomUUID(), isDynamicSize }, (reply) =>
         reply.t === "resized" ? true : undefined,
       ),
     listAuthorPixels: (x, y, placementId) =>

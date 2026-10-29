@@ -11,8 +11,9 @@ export type SegmentedOption<Value extends string> = { value: Value; label: strin
 type SegmentedProps<Value extends string> = {
   label: string;
   options: readonly SegmentedOption<Value>[];
-  value: Value;
+  value: Value | null; // `null` : aucune option n'est choisie
   onSelect: (value: Value) => void;
+  isDisabled?: boolean; // Écart §5.3 (JOURNAL 2026-10-29) : grisé, l'option choisie se lit encore, ni clic ni clavier
 };
 
 export const Segmented = <Value extends string>({
@@ -20,6 +21,7 @@ export const Segmented = <Value extends string>({
   options,
   value,
   onSelect,
+  isDisabled = false,
 }: SegmentedProps<Value>) => {
   const name = useId();
   const selection = useSelectionGlide<HTMLDivElement>();
@@ -35,6 +37,7 @@ export const Segmented = <Value extends string>({
             name={name}
             value={optionValue}
             checked={optionValue === value}
+            disabled={isDisabled}
             onChange={() => onSelect(optionValue)}
           />
           {Icon && <Icon aria-hidden="true" />}

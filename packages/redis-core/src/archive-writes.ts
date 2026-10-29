@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import type { ArchiveWrites, CanvasImage, LiveMessage } from "@liveplace/domain/ports";
 import type { Redis } from "ioredis";
-import { getCanvasMeta } from "./client";
+import { getCanvasMeta, toMetaFields } from "./client";
 import { buildCanvasKeys, OWNER_LOCK_TTL_MS, ownerLockKey } from "./keys";
 
 const SCAN_COUNT = 500;
@@ -90,7 +90,7 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
       const keys = canvasKeysOf(canvasId);
       await redis
         .multi()
-        .hset(keys.meta, meta)
+        .hset(keys.meta, toMetaFields(meta))
         .set(keys.state, Buffer.alloc(meta.width * meta.height))
         .set(keys.version, 0)
         .exec();

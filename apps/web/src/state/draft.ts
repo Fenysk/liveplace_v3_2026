@@ -1,7 +1,13 @@
 // Le brouillon (CDC 2026, écart §9.3, JOURNAL 2026-09-24) : les cases choisies, pas encore posées, et ses règles.
 // Pur : ni navigateur, ni réseau. Un brouillon ne se modifie jamais, chaque règle en rend un nouveau.
 
-import { type CanvasSize, type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
+import {
+  type CanvasOrigin,
+  type CanvasSize,
+  type CellKey,
+  TRANSPARENT_COLOR_INDEX,
+  toCellKey,
+} from "@liveplace/domain";
 import type { AckFrame } from "@liveplace/domain/ports";
 import type { Pixel } from "./canvas-store";
 
@@ -67,6 +73,21 @@ export function toBatches(draft: Draft): Pixel[][] {
 export function fitDraft(draft: Draft, { width, height }: CanvasSize): Draft {
   const inside = [...draft].filter(([, { x, y }]) => x < width && y < height);
   return inside.length === draft.size ? draft : new Map(inside);
+}
+
+// Écart §5.3 (JOURNAL 2026-10-28) : la fresque a été décalée de `shift` cases, et ses cases avec elle ; l'ordre d'envoi reste. Une case
+// qui passerait avant l'origine est sortie du cadre (un resserrement a coupé son bord).
+export function shiftDraft(draft: Draft, shift: CanvasOrigin): Draft {
+  if (shift.x === 0 && shift.y === 0) return draft;
+  const moved = [...draft.values()]
+    .map((pixel) => ({ ...pixel, x: pixel.x + shift.x, y: pixel.y + shift.y }))
+    .filter(({ x, y }) => x >= 0 && y >= 0);
+  return new Map(moved.map((pixel) => [toCellKey(pixel.x, pixel.y), pixel]));
+}
+
+// Les cases d'un lot en vol, décalées de même (`shiftDraft` pour un lot).
+export function shiftBatch(batch: readonly Pixel[], shift: CanvasOrigin): Pixel[] {
+  return batch.map((pixel) => ({ ...pixel, x: pixel.x + shift.x, y: pixel.y + shift.y }));
 }
 
 // L'`index` d'un refus est la place du pixel dans son lot, jamais dans le brouillon.

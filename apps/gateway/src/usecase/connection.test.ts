@@ -1,5 +1,6 @@
 import {
   type CanvasMeta,
+  type CanvasOrigin,
   DEVELOPER_USER_ID,
   type Device,
   defaultCanvasMeta,
@@ -194,6 +195,7 @@ const place = (requestId = ack.requestId) =>
     t: "place",
     requestId,
     placementId: "puser1001",
+    origin: { x: 0, y: 0 },
     pixels: [{ x: 1, y: 2, colorIndex: 3 }],
   });
 
@@ -232,6 +234,9 @@ type SetupOptions = {
   movedAtVersion?: number; // la version du dernier rapprochement qui a déplacé des pixels, lue dans `meta` (Écart §5.3, JOURNAL 2026-10-24)
   movedOnResize?: number; // la version que pose un rapprochement qui déplace des pixels, comme resize.lua
   isBusyResizing?: boolean; // resizeCanvas rend `busy` : des poses ont couru pendant chaque essai (Écart §5.3, JOURNAL 2026-10-24)
+  isDynamicSize?: boolean; // la taille dynamique est activée, lue dans `meta` (Écart §5.3, JOURNAL 2026-10-28)
+  origin?: CanvasOrigin; // le repère de la fresque, lu dans `meta`
+  originOnDynamicSize?: CanvasOrigin; // le repère que pose `setDynamicSize`, comme dynamic-size.lua
   isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
   isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
@@ -257,6 +262,7 @@ const setup = (options: SetupOptions = {}) => {
   const gaugeLimits: GaugeLimits[] = [];
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
+  const dynamicSizes: { isDynamicSize: boolean }[] = [];
   const twitchLiveReads: string[] = []; // les comptes dont le live a été lu
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
@@ -266,6 +272,8 @@ const setup = (options: SetupOptions = {}) => {
     ...(options.archivedAt === undefined ? {} : { archivedAt: options.archivedAt }),
     ...(options.theme === undefined ? {} : { theme: options.theme }),
     ...(options.movedAtVersion === undefined ? {} : { movedAtVersion: options.movedAtVersion }),
+    ...(options.isDynamicSize ? { isDynamicSize: true } : {}),
+    ...(options.origin === undefined ? {} : { origin: options.origin }),
     ...(options.backgroundImageAt === undefined ? {} : { backgroundImageAt: options.backgroundImageAt }),
     ...(options.backgroundImageOpacity === undefined
       ? {}
@@ -397,6 +405,17 @@ const setup = (options: SetupOptions = {}) => {
       };
       return { ok: true as const, value: undefined };
     },
+    async setDynamicSize(_asked: string, { isDynamicSize }: { isDynamicSize: boolean }) {
+      dynamicSizes.push({ isDynamicSize });
+      if (options.isRefusedByScripts) return archivedRefusal;
+      if (options.isBusyResizing) return { ok: false as const, error: "busy" as const };
+      currentMeta = {
+        ...currentMeta,
+        ...(isDynamicSize ? { isDynamicSize: true } : {}),
+        ...(options.originOnDynamicSize === undefined ? {} : { origin: options.originOnDynamicSize }),
+      };
+      return { ok: true as const, value: undefined };
+    },
     async listAuthorPixels(_asked: string, x: number, y: number) {
       return x === 1 && y === 2 ? authoredPixels : null;
     },
@@ -472,6 +491,7 @@ const setup = (options: SetupOptions = {}) => {
     gaugeLimits,
     namedModerators,
     reports,
+    dynamicSizes,
     twitchLiveReads,
     clock,
     roles,
@@ -614,6 +634,7 @@ describe("createConnection (§6.1)", () => {
         requestId: ack.requestId,
         placementId: "puser1001",
         nowMs: now,
+        origin: { x: 0, y: 0 },
         pixels: [{ x: 1, y: 2, colorIndex: 3 }],
       },
     ]);
@@ -1616,6 +1637,7 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
       frame: { t: "setGaugeLimits", gaugeMaxStart: 20, gaugeMaxCeiling: 40 },
     },
     { name: "resizeCanvas", minimum: "owner", frame: { t: "resizeCanvas", width: 64, height: 36 } },
+    { name: "setDynamicSize", minimum: "owner", frame: { t: "setDynamicSize", isDynamicSize: true } },
   ];
   const ownerOnly = reserved.filter(({ minimum }) => minimum === "owner");
   const moderatorLevel = reserved.filter(({ minimum }) => minimum === "moderator");
@@ -1629,6 +1651,7 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
     ...context.obsBackgrounds,
     ...context.backgroundImageOpacities,
     ...context.gaugeLimits,
+    ...context.dynamicSizes,
   ];
 
   // Refuse chaque commande réservée à un viewer et à un invité par forbidden, nommée par sa requête, sans toucher au noyau ni fermer
@@ -1847,6 +1870,122 @@ describe("the status of the canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
+describe("the dynamic size (Écart §5.3, JOURNAL 2026-10-28)", () => {
+  const setDynamic = (isDynamicSize: boolean) =>
+    JSON.stringify({ t: "setDynamicSize", requestId: "dynamic-1", isDynamicSize });
+  const welcomeOf = ({ sent }: { sent: readonly unknown[] }) =>
+    sent.filter((frame) => hasFrame(frame, "welcome")).at(-1);
+
+  // Active ou retire le réglage pour le seul streamer, et répond `resized`
+  it("sets it for the owner only, and answers resized", async () => {
+    const byOwner = setup({ session: owner });
+    const byViewer = setup();
+    for (const { connection } of [byOwner, byViewer]) {
+      await connection.receive(hello());
+      await connection.receive(setDynamic(true));
+    }
+
+    expect(byOwner.sent.at(-1)).toEqual({ t: "resized", requestId: "dynamic-1" });
+    expect(byOwner.dynamicSizes).toEqual([{ isDynamicSize: true }]);
+    expect(byViewer.sent.at(-1)).toEqual({ t: "error", code: "forbidden", requestId: "dynamic-1" });
+    expect(byViewer.dynamicSizes).toEqual([]);
+  });
+
+  // Des poses ont couru pendant chaque essai du plan : le streamer l'apprend comme d'un débit dépassé
+  it("answers a busy setting as a rate limit, and leaves the page as it is", async () => {
+    const context = setup({ session: owner, isBusyResizing: true });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(setDynamic(true));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "rate_limited", requestId: "dynamic-1" });
+    expect(context.closed).toEqual([]);
+  });
+
+  // Dit dans le welcome si la taille est dynamique et l'origine de la fresque, et rien avant le premier décalage
+  it("tells the welcome whether the size is dynamic and the origin of the canvas, and nothing before the first shift", async () => {
+    const never = setup();
+    const dynamic = setup({ isDynamicSize: true, origin: { x: 2, y: -3 } });
+    for (const { connection } of [never, dynamic]) await connection.receive(hello());
+
+    expect(welcomeOf(never)).not.toMatchObject({ canvas: { isDynamicSize: expect.anything() } });
+    expect(welcomeOf(never)).not.toMatchObject({ canvas: { origin: expect.anything() } });
+    expect(welcomeOf(dynamic)).toMatchObject({ canvas: { isDynamicSize: true, origin: { x: 2, y: -3 } } });
+  });
+
+  // Un décalage : le nouveau welcome de chaque page porte l'origine, la taille et le réglage
+  it("at a shift, the new welcome of each page carries the origin and the setting", async () => {
+    const context = setup({ session: owner, originOnDynamicSize: { x: -17, y: -27 } });
+    const other = context.open(session);
+    for (const opened of [context, other]) await opened.connection.receive(hello());
+
+    await context.connection.receive(setDynamic(true));
+    context.control({ t: "resize" });
+    await flush();
+
+    for (const opened of [context, other])
+      expect(welcomeOf(opened)).toMatchObject({
+        canvas: { isDynamicSize: true, origin: { x: -17, y: -27 } },
+      });
+  });
+
+  // Donne au noyau l'origine des pixels de la page : c'est le script qui les traduit
+  it("hands the core the origin of the page with its pixels", async () => {
+    const context = setup();
+    await context.connection.receive(hello());
+
+    await context.connection.receive(JSON.stringify({ ...JSON.parse(place()), origin: { x: 2, y: -3 } }));
+
+    expect(context.placements.at(-1)).toMatchObject({ origin: { x: 2, y: -3 } });
+  });
+
+  // Une pose sans origine n'est pas une frame du protocole
+  it("refuses a placement that does not say its origin", async () => {
+    const context = setup();
+    await context.connection.receive(hello());
+    const { origin, ...withoutOrigin } = JSON.parse(place());
+
+    await context.connection.receive(JSON.stringify(withoutOrigin));
+
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "invalid_frame" });
+    expect(context.closed).toEqual([1008]);
+  });
+
+  // Une case que le snapshot contient déjà, restée dans le tampon du tick, ne part pas : elle parle peut-être d'un cadre d'avant
+  it("does not send a cell the snapshot already holds, left in the tick buffer: it may speak of a frame from before a growth", async () => {
+    const context = setup({ version: 5 });
+    await context.connection.receive(hello());
+    const received = context.sent.length;
+
+    context.publish(event(4, 1, 5));
+    context.broadcast.tick();
+    expect(context.sent).toHaveLength(received);
+
+    context.publish(event(4, 1, 5));
+    context.publish(event(6, 2, 6));
+    context.broadcast.tick();
+    expect(context.sent.at(-1)).toEqual({
+      t: "cells",
+      toVersion: 6,
+      cells: [{ x: 2, y: 2, colorIndex: 6, previousColorIndex: 0, placedAt: now, version: 6, kind: "place" }],
+    });
+  });
+
+  // Après le nouveau snapshot d'un décalage, les cases d'avant lui ne repartent pas non plus
+  it("after the new snapshot of a shift, does not send the cells from before it either", async () => {
+    const context = setup({ session: owner, version: 5 });
+    await context.connection.receive(hello());
+    context.publish(event(4, 1, 5)); // d'avant le décalage, encore dans le tampon
+    context.control({ t: "resize" });
+    await flush();
+    const received = context.sent.length;
+
+    context.broadcast.tick();
+
+    expect(context.sent).toHaveLength(received);
+  });
+});
+
 describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () => {
   const archivedAt = now - 86_400_000;
   const frames = {
@@ -1856,6 +1995,7 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
     setModerator: { t: "setModerator", requestId: "moderator-1", userId: "user-2", isModerator: true },
     report: { t: "report", requestId: "report-1", x: 1, y: 2, placementId: "puser2001" },
     resizeCanvas: { t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 },
+    setDynamicSize: { t: "setDynamicSize", requestId: "dynamic-1", isDynamicSize: true },
     setObsDelay: { t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 },
     setObsBackground: { t: "setObsBackground", requestId: "background-1", obsBackground: "white" },
     setBackgroundImageOpacity: {
@@ -2032,6 +2172,7 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
       "setModerator",
       "report",
       "resizeCanvas",
+      "setDynamicSize",
     ] as const) {
       // Le noyau dit `canvas_archived` : la page l'apprend par l'erreur de sa requête, sans fermeture
       it(`hands ${name} to the page as canvas_archived, without closing, and refuses the next write without the core`, async () => {

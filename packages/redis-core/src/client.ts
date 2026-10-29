@@ -2,11 +2,15 @@
 
 import { readFileSync } from "node:fs";
 import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
   type CanvasMeta,
   type CanvasSize,
   CELL_STRIDE,
   COUNTED_PIXELS_PER_DAY,
   claimableRewards,
+  DYNAMIC_SIZE_MARGIN,
+  FIXED_DEFAULT_CANVAS_SIZE,
   GAUGE_GROWTH_FACTOR,
   type GaugeLimits,
   isBackgroundImageOpacity,
@@ -22,6 +26,7 @@ import {
   toCellKey,
   toParisDay,
 } from "@liveplace/domain";
+import { planDynamicSize, type Reframe } from "@liveplace/domain/dynamic-size";
 import type {
   AckFrame,
   AuthoredPixel,
@@ -88,6 +93,7 @@ declare module "ioredis" {
     report(...args: (string | number)[]): RedisResult<string, Context>;
     streamView(...args: (string | number)[]): RedisResult<number[], Context>;
     resize(...args: (string | number)[]): RedisResult<[status: string, version?: number], Context>;
+    dynamicSize(...args: (string | number)[]): RedisResult<[status: string, version?: number], Context>;
   }
 }
 
@@ -162,6 +168,11 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
     ...(fields.theme ? { theme: fields.theme } : {}),
     // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a encore déplacé de pixel.
     ...(fields.movedAtVersion === undefined ? {} : { movedAtVersion: metaNumber(fields, "movedAtVersion") }),
+    // Écart §5.3 (JOURNAL 2026-10-28) : absents, la taille dynamique est retirée et la fresque n'a jamais été décalée.
+    ...(fields.dynamicSize === "1" ? { isDynamicSize: true } : {}),
+    ...(fields.originX === undefined
+      ? {}
+      : { origin: { x: metaNumber(fields, "originX"), y: metaNumber(fields, "originY") } }),
   };
 }
 
@@ -184,15 +195,32 @@ const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
   return value;
 };
 
+// Les champs de `meta` tels que Redis les garde : ceux de `CanvasMeta`, sauf le réglage et l'origine de la taille dynamique (Écart §5.3,
+// JOURNAL 2026-10-28), qui s'écrivent sous d'autres noms.
+export const toMetaFields = ({
+  isDynamicSize,
+  origin,
+  ...fields
+}: CanvasMeta): Record<string, string | number> => ({
+  ...fields,
+  ...(isDynamicSize ? { dynamicSize: 1 } : {}),
+  ...(origin ? { originX: origin.x, originY: origin.y } : {}),
+});
+
 // Ce que le web écrit à la connexion (§2) : ni script ni connexion abonnée, il ne pose jamais un pixel.
 export function createSignInWrites(redis: Redis): SignInWrites {
   return {
     ...createSignupWrites(redis), // écart §5.1 (JOURNAL 2026-10-06) : un nouveau compte, à sa première connexion
     // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
+    // Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique naît avec le canvas, un canvas qui existe déjà garde son réglage (sans champ : retiré).
     async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
       const keys = buildCanvasKeys(canvasId);
+      const isExisting = (await redis.exists(keys.meta)) === 1;
       const transaction = redis.multi();
-      for (const [field, value] of Object.entries(meta)) transaction.hsetnx(keys.meta, field, value);
+      for (const [field, value] of Object.entries(
+        toMetaFields(isExisting ? { ...meta, isDynamicSize: false } : meta),
+      ))
+        transaction.hsetnx(keys.meta, field, value);
       await transaction
         .set(keys.state, Buffer.alloc(meta.width * meta.height), "NX")
         .set(keys.version, 0, "NX")
@@ -348,32 +376,96 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   };
 }
 
-// Écart §5.3 (JOURNAL 2026-10-24) : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan de la nouvelle
-// taille. Sans plan (`null`), le canvas n'est pas prêt ou la taille ne change pas : resize.lua le dit avant de le lire.
-const getResizePlan = async (
+// Écart §5.3 (JOURNAL 2026-10-24) : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle
+// taille. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
+const getPlanInput = async (
   redis: Redis,
   keys: CanvasKeys,
-  to: CanvasSize,
-): Promise<{ version: number; plan: ResizePlan | null }> => {
+  name: string,
+): Promise<{ version: number; input: { state: Buffer; from: CanvasSize } | null }> => {
   const results = await redis
     .multi()
     .getBuffer(keys.state)
     .get(keys.version)
     .hmget(keys.meta, "width", "height")
     .exec();
-  if (!results) throw new Error(`resizeCanvas ${keys.prefix} : transaction annulée`);
+  if (!results) throw new Error(`${name} ${keys.prefix} : transaction annulée`);
   const [state, version, size] = results.map(unwrap);
   const [width, height] = Array.isArray(size) ? size.map(Number) : [];
   const from = width !== undefined && height !== undefined ? { width, height } : null;
-  const isPlannable =
-    Buffer.isBuffer(state) &&
-    from !== null &&
-    state.length === from.width * from.height &&
-    (from.width !== to.width || from.height !== to.height);
+  const isReadable = Buffer.isBuffer(state) && from !== null && state.length === from.width * from.height;
+  return { version: Number(version ?? 0), input: isReadable ? { state, from } : null };
+};
+
+// Sans plan (`null`), la taille ne change pas : resize.lua le dit avant de le lire.
+const getResizePlan = async (
+  redis: Redis,
+  keys: CanvasKeys,
+  to: CanvasSize,
+): Promise<{ version: number; plan: ResizePlan | null }> => {
+  const { version, input } = await getPlanInput(redis, keys, "resizeCanvas");
+  const isChanging = input !== null && (input.from.width !== to.width || input.from.height !== to.height);
+  return { version, plan: input && isChanging ? planResize(input.state, input.from, to) : null };
+};
+
+// Écart §5.3 (JOURNAL 2026-10-28 et 2026-10-29) : ce que change le réglage, du même état lu. Activé : le resserrement sur les dessins
+// (`reframe`). Retiré : le retour à la taille fixe par défaut par le plan de taille d'un format (`resize`, absent si la fresque y est déjà).
+// Sans plan, un canvas pas prêt.
+type DynamicPlan = { reframe: Reframe; resize: ResizePlan | null };
+const getDynamicPlan = async (
+  redis: Redis,
+  keys: CanvasKeys,
+  isDynamicSize: boolean,
+): Promise<{ version: number; plan: DynamicPlan | null }> => {
+  const { version, input } = await getPlanInput(redis, keys, "setDynamicSize");
+  if (!input) return { version, plan: null };
+  if (isDynamicSize)
+    return { version, plan: { reframe: planDynamicSize(input.state, input.from), resize: null } };
+  const isFixedDefaultSize =
+    input.from.width === FIXED_DEFAULT_CANVAS_SIZE.width &&
+    input.from.height === FIXED_DEFAULT_CANVAS_SIZE.height;
   return {
-    version: Number(version ?? 0),
-    plan: isPlannable ? planResize(state, from, to) : null,
+    version,
+    plan: {
+      reframe: { ...FIXED_DEFAULT_CANVAS_SIZE, dx: 0, dy: 0 },
+      resize: isFixedDefaultSize ? null : planResize(input.state, input.from, FIXED_DEFAULT_CANVAS_SIZE),
+    },
   };
+};
+
+// L'ordre des arguments est celui que lit dynamic-size.lua. `stale` : une pose a couru entre la lecture et le script.
+const tryDynamicSize = async (
+  redis: Redis,
+  keys: CanvasKeys,
+  by: string,
+  isDynamicSize: boolean,
+): Promise<string> => {
+  const { version, plan } = await getDynamicPlan(redis, keys, isDynamicSize);
+  const [status] = await redis.dynamicSize(
+    keys.meta,
+    keys.state,
+    keys.version,
+    keys.bans,
+    keys.cleared,
+    keys.clearedPlacements,
+    keys.clearedRanges,
+    keys.histPrefix,
+    keys.cellsPrefix,
+    keys.clearingPrefix,
+    keys.banPrefix,
+    keys.recentlyClearedPrefix,
+    keys.live,
+    CELL_STRIDE,
+    by,
+    isDynamicSize ? 1 : 0,
+    version,
+    plan?.reframe.dx ?? "",
+    plan?.reframe.dy ?? "",
+    plan?.reframe.width ?? "",
+    plan?.reframe.height ?? "",
+    plan?.resize ? JSON.stringify(plan.resize) : "",
+  );
+  return status;
 };
 
 // L'ordre des arguments est celui que lit resize.lua. Un essai : lit le plan, puis l'applique. `stale` : une pose a couru entre les deux.
@@ -392,7 +484,6 @@ const tryResize = async (redis: Redis, keys: CanvasKeys, by: string, to: CanvasS
     keys.cellsPrefix,
     keys.clearingPrefix,
     version,
-    plan?.hasMovedPixels ? 1 : 0,
     JSON.stringify(plan),
   );
   return status;
@@ -406,13 +497,22 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
   // §5.3 : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
   const gauge = scriptOf("gauge.lua");
-  redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withPile("place.lua")}` });
+  // Écart §5.3 (JOURNAL 2026-10-28) : pile-moves.lua, collé après pile.lua devant les scripts qui déplacent des piles, et reframe.lua
+  // devant ceux qui agrandissent ou resserrent la fresque.
+  const moves = `${pile}\n${scriptOf("pile-moves.lua")}`;
+  const withResize = (name: string): string => `${moves}\n${scriptOf("resize-plan.lua")}\n${scriptOf(name)}`;
+  const withReframe = (name: string): string => `${moves}\n${scriptOf("reframe.lua")}\n${scriptOf(name)}`;
+  redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withReframe("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
-  redis.defineCommand("moderate", { numberOfKeys: 20, lua: withPile("moderate.lua") });
+  redis.defineCommand("moderate", { numberOfKeys: 20, lua: withReframe("moderate.lua") });
   redis.defineCommand("moderators", { numberOfKeys: 5, lua: scriptOf("moderators.lua") });
   redis.defineCommand("report", { numberOfKeys: 10, lua: withPile("report.lua") });
   redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
-  redis.defineCommand("resize", { numberOfKeys: 3, lua: withPile("resize.lua") });
+  redis.defineCommand("resize", { numberOfKeys: 3, lua: withResize("resize.lua") });
+  redis.defineCommand("dynamicSize", {
+    numberOfKeys: 7,
+    lua: `${moves}\n${scriptOf("resize-plan.lua")}\n${scriptOf("reframe.lua")}\n${scriptOf("dynamic-size.lua")}`,
+  });
 
   // Un seul rappel par canal, sur la seule connexion abonnée du process (§6.3).
   const listeners = new Map<string, (message: LiveMessage) => void>();
@@ -548,7 +648,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
 
     // L'ordre des arguments est celui que lit place.lua.
     async place(canvasId: string, placement: Placement): Promise<Result<AckFrame, CanvasRefusal>> {
-      const { userId, requestId, placementId, nowMs, pixels } = placement;
+      const { userId, requestId, placementId, nowMs, origin, pixels } = placement;
       const keys = buildCanvasKeys(canvasId);
       const [status, ack] = await redis.place(
         keys.meta,
@@ -583,6 +683,14 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         SCORE_TIE_SPAN,
         SCORE_MAX_PIXELS,
         TRANSPARENT_COLOR_INDEX,
+        origin?.x ?? "", // sans origine, les pixels sont déjà dans le repère de la fresque
+        origin?.y ?? "",
+        keys.clearingPrefix,
+        keys.banPrefix,
+        keys.recentlyClearedPrefix,
+        DYNAMIC_SIZE_MARGIN,
+        CANVAS_WIDTH,
+        CANVAS_HEIGHT,
         ...pixels.flatMap(({ x, y, colorIndex }) => [x, y, colorIndex]),
       );
       if (isRefusal(status)) return { ok: false, error: status };
@@ -678,6 +786,11 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         keys.clearingPrefix,
         keys.reportsPrefix,
         RECENTLY_CLEARED_TTL_SECONDS,
+        keys.banPrefix,
+        keys.recentlyClearedPrefix,
+        DYNAMIC_SIZE_MARGIN,
+        CANVAS_WIDTH,
+        CANVAS_HEIGHT,
       );
       if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)
@@ -828,6 +941,19 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         if (status === "resized") return { ok: true, value: undefined };
         if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
         if (status !== "stale") throw new Error(`resize.lua a renvoyé une réponse invalide : ${status}`);
+      }
+      return { ok: false, error: "busy" };
+    },
+
+    // Écart §5.3 (JOURNAL 2026-10-28 et 2026-10-29) : de même que la taille, le plan se relit si une pose a couru.
+    async setDynamicSize(canvasId, { by, isDynamicSize }) {
+      const keys = buildCanvasKeys(canvasId);
+      for (let attempt = 0; attempt < RESIZE_ATTEMPTS; attempt++) {
+        const status = await tryDynamicSize(redis, keys, by, isDynamicSize);
+        if (status === "set") return { ok: true, value: undefined };
+        if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
+        if (status !== "stale")
+          throw new Error(`dynamic-size.lua a renvoyé une réponse invalide : ${status}`);
       }
       return { ok: false, error: "busy" };
     },

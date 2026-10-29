@@ -1,4 +1,5 @@
--- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua, la jauge de gauge.lua.
+-- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua, la jauge de gauge.lua,
+-- `planGrowth` et `reframe` de reframe.lua (Écart §5.3, JOURNAL 2026-10-28).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, gaugeKey, reqKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -14,7 +15,11 @@ local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), ton
 -- §5.1 : le classement, et l'encodage de son score (keys.ts).
 local scoreboardKey = KEYS[13]
 local scoreTieSpan, scoreMaxPixels, transparentColorIndex = tonumber(ARGV[17]), tonumber(ARGV[18]), tonumber(ARGV[19])
-local firstPixelArg = 20
+-- Écart §5.3 (JOURNAL 2026-10-28) : l'origine des pixels de la page, ce que reframe.lua décale, et les bornes d'une taille dynamique.
+local frameOriginX, frameOriginY = tonumber(ARGV[20]), tonumber(ARGV[21])
+local clearingPrefix, banPrefix, recentlyClearedPrefix = ARGV[22], ARGV[23], ARGV[24]
+local growthLimits = { margin = tonumber(ARGV[25]), maxWidth = tonumber(ARGV[26]), maxHeight = tonumber(ARGV[27]) }
+local firstPixelArg = 28
 local pixelCount = (#ARGV - firstPixelArg + 1) / 3
 
 -- cjson encode une table vide en `{}`, or `rejected` est un tableau.
@@ -33,7 +38,10 @@ local meta = redis.call(
   "gaugeMaxCeiling",
   "refillMs",
   "refillCharges",
-  "archivedAt"
+  "archivedAt",
+  "dynamicSize",
+  "originX",
+  "originY"
 )
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
@@ -44,6 +52,10 @@ end
 local width, height = tonumber(meta[2]), tonumber(meta[3])
 local limits = { start = tonumber(meta[4]), ceiling = tonumber(meta[5]) }
 local refillMs, refillCharges = tonumber(meta[6]), tonumber(meta[7])
+-- Le repère de la fresque d'aujourd'hui, et de combien les pixels de la page doivent y être décalés.
+local originX, originY = tonumber(meta[10]) or 0, tonumber(meta[11]) or 0
+local shiftX = frameOriginX and originX - frameOriginX or 0
+local shiftY = frameOriginY and originY - frameOriginY or 0
 
 -- 1. Idempotence.
 local stored = redis.call("GET", reqKey)
@@ -71,7 +83,7 @@ end
 local accepted, rejected = {}, {}
 for index = 0, pixelCount - 1 do
   local arg = firstPixelArg + index * 3
-  local x, y, colorIndex = tonumber(ARGV[arg]), tonumber(ARGV[arg + 1]), tonumber(ARGV[arg + 2])
+  local x, y, colorIndex = tonumber(ARGV[arg]) + shiftX, tonumber(ARGV[arg + 1]) + shiftY, tonumber(ARGV[arg + 2])
   if x < 0 or x >= width or y < 0 or y >= height or colorIndex < 0 or colorIndex >= paletteSize then
     rejected[#rejected + 1] = { index = index, reason = "invalid" }
   elseif #accepted >= charges then
@@ -83,6 +95,43 @@ end
 
 local version
 if #accepted > 0 then
+  -- 5b. Écart §5.3 (JOURNAL 2026-10-28) : une taille dynamique garde ses marges. Un pixel posé trop près d'un bord agrandit la
+  -- fresque, avant la pose : les cases du lot, les piles et l'événement parlent déjà du nouveau cadre.
+  if meta[9] == "1" then
+    local added = {}
+    for _, pixel in ipairs(accepted) do
+      if pixel.colorIndex ~= transparentColorIndex then
+        added[#added + 1] = pixel
+      end
+    end
+    local left, top, grownWidth, grownHeight = planGrowth(added, width, height, growthLimits)
+    if left then
+      reframe({
+        metaKey = metaKey,
+        stateKey = stateKey,
+        versionKey = versionKey,
+        liveChannel = liveChannel,
+        histPrefix = histPrefix,
+        cellsPrefix = cellsPrefix,
+        clearingPrefix = clearingPrefix,
+        banPrefix = banPrefix,
+        recentlyClearedPrefix = recentlyClearedPrefix,
+        bansKey = bansKey,
+        clearedKey = KEYS[8],
+        clearedPlacementsKey = KEYS[9],
+        clearedRangesKey = KEYS[10],
+        cellStride = cellStride,
+        width = width,
+        height = height,
+        originX = originX,
+        originY = originY,
+      }, left, top, grownWidth, grownHeight)
+      width, height = grownWidth, grownHeight
+      for _, pixel in ipairs(accepted) do
+        pixel.x, pixel.y = pixel.x + left, pixel.y + top
+      end
+    end
+  end
   -- 6. Version.
   version = redis.call("INCR", versionKey)
   -- §9.5 : sans pose cachée, aucune pile n'est relue en entier.

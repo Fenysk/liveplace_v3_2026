@@ -174,6 +174,24 @@ export const CANVAS_TEXTS = defineTexts({
     en: ({ width, height }) => `Size changed: ${width} × ${height} cells`,
   }),
   canvasSize: { fr: "Taille de la fresque", en: "Canvas size" },
+  // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique, et une taille qui n'est dans aucun format.
+  dynamicSize: { fr: "Taille dynamique", en: "Dynamic size" },
+  dynamicSizeNote: {
+    fr: "La fresque garde 3 cases vides autour de ses dessins : elle grandit seule quand un dessin approche d'un bord, et ne rétrécit jamais. En l'activant, elle se resserre sur ses dessins, 10 × 10 au moins. En la désactivant, elle revient à 50 × 50.",
+    en: "The canvas keeps 3 empty cells around its drawings: it grows on its own when a drawing gets close to an edge, and never shrinks. Turning it on tightens it around its drawings, 10 × 10 at least. Turning it off brings it back to 50 × 50.",
+  },
+  dynamicSizeSaved: localized({
+    fr: (isOn: boolean) => (isOn ? "Taille dynamique activée" : "Taille dynamique désactivée"),
+    en: (isOn) => (isOn ? "Dynamic size on" : "Dynamic size off"),
+  }),
+  dynamicSizeFailed: {
+    fr: "La taille dynamique n'a pas été changée. Réessaie.",
+    en: "The dynamic size wasn't changed. Try again.",
+  },
+  noFormat: {
+    fr: "Cette taille n'est dans aucun format. Choisis un format pour en changer.",
+    en: "This size is in no format. Pick a format to change it.",
+  },
   currentSize: localized({
     fr: (size: string) => `Actuellement ${size}.`,
     en: (size) => `Currently ${size}.`,

@@ -2,6 +2,8 @@
 // fenêtre, et les confirmations de la taille et de la jauge maximale. Les vrais composants du jeu, avec des props d'exemple.
 
 import {
+  type CanvasSize,
+  FIXED_DEFAULT_CANVAS_SIZE,
   GAUGE_MAX_CEILING,
   GAUGE_MAX_START,
   type GaugeLimits,
@@ -23,7 +25,7 @@ import {
   type ThemeField,
   ThemeSettings,
 } from "../canvas/canvas-settings";
-import { previewResize, type SizeChoice, toCanvasSize } from "../canvas/canvas-size";
+import { previewResize, type SizeChoice, toCanvasSize, toSizeChoice } from "../canvas/canvas-size";
 import { BackgroundPreview } from "../design/background-preview";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { ObsSettings } from "../obs/obs-settings";
@@ -158,18 +160,49 @@ const ThemeScene = ({ initial, status, isSaving }: ThemeSceneProps) => {
   );
 };
 
-// Le thème du canvas, puis le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui sort du
-// cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256).
-const CanvasSettingsScene = () => {
+// Le thème du canvas, puis la taille dynamique, le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui
+// sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256). Écart §5.3 (JOURNAL 2026-10-28) : une taille dans aucun
+// format n'en présente aucun comme choisi. Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique activée grise le choix de taille, qui
+// montre encore le format de la taille d'aujourd'hui ; la décocher ramène la fresque à 50 × 50, par la confirmation d'un format plus petit
+// si des dessins sortiraient du cadre (`hasOutside`), sinon d'un coup ; le format Petit carré est alors choisi.
+type CanvasSettingsSceneProps = {
+  current?: CanvasSize;
+  isDynamic?: boolean;
+  hasFormat?: boolean;
+  hasOutside?: boolean;
+};
+
+const NOTHING_OUTSIDE = { outside: [], hasMovedPixels: false };
+
+// Dynamique, le format de la taille d'aujourd'hui s'il y en a un ; sinon Moyen carré, ou aucun format (`hasFormat`).
+const startChoice = (current: CanvasSize, isDynamic: boolean, hasFormat: boolean): SizeChoice | null => {
+  if (isDynamic) return toSizeChoice(current);
+  return hasFormat ? { format: "1:1", sizeIndex: 1 } : null;
+};
+
+const CanvasSettingsScene = ({
+  current = { width: 256, height: 256 },
+  isDynamic = false,
+  hasFormat = true,
+  hasOutside = true,
+}: CanvasSettingsSceneProps) => {
   const theme = useThemeField("");
   const background = useBackgroundDemo("transparent");
   const image = useImageDemo(background.value, false, 40);
-  const [choice, setChoice] = useState<SizeChoice>({ format: "1:1", sizeIndex: 1 });
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [size, setSize] = useState(current);
+  const [choice, setChoice] = useState(startChoice(current, isDynamic, hasFormat));
+  const [isOn, setIsOn] = useState(isDynamic);
+  const [confirming, setConfirming] = useState<"resize" | "turnOff" | null>(null);
   const [status, setStatus] = useState<ResizeStatus>("idle");
-  const current = { width: 256, height: 256 };
-  const chosen = toCanvasSize(choice);
-  const preview = previewSampleResize(chosen);
+  const chosen = choice && toCanvasSize(choice);
+  const next = confirming === "turnOff" ? FIXED_DEFAULT_CANVAS_SIZE : confirming === "resize" ? chosen : null;
+  const isTurnOff = confirming === "turnOff";
+  const preview = isTurnOff && !hasOutside ? NOTHING_OUTSIDE : previewSampleResize(next ?? size);
+  const turnOff = () => {
+    setIsOn(false);
+    setSize(FIXED_DEFAULT_CANVAS_SIZE);
+    setChoice({ format: "1:1", sizeIndex: 0 });
+  };
   return (
     <>
       <InWindow>
@@ -177,27 +210,42 @@ const CanvasSettingsScene = () => {
           theme={theme}
           background={background}
           image={image}
-          current={current}
+          dynamic={{
+            isOn,
+            isBusy: false,
+            onToggle: (next) => {
+              if (next) setIsOn(true);
+              else if (hasOutside) {
+                setStatus("idle");
+                setConfirming("turnOff");
+              } else turnOff();
+            },
+          }}
+          current={size}
           choice={choice}
           chosen={chosen}
           onChoose={setChoice}
           onApply={() => {
             setStatus("idle");
-            setIsConfirming(true);
+            setConfirming("resize");
           }}
         />
       </InWindow>
       <ResizeWindow
-        next={isConfirming ? chosen : null}
+        next={next}
         outside={preview.outside}
         hasMovedPixels={preview.hasMovedPixels}
         status={status}
         canvas={SAMPLE_CANVAS}
         onConfirm={() => {
           setStatus("running");
-          setTimeout(() => setIsConfirming(false), LOCKED_MS);
+          setTimeout(() => {
+            if (isTurnOff) turnOff();
+            setStatus("idle");
+            setConfirming(null);
+          }, LOCKED_MS);
         }}
-        onClose={() => setIsConfirming(false)}
+        onClose={() => setConfirming(null)}
       />
     </>
   );
@@ -243,7 +291,7 @@ export const CanvasSettingsEntry = () => (
       "GaugeSettings",
     ]}
     file="ui/canvas/canvas-settings.tsx"
-    note="Pour le streamer : le thème de la fresque, qui s'enregistre quand le champ perd le focus, son fond (Transparent, Noir ou Blanc), son image avec son opacité, la taille de la fresque, sans rien perdre, et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
+    note="Pour le streamer : le thème de la fresque, qui s'enregistre quand le champ perd le focus, son fond (Transparent, Noir ou Blanc), son image avec son opacité, la taille de la fresque, sans rien perdre, ou dynamique (une case à cocher : elle grandit avec ses dessins, et le choix de taille se grise), et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
   >
     <Block title="États">
       <StateRow
@@ -251,6 +299,30 @@ export const CanvasSettingsEntry = () => (
         detail="La confirmation montre ce qui sort du cadre."
       >
         <CanvasSettingsScene />
+      </StateRow>
+      <StateRow
+        name="La taille dynamique activée"
+        detail="La fresque grandit avec ses dessins : le choix de taille reste visible mais grisé, ni clic ni clavier. La taille d'aujourd'hui n'est dans aucun format, aucun n'est présenté comme choisi, et la ligne « Actuellement » la dit. La décocher la ramène à 50 × 50 : des dessins sortiraient du cadre, la même confirmation que pour un format plus petit s'ouvre, puis le choix se dégrise sur Petit carré."
+      >
+        <CanvasSettingsScene current={{ width: 37, height: 41 }} isDynamic />
+      </StateRow>
+      <StateRow
+        name="La taille dynamique activée sur un format"
+        detail="La taille d'aujourd'hui est celle d'un format : il reste montré comme choisi, grisé."
+      >
+        <CanvasSettingsScene current={{ width: 100, height: 100 }} isDynamic />
+      </StateRow>
+      <StateRow
+        name="La taille dynamique activée, rien ne sortirait"
+        detail="Décocher change la taille tout de suite, sans confirmation : la case se décoche, la fresque passe à 50 × 50, le choix se dégrise sur Petit carré."
+      >
+        <CanvasSettingsScene current={{ width: 12, height: 12 }} isDynamic hasOutside={false} />
+      </StateRow>
+      <StateRow
+        name="Une taille dans aucun format"
+        detail="Après la taille dynamique : aucun format n'est présenté comme choisi, la taille réelle est dite. Choisir un format ouvre le choix de taille."
+      >
+        <CanvasSettingsScene current={{ width: 37, height: 41 }} hasFormat={false} />
       </StateRow>
       <StateRow name="Le thème de la fresque rempli" detail="Enregistré en quittant le champ, sans bouton.">
         <ThemeScene initial="Halloween" />

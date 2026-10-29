@@ -39,3 +39,13 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* Désactivé : la même opacité que la case à cocher, l'option choisie se lit encore */
+.lp-segmented:has(input:disabled) {
+  opacity: 0.5;
+}
+
+.lp-segmented:has(input:disabled) .lp-segmented-option,
+.lp-segmented:has(input:disabled) .lp-segmented-option input {
+  cursor: default;
+}

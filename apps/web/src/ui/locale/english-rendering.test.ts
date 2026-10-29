@@ -392,6 +392,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
           onClearImage: doNothing,
           onPickOpacity: doNothing,
         },
+        dynamic: { isOn: false, isBusy: false, onToggle: doNothing },
         current,
         choice: { format: "16:9", sizeIndex: 1 },
         chosen: { width: 64, height: 36 },
@@ -414,6 +415,8 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(section).toContain(">Theme</label>");
     expect(section).toContain("Currently 32 × 32 cells.");
     expect(section).toContain("Landscape 16:9, 64 × 36 cells. Nothing is lost");
+    expect(section).toContain("Dynamic size");
+    expect(section).toContain("keeps 3 empty cells around its drawings");
     for (const label of ["Small", "Medium", "Large", "Change size"]) expect(section).toContain(label);
     // Le fond de la fresque, avec son image (Écart §9.1, JOURNAL 2026-10-10)
     for (const label of [

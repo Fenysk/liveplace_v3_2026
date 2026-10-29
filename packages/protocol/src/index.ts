@@ -43,7 +43,9 @@ import { z } from "zod";
 // 21 : le développeur relit un jour passé, `listActivityDay` et `activityDay`, et `firstDayAt` dans `activityHistory`
 // (Écart §4.2 et §4.3, JOURNAL 2026-10-14).
 // 22 : le `welcome` dit la version du dernier rapprochement qui a déplacé des pixels, `movedAtVersion` (Écart §5.3, JOURNAL 2026-10-24).
-export const PROTOCOL_VERSION = 22;
+// 23 : la taille dynamique, `setDynamicSize`, `isDynamicSize` et `origin` dans le `welcome`, et l'`origin` de la page dans `place`
+// (Écart §4.2, §4.3 et §5.3, JOURNAL 2026-10-28).
+export const PROTOCOL_VERSION = 23;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -89,6 +91,10 @@ const PixelSchema = z.object({
   y: CoordinateSchema,
   colorIndex: ColorIndexSchema,
 });
+
+// Écart §5.3 (JOURNAL 2026-10-28) : le repère d'une page, les décalages cumulés d'une taille dynamique (négatifs après un resserrement).
+const OriginShape = { x: z.number().int(), y: z.number().int() };
+const OriginSchema = z.object(OriginShape);
 
 const GaugeSchema = z.object({
   charges: z.number().int().nonnegative(),
@@ -184,6 +190,8 @@ const PlaceFrameSchema = z.strictObject({
   t: z.literal("place"),
   requestId: RequestIdSchema,
   placementId: ClientPlacementIdSchema, // le même pour chaque lot d'un brouillon validé (JOURNAL 2026-09-28)
+  // Écart §5.3 (JOURNAL 2026-10-28) : le repère des `pixels`, celui du dernier `welcome` de la page ; le serveur les traduit vers le sien.
+  origin: z.strictObject(OriginShape),
   pixels: z.array(z.strictObject(PixelSchema.shape)).min(1).max(64), // strict ici seulement : `PixelSchema` sert aussi au serveur
 });
 
@@ -287,6 +295,13 @@ const ResizeCanvasFrameSchema = z
   })
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
+// Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul. Activée, la fresque se resserre sur ses dessins puis grandit avec eux ; répond par `resized`.
+const SetDynamicSizeFrameSchema = z.strictObject({
+  t: z.literal("setDynamicSize"),
+  requestId: RequestIdSchema,
+  isDynamicSize: z.boolean(),
+});
+
 // Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de l'image du fond, un cran de dix points de 0 à 100.
 const BackgroundImageOpacitySchema = z
   .number()
@@ -364,6 +379,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   ListAuthorPixelsFrameSchema,
   ListReportsFrameSchema,
   ResizeCanvasFrameSchema,
+  SetDynamicSizeFrameSchema,
   SetObsBackgroundFrameSchema,
   SetBackgroundImageOpacityFrameSchema,
   ClaimGaugeFrameSchema,
@@ -399,6 +415,9 @@ const WelcomeFrameSchema = z.object({
     archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
     ownerTwitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : le streamer est en live
     movedAtVersion: VersionSchema.optional(), // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a déplacé de pixel
+    // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique est activée ; et le repère de la fresque (absent : jamais décalée).
+    isDynamicSize: z.boolean().optional(),
+    origin: OriginSchema.optional(),
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
@@ -534,6 +553,7 @@ const ReportedPlacementSchema = z.object({
 const ReportedFrameSchema = z.object({ t: z.literal("reported"), requestId: RequestIdSchema });
 
 // La nouvelle taille arrive ensuite par un `welcome` et un snapshot, à toutes les pages du canvas (JOURNAL 2026-09-29).
+// Écart §5.3 (JOURNAL 2026-10-28) : c'est aussi la réponse à `setDynamicSize`.
 const ResizedFrameSchema = z.object({ t: z.literal("resized"), requestId: RequestIdSchema });
 
 const ReportsFrameSchema = z.object({

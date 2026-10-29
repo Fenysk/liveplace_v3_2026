@@ -31,6 +31,8 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   isBanned: false,
   isArchived: false,
   isDiscarded: false,
+  isDynamicSize: false,
+  origin: { x: 0, y: 0 },
   isImageLoaded: true,
   pixels: new Uint8Array(256 * 4).fill(9),
   ...overrides,
@@ -1523,5 +1525,151 @@ describe("createDraftStore — pixels moved by a resize (Écart §5.3, JOURNAL 2
     setCanvasView(liveView({ movedAtVersion: 12 }));
 
     expect(left).not.toHaveBeenCalled();
+  });
+});
+
+describe("createDraftStore — the canvas shifted (Écart §5.3, JOURNAL 2026-10-28)", () => {
+  const key = "liveplace:draft:canvas-1:user-1";
+
+  const drawing = (view = liveView()) => {
+    const context = setup({ view });
+    context.store.enterDraftMode();
+    context.store.toggleCell(1, 1);
+    context.store.toggleCell(2, 1);
+    const wiped = vi.fn();
+    context.store.listenWiped(wiped);
+    const xs = () => context.cells().map(({ x }) => x);
+    return { ...context, wiped, xs };
+  };
+
+  // Le brouillon suit la fresque : ses cases se décalent du même nombre de colonnes, rien n'est effacé, ni dit
+  it("moves the draft with the canvas by the same number of cells, wiping nothing and saying nothing", () => {
+    const { store, setCanvasView, wiped, xs, entries } = drawing();
+
+    setCanvasView(liveView({ origin: { x: 2, y: 2 } }));
+
+    expect(xs()).toEqual([3, 4]);
+    expect(store.getView().draft.get(toCellKey(3, 3))).toMatchObject({ x: 3, y: 3 });
+    expect(wiped).not.toHaveBeenCalled();
+    expect(JSON.parse(entries.get(key) ?? "null")).toEqual({
+      origin: { x: 2, y: 2 },
+      pixels: [
+        { x: 3, y: 3, colorIndex: store.getView().colorIndex },
+        { x: 4, y: 3, colorIndex: store.getView().colorIndex },
+      ],
+    });
+  });
+
+  // Une même vue qui se republie n'est pas un nouveau décalage
+  it("does not move the draft again when the same view is published again", () => {
+    const { setCanvasView, xs } = drawing();
+    setCanvasView(liveView({ origin: { x: 2, y: 0 } }));
+
+    setCanvasView(liveView({ origin: { x: 2, y: 0 }, version: 2 }));
+
+    expect(xs()).toEqual([3, 4]);
+  });
+
+  // Un resserrement coupe un bord vide : les cases du brouillon qui y étaient quittent le brouillon, les autres suivent
+  it("drops the draft cells a tightening cut with an empty border, and moves the others", () => {
+    const { setCanvasView, xs } = drawing();
+
+    setCanvasView(liveView({ origin: { x: -2, y: 0 } }));
+
+    expect(xs()).toEqual([0]);
+
+    const again = drawing();
+    again.setCanvasView(liveView({ origin: { x: -3, y: 0 } }));
+    expect(again.xs()).toEqual([]);
+  });
+
+  // Annuler défait toujours le dernier trait, dans le nouveau repère
+  it("lets Ctrl+Z undo the last stroke after a shift, in the new frame of reference", () => {
+    const { store, setCanvasView, xs } = drawing();
+
+    setCanvasView(liveView({ origin: { x: 2, y: 0 } }));
+    store.undo();
+
+    expect(xs()).toEqual([3]);
+
+    store.redo();
+    expect(xs()).toEqual([3, 4]);
+  });
+
+  // Le rétablir de Vider retrouve son brouillon, décalé comme la fresque
+  it("lets the take-back of Vider find its draft, moved like the canvas", () => {
+    const { store, setCanvasView, xs } = drawing();
+    const cleared = store.discardDraft();
+
+    setCanvasView(liveView({ origin: { x: 2, y: 0 } }));
+    if (cleared) store.restoreDraft(cleared);
+
+    expect(xs()).toEqual([3, 4]);
+  });
+
+  // Un brouillon sauvegardé avant un décalage revient décalé, sauvegardé dans le repère d'aujourd'hui
+  it("brings back a draft saved before a shift, moved by the shift", () => {
+    const { entries } = drawing();
+
+    const reloaded = setup({ view: liveView({ origin: { x: 5, y: 0 } }), entries });
+
+    expect(reloaded.cells().map(({ x }) => x)).toEqual([6, 7]);
+  });
+
+  // Après un décalage, le brouillon sauvegardé dit son repère : un rechargement le retrouve
+  it("saves the draft with its origin, so a reload after more shifts finds it", () => {
+    const { setCanvasView, entries } = drawing();
+    setCanvasView(liveView({ origin: { x: 2, y: 0 } }));
+
+    const reloaded = setup({ view: liveView({ origin: { x: 3, y: 0 } }), entries });
+
+    expect(reloaded.cells().map(({ x }) => x)).toEqual([4, 5]);
+  });
+
+  // Un rapprochement efface toujours, même s'il décale aussi : le brouillon parlait d'un autre dessin
+  it("still wipes at a move of pixels by a resize, whatever the shift", () => {
+    const { setCanvasView, wiped, xs } = drawing();
+
+    setCanvasView(liveView({ movedAtVersion: 12, origin: { x: 2, y: 0 } }));
+
+    expect(xs()).toEqual([]);
+    expect(wiped).toHaveBeenCalledTimes(1);
+  });
+
+  // Un décalage pendant l'envoi : le lot suivant part dans le repère d'aujourd'hui, et l'ack du précédent retire les bonnes cases
+  it("sends the next lot in the origin of the moment when the canvas shifts mid-send, and settles the right cells", async () => {
+    const shift: { run?: () => void } = {};
+    const { store, setCanvasView, sentBatches, cells } = setup({ onPlace: () => shift.run?.() });
+    shift.run = () => {
+      delete shift.run;
+      setCanvasView(liveView({ origin: { x: 2, y: 0 } }));
+    };
+    store.enterDraftMode();
+    for (let x = 0; x < 70; x++) store.toggleCell(x, 1);
+
+    await store.submit();
+
+    expect(sentBatches).toHaveLength(2);
+    expect(sentBatches[0]).toHaveLength(64);
+    expect(sentBatches[0]?.[0]).toMatchObject({ x: 0, y: 1 });
+    expect(sentBatches[1]?.map(({ x }) => x)).toEqual([66, 67, 68, 69, 70, 71]);
+    expect(cells()).toEqual([]);
+  });
+
+  // Une case du lot que le brouillon a quittée pendant l'attente ne part pas
+  it("does not send a lot cell the draft left while waiting", async () => {
+    const shift: { run?: () => void } = {};
+    const { store, setCanvasView, sentBatches } = setup({ onPlace: () => shift.run?.() });
+    shift.run = () => {
+      delete shift.run;
+      setCanvasView(liveView({ origin: { x: -67, y: 0 } }));
+    };
+    store.enterDraftMode();
+    for (let x = 0; x < 70; x++) store.toggleCell(x, 1);
+
+    await store.submit();
+
+    expect(sentBatches).toHaveLength(2);
+    expect(sentBatches[1]?.map(({ x }) => x)).toEqual([0, 1, 2]);
   });
 });

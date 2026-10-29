@@ -323,6 +323,32 @@ const fakeLayer: FakeLayer = {
 };
 const LAYER = fakeLayer as HTMLElement;
 
+// L'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29) : ses pièces notent ce que la scène leur écrit.
+const preview = { isShown: false, clip: "", outline: {} as Record<string, string> };
+const PREVIEW = {
+  root: {
+    classList: {
+      toggle: (_name: string, force: boolean) => {
+        preview.isShown = force;
+        return force;
+      },
+    },
+  },
+  checker: {
+    style: {
+      setProperty: (name: string, value: string) => {
+        if (name === "--lp-checker-clip") preview.clip = value;
+      },
+    },
+  },
+  tiles: LAYER,
+  outline: {
+    setAttribute: (name: string, value: string) => {
+      preview.outline[name] = value;
+    },
+  },
+};
+
 const createSurface = () => {
   const addEventListener = vi.fn<(type: string, listener: (event: PointerLike) => void) => void>();
   const fakeSurface: FakeSurface = {
@@ -347,9 +373,15 @@ type BackgroundParams = {
   backgroundImageOpacity?: number;
 };
 
-const welcomeOf = (canvas: Size, background: BackgroundParams = {}): ServerFrame => ({
+const welcomeOf = (canvas: Size, background: BackgroundParams = {}, isDynamicSize = false): ServerFrame => ({
   t: "welcome",
-  canvas: { canvasId: "canvas-1", width: canvas.width, height: canvas.height, ownerId: "owner-1" },
+  canvas: {
+    canvasId: "canvas-1",
+    width: canvas.width,
+    height: canvas.height,
+    ownerId: "owner-1",
+    ...(isDynamicSize ? { isDynamicSize } : {}),
+  },
   params: {
     gaugeMaxStart: 10,
     gaugeMaxCeiling: 150,
@@ -411,6 +443,7 @@ type Options = {
   isLoaded?: boolean;
   handoff?: Handoff;
   background?: BackgroundParams; // le fond de la fresque que le welcome annonce (Écart §9.1, JOURNAL 2026-10-10)
+  isDynamicSize?: boolean; // la taille dynamique, que le welcome annonce (Écart §5.3, JOURNAL 2026-10-28)
 };
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
@@ -423,8 +456,12 @@ const openScene = (
     isLoaded = false,
     handoff,
     background,
+    isDynamicSize = false,
   }: Options = {},
 ) => {
+  preview.isShown = false;
+  preview.clip = "";
+  preview.outline = {};
   probe.arrival = place.arrival;
   probe.draftInsets = place.draftInsets;
   browser.isCoarse = place.isTouch;
@@ -446,7 +483,7 @@ const openScene = (
     reload: () => undefined,
   });
   listening.listeners?.onOpen();
-  listening.listeners?.onFrame(welcomeOf(canvas, background));
+  listening.listeners?.onFrame(welcomeOf(canvas, background, isDynamicSize));
   const saved = new Map<string, string>();
   if (draft.length > 0)
     saved.set(DRAFT_KEY, JSON.stringify(draft.map(({ x, y }) => ({ x, y, colorIndex: 3 }))));
@@ -473,6 +510,7 @@ const openScene = (
     handoff,
     checker: LAYER,
     checkerTiles: LAYER,
+    preview: PREVIEW,
   });
   browser.resizes.at(-1)?.([{ contentRect: place.screen }]);
   flush(FRAME_MS);
@@ -2296,5 +2334,149 @@ describe("le curseur de la scène, Écart §9.3 (JOURNAL 2026-10-13)", () => {
     world.exitDraft();
 
     expect(cursorOf(world)).toBe("crosshair");
+  });
+});
+
+describe("l'aperçu de la croissance dans la scène, Écart §9.3 (JOURNAL 2026-10-29)", () => {
+  const SMALL = { width: 10, height: 10 };
+  beforeEach(startBrowser);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Le centre d'une case de la fresque, à l'écran
+  const centerOfCell = (world: ReturnType<typeof openScene>, cell: Cell): ScreenPoint => {
+    const { scale, offsetX, offsetY } = world.view();
+    return { x: offsetX + (cell.x + 0.5) * scale, y: offsetY + (cell.y + 0.5) * scale };
+  };
+
+  // La fresque agrandie, à l'écran : de combien la bordure d'avant dépasse de chaque côté, en cases
+  const grownOf = (world: ReturnType<typeof openScene>) => {
+    const { scale, offsetX, offsetY } = world.view();
+    const [top, right, bottom, left] = [...preview.clip.matchAll(/(-?[\d.]+)px/g)].map(([, value]) =>
+      Number(value),
+    );
+    return {
+      left: Math.round((offsetX - (left ?? 0)) / scale),
+      top: Math.round((offsetY - (top ?? 0)) / scale),
+      right: Math.round((PLACE.screen.width - (right ?? 0) - (offsetX + SMALL.width * scale)) / scale),
+      bottom: Math.round((PLACE.screen.height - (bottom ?? 0) - (offsetY + SMALL.height * scale)) / scale),
+    };
+  };
+  const PLACE = LAPTOP_PLACE;
+
+  // Rien au repos : en Dessin sans rien viser, ni au brouillon, rien n'est montré
+  it("shows nothing at rest in draw mode", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true });
+    world.enterDraft();
+
+    expect(preview.isShown).toBe(false);
+  });
+
+  // Viser la marge de gauche en Dessin montre 3 colonnes à gauche : l'aperçu paraît, découpé à la fresque agrandie
+  it("shows 3 columns on the left when the mouse aims at column 0 in draw mode", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true });
+    world.enterDraft();
+
+    world.hover(centerOfCell(world, { x: 0, y: 5 }));
+    flush(FRAME_MS);
+
+    expect(preview.isShown).toBe(true);
+    expect(grownOf(world)).toEqual({ left: 3, top: 0, right: 0, bottom: 0 });
+    expect(Number(preview.outline.width)).toBeGreaterThan(0);
+  });
+
+  // La colonne 7 d'une 10 × 10 ajoute 1 colonne à droite, la colonne 8 en ajoute 2 : la règle du serveur
+  it("shows what the server would add: 1 column on the right for column 7, 2 for column 8", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true });
+    world.enterDraft();
+
+    world.hover(centerOfCell(world, { x: 7, y: 5 }));
+    flush(FRAME_MS);
+    expect(grownOf(world)).toEqual({ left: 0, top: 0, right: 1, bottom: 0 });
+
+    world.hover(centerOfCell(world, { x: 8, y: 5 }));
+    flush(FRAME_MS);
+    expect(grownOf(world)).toEqual({ left: 0, top: 0, right: 2, bottom: 0 });
+  });
+
+  // La souris qui quitte la fresque, ou qui vise une case du milieu : l'aperçu s'en va
+  it("goes away when the mouse aims at a cell with room around it, and when it leaves", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true });
+    world.enterDraft();
+    world.hover(centerOfCell(world, { x: 0, y: 5 }));
+    flush(FRAME_MS);
+    expect(preview.isShown).toBe(true);
+
+    world.hover(centerOfCell(world, { x: 5, y: 5 }));
+    flush(FRAME_MS);
+
+    expect(preview.isShown).toBe(false);
+  });
+
+  // Jamais en Vue, même en visant la marge
+  it("never shows in view mode, even when aiming at the margin", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true });
+
+    world.hover(centerOfCell(world, { x: 0, y: 5 }));
+    flush(FRAME_MS);
+
+    expect(preview.isShown).toBe(false);
+  });
+
+  // Jamais à taille fixe
+  it("never shows on a fixed-size canvas", () => {
+    const world = openScene(PLACE, { canvas: SMALL });
+    world.enterDraft();
+
+    world.hover(centerOfCell(world, { x: 0, y: 5 }));
+    flush(FRAME_MS);
+
+    expect(preview.isShown).toBe(false);
+  });
+
+  // Au toucher, rien ne survole : l'aperçu attend le brouillon, qui le déclenche avant Valider
+  it("on a touch screen, ignores the aimed cell and shows from the draft before sending", () => {
+    const world = openScene(PHONE_PLACE, { canvas: SMALL, isDynamicSize: true });
+    world.enterDraft();
+    const marginCell = (cell: Cell): ScreenPoint => {
+      const { scale, offsetX, offsetY } = world.view();
+      return { x: offsetX + (cell.x + 0.5) * scale, y: offsetY + (cell.y + 0.5) * scale };
+    };
+
+    world.hover(marginCell({ x: 5, y: 5 }));
+    flush(FRAME_MS);
+    expect(preview.isShown).toBe(false);
+
+    world.tap(marginCell({ x: 9, y: 5 }));
+    flush(FRAME_MS);
+
+    // le brouillon porte la case tapée : c'est lui qui montre la croissance, pas la case visée
+    expect(world.draftStore.getView().draft.size).toBe(1);
+    expect(preview.isShown).toBe(true);
+  });
+
+  // Un brouillon dans la marge de droite montre l'aperçu avant l'envoi, la gomme n'ajoute rien
+  it("shows a draft in the right margin before it is sent, and nothing for an eraser", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true, draft: [{ x: 9, y: 4 }] });
+    world.enterDraft();
+    flush(FRAME_MS);
+    expect(grownOf(world)).toEqual({ left: 0, top: 0, right: 3, bottom: 0 });
+
+    world.draftStore.toggleEraser();
+    world.draftStore.discardCell(9, 4);
+    flush(FRAME_MS);
+    expect(preview.isShown).toBe(false);
+  });
+
+  // Sortir du Dessin retire l'aperçu
+  it("goes away when leaving draw mode", () => {
+    const world = openScene(PLACE, { canvas: SMALL, isDynamicSize: true, draft: [{ x: 9, y: 4 }] });
+    world.enterDraft();
+    expect(preview.isShown).toBe(true);
+
+    world.exitDraft();
+
+    expect(preview.isShown).toBe(false);
   });
 });

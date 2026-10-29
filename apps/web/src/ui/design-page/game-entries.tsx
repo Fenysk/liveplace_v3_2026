@@ -33,6 +33,7 @@ import {
   StateRow,
   useNowMs,
 } from "./entry-layout";
+import { GrowthPreviewDemo } from "./growth-preview-demo";
 import { PanFadeDemo } from "./pan-fade-demo";
 
 const REFILL_MS = 10_000;
@@ -780,9 +781,9 @@ export const DraftPillEntry = () => {
   return (
     <Entry
       slug="dessin"
-      components={["DraftPill"]}
-      file="ui/draft/draft-pill.tsx"
-      note="La pill du joueur : regarder, réclamer, dessiner, envoyer. La même que dans le jeu, avec des props d'exemple."
+      components={["DraftPill", "GrowthPreview"]}
+      file="ui/draft/draft-pill.tsx · ui/canvas/growth-preview-layers.tsx"
+      note="La pill du joueur : regarder, réclamer, dessiner, envoyer. La même que dans le jeu, avec des props d'exemple. Sous elle, l'aperçu de la croissance d'une fresque à taille dynamique."
       where="En bas au centre · sur mobile, la barre du bas · en paysage ou sur un écran large (pliable déplié, tablette), une colonne en bas à droite"
     >
       {draftBlocks(nowMs).map(({ title, isCompact = false, scenes }) => (
@@ -802,9 +803,33 @@ export const DraftPillEntry = () => {
         </Block>
       ))}
       <LandscapeBlocks nowMs={nowMs} />
+      <Block
+        title="L'aperçu de la croissance"
+        note="En Dessin, dans une fresque à taille dynamique : les cases qui vont apparaître, avant la pose. Le damier à 35 %, et un contour en pointillé autour de la fresque telle qu'elle sera. La bordure d'aujourd'hui reste. Il apparaît et s'efface en fondu sur --lp-dur-fade (d'un coup en mouvement réduit), et ne prend aucun clic. Jamais en Vue, jamais dans la vue OBS."
+      >
+        <StateRow
+          name="La souris vise la marge de gauche"
+          detail="3 colonnes à gauche. Passe la souris sur la fresque : une case de la marge montre ce qui s'ajoute, une case du milieu ne montre rien."
+          isDemo
+        >
+          <GrowthPreviewDemo initialAim={{ x: 0, y: 5 }} />
+        </StateRow>
+        <StateRow
+          name="Un brouillon dans la marge de droite"
+          detail="Au toucher, rien ne survole : c'est le brouillon qui montre l'aperçu, avant Valider. Ici, 3 colonnes à droite."
+        >
+          <GrowthPreviewDemo draft={DRAFT_IN_MARGIN} isInteractive={false} />
+        </StateRow>
+        <StateRow name="Au repos" detail="Rien : ni case visée, ni brouillon dans la marge.">
+          <GrowthPreviewDemo isInteractive={false} />
+        </StateRow>
+      </Block>
     </Entry>
   );
 };
+
+// Une case de brouillon dans la marge de droite d'une 10 × 10 (l'aperçu de la croissance)
+const DRAFT_IN_MARGIN = [{ x: 9, y: 4 }] as const;
 
 // Sur ordinateur, la pill est toujours là et ne dit aucun pourcentage (Écart §8.1, JOURNAL 2026-10-13).
 const VIEWPORT_STATES: readonly { name: string; detail: string; framing: Framing }[] = [

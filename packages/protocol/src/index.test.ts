@@ -35,6 +35,7 @@ describe("protocol frames", () => {
       t: "place",
       requestId: "req-1",
       placementId: "p1a2b3c4d5e6f7a8",
+      origin: { x: 0, y: 0 },
       pixels: [
         { x: 0, y: 0, colorIndex: 5 },
         { x: 10, y: 20, colorIndex: 0 },
@@ -186,7 +187,13 @@ describe("protocol frames", () => {
   // à un pixel plus ancien, qu'on signale ou retire, mais jamais qu'on pose
   it("takes a page-drawn placement to place, and a version as placement only to report or clear", () => {
     const place = (placementId: string) =>
-      decodeClientFrame({ t: "place", requestId: "r", placementId, pixels: [{ x: 0, y: 0, colorIndex: 1 }] });
+      decodeClientFrame({
+        t: "place",
+        requestId: "r",
+        placementId,
+        origin: { x: 0, y: 0 },
+        pixels: [{ x: 0, y: 0, colorIndex: 1 }],
+      });
     const report = (placementId: string) =>
       decodeClientFrame({ t: "report", requestId: "r", x: 0, y: 0, placementId });
 
@@ -364,7 +371,13 @@ describe("protocol 14: the archive", () => {
 describe("strict client frames", () => {
   const hello = { t: "hello", protocolVersion: PROTOCOL_VERSION, canvasId: "abc123", mode: "ui" };
   const pixel = { x: 0, y: 0, colorIndex: 5 };
-  const place = { t: "place", requestId: "r", placementId: "p1a2b3c4d5e6f7a8", pixels: [pixel] };
+  const place = {
+    t: "place",
+    requestId: "r",
+    placementId: "p1a2b3c4d5e6f7a8",
+    origin: { x: 0, y: 0 },
+    pixels: [pixel],
+  };
   const range = { from: 10, to: 20 };
   const clear = { action: "clearPlacement", target: "u1", placementId: "42", range };
   const report = { t: "report", requestId: "r", x: 0, y: 0, placementId: "42", range };
@@ -374,6 +387,7 @@ describe("strict client frames", () => {
     for (const frame of [
       { ...hello, isAdmin: true },
       { ...place, isFree: true },
+      { ...place, origin: { x: 0, y: 0, z: 1 } },
       { ...place, pixels: [{ ...pixel, owner: "u1" }] },
       { t: "moderate", requestId: "r", action: { ...clear, force: true } },
       { t: "moderate", requestId: "r", action: { ...clear, range: { ...range, all: true } } },
@@ -421,6 +435,7 @@ describe("strict client frames", () => {
       { t: "listAuthorPixels", requestId: "r", x: 0, y: 0, placementId: "42" },
       { t: "listReports", requestId: "r" },
       { t: "resizeCanvas", requestId: "r", width: 50, height: 50 },
+      { t: "setDynamicSize", requestId: "r", isDynamicSize: true },
       { t: "watchActivity", isWatching: true },
       { t: "listActivityHistory", requestId: "r", period: "day" },
       { t: "ping" },
@@ -1363,5 +1378,73 @@ describe("protocol 22: pixels moved by a resize", () => {
   it("refuses a negative, fractional or non-numeric version of the last move", () => {
     for (const movedAtVersion of [-1, 1.5, "12", null])
       expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, movedAtVersion } }).ok).toBe(false);
+  });
+});
+
+// Protocole 23 (Écart §4.2, §4.3 et §5.3, JOURNAL 2026-10-28) : la taille dynamique et le repère des pages
+describe("protocol 23: the dynamic size", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "guest" },
+  };
+  const place = {
+    t: "place",
+    requestId: "r",
+    placementId: "p1a2b3c4d5e6f7a8",
+    pixels: [{ x: 0, y: 0, colorIndex: 1 }],
+  };
+
+  // Passe au protocole 23 : une page en 22 se recharge
+  it("is protocol 23 or later: a page in 22 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(23);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 22, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Une pose dit son repère, négatif après un resserrement ; sans lui, elle n'est pas une frame
+  it("takes a placement with its origin, negative after a tightening, and refuses one without", () => {
+    for (const origin of [
+      { x: 0, y: 0 },
+      { x: 12, y: 3 },
+      { x: -17, y: -27 },
+    ])
+      expect(decodeClientFrame({ ...place, origin }).ok).toBe(true);
+    for (const origin of [undefined, { x: 1 }, { x: 1.5, y: 0 }, { x: "1", y: 0 }, null])
+      expect(decodeClientFrame({ ...place, ...(origin === undefined ? {} : { origin }) }).ok).toBe(false);
+  });
+
+  // Active ou retire la taille dynamique
+  it("takes setDynamicSize, on or off, and nothing else in it", () => {
+    const frame = { t: "setDynamicSize", requestId: "r", isDynamicSize: false };
+
+    expect(decodeClientFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeClientFrame({ ...frame, isDynamicSize: "yes" }).ok).toBe(false);
+    expect(decodeClientFrame({ ...frame, width: 50 }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "setDynamicSize", requestId: "r" }).ok).toBe(false);
+  });
+
+  // Garde le réglage et le repère dans le welcome, et accepte un welcome sans eux
+  it("keeps the setting and the origin in a welcome, and accepts a welcome without them", () => {
+    const dynamic = {
+      ...welcome,
+      canvas: { ...welcome.canvas, isDynamicSize: true, origin: { x: -3, y: 4 } },
+    };
+
+    expect(decodeServerFrame(dynamic)).toEqual({ ok: true, value: dynamic });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+    expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, isDynamicSize: "yes" } }).ok).toBe(
+      false,
+    );
+    expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, origin: { x: 1 } } }).ok).toBe(false);
   });
 });

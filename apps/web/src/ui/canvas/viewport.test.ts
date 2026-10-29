@@ -7,6 +7,7 @@ import {
   panBy,
   panToShow,
   pickArrivalZone,
+  shiftViewport,
   viewportToCell,
   zoomAt,
   zoomLimits,
@@ -145,6 +146,28 @@ describe("panBy", () => {
   it("moves the canvas by the dragged distance", () => {
     const viewport = { scale: 3, offsetX: 100, offsetY: 50 };
     expect(panBy(viewport, 30, -10)).toEqual({ scale: 3, offsetX: 130, offsetY: 40 });
+  });
+});
+
+describe("shiftViewport (Écart §5.3, JOURNAL 2026-10-28)", () => {
+  // La case regardée au même point de l'écran porte, après le décalage, son nouveau numéro : la vue ne saute pas
+  it("keeps the cell under every screen point, with its new number, when the canvas shifts", () => {
+    const viewport = { scale: 8, offsetX: 120, offsetY: -35 };
+    const shift = { x: 2, y: 3 };
+    const point = { x: 400, y: 300 };
+
+    const before = viewportToCell(viewport, point, CANVAS);
+    const after = viewportToCell(shiftViewport(viewport, shift), point, CANVAS);
+
+    expect(after).toEqual({ x: (before?.x ?? 0) + 2, y: (before?.y ?? 0) + 3 });
+  });
+
+  // Un décalage en arrière (un resserrement) ramène la vue de l'autre côté
+  it("moves the other way for a tightening, and not at all for no shift", () => {
+    const viewport = { scale: 4, offsetX: 100, offsetY: 50 };
+
+    expect(shiftViewport(viewport, { x: -5, y: 0 })).toEqual({ scale: 4, offsetX: 120, offsetY: 50 });
+    expect(shiftViewport(viewport, { x: 0, y: 0 })).toEqual(viewport);
   });
 });
 

@@ -1,7 +1,14 @@
 // La taille du canvas (CDC 2026 §1, JOURNAL 2026-09-29) : où se range une taille dans le tableau des formats, et ce
 // qu'une nouvelle taille laisse hors du cadre. Pur : la section Canvas l'affiche.
 
-import { CANVAS_FORMATS, type CanvasFormat, type CanvasSize } from "@liveplace/domain";
+import {
+  CANVAS_FORMATS,
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  type CanvasFormat,
+  type CanvasSize,
+  FIXED_DEFAULT_CANVAS_SIZE,
+} from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
 import { listCutPixels, planResize } from "@liveplace/domain/resize";
 
@@ -9,17 +16,25 @@ import { listCutPixels, planResize } from "@liveplace/domain/resize";
 export type SizeChoice = { format: CanvasFormat; sizeIndex: number };
 
 // La taille des canvas d'avant les formats (256 × 256) n'est dans aucun : on propose alors le grand carré.
-export function toSizeChoice({ width, height }: CanvasSize): SizeChoice {
+// Écart §5.3 (JOURNAL 2026-10-28) : toute autre taille hors format (celle d'une fresque devenue dynamique) ne se range nulle part : aucun
+// choix, la section dit la taille réelle.
+export function toSizeChoice({ width, height }: CanvasSize): SizeChoice | null {
   for (const { format, sizes } of CANVAS_FORMATS) {
     const sizeIndex = sizes.findIndex((size) => size.width === width && size.height === height);
     if (sizeIndex >= 0) return { format, sizeIndex };
   }
-  return { format: "1:1", sizeIndex: 2 };
+  return width === CANVAS_WIDTH && height === CANVAS_HEIGHT ? { format: "1:1", sizeIndex: 2 } : null;
 }
 
 export function toCanvasSize({ format, sizeIndex }: SizeChoice): CanvasSize {
   const sizes = CANVAS_FORMATS.find((each) => each.format === format)?.sizes ?? CANVAS_FORMATS[0].sizes;
   return sizes[sizeIndex] ?? sizes[0];
+}
+
+// Écart §5.3 (JOURNAL 2026-10-29) : retirer la taille dynamique ramène la fresque à la taille fixe par défaut par le plan d'un choix de
+// format. Ce que ce retour laisse hors du cadre : sans rien (`outside` vide), il n'y a rien à confirmer.
+export function turnOffPreview(pixels: Uint8Array, current: CanvasSize): ReturnType<typeof previewResize> {
+  return previewResize(pixels, current, FIXED_DEFAULT_CANVAS_SIZE);
 }
 
 // Écart §5.3 (JOURNAL 2026-10-24) : ce que montrera une nouvelle taille, du même plan que redis-core applique. `outside` : les

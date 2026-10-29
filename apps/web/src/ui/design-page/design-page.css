@@ -854,3 +854,44 @@
   width: 64px;
   height: 64px;
 }
+
+/* L'aperçu de la croissance sur une fresque de 10 × 10, à 16 px la case (growth-preview-demo.tsx) : les couches du jeu, dans une boîte.
+   La fresque est à 80 px du bord gauche et à 48 px du haut : trois cases de chaque côté tiennent dans la boîte. */
+.design-preview-stage {
+  position: relative;
+  width: 320px;
+  height: 256px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(circle, var(--void-dot) 0 1px, transparent 1.5px) 50% 50% / 24px 24px,
+    var(--void);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.design-preview-stage .lp-checker {
+  position: absolute;
+}
+
+.design-preview-cells {
+  position: absolute;
+  left: 80px;
+  top: 48px;
+  width: 160px;
+  height: 160px;
+  display: grid;
+  grid-template: repeat(10, 1fr) / repeat(10, 1fr);
+  outline: 1px solid var(--canvas-border);
+  pointer-events: none;
+}
+
+.design-preview-cell.is-draft {
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+.design-preview-cell.is-aimed {
+  outline: 2px solid var(--draft-outline-in);
+  outline-offset: -2px;
+}

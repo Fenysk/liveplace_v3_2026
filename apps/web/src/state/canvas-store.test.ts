@@ -9,6 +9,7 @@ import {
   type CanvasStoreOptions,
   type ConfirmedPixel,
   createCanvasStore,
+  toMoveKey,
 } from "./canvas-store";
 
 const width = 4;
@@ -1946,5 +1947,148 @@ describe("pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
     const ack = ackOf(first);
     receive(ack);
     expect(await placing).toEqual({ ok: true, value: ack });
+  });
+});
+
+describe("a dynamic size, and the shifts it brings (Écart §5.3, JOURNAL 2026-10-28)", () => {
+  const welcomeShifted = (
+    origin: { x: number; y: number } | undefined,
+    size = { width, height: 4 },
+    isDynamicSize = true,
+  ): Extract<ServerFrame, { t: "welcome" }> => {
+    if (welcome.t !== "welcome") throw new Error("welcome attendu");
+    return {
+      ...welcome,
+      canvas: {
+        ...welcome.canvas,
+        ...size,
+        ...(isDynamicSize ? { isDynamicSize } : {}),
+        ...(origin ? { origin } : {}),
+      },
+    };
+  };
+
+  // Garde le réglage et le repère du welcome, et un repère de départ quand il n'en dit pas
+  it("keeps the setting and the origin of the welcome, and a starting origin when it says none", () => {
+    const { store, receive } = setup();
+
+    expect(store.getView()).toMatchObject({ isDynamicSize: false, origin: { x: 0, y: 0 } });
+
+    receive(welcomeShifted({ x: 2, y: -3 }));
+
+    expect(store.getView()).toMatchObject({ isDynamicSize: true, origin: { x: 2, y: -3 } });
+  });
+
+  // Chaque lot dit à quel repère parlent ses cases : c'est ce que le serveur traduit
+  it("tells every lot which origin its cells speak of, the one of the last welcome", () => {
+    const { store, receive, lastPlace } = setup();
+
+    void store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    expect(lastPlace().origin).toEqual({ x: 0, y: 0 });
+
+    receive(welcomeShifted({ x: 2, y: 1 }));
+    void store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+
+    expect(lastPlace().origin).toEqual({ x: 2, y: 1 });
+  });
+
+  // La frame d'un lot en vol n'est pas touchée par un décalage : le serveur la traduit de son origine, même renvoyée après une reprise
+  it("does not touch the frame of an in-flight lot at a shift, which the server translates from its origin, even sent again after a resumption", async () => {
+    const { store, sent, close, open, receive, lastPlace, ackOf } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const first = lastPlace();
+    close();
+    open();
+
+    receive(welcomeShifted({ x: 2, y: 0 }, { width: 6, height: 4 }));
+
+    expect(sent.at(-1)).toEqual(first);
+    expect(first.origin).toEqual({ x: 0, y: 0 });
+    const ack = ackOf(first);
+    receive(ack);
+    expect(await placing).toEqual({ ok: true, value: ack });
+  });
+
+  // Un lot en vol traverse un décalage sans ranger ses anciens octets dans la nouvelle image
+  it("lets an in-flight lot cross a shift without restoring its old bytes into the new image", async () => {
+    const { store, receive, snapshot, lastPlace, ackOf } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    const first = lastPlace();
+
+    receive(welcomeShifted({ x: 2, y: 0 }, { width: 6, height: 4 }));
+    snapshot(new Uint8Array(6 * 4).fill(3));
+    receive(ackOf(first, [0]));
+
+    expect(await placing).toMatchObject({ ok: true });
+    expect([...store.getView().pixels].every((colorIndex) => colorIndex === 3)).toBe(true);
+  });
+
+  // L'inspection suit sa case, et la réponse encore attendue ferme l'inspection
+  it("moves an open inspection with its cell, and closes one still waiting for its answer", () => {
+    const { store, sent, receive } = setup();
+    store.inspect(1, 2);
+    const requestId = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+    receive({ t: "inspected", requestId, x: 1, y: 2 });
+
+    receive(welcomeShifted({ x: 2, y: 3 }, { width: 6, height: 8 }));
+
+    expect(store.getView().inspection).toEqual({ status: "empty", x: 3, y: 5 });
+
+    store.inspect(0, 0);
+    const waiting = sent.flatMap((frame) => (frame.t === "inspect" ? [frame.requestId] : [])).at(-1) ?? "";
+    receive(welcomeShifted({ x: 3, y: 3 }, { width: 6, height: 8 }));
+    receive({ t: "inspected", requestId: waiting, x: 0, y: 0 });
+
+    expect(store.getView().inspection).toBeNull();
+  });
+
+  // Un decalage seul n'est pas un rapprochement : le lot en vol n'échoue pas, et `movedAtVersion` ne bouge pas
+  it("is not a move of pixels by a resize: an in-flight lot does not fail, and movedAtVersion stays", async () => {
+    const { store, receive, lastPlace, ackOf } = setup();
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+
+    receive(welcomeShifted({ x: 2, y: 0 }, { width: 6, height: 4 }));
+    receive(ackOf(lastPlace()));
+
+    expect(await placing).toMatchObject({ ok: true });
+    expect(store.getView().movedAtVersion).toBeUndefined();
+  });
+
+  // La clé des déplacements change au rapprochement comme au décalage, pas à une simple croissance à droite
+  it("changes the move key at a move and at a shift, not at a growth on the right", () => {
+    const { store, receive } = setup();
+    const keys = [toMoveKey(store.getView())];
+
+    receive(welcomeShifted({ x: 0, y: 0 }, { width: 6, height: 4 }));
+    keys.push(toMoveKey(store.getView()));
+    receive(welcomeShifted({ x: 2, y: 0 }, { width: 8, height: 4 }));
+    keys.push(toMoveKey(store.getView()));
+
+    expect(keys).toEqual(["0:0,0", "0:0,0", "0:2,0"]);
+  });
+
+  // Demande au gateway d'activer ou de retirer la taille dynamique, et attend sa réponse
+  it("asks the gateway to set or remove the dynamic size, and waits for its answer", async () => {
+    const { store, sent, receive } = setup();
+
+    const asking = store.setDynamicSize(true);
+    const frame = sent.at(-1);
+    if (frame?.t !== "setDynamicSize") throw new Error("aucune frame setDynamicSize envoyée");
+    receive({ t: "resized", requestId: frame.requestId });
+
+    expect(frame.isDynamicSize).toBe(true);
+    expect(await asking).toEqual({ ok: true, value: true });
+  });
+
+  // Un refus du gateway est rendu, nommé par sa requête
+  it("hands back a refusal of the gateway", async () => {
+    const { store, sent, receive } = setup();
+
+    const asking = store.setDynamicSize(false);
+    const frame = sent.at(-1);
+    if (frame?.t !== "setDynamicSize") throw new Error("aucune frame setDynamicSize envoyée");
+    receive({ t: "error", code: "forbidden", requestId: frame.requestId });
+
+    expect(await asking).toEqual({ ok: false, error: "forbidden" });
   });
 });

@@ -1,5 +1,5 @@
-import type { User } from "@liveplace/domain";
-import type { SignedInUser, Signup } from "@liveplace/domain/ports";
+import { birthCanvasMeta, type CanvasMeta, type User } from "@liveplace/domain";
+import type { OwnedCanvas, SignedInUser, Signup } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { completeSignIn, type SignInDeps } from "./sign-in";
 
@@ -16,6 +16,8 @@ const owner: User = {
 const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, ownerCanvasId?: string) => {
   const activeCanvasReads: string[] = [];
   const createdCanvases: string[] = [];
+  const createdMetas: CanvasMeta[] = [];
+  const candidates: OwnedCanvas[] = [];
   const mirroredUsers: string[] = [];
   const signedUsers: string[] = [];
   const upserts: { user: SignedInUser; discoveredViaUserId: string | undefined }[] = [];
@@ -35,15 +37,19 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
         upserts.push({ user: upserted, discoveredViaUserId });
       },
       getUserByLogin: async (login) => known.find((candidate) => candidate.login === login) ?? null,
-      ensureCanvasForOwner: async () => ensuredCanvasId,
+      ensureCanvasForOwner: async (_ownerId, candidate) => {
+        candidates.push(candidate);
+        return ensuredCanvasId;
+      },
       getActiveCanvasForOwner: async (ownerId) => {
         activeCanvasReads.push(ownerId);
         return ownerCanvasId ? { canvasId: ownerCanvasId, width: 100, height: 100 } : null;
       },
     },
     redis: {
-      createCanvas: async (canvasId) => {
+      createCanvas: async (canvasId, meta) => {
         createdCanvases.push(canvasId);
+        createdMetas.push(meta);
       },
       setUser: async (mirroredUser) => {
         mirroredUsers.push(mirroredUser.userId);
@@ -73,6 +79,8 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
     tracked,
     activeCanvasReads,
     createdCanvases,
+    createdMetas,
+    candidates,
     mirroredUsers,
     signedUsers,
     upserts,
@@ -90,6 +98,17 @@ describe("completeSignIn (§10.1)", () => {
     await completeSignIn(deps, "code", null);
 
     expect(createdCanvases).toEqual(["existing-canvas"]);
+  });
+
+  // Écart §5.3 (JOURNAL 2026-10-29) : le canvas de la première connexion naît en taille dynamique et 10 × 10, pour Redis comme pour Convex
+  it("makes the canvas of a first sign-in dynamic and 10 × 10, for Redis and for Convex", async () => {
+    const { deps, createdMetas, candidates } = doubles("random-candidate");
+
+    await completeSignIn(deps, "code", null);
+
+    expect(createdMetas).toEqual([birthCanvasMeta(user.userId)]);
+    expect(createdMetas[0]).toMatchObject({ width: 10, height: 10, isDynamicSize: true });
+    expect(candidates).toEqual([{ canvasId: "random-candidate", width: 10, height: 10 }]);
   });
 
   // Un canvas dont ce scope garde une sauvegarde ne naît jamais vide : Redis l'a perdu, le worker le remet (JOURNAL 2026-10-08)

@@ -9,6 +9,7 @@
     "./snapshot": "./src/snapshot.ts",
     "./chunk": "./src/chunk.ts",
     "./resize": "./src/resize.ts",
+    "./dynamic-size": "./src/dynamic-size.ts",
     "./retention": "./src/retention.ts",
     "./capacity": "./src/capacity.ts"
   }

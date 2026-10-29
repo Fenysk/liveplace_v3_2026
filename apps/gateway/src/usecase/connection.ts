@@ -78,6 +78,7 @@ type SetGaugeLimitsFrame = Extract<ClientFrame, { t: "setGaugeLimits" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
 type ResizeCanvasFrame = Extract<ClientFrame, { t: "resizeCanvas" }>;
+type SetDynamicSizeFrame = Extract<ClientFrame, { t: "setDynamicSize" }>;
 type ListAuthorPixelsFrame = Extract<ClientFrame, { t: "listAuthorPixels" }>;
 type ListActivityHistoryFrame = Extract<ClientFrame, { t: "listActivityHistory" }>;
 type ListActivityDayFrame = Extract<ClientFrame, { t: "listActivityDay" }>;
@@ -128,6 +129,9 @@ type ReadyState = {
   height: number;
   role: Role;
   isArchived: boolean;
+  // Écart §5.3 (JOURNAL 2026-10-28) : la dernière version que l'arrivée de la page a déjà couverte. Une case plus ancienne, qui
+  // attendait encore dans le tampon du tick, parle peut-être d'un cadre d'avant un agrandissement : elle n'est plus envoyée.
+  coveredVersion: number;
 };
 // `isRoleStale` : un `ctl` `role` est tombé pendant l'arrivée, le rôle lu au `hello` a pu vieillir.
 // `isSizeStale` : un `ctl` `resize` aussi, la taille lue au `hello` a pu changer (JOURNAL 2026-09-29).
@@ -209,6 +213,8 @@ const buildWelcome = (
     ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
     ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
     ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // Écart §5.3 (JOURNAL 2026-10-24)
+    ...(meta.isDynamicSize ? { isDynamicSize: true } : {}), // Écart §5.3 (JOURNAL 2026-10-28)
+    ...(meta.origin ? { origin: meta.origin } : {}),
   },
   params: {
     gaugeMaxStart: meta.gaugeMaxStart,
@@ -293,7 +299,13 @@ export function createConnection(
 
   const listener: CellsListener = (frame) => {
     if (state.status === "joining") state.pendingFrames.push(frame);
-    else if (state.status === "ready") socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
+    else if (state.status === "ready") {
+      const { coveredVersion } = state;
+      const cells = frame.cells.filter((changed) => changed.version > coveredVersion);
+      if (cells.length === frame.cells.length)
+        socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
+      else if (cells.length > 0) socket.sendFrame({ t: "cells", toVersion: frame.toVersion, cells });
+    }
   };
 
   // §10.3 : ses droits ont changé, le rôle se relit et la page l'apprend. Sur une archive, plus personne ne modère.
@@ -520,6 +532,7 @@ export function createConnection(
       height: meta.height,
       role,
       isArchived: isArchivedAfter(lastStatusOf(held.pendingControls), meta.archivedAt !== undefined),
+      coveredVersion: arrival.coveredVersion,
     };
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
@@ -594,6 +607,7 @@ export function createConnection(
       requestId: frame.requestId,
       placementId: frame.placementId,
       nowMs: deps.now(),
+      origin: frame.origin, // Écart §5.3 (JOURNAL 2026-10-28) : le script traduit les pixels vers le repère d'aujourd'hui
       pixels: frame.pixels,
     });
     if (!result.ok)
@@ -738,19 +752,35 @@ export function createConnection(
     socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
+  // La réponse à une requête de taille. Écart §5.3 (JOURNAL 2026-10-24) : `busy`, des poses ont couru pendant chaque essai, rien n'a
+  // bougé ; il suffit de réessayer.
+  const answerSizeRequest = (
+    result: Awaited<ReturnType<CanvasCore["resizeCanvas"]>> | null,
+    requestId: string,
+  ): void => {
+    if (result?.ok) socket.sendFrame({ t: "resized", requestId });
+    else if (result?.error === "canvas_archived") refuseArchived(requestId);
+    else if (result?.error === "busy") socket.sendFrame({ t: "error", code: "rate_limited", requestId });
+    else forbid(requestId);
+  };
+
   // §4.2 : le streamer seul ; les pages l'apprennent par le `ctl` `resize`.
-  const resizeCanvas = async ({ requestId, width, height }: ResizeCanvasFrame, ready: ReadyState) => {
-    const result =
+  const resizeCanvas = async ({ requestId, width, height }: ResizeCanvasFrame, ready: ReadyState) =>
+    answerSizeRequest(
       ready.role === "owner" && session
         ? await deps.core.resizeCanvas(ready.canvasId, { by: session.userId, width, height })
-        : null;
-    if (result && !result.ok && result.error === "canvas_archived") return refuseArchived(requestId);
-    // Écart §5.3 (JOURNAL 2026-10-24) : des poses ont couru pendant chaque essai, rien n'a bougé ; il suffit de réessayer.
-    if (result && !result.ok && result.error === "busy")
-      return socket.sendFrame({ t: "error", code: "rate_limited", requestId });
-    if (!result?.ok) return forbid(requestId);
-    socket.sendFrame({ t: "resized", requestId });
-  };
+        : null,
+      requestId,
+    );
+
+  // Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul, comme la taille, et la même réponse.
+  const setDynamicSize = async ({ requestId, isDynamicSize }: SetDynamicSizeFrame, ready: ReadyState) =>
+    answerSizeRequest(
+      ready.role === "owner" && session
+        ? await deps.core.setDynamicSize(ready.canvasId, { by: session.userId, isDynamicSize })
+        : null,
+      requestId,
+    );
 
   const listReports = async (requestId: string, ready: ReadyState): Promise<void> => {
     if (!canModerate(ready.role)) return forbid(requestId);
@@ -863,6 +893,8 @@ export function createConnection(
         return listAuthorPixels(frame, ready);
       case "resizeCanvas":
         return resizeCanvas(frame, ready);
+      case "setDynamicSize":
+        return setDynamicSize(frame, ready);
       case "listReports":
         return listReports(frame.requestId, ready);
       case "watchActivity":

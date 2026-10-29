@@ -102,8 +102,26 @@ function size(width: number, height: number): CanvasSize {
   return { width, height };
 }
 
-// CDC 2026 §1 : un nouveau canvas naît en 50×50, le petit carré.
-export const BIRTH_CANVAS_SIZE: CanvasSize = size(50, 50);
+// CDC 2026 §1 : la taille fixe par défaut est le petit carré, 50×50. Écart §5.3 (JOURNAL 2026-10-29) : un canvas n'y naît plus (il naît
+// dynamique, `DYNAMIC_BIRTH_CANVAS_SIZE`), mais y revient quand le streamer retire la taille dynamique.
+export const FIXED_DEFAULT_CANVAS_SIZE: CanvasSize = size(50, 50);
+
+// Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique garde 3 cases vides entre ses pixels posés et chaque bord, de 10 à 256 par axe.
+export const DYNAMIC_SIZE_MARGIN = 3;
+export const DYNAMIC_SIZE_MIN = 10;
+
+// Écart §5.3 (JOURNAL 2026-10-29) : un canvas neuf naît en taille dynamique, au plus petit : 10×10.
+export const DYNAMIC_BIRTH_CANVAS_SIZE: CanvasSize = size(DYNAMIC_SIZE_MIN, DYNAMIC_SIZE_MIN);
+
+// Le repère d'une page : la somme des décalages (vers la droite et vers le bas) qu'une taille dynamique a imposés à ses cases.
+// Une case d'un repère passe dans un autre en ajoutant l'écart de leurs origines.
+export type CanvasOrigin = { x: number; y: number };
+export const START_ORIGIN: CanvasOrigin = { x: 0, y: 0 };
+
+// De combien passent les cases du repère `from` dans le repère `to` : cet écart s'ajoute à leurs coordonnées.
+export function originShift(from: CanvasOrigin, to: CanvasOrigin): CanvasOrigin {
+  return { x: to.x - from.x, y: to.y - from.y };
+}
 
 export function isCanvasSize({ width, height }: CanvasSize): boolean {
   return CANVAS_FORMATS.some(({ sizes }) =>
@@ -150,6 +168,9 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     theme?: string;
     // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Absent : jamais.
     movedAtVersion?: number;
+    // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique est activée ; et le repère de la fresque, absent : jamais décalée.
+    isDynamicSize?: boolean;
+    origin?: CanvasOrigin;
   };
 
 // Écart §15 (JOURNAL 2026-10-06) : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.
@@ -353,11 +374,11 @@ export function isObsDelayStep(obsDelayMs: number): boolean {
   return OBS_DELAY_STEPS_MS.some((step) => step === obsDelayMs);
 }
 
-// Un canvas neuf aux valeurs par défaut du jeu (CDC §1). Seuls sa taille et le délai OBS changent ensuite.
+// Un canvas en taille fixe aux valeurs par défaut du jeu (CDC §1). Seuls sa taille et le délai OBS changent ensuite.
 export function defaultCanvasMeta(ownerId: string): CanvasMeta {
   return {
     ownerId,
-    ...BIRTH_CANVAS_SIZE,
+    ...FIXED_DEFAULT_CANVAS_SIZE,
     gaugeMaxStart: GAUGE_MAX_START,
     gaugeMaxCeiling: GAUGE_MAX_CEILING,
     refillMs: REFILL_MS,
@@ -365,6 +386,12 @@ export function defaultCanvasMeta(ownerId: string): CanvasMeta {
     obsDelayMs: OBS_DELAY_MS,
     obsBackground: OBS_BACKGROUND,
   };
+}
+
+// Écart §5.3 (JOURNAL 2026-10-29) : le canvas de la première connexion d'un streamer, en taille dynamique et 10×10. Les canvas d'avant
+// gardent leur réglage : sans le champ, la taille dynamique est retirée.
+export function birthCanvasMeta(ownerId: string): CanvasMeta {
+  return { ...defaultCanvasMeta(ownerId), ...DYNAMIC_BIRTH_CANVAS_SIZE, isDynamicSize: true };
 }
 
 export type Palette = readonly string[];

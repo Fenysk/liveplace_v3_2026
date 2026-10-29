@@ -3,14 +3,16 @@
 
 import {
   BACKGROUND_IMAGE_OPACITY,
+  type CanvasOrigin,
   type CellKey,
   OBS_BACKGROUND,
+  originShift,
   TRANSPARENT_COLOR_INDEX,
   toStateOffset,
 } from "@liveplace/domain";
 import { backgroundImagePath } from "../../shared/background-image-path";
 import type { ArrivedPixel, CanvasStore, CanvasView, ConfirmedPixel } from "../../state/canvas-store";
-import type { Draft } from "../../state/draft";
+import { type Draft, shiftDraft } from "../../state/draft";
 import type { DraftMode, DraftStore } from "../../state/draft-store";
 import { BOTTOM_BAR_HEIGHT } from "../design/bottom-bar";
 import { easingCurve, motionEasing, motionMs } from "../design/motion";
@@ -36,6 +38,7 @@ import {
   type PointerInput,
   wheelFactor,
 } from "./gestures";
+import { createGrowthPreview, type GrowthPreviewElements, previewGrowth } from "./growth-preview";
 import { type Handoff, takeLeftBehind } from "./handoff";
 import { createNavigationWatch, type NavigationKind } from "./navigation-watch";
 import {
@@ -54,13 +57,16 @@ import {
   clampCell,
   type Framing,
   fitViewport,
+  frameBox,
   type Insets,
+  insetOf,
   isArrivalView,
   NO_INSETS,
   panBy,
   panToShow,
   type ScreenPoint,
   type Size,
+  shiftViewport,
   type Viewport,
   viewportToCell,
   zoomAt,
@@ -82,6 +88,8 @@ export type CanvasScene = {
 // `onFraming` : à chaque changement du zoom ou du « la vue a bougé » (Recentrer sur mobile).
 // `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
 // et fait dériver son motif (`checkerTiles`).
+// `preview` (Écart §9.3, JOURNAL 2026-10-29) : les couches de l'aperçu de la croissance (growth-preview.tsx), entre le damier et le canvas ;
+// son damier dérive avec l'autre, au même instant, pour que les deux se prolongent.
 // `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
 // `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
 // `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
@@ -98,6 +106,7 @@ type SceneOptions = {
   handoff?: Handoff | undefined;
   checker: HTMLElement;
   checkerTiles: HTMLElement;
+  preview: GrowthPreviewElements & { tiles: HTMLElement };
 };
 
 // Les cases du damier, en pixels CSS : leur taille suit l'écran, jamais le zoom (CDC 2026).
@@ -117,6 +126,7 @@ const isSameInsets = (a: Insets, b: Insets) =>
 
 const MIDDLE_BUTTON = 1;
 const NO_POINT: ScreenPoint = { x: 0, y: 0 };
+const NO_SHIFT: Cell = { x: 0, y: 0 };
 // Au clavier, la case visée garde ses distances avec les bords de l'écran et les pills qui y flottent (CDC 2026).
 const KEY_MARGIN = 48;
 // Pendant un glissement ou un pincement, les pills s'effacent en fondu (CDC 2026) : le CSS lit cet attribut.
@@ -224,25 +234,49 @@ export function createCanvasScene(
   };
 
   // Le damier défile en CSS, accroché à l'écran : seul son cadre suit le canvas, sans jamais en dépasser.
-  let checkerDrift: Animation | null = null;
+  let checkerDrift: Animation[] = [];
   let driftTile = 0;
   const driftChecker = (tile: number) => {
     if (tile === driftTile) return;
     driftTile = tile;
-    checkerDrift?.cancel();
+    for (const drift of checkerDrift) drift.cancel();
+    checkerDrift = [];
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const shift = `${2 * tile}px`;
-    checkerDrift = options.checkerTiles.animate(
-      [{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${shift}, ${shift}, 0)` }],
-      { duration: CHECKER_DRIFT_MS, iterations: Number.POSITIVE_INFINITY, easing: "linear" },
+    const keyframes = [
+      { transform: "translate3d(0, 0, 0)" },
+      { transform: `translate3d(${shift}, ${shift}, 0)` },
+    ];
+    const timing: KeyframeAnimationOptions = {
+      duration: CHECKER_DRIFT_MS,
+      iterations: Number.POSITIVE_INFINITY,
+      easing: "linear",
+    };
+    // Créés ensemble, les deux damiers partent à la même image : celui de l'aperçu prolonge toujours celui de la fresque.
+    checkerDrift = [options.checkerTiles, options.preview.tiles].map((tiles) =>
+      tiles.animate(keyframes, timing),
     );
   };
 
   const clipChecker = (current: Viewport, canvas: Size) => {
-    const right = screen.width - (current.offsetX + canvas.width * current.scale);
-    const bottom = screen.height - (current.offsetY + canvas.height * current.scale);
-    const inset = [current.offsetY, right, bottom, current.offsetX].map((side) => `${Math.max(0, side)}px`);
-    options.checker.style.setProperty("--lp-checker-clip", `inset(${inset.join(" ")})`);
+    options.checker.style.setProperty("--lp-checker-clip", insetOf(frameBox(current, canvas), screen));
+  };
+
+  // Écart §9.3 (JOURNAL 2026-10-29) : l'aperçu de la croissance. Au toucher, rien ne survole : seul le brouillon le nourrit.
+  const showPreview = createGrowthPreview(options.preview);
+  let isAimTouched = false;
+  const showGrowth = (view: CanvasView, canvas: Size, viewport: Viewport) => {
+    const draftView = draftStore.getView();
+    const growth = previewGrowth({
+      isDynamicSize: view.isDynamicSize,
+      mode: draftView.mode,
+      draft: [...draftView.draft.values()],
+      aimedCell: isAimTouched ? null : targetCell,
+      colorIndex: draftView.colorIndex,
+      isPicking: draftView.isPicking,
+      canvas,
+    });
+    showPreview(growth ? frameBox(viewport, canvas, growth) : null, screen);
   };
 
   // L'apparition en mosaïque (revealer.ts) : l'état est partagé avec la vue OBS.
@@ -376,6 +410,7 @@ export function createCanvasScene(
     }
     reportFraming(viewport, canvas);
     clipChecker(viewport, canvas);
+    showGrowth(view, canvas, viewport);
     if (isImageStale) {
       image.repaint(view);
       isImageStale = false;
@@ -662,6 +697,7 @@ export function createCanvasScene(
     surface.height = Math.round(screen.height * pixelRatio);
     const tile = checkerTile(screen);
     options.checker.style.setProperty("--lp-checker-tile", `${tile}px`);
+    options.preview.checker.style.setProperty("--lp-checker-tile", `${tile}px`);
     driftChecker(tile);
     refreshCursor();
     requestRender();
@@ -686,14 +722,56 @@ export function createCanvasScene(
   };
   const unobserveZone = options.isFramedInFreeArea ? observeZone(root, refreshZone) : () => undefined;
 
-  // §5.3 : une nouvelle taille ramène la vue à l'arrivée. Écart §9.3 (JOURNAL 2026-10-09) : sa forme dit aussi la zone d'arrivée.
+  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque a été décalée de `shift` cases (vers la droite et le bas) : tout ce que la scène
+  // tient par case suit, pour que la vue, le viseur et les animations en cours restent sous les yeux de la personne.
+  const moveCell = (cell: Cell | null, shift: Cell): Cell | null =>
+    cell && clampCell({ x: cell.x + shift.x, y: cell.y + shift.y }, canvasSize());
+  const followShift = (shift: Cell) => {
+    targetCell = moveCell(targetCell, shift);
+    lastTracedCell = moveCell(lastTracedCell, shift);
+    reticleTarget = moveCell(reticleTarget, shift);
+    reticleShown = moveCell(reticleShown, shift);
+    if (reticleGlide)
+      reticleGlide = { ...reticleGlide, from: moveCell(reticleGlide.from, shift) ?? reticleGlide.from };
+    settles = settles.map((settle) => ({
+      ...settle,
+      pixels: settle.pixels.map((pixel) => ({ ...pixel, x: pixel.x + shift.x, y: pixel.y + shift.y })),
+    }));
+    if (viewport) moveViewport(shiftViewport(viewport, shift));
+  };
+
+  // Ce que la scène n'a pas encore vu de la fresque : sa taille, et de combien ses cases ont été décalées depuis. Elle le retient ensuite.
   let knownSize: Size | null = null;
+  let knownOrigin: CanvasOrigin | null = null;
+  const unseenShift = (): Cell => (knownOrigin ? originShift(knownOrigin, store.getView().origin) : NO_SHIFT);
+  const takeSeenCanvas = () => {
+    const { width, height, origin } = store.getView();
+    const seen = {
+      isFirstSize: knownSize === null && width > 0,
+      isResized: knownSize !== null && (width !== knownSize.width || height !== knownSize.height),
+      shift: unseenShift(),
+    };
+    if (width > 0) {
+      knownSize = { width, height };
+      knownOrigin = origin;
+    }
+    return seen;
+  };
+
+  // Une taille dynamique ne ramène pas la vue à l'arrivée : elle grandit sous la vue sans la déplacer, et la vue la suit quand elle se décale.
+  const keepViewThrough = (shift: Cell): void => {
+    isAtArrival = false;
+    if (shift.x !== 0 || shift.y !== 0) followShift(shift);
+  };
+
+  // §5.3 : une nouvelle taille ramène la vue à l'arrivée. Écart §9.3 (JOURNAL 2026-10-09) : sa forme dit aussi la zone d'arrivée.
+  // Écart §5.3 (JOURNAL 2026-10-28) : sauf une taille dynamique (`keepViewThrough`).
   const unsubscribe = store.subscribe(() => {
-    const { width, height } = store.getView();
-    const isFirstSize = knownSize === null && width > 0;
-    const isResized = knownSize !== null && (width !== knownSize.width || height !== knownSize.height);
-    if (width > 0) knownSize = { width, height };
-    if (isResized && viewport && width > 0) {
+    const { width, height, isDynamicSize } = store.getView();
+    const { isFirstSize, isResized, shift } = takeSeenCanvas();
+    const isMoved = isResized || shift.x !== 0 || shift.y !== 0;
+    if (isDynamicSize && viewport && isMoved) keepViewThrough(shift);
+    else if (isResized && viewport && width > 0) {
       insets = measureInsets();
       frameArrival({ width, height });
     } else if (isFirstSize) refreshInsets();
@@ -728,7 +806,8 @@ export function createCanvasScene(
   const unsubscribeDraft = draftStore.subscribe(() => {
     const { isTracing, mode, draft } = draftStore.getView();
     if (draft !== lastDraft) {
-      startDraftFades(lastDraft, draft, mode);
+      // Un décalage de la fresque a déjà déplacé le brouillon : ses cases ne sont pas neuves pour autant.
+      startDraftFades(shiftDraft(lastDraft, unseenShift()), draft, mode);
       lastDraft = draft;
     }
     if (isTracing !== wasTracing) {
@@ -751,11 +830,19 @@ export function createCanvasScene(
       surface.setPointerCapture(event.pointerId);
       stopZoom();
       pressedPointers.add(event.pointerId);
+      isAimTouched = event.pointerType === "touch";
       apply(tracker.press(toPointerInput(event)));
     },
     { signal },
   );
-  surface.addEventListener("pointermove", (event) => apply(tracker.move(toPointerInput(event))), { signal });
+  surface.addEventListener(
+    "pointermove",
+    (event) => {
+      isAimTouched = event.pointerType === "touch";
+      apply(tracker.move(toPointerInput(event)));
+    },
+    { signal },
+  );
   surface.addEventListener(
     "pointerup",
     (event) => {
@@ -820,6 +907,7 @@ export function createCanvasScene(
       const next = targetCell
         ? clampCell({ x: targetCell.x + dx, y: targetCell.y + dy }, canvas)
         : firstKeyTarget(viewport, canvas);
+      isAimTouched = false;
       setTargetCell(next);
       if (draftStore.getView().isTracing) traceTo(next);
       const shown = panToShow(viewport, next, screen, keyInsets());
@@ -835,7 +923,7 @@ export function createCanvasScene(
       cancelAnimationFrame(frameRequest);
       stopZoom();
       resizeObserver.disconnect();
-      checkerDrift?.cancel();
+      for (const drift of checkerDrift) drift.cancel();
       appearanceObserver.disconnect();
       insetsObserver.disconnect();
       unobserveZone();

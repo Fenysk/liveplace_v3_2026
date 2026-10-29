@@ -7,6 +7,7 @@ import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
   ActivityPeriod,
   CanvasMeta,
+  CanvasOrigin,
   CanvasSize,
   CanvasStatus,
   GaugeLimits,
@@ -19,11 +20,13 @@ import type { ChunkSize, TierRow } from "./retention";
 import type { CanvasSnapshot, SnapshotTier } from "./snapshot";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
+// Écart §5.3 (JOURNAL 2026-10-28) : `origin`, le repère des pixels ; le script les traduit vers celui de la fresque. Absent : le même.
 export type Placement = {
   userId: string;
   requestId: string;
   placementId: string;
   nowMs: Timestamp;
+  origin?: CanvasOrigin;
   pixels: Extract<ClientFrame, { t: "place" }>["pixels"];
 };
 
@@ -219,6 +222,12 @@ export interface CanvasCore {
   resizeCanvas(
     canvasId: string,
     resize: CanvasSize & { by: string },
+  ): Promise<Result<void, CanvasRefusal | "forbidden" | "busy">>;
+  // Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul. Activée, la fresque se resserre sur ses dessins ; publie le `ctl` `resize`
+  // quand quelque chose a changé. `forbidden` aussi pour `resizeCanvas` tant que le réglage est actif.
+  setDynamicSize(
+    canvasId: string,
+    change: { by: string; isDynamicSize: boolean },
   ): Promise<Result<void, CanvasRefusal | "forbidden" | "busy">>;
   // Le resync (§4.5) : les événements depuis `fromVersion`, ou `null` si le stream ne les a plus ou s'ils dépassent `maxCount`.
   listEvents(canvasId: string, fromVersion: number, maxCount: number): Promise<Event[] | null>;

@@ -3,7 +3,7 @@
 // Les poses signalées restent « Signalé » pendant la session.
 
 import { useRef, useState, useSyncExternalStore } from "react";
-import type { CanvasStore } from "../../state/canvas-store";
+import { type CanvasStore, toMoveKey } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import type { ReportControl } from "../inspection/inspection-pill";
 import { useTexts } from "../locale/use-locale";
@@ -52,7 +52,7 @@ export function useReport(canvas: CanvasStore): {
     drop();
   };
   // Écart §5.3 (JOURNAL 2026-10-24) : un signalement qui part (`running`) est laissé, la case visée est celle que le serveur relit.
-  useCloseOnMove(view.movedAtVersion, target !== null && status !== "running", close);
+  useCloseOnMove(toMoveKey(view), target !== null && status !== "running", close);
 
   // Cette pose seule, ou ses voisines : la plage de l'aperçu, calculée sur les mêmes pixels.
   const rangeOf = ({ placementId }: ReportTarget) =>

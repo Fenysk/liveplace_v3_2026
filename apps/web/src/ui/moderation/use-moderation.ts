@@ -5,7 +5,7 @@
 
 import { canModerate } from "@liveplace/domain";
 import { useRef, useState, useSyncExternalStore } from "react";
-import type { CanvasStore, ModerationAction } from "../../state/canvas-store";
+import { type CanvasStore, type ModerationAction, toMoveKey } from "../../state/canvas-store";
 import { useToast } from "../design/toast";
 import { useTexts } from "../locale/use-locale";
 import { canBan } from "./can-ban";
@@ -67,7 +67,7 @@ export function useModeration(canvas: CanvasStore): {
   };
 
   // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, l'aperçu de la fenêtre est faux ; une action qui part est laissée.
-  useCloseOnMove(view.movedAtVersion, request !== null && status !== "running", () => show(null));
+  useCloseOnMove(toMoveKey(view), request !== null && status !== "running", () => show(null));
 
   // Pas d'étape « après » un ban : la fenêtre et l'inspection se ferment, les pixels partent par le flux.
   const finish = (): void => {

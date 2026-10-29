@@ -43,6 +43,8 @@ const canvasView = (claimable: number): CanvasView => ({
   isBanned: false,
   isArchived: false,
   isDiscarded: false,
+  isDynamicSize: false,
+  origin: { x: 0, y: 0 },
   userId: "user-1",
   gauge: { charges: 6, max: 10, nextRefillAt: 0, claimable },
   reportCount: 0,

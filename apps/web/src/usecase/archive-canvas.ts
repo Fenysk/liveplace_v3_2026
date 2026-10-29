@@ -1,7 +1,7 @@
 // Écart §10.3 (JOURNAL 2026-10-06) : archiver le canvas actif, et repartir sur un canvas vide.
 // L'ordre fait l'opération fiable : tant que Convex n'a pas tranché, tout se défait ; après, plus rien ne l'empêche.
 
-import { type CanvasMeta, MAX_ARCHIVES, toTheme } from "@liveplace/domain";
+import { type CanvasMeta, DYNAMIC_BIRTH_CANVAS_SIZE, MAX_ARCHIVES, toTheme } from "@liveplace/domain";
 import {
   bestEffort,
   commitToDurable,
@@ -16,11 +16,13 @@ import {
 export type ArchiveRequest = { canvasId: string; theme: string; progress: ProgressChoice };
 
 // Le canvas vide qui prend la place : la même taille, les mêmes jauges de départ et maximale, la même recharge. Son
-// thème ne se recopie pas : il part sans (Écart §8.1, JOURNAL 2026-10-07).
+// thème ne se recopie pas : il part sans (Écart §8.1, JOURNAL 2026-10-07). Écart §5.3 (JOURNAL 2026-10-29) : archivé en taille dynamique, il
+// naît en taille dynamique et 10×10, comme un canvas de première connexion ; en taille fixe, il garde la taille du sortant.
 const toIncomingMeta = (meta: CanvasMeta): CanvasMeta => ({
   ownerId: meta.ownerId,
-  width: meta.width,
-  height: meta.height,
+  ...(meta.isDynamicSize
+    ? { ...DYNAMIC_BIRTH_CANVAS_SIZE, isDynamicSize: true }
+    : { width: meta.width, height: meta.height }),
   gaugeMaxStart: meta.gaugeMaxStart,
   gaugeMaxCeiling: meta.gaugeMaxCeiling,
   refillMs: meta.refillMs,
@@ -43,13 +45,18 @@ const archive = async (deps: SwitchDeps, ownerId: string, request: ArchiveReques
   const outgoing = await deps.redis.getCanvas(active.canvasId);
   if (!outgoing) return refused("failed");
 
-  const incoming = { canvasId: deps.randomCanvasId(), width: outgoing.width, height: outgoing.height };
+  const incomingMeta = toIncomingMeta(outgoing);
+  const incoming = {
+    canvasId: deps.randomCanvasId(),
+    width: incomingMeta.width,
+    height: incomingMeta.height,
+  };
   const archivedAt = deps.now();
   const theme = toTheme(request.theme);
   try {
     // Le nouveau canvas sans `ready` : personne ne le sert. Puis le sortant figé d'un seul `HSET` : dès lors, aucun
     // script n'y écrit plus, et personne ne voit un nouveau canvas à moitié copié.
-    await deps.redis.prepareCanvas(incoming.canvasId, toIncomingMeta(outgoing));
+    await deps.redis.prepareCanvas(incoming.canvasId, incomingMeta);
     await deps.redis.markArchived(active.canvasId, { archivedAt, successorId: incoming.canvasId });
     await deps.redis.copyShared(active.canvasId, incoming.canvasId);
     if (request.progress === "keep") await deps.redis.copyProgress(active.canvasId, incoming.canvasId);

@@ -1,6 +1,6 @@
 // Le callback OAuth, dans l'ordre du §10.1. Chaque étape est idempotente : un callback rejoué ne crée rien en double.
 
-import { defaultCanvasMeta, type Timestamp, type User } from "@liveplace/domain";
+import { birthCanvasMeta, type Timestamp, type User } from "@liveplace/domain";
 import type {
   DurableStore,
   RecoveryStore,
@@ -67,7 +67,8 @@ export async function signInTwitchUser(
   const { email, ...user } = signedIn;
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);
-  const meta = defaultCanvasMeta(user.userId);
+  // Écart §5.3 (JOURNAL 2026-10-29) : un canvas neuf naît en taille dynamique, 10×10 ; Convex garde cette taille de naissance, Redis fait foi ensuite.
+  const meta = birthCanvasMeta(user.userId);
   const candidateCanvasId = deps.randomCanvasId();
   // Le candidat n'est retenu qu'à la première connexion : seul le `canvasId` rendu fait foi (D-14).
   const canvasId = await deps.durable.ensureCanvasForOwner(user.userId, {

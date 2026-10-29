@@ -1,5 +1,6 @@
 // La section Canvas de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-29), pour le streamer : le thème du canvas, son fond et son image
-// (Écart §9.1, JOURNAL 2026-10-10), un format, puis Petit, Moyen ou Grand, et la confirmation qui montre ce qui sort du cadre.
+// (Écart §9.1, JOURNAL 2026-10-10), la taille dynamique (Écart §5.3, JOURNAL 2026-10-28), un format puis Petit, Moyen ou Grand (grisés tant
+// qu'elle est activée, JOURNAL 2026-10-29), et la confirmation qui montre ce qui sort du cadre.
 // L'affichage seul, nourri par `CanvasTab`.
 
 import {
@@ -19,6 +20,7 @@ import { useMemo, useRef, useState } from "react";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { BackgroundPreview } from "../design/background-preview";
 import { Button } from "../design/button";
+import { Checkbox } from "../design/checkbox";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { SwatchChoice, type SwatchOption } from "../design/palette";
 import { PixelPreview } from "../design/pixel-preview";
@@ -194,21 +196,88 @@ export const BackgroundImageSettings = ({ image }: { image: BackgroundImageField
   );
 };
 
+// Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique. `isOn` est la valeur choisie, ou demandée tant que le gateway ne l'a pas
+// confirmée ; `isBusy`, la demande attend sa réponse.
+export type DynamicSizeField = {
+  isOn: boolean;
+  isBusy: boolean;
+  onToggle: (isOn: boolean) => void;
+};
+
+type SizeChoiceSettingsProps = {
+  current: CanvasSize;
+  choice: SizeChoice | null; // `null` : la taille d'aujourd'hui n'est dans aucun format, aucun n'est présenté comme choisi
+  chosen: CanvasSize | null; // la taille de `choice`
+  isLocked: boolean; // Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique est activée, le choix reste visible mais grisé
+  onChoose: (choice: SizeChoice) => void;
+  onApply: () => void; // ouvre la confirmation
+};
+
+const SizeChoiceSettings = ({
+  current,
+  choice,
+  chosen,
+  isLocked,
+  onChoose,
+  onApply,
+}: SizeChoiceSettingsProps) => {
+  const t = useTexts(CANVAS_TEXTS);
+  const isCurrent = chosen === null || (chosen.width === current.width && chosen.height === current.height);
+  const sizeOptions: readonly SegmentedOption<SizeKey>[] = SIZE_KEYS.map((value) => ({
+    value,
+    label: t.sizeNames[value],
+  }));
+  return (
+    <div className="lp-setting">
+      <Segmented
+        label={t.format}
+        options={FORMAT_OPTIONS}
+        value={choice?.format ?? null}
+        isDisabled={isLocked}
+        onSelect={(format) => onChoose(choice ? { ...choice, format } : { format, sizeIndex: 0 })}
+      />
+      {choice && chosen ? (
+        <>
+          <Segmented
+            label={t.size}
+            options={sizeOptions}
+            value={SIZE_KEYS[choice.sizeIndex] ?? "0"}
+            isDisabled={isLocked}
+            onSelect={(sizeIndex) => onChoose({ ...choice, sizeIndex: Number(sizeIndex) })}
+          />
+          {!isLocked && (
+            <p className="lp-type-caption lp-muted">
+              {t.chosenSize({ format: t.formatNames[choice.format], size: t.cellsLabel(chosen) })}
+            </p>
+          )}
+        </>
+      ) : (
+        !isLocked && <p className="lp-type-caption lp-muted">{t.noFormat}</p>
+      )}
+      <div className="lp-row">
+        <Button label={t.changeSize} variant="primary" isDisabled={isLocked || isCurrent} onPress={onApply} />
+      </div>
+    </div>
+  );
+};
+
 type CanvasSettingsProps = {
   theme: ThemeField;
   background: BackgroundField;
   image: BackgroundImageField;
+  dynamic: DynamicSizeField;
   current: CanvasSize;
-  choice: SizeChoice;
-  chosen: CanvasSize; // la taille de `choice`
+  choice: SizeChoice | null;
+  chosen: CanvasSize | null;
   onChoose: (choice: SizeChoice) => void;
-  onApply: () => void; // ouvre la confirmation
+  onApply: () => void;
 };
 
 export const CanvasSettings = ({
   theme,
   background,
   image,
+  dynamic,
   current,
   choice,
   chosen,
@@ -216,11 +285,6 @@ export const CanvasSettings = ({
   onApply,
 }: CanvasSettingsProps) => {
   const t = useTexts(CANVAS_TEXTS);
-  const isCurrent = chosen.width === current.width && chosen.height === current.height;
-  const sizeOptions: readonly SegmentedOption<SizeKey>[] = SIZE_KEYS.map((value) => ({
-    value,
-    label: t.sizeNames[value],
-  }));
   return (
     <>
       <ThemeSettings theme={theme} />
@@ -231,25 +295,22 @@ export const CanvasSettings = ({
         <p className="lp-type-caption lp-muted">{t.currentSize(t.cellsLabel(current))}</p>
       </div>
       <div className="lp-setting">
-        <Segmented
-          label={t.format}
-          options={FORMAT_OPTIONS}
-          value={choice.format}
-          onSelect={(format) => onChoose({ ...choice, format })}
+        <Checkbox
+          label={t.dynamicSize}
+          isChecked={dynamic.isOn}
+          isDisabled={dynamic.isBusy}
+          onToggle={dynamic.onToggle}
         />
-        <Segmented
-          label={t.size}
-          options={sizeOptions}
-          value={SIZE_KEYS[choice.sizeIndex] ?? "0"}
-          onSelect={(sizeIndex) => onChoose({ ...choice, sizeIndex: Number(sizeIndex) })}
-        />
-        <p className="lp-type-caption lp-muted">
-          {t.chosenSize({ format: t.formatNames[choice.format], size: t.cellsLabel(chosen) })}
-        </p>
-        <div className="lp-row">
-          <Button label={t.changeSize} variant="primary" isDisabled={isCurrent} onPress={onApply} />
-        </div>
+        <p className="lp-type-caption lp-muted">{t.dynamicSizeNote}</p>
       </div>
+      <SizeChoiceSettings
+        current={current}
+        choice={choice}
+        chosen={chosen}
+        isLocked={dynamic.isOn}
+        onChoose={onChoose}
+        onApply={onApply}
+      />
     </>
   );
 };

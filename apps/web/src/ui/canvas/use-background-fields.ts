@@ -19,7 +19,7 @@ import { CANVAS_TEXTS } from "./canvas-texts";
 type BackgroundFieldsInput = { canvas: CanvasStore; canvasId: string; login: string };
 
 // Une valeur demandée, que la frame du gateway confirme : `onConfirm` dit alors le toast, et la demande s'efface.
-function useRequested<Value>(confirmed: Value, onConfirm: (value: Value) => void) {
+export function useRequested<Value>(confirmed: Value, onConfirm: (value: Value) => void) {
   const [requested, setRequested] = useState<Value | null>(null);
   useEffect(() => {
     if (requested !== confirmed) return;
