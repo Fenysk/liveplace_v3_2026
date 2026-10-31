@@ -111,6 +111,7 @@ export const landPixels = (state: DemoState, pixels: readonly LaunchedPixel[]): 
   ]),
 });
 
-// Le premier geste du visiteur : la démo s'arrête pour de bon, l'écran reste tel quel.
+// Le premier geste du visiteur : la démo s'arrête pour de bon et son brouillon part (« Dessiner · n » ne compte que les cases du
+// visiteur). Le reste de l'écran (fresques, couleur, jauge) reste tel quel.
 export const takeOver = (state: DemoState): DemoState =>
-  state.hasVisitorActed ? state : { ...state, hasVisitorActed: true };
+  state.hasVisitorActed ? state : { ...state, hasVisitorActed: true, draft: new Map() };

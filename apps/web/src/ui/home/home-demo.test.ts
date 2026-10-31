@@ -196,21 +196,31 @@ describe("sending the draft", () => {
 });
 
 describe("the first gesture of the visitor", () => {
-  // Au premier geste du visiteur, la démo s'arrête pour de bon ; ce que l'écran montrait reste : le brouillon, la couleur, la jauge
-  it("stops the demo for good and leaves everything else on screen", () => {
+  // Au premier geste du visiteur, la démo s'arrête pour de bon et le brouillon qu'elle laissait part ; le reste de l'écran reste : fresques, couleur, jauge
+  it("stops the demo for good, drops the draft it left and leaves everything else on screen", () => {
     const building = pickColor(withDraft(3), DEMO_COLOR.green);
     const taken = takeOver(building);
 
     expect(building.hasVisitorActed).toBe(false);
     expect(taken.hasVisitorActed).toBe(true);
-    expect({ ...taken, hasVisitorActed: false }).toEqual(building);
+    expect(taken.draft.size).toBe(0);
+    expect({ ...taken, hasVisitorActed: false, draft: building.draft }).toEqual(building);
   });
 
-  // Les gestes suivants n'y changent rien : la démo ne repart pas
-  it("never starts the demo again", () => {
-    const taken = takeOver(initialDemo());
+  // « Dessiner · n » ne compte que les cases du visiteur : sa première case fait 1, quel que soit le brouillon de la démo
+  it("counts only the cells the visitor touched, whatever the demo had drafted", () => {
+    const touched = touchCell(takeOver(withDraft(4)), 40, NOW);
 
-    expect(takeOver(touchCell(taken, 7, NOW)).hasVisitorActed).toBe(true);
+    expect([...touched.draft.keys()]).toEqual([40]);
+  });
+
+  // Les gestes suivants n'y changent rien : la démo ne repart pas, et le brouillon du visiteur reste
+  it("never starts the demo again, nor drops what the visitor drafted", () => {
+    const taken = takeOver(initialDemo());
+    const drafting = touchCell(taken, 7, NOW);
+
+    expect(takeOver(drafting).hasVisitorActed).toBe(true);
+    expect(takeOver(drafting)).toBe(drafting);
     expect(takeOver(taken)).toBe(taken);
   });
 });

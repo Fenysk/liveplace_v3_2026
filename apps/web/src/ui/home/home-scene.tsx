@@ -2,7 +2,7 @@
 // montre la vraie interface mobile. Chaque pixel envoyé s'envole de sa case sur le téléphone à SA case sur le stream. La démo
 // joue seule jusqu'au premier geste du visiteur. Tout reste dans la page : aucune connexion, aucune requête.
 
-import { useCallback, useEffect, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { FakeStream } from "./fake-stream";
 import type { LaunchedPixel } from "./home-demo";
 import { motionPlan } from "./home-script";
@@ -32,6 +32,25 @@ const useSceneEffects = () => {
   return { scene, layer, effects };
 };
 
+// Un geste n'importe où dans la scène, dès l'appui : un clic sur le stream, un glissement, la molette, le clavier. Le clic sur
+// une case, une couleur ou l'envoi arrête déjà la démo ; les autres ne passent que par ici.
+const SCENE_GESTURES = ["pointerdown", "wheel", "keydown", "focusin"] as const;
+
+const useSceneGesture = (
+  scene: RefObject<HTMLDivElement | null>,
+  isListening: boolean,
+  onGesture: () => void,
+): void => {
+  useEffect(() => {
+    const element = scene.current;
+    if (!element || !isListening) return;
+    const controller = new AbortController();
+    for (const type of SCENE_GESTURES)
+      element.addEventListener(type, onGesture, { passive: true, signal: controller.signal });
+    return () => controller.abort();
+  }, [scene, isListening, onGesture]);
+};
+
 export const HomeScene = ({ isMotionReduced }: { isMotionReduced: boolean }) => {
   const isMounted = useIsMounted();
   const isPageVisible = useIsPageVisible();
@@ -49,8 +68,10 @@ export const HomeScene = ({ isMotionReduced }: { isMotionReduced: boolean }) => 
     [plan.flies, effects, actions],
   );
 
+  const isAutoplaying = plan.autoplays && isMounted && !state.hasVisitorActed;
+  useSceneGesture(scene, isAutoplaying, actions.visitorAct);
   useAutoplay({
-    isEnabled: plan.autoplays && isMounted && !state.hasVisitorActed,
+    isEnabled: isAutoplaying,
     read: actions.read,
     show: (step) => {
       const target = scene.current && stepTarget(scene.current, step);
