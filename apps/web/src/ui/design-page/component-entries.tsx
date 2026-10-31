@@ -27,6 +27,7 @@ import { Segmented, type SegmentedOption } from "../design/segmented";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
+import { SupportButton } from "../design/support";
 import { TextField } from "../design/text-field";
 import { TimeCharts } from "../design/time-charts";
 import { TwitchGlyph } from "../design/twitch";
@@ -352,6 +353,9 @@ export const ButtonEntry = () => (
           <Button {...props} />
         </StateRow>
       ))}
+      <StateRow name="Soutenir LivePlace" detail="Rose clair, un lien vers Ko-fi (entrée Soutenir).">
+        <SupportButton />
+      </StateRow>
     </Block>
     <Block title="Icône seule">
       {ICON_BUTTONS.map(({ name, props }) => (
@@ -359,6 +363,9 @@ export const ButtonEntry = () => (
           <Button {...props} />
         </StateRow>
       ))}
+      <StateRow name="Soutenir LivePlace" detail="Le cœur seul, rose clair : son titre le nomme.">
+        <SupportButton hasLabel={false} />
+      </StateRow>
     </Block>
     <MorphingScenes />
   </Entry>

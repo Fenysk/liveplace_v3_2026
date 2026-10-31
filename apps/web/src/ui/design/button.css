@@ -78,6 +78,18 @@
   }
 }
 
+/* Soutenir LivePlace (CDC 2026) : rose clair, encre rose foncé */
+.lp-btn--support {
+  background: var(--support-bg);
+  color: var(--support-ink);
+}
+
+@media (hover: hover) {
+  .lp-btn--support:hover {
+    background: var(--support-bg-hover);
+  }
+}
+
 .lp-btn--ghost {
   background: transparent;
 }

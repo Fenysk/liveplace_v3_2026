@@ -1,0 +1,131 @@
+/* La pill Soutenir (CDC 2026, Soutenir LivePlace), en bas à gauche d'une fresque et de son archive, pour tous. Chargé après
+   pill.css, pill-landscape.css, pill-hinge.css et bubble.css : chaque règle y reprend la main sur la leur. Elle ne change
+   aucune zone du canvas (canvas-zone.css) : le cadrage d'arrivée ne la lit pas. */
+
+/* Au PC, au bord de la bande de la publicité (--lp-ad-side, à 0 tant qu'elle n'existe pas), comme la colonne du classement ;
+   une encoche sur le côté se contourne */
+.lp-floating[data-dock="bl"] {
+  bottom: var(--space-4);
+  left: calc(var(--lp-ad-side, 0px) + max(var(--space-4), env(safe-area-inset-left)));
+}
+
+/* Le toast se pose au-dessus d'elle partout où il est en bas à gauche (pill.css) : sa hauteur, un contrôle et ses deux marges,
+   et un espace */
+html:has(.lp-floating[data-dock="bl"]) {
+  --lp-toast-lift: calc(var(--control-size) + 3 * var(--space-2));
+}
+
+/* En Dessin, elle s'efface en fondu, puis quitte le clavier et les lecteurs d'écran ; pendant un déplacement, le PC l'efface avec
+   toutes les pills (pill.css) */
+html[data-drafting] .lp-floating[data-dock="bl"] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--lp-dur-fade) ease,
+    visibility 0s linear var(--lp-dur-fade);
+}
+
+/* Écran étroit : au-dessus de la barre du bas, à gauche, à la hauteur de Recentrer (pill.css) */
+@media (max-width: 640px) {
+  .lp-floating[data-dock="bl"] {
+    left: var(--space-2);
+    bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+      var(--space-2)
+    );
+  }
+}
+
+/* Sur mobile, elle s'efface aussi pendant un geste de vue, contrairement à la barre du bas ; la visibilité ne part qu'une fois
+   le fondu fini, et revient d'un coup avec le fondu normal des pills */
+@media (max-width: 640px), (pointer: coarse) {
+  html[data-panning] .lp-floating[data-dock="bl"] {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      visibility 0s linear var(--lp-dur-fade);
+  }
+
+  html[data-panning] .lp-floating[data-dock="bl"] > .lp-pill {
+    pointer-events: none;
+  }
+}
+
+/* Un téléphone en paysage : en bas à gauche de l'écran, contre l'encoche latérale, là où l'inspection monte aussi */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 640px),
+  (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  html .lp-floating[data-dock="bl"] {
+    left: var(--lp-land-left);
+    bottom: var(--lp-land-bottom);
+  }
+}
+
+/* Un double écran côte à côte : sur le second, avec les commandes, au-dessus de leur colonne et contre le bord (pill-hinge.css) */
+@media (horizontal-viewport-segments: 2) and (pointer: coarse) {
+  html .lp-floating[data-dock="bl"] {
+    left: auto;
+    right: var(--lp-land-right, var(--space-2));
+    bottom: calc(var(--lp-land-bottom, var(--space-2)) + 2 * var(--control-size) + 4 * var(--space-2));
+  }
+}
+
+/* Une feuille ou une bulle prend sa place sur mobile : l'inspection couvre toute la largeur au-dessus de la barre du bas, et la
+   bulle qui vise la barre se pose juste au-dessus d'elle. La pill s'efface le temps de l'une ou de l'autre. */
+@media (max-width: 640px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  html:has(.lp-bubble--pointing[data-aimed-dock="bc"]:not(.is-hidden)) .lp-floating[data-dock="bl"],
+  html:has(.lp-floating[data-dock="cr"] > .lp-pill:not(.is-hidden)) .lp-floating[data-dock="bl"] {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--lp-dur-fade) ease,
+      visibility 0s linear var(--lp-dur-fade);
+  }
+}
+
+/* Le conseil de première visite, sans cible, se posait là où elle est (bubble.css, pill-landscape.css) : il monte d'une pill et
+   d'un espace au-dessus d'elle, tant qu'elle est là (pas en Dessin) */
+@media (max-width: 640px) {
+  html:not([data-drafting]):has(.lp-floating[data-dock="bl"])
+    .lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+    bottom: calc(
+      max(var(--space-2), env(safe-area-inset-bottom)) +
+      var(--lp-bottom-bar, calc(var(--control-size) + 2 * var(--space-2))) +
+      var(--space-2) +
+      var(--control-size) +
+      3 *
+      var(--space-2)
+    );
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 640px),
+  (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  html:not([data-drafting]):has(.lp-floating[data-dock="bl"])
+    .lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+    bottom: calc(
+      100dvh -
+      var(--lp-zone-h, 100dvh) +
+      var(--lp-zone-bottom) +
+      var(--control-size) +
+      3 *
+      var(--space-2)
+    );
+  }
+}
+
+/* Un écran tactile large : la pill est à un --space-4 du bord quand la zone du canvas finit à un --space-2 : un espace de plus */
+@media (pointer: coarse) and (min-width: 560px) and (min-height: 560px) {
+  html:not([data-drafting]):has(.lp-floating[data-dock="bl"])
+    .lp-floating.lp-bubble:not(.lp-bubble--pointing) {
+    bottom: calc(
+      100dvh -
+      var(--lp-zone-h, 100dvh) +
+      var(--lp-zone-bottom) +
+      var(--control-size) +
+      4 *
+      var(--space-2)
+    );
+  }
+}

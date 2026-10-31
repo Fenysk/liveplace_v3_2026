@@ -416,6 +416,22 @@
   gap: var(--space-2);
 }
 
+/* Au bas d'un téléphone : la pill Soutenir à gauche, Recentrer à droite, à la même hauteur (support.css, pill.css) */
+.design-support-row {
+  --control-size: var(--control-size-touch);
+  width: 359px;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Un téléphone de 320 px : 304 px sous ses marges */
+.design-support-row--narrow {
+  width: 304px;
+}
+
 /* Les régions d'un toast pour un lecteur d'écran, rendues visibles pour se lire : leur rôle, puis ce qu'elles disent */
 .design-announcement {
   display: grid;

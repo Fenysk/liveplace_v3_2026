@@ -23,6 +23,7 @@ import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
 import type { ProfileUser } from "../ui/design/profile";
+import { SupportPill } from "../ui/design/support";
 import { ThemePill } from "../ui/design/theme-pill";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, SIDE_COLUMN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
@@ -308,6 +309,8 @@ const GamePage = () => {
       )}
       {/* Le store d'un canvas qu'on quitte (le streamer vient d'archiver) ne dit plus le thème de celui-ci. */}
       <CanvasThemePill canvas={stores?.canvasId === canvasId ? stores.canvas : undefined} loaded={theme} />
+      {/* CDC 2026, Soutenir LivePlace : pour tous, dès le rendu serveur, avant les pills et les bulles qui la recouvrent */}
+      <SupportPill />
       {stores ? (
         // CDC 2026, Toasts : un seul à la fois, pour toute la page.
         <ToastProvider>

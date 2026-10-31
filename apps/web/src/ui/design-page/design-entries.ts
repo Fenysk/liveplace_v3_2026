@@ -56,6 +56,7 @@ const ENTRIES_BY_SLUG = {
   inspection: { title: "Inspection", chapterId: "game", place: "centre droite" },
   dessin: { title: "Dessin", chapterId: "game", place: "bas centre" },
   pratique: { title: "Pratique", chapterId: "game", place: "bas droite" },
+  "pill-soutenir": { title: "Soutenir", chapterId: "game", place: "bas gauche" },
   "message-seul": { title: "Message seul", chapterId: "game", place: "centre" },
 
   "fenetre-canvas": { title: "Fresque", chapterId: "window" },

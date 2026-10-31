@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -102,6 +104,57 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
       expect(settings).toContain(`title="${words.appearance}"`);
       expect(settings.match(/<button/g)).toHaveLength(2);
     }
+  });
+
+  // CDC 2026, Soutenir LivePlace : en haut à droite, avant la langue et l'apparence, un lien vers Ko-fi dans un nouvel onglet. Le
+  // serveur écrit les deux formes (le texte et le cœur seul), home.css montre celle qui tient sur un téléphone.
+  it("writes Support LivePlace first among the settings, a Ko-fi link in a new tab, in both forms", () => {
+    for (const [locale, text] of [
+      ["fr", "Soutenir LivePlace"],
+      ["en", "Support LivePlace"],
+    ] as const) {
+      const html = serverHtml(locale);
+      const settings = html.slice(html.indexOf('<div class="lp-home-settings">'), html.indexOf("<h1"));
+      const links = settings.match(/<a [^>]*href="https:\/\/ko-fi\.com\/fenysk"[^>]*>/g) ?? [];
+
+      expect(links).toHaveLength(2);
+      for (const link of links) {
+        expect(link).toContain('target="_blank"');
+        expect(link).toContain('rel="noopener noreferrer"');
+        expect(link).toContain("lp-btn--support");
+      }
+      expect(settings).toContain(`<div class="lp-home-support lp-home-support--label">`);
+      expect(settings).toContain(`<div class="lp-home-support lp-home-support--icon">`);
+      expect(settings).toContain(`<span>${text}</span>`);
+      expect(settings).toMatch(
+        new RegExp(`title="${text}"[^>]*aria-label="${text}"|aria-label="${text}"[^>]*title="${text}"`),
+      );
+      expect(settings.indexOf("lp-home-support--label")).toBeLessThan(settings.indexOf('role="radiogroup"'));
+      expect(settings.indexOf("lp-home-support--icon")).toBeLessThan(settings.indexOf('role="radiogroup"'));
+      expect(settings.indexOf("lp-home-support--icon")).toBeLessThan(
+        settings.indexOf("lp-home-locale--cycle"),
+      );
+      expect(html.indexOf("lp-home-wordmark")).toBeLessThan(html.indexOf("lp-home-support"));
+    }
+  });
+
+  // Sur un téléphone, le cœur seul : home.css cache le texte et montre le cœur dans la même requête que la langue
+  it("shows only the heart on a phone, with the same container query as the language", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(".lp-home-locale--cycle, .lp-home-support--icon { display: none; }");
+    expect(css).toContain(
+      "@container lp-home (max-width: 640px) { .lp-home-locale--choices, .lp-home-support--label { display: none; } .lp-home-locale--cycle, .lp-home-support--icon { display: block; } }",
+    );
+  });
+
+  // À 320 px, le mot-symbole et trois contrôles de 44 px ne tiennent sur une ligne que si les réglages se rapprochent
+  it("brings the three controls closer on a 320 px phone, so the wordmark and they fit on one line", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(
+      "@container lp-home (max-width: 320px) { .lp-home-settings { gap: var(--space-1); } }",
+    );
   });
 
   // Le lecteur : un fond uni et un streamer filmé en silhouette, une tête ronde et des épaules, rien d'autre (ni décor, ni visage)

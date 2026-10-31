@@ -16,6 +16,7 @@ import { CanvasRecovering, useIsCanvasRecovering } from "../canvas/canvas-recove
 import { useIsCanvasDiscarded, useIsCanvasReopened } from "../canvas/canvas-status";
 import { useOwnerProfile } from "../canvas/owner-profile";
 import { PixelCanvas } from "../canvas/pixel-canvas";
+import { SupportPill } from "../design/support";
 import { ToastProvider, useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
 import { browserClock, getBrowserStorage } from "../draft/browser-draft";
@@ -187,6 +188,8 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
           ownerName={owner.displayName}
         />
       )}
+      {/* CDC 2026, Soutenir LivePlace : sur une archive aussi, pour tous */}
+      <SupportPill />
       <ToastProvider>
         <ArchiveControls archive={archive} stores={stores} isCompact={isCompact} />
       </ToastProvider>

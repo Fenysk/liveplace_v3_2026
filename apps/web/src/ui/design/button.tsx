@@ -4,8 +4,9 @@ import type { ComponentType, MouseEvent } from "react";
 import { classNames } from "./class-names";
 import { useLabelMorph } from "./use-label-morph";
 
-// `twitch` : aux couleurs de Twitch, pour Se connecter seulement (SignInButton).
-export type ButtonVariant = "primary" | "danger" | "ghost" | "twitch";
+// `twitch` : aux couleurs de Twitch, pour Se connecter seulement (SignInButton). `support` : rose clair, pour Soutenir LivePlace
+// seulement (SupportButton).
+export type ButtonVariant = "primary" | "danger" | "ghost" | "twitch" | "support";
 
 // Une icône Lucide, ou le logo Twitch : le bouton la rend muette, son texte ou son titre la nomme.
 export type ButtonIcon = ComponentType<{ "aria-hidden"?: "true" }>;

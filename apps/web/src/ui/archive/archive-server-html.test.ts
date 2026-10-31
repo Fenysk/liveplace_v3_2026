@@ -100,6 +100,23 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
     expect(serverHtml.page()).not.toContain("lp-btn--live");
   });
 
+  // CDC 2026, Soutenir LivePlace : sur une archive aussi, pour tous (l'invité du rendu serveur n'a ni compte ni store), la pill en
+  // bas à gauche vers Ko-fi, dans un nouvel onglet ; hors du bandeau, qui est en haut à gauche
+  it("writes the Support pill for everyone, bottom left, outside the banner", () => {
+    const html = serverHtml.page();
+    const pill = html.slice(html.indexOf('data-dock="bl"'));
+    const link = /<a [^>]*href="https:\/\/ko-fi\.com\/fenysk"[^>]*>/.exec(pill)?.[0] ?? "";
+
+    expect(html.match(/data-dock="bl"/g)).toHaveLength(1);
+    expect(link).toContain('target="_blank"');
+    expect(link).toContain('rel="noopener noreferrer"');
+    expect(pill).toContain("Soutenir LivePlace");
+    expect(html.slice(0, html.indexOf('data-dock="bl"'))).not.toContain("ko-fi.com");
+    expect(serverHtml.banner(false)).not.toContain("ko-fi.com");
+    expect(serverHtml.banner(true)).not.toContain("ko-fi.com");
+    expect(serverHtml.notFound()).not.toContain("ko-fi.com");
+  });
+
   // Les pastilles de fond prennent leur couleur d'une classe : Noir et Blanc ont chacune la leur, Transparent le damier
   it("gives each background swatch its look by a class: a tone for black and white, the checker for transparent", () => {
     const swatches = [...serverHtml.window(true).matchAll(/<button[^>]*class="(lp-swatch[^"]*)"/g)].map(

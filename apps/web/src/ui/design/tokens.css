@@ -41,6 +41,11 @@
   --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
   --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
   --twitch-live-ink: #6d28d9;
+  /* Soutenir LivePlace (CDC 2026) : le rose clair du bouton, teinté de la même recette. L'encre fonce par rapport au rose de marque :
+     AA (4,5:1) sur le fond teinté, au survol compris. Le rose se distingue du rouge de --danger. */
+  --support-bg: color-mix(in srgb, var(--support) 16%, var(--pill-surface));
+  --support-bg-hover: color-mix(in srgb, var(--support) 24%, var(--pill-surface));
+  --support-ink: #a32a73;
   /* Les anneaux du classement : un dégradé discret par place, plus soutenu sur le fond clair */
   --rank-gold-from: #c8901a;
   --rank-gold-to: #f2cf6b;
@@ -87,6 +92,9 @@
   --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
   --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
   --twitch-live-ink: #bf94ff;
+  --support-bg: color-mix(in srgb, var(--support) 16%, var(--pill-surface));
+  --support-bg-hover: color-mix(in srgb, var(--support) 24%, var(--pill-surface));
+  --support-ink: #f28fca;
   --rank-gold-from: #e8b84a;
   --rank-gold-to: #f7e08a;
   --rank-silver-from: #b8bfcc;
@@ -128,6 +136,9 @@
   --twitch: #9146ff;
   --twitch-hover: #772ce8;
   --on-twitch: #ffffff;
+
+  /* Le rose de Soutenir LivePlace, le même dans les deux apparences : la base dont --support-bg tire son fond */
+  --support: #e0529c;
 
   /* Mouvement : une courbe douce, sans rebond, partout */
   --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);

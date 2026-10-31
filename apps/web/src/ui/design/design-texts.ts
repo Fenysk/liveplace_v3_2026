@@ -53,6 +53,9 @@ export const DESIGN_TEXTS = defineTexts({
   signInNote: { fr: "En te connectant, tu acceptes la ", en: "By signing in, you accept the " },
   privacyPolicy: { fr: "politique de confidentialité", en: "privacy policy" },
 
+  // Soutenir LivePlace (CDC 2026) : le bouton, qui mène à la page de dons de LivePlace, et sa pill.
+  supportLiveplace: { fr: "Soutenir LivePlace", en: "Support LivePlace" },
+
   copy: localized({ fr: (value: string) => `Copier ${value}`, en: (value) => `Copy ${value}` }),
   copyAction: { fr: "Copier", en: "Copy" },
   copied: { fr: "Copié", en: "Copied" },

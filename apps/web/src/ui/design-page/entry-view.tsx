@@ -41,6 +41,7 @@ import {
   CanvasPillEntry,
   DraftPillEntry,
   NoticeEntry,
+  SupportPillEntry,
   ThemePillEntry,
   ViewportPillEntry,
 } from "./game-entries";
@@ -97,6 +98,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   inspection: InspectionEntry,
   dessin: DraftPillEntry,
   pratique: ViewportPillEntry,
+  "pill-soutenir": SupportPillEntry,
   "message-seul": NoticeEntry,
 
   "fenetre-canvas": CanvasSettingsEntry,

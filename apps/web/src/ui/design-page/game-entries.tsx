@@ -13,6 +13,7 @@ import { Button } from "../design/button";
 import type { GaugeProps } from "../design/gauge";
 import { NoticePill } from "../design/pill";
 import type { ProfileUser } from "../design/profile";
+import { SupportButton, SupportPill } from "../design/support";
 import { ThemePill } from "../design/theme-pill";
 import { Toast } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
@@ -913,6 +914,115 @@ export const ViewportPillEntry = () => {
           detail="Un pliable déplié ou une tablette en portrait : la fresque garde toute la largeur."
         >
           <WithColumn nowMs={nowMs} isAbove />
+        </StateRow>
+      </Block>
+    </Entry>
+  );
+};
+
+// Au bas d'un téléphone : la pill Soutenir à gauche, Recentrer à droite, à la même hauteur au-dessus de la barre du bas.
+const SupportRow = ({ isNarrow = false }: { isNarrow?: boolean }) => (
+  <div className={isNarrow ? "design-support-row design-support-row--narrow" : "design-support-row"}>
+    <SupportPill isDocked={false} />
+    <RecenterPill />
+  </div>
+);
+
+export const SupportPillEntry = () => {
+  const nowMs = useNowMs();
+  return (
+    <Entry
+      slug="pill-soutenir"
+      components={["SupportButton", "SupportPill"]}
+      file="ui/design/support.tsx"
+      note="Un don va à LivePlace, jamais à un streamer : le bouton ne se rattache à aucun compte ni à aucune fresque, et n'entre dans aucune de leurs pills. Un cœur et « Soutenir LivePlace », rose clair, l'encre rose foncé (le rose n'est pas le rouge de la modération) ; il ouvre la page Ko-fi de LivePlace dans un nouvel onglet. Sur une fresque, archive comprise, la pill est là pour tous, un invité compris ; elle s'efface en fondu en Dessin et pendant un déplacement de la vue, et n'existe pas dans la vue OBS. Sur l'accueil, le bouton est en haut à droite, avant la langue et l'apparence : le cœur seul sur un téléphone."
+      where="En bas à gauche, au bord de la bande de la publicité · sur mobile, au-dessus de la barre du bas, à gauche de Recentrer · en paysage, en bas à gauche de l'écran · double écran, sur le second, avec les commandes"
+    >
+      <Block title="États">
+        <StateRow
+          name="Le bouton"
+          detail="Un lien vers Ko-fi, dans un nouvel onglet : rose clair, un peu plus soutenu au survol."
+        >
+          <SupportButton />
+        </StateRow>
+        <StateRow
+          name="Le cœur seul"
+          detail="Sur l'accueil, sur un téléphone, là où le libellé ne tient pas à côté de « LivePlace » : son titre le nomme."
+        >
+          <SupportButton hasLabel={false} />
+        </StateRow>
+        <StateRow name="La pill" detail="Pour tous : un invité la voit comme le streamer.">
+          <SupportPill isDocked={false} />
+        </StateRow>
+        <StateRow
+          name="Un toast au-dessus"
+          detail="Au PC, les toasts se posent en bas à gauche, au-dessus d'elle : aucun ne la recouvre."
+        >
+          <div className="design-bubble-stack design-bubble-stack--start">
+            <Toast message={{ id: 1, tone: "success", text: "Délai enregistré : 10 s" }} isDocked={false} />
+            <SupportPill isDocked={false} />
+          </div>
+        </StateRow>
+      </Block>
+      <Block title="Sur mobile">
+        <StateRow
+          name="À gauche de Recentrer"
+          detail="Le libellé complet tient à côté de Recentrer, au-dessus de la barre du bas. Le toast est en haut : il ne la touche pas."
+        >
+          <SupportRow />
+        </StateRow>
+        <StateRow name="320 px" detail="Le libellé tient toujours à côté de Recentrer.">
+          <SupportRow isNarrow />
+        </StateRow>
+        <StateRow
+          name="Pendant un déplacement de la fresque"
+          detail="Elle s'efface en fondu avec le haut tant que la vue bouge, contrairement à la barre du bas, et revient dès que le doigt se lève."
+          isDemo
+        >
+          <PanFadeDemo>
+            <SupportRow />
+          </PanFadeDemo>
+        </StateRow>
+      </Block>
+      <Block
+        title="Écrans à charnière"
+        note="Elle suit les commandes : sur le second écran, jamais sur la charnière."
+      >
+        <StateRow name="Côte à côte" detail="Au-dessus de la colonne, contre le bord.">
+          <InHinge
+            canvas={<CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />}
+            controls={
+              <div className="design-bubble-stack design-bubble-stack--end">
+                <SupportPill isDocked={false} />
+                <InLandscape>
+                  <DraftPill
+                    state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+                    actions={DRAFT_ACTIONS}
+                    isCompact
+                    isSidePanel
+                    isDocked={false}
+                  />
+                </InLandscape>
+              </div>
+            }
+          />
+        </StateRow>
+        <StateRow name="L'un sur l'autre" detail="Dans l'écran du bas, au-dessus de la barre du bas.">
+          <InHinge
+            isStacked
+            canvas={<CanvasPill owner={SAMPLE_OWNER} isCompact isDocked={false} />}
+            controls={
+              <div className="design-bubble-stack design-bubble-stack--start">
+                <SupportPill isDocked={false} />
+                <DraftPill
+                  state={{ kind: "view", gauge: gaugeAt(nowMs, 6), canClaim: false }}
+                  actions={DRAFT_ACTIONS}
+                  isCompact
+                  isDocked={false}
+                />
+              </div>
+            }
+          />
         </StateRow>
       </Block>
     </Entry>

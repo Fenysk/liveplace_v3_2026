@@ -19,7 +19,7 @@ export const HomeEntry = () => {
       slug="accueil"
       components={["HomeContent"]}
       file="ui/home/home-page.tsx"
-      note="La page d'accueil `/` : « LivePlace » en lettres en haut à gauche, et en haut à droite les réglages du visiteur, la langue (les deux choix, ou un bouton « FR » sur un écran étroit) et le bouton d'apparence de la pill Compte, puis une phrase, « Lancer ma fresque », et une scène. Un écran montre un faux stream (des formes et des squelettes, un streamer en silhouette, la fresque du stream cernée d'un trait fin, aucun texte), et devant lui un téléphone montre la vraie interface mobile. Au PC, le téléphone est un iPhone simple : un îlot, une barre d'état, une barre d'accueil, un écran uni, et l'interface commence sous la barre d'état. À la souris, la case visée sur sa fresque prend le trait double du jeu. Chaque pixel envoyé s'envole de sa case à SA case sur le stream. Tout reste dans la page : aucune connexion, aucune requête."
+      note="La page d'accueil `/` : « LivePlace » en lettres en haut à gauche, et en haut à droite les réglages du visiteur, Soutenir LivePlace (un cœur et le texte, le cœur seul sur un écran étroit), la langue (les deux choix, ou un bouton « FR » sur un écran étroit) et le bouton d'apparence de la pill Compte, puis une phrase, « Lancer ma fresque », et une scène. Un écran montre un faux stream (des formes et des squelettes, un streamer en silhouette, la fresque du stream cernée d'un trait fin, aucun texte), et devant lui un téléphone montre la vraie interface mobile. Au PC, le téléphone est un iPhone simple : un îlot, une barre d'état, une barre d'accueil, un écran uni, et l'interface commence sous la barre d'état. À la souris, la case visée sur sa fresque prend le trait double du jeu. Chaque pixel envoyé s'envole de sa case à SA case sur le stream. Tout reste dans la page : aucune connexion, aucune requête."
     >
       <Block title="Rejouer" hasCount={false}>
         <StateRow
@@ -48,7 +48,7 @@ export const HomeEntry = () => {
       </Block>
       <Block
         title="Sur téléphone"
-        note="Le cadre du téléphone disparaît : le vrai téléphone du visiteur en tient lieu. « LivePlace » et les réglages tiennent sur la même ligne (la langue devient un bouton « FR », les deux choix ne tiennent pas à côté du mot-symbole), puis la phrase et le bouton, l'écran du stream, la fresque (21 px par case) et la feuille."
+        note="Le cadre du téléphone disparaît : le vrai téléphone du visiteur en tient lieu. « LivePlace » et les réglages tiennent sur la même ligne (Soutenir LivePlace n'a plus que son cœur, la langue devient un bouton « FR » : ni le texte ni les deux choix ne tiennent à côté du mot-symbole), puis la phrase et le bouton, l'écran du stream, la fresque (21 px par case) et la feuille."
       >
         <StateRow name="375 px" isDemo>
           <InHome width="phone">

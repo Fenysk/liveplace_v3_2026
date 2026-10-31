@@ -174,10 +174,10 @@
   transform: translateY(-50%);
 }
 
-/* Le toast (CDC 2026, Toasts) : en bas à gauche, par-dessus les autres pills */
+/* Le toast (CDC 2026, Toasts) : en bas à gauche, par-dessus les autres pills, au-dessus de la pill Soutenir (--lp-toast-lift, support.css) */
 .lp-floating[data-dock="toast"] {
   z-index: 3;
-  bottom: var(--space-4);
+  bottom: calc(var(--space-4) + var(--lp-toast-lift, 0px));
   left: var(--space-4);
 }
 

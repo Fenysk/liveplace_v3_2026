@@ -92,18 +92,29 @@
   gap: var(--space-2);
 }
 
-/* La langue : les deux choix côte à côte ; sur un écran étroit, ils ne tiennent pas à côté du mot-symbole, un bouton les remplace */
-.lp-home-locale--cycle {
+/* La langue : les deux choix côte à côte ; sur un écran étroit, ils ne tiennent pas à côté du mot-symbole, un bouton les remplace.
+   Soutenir LivePlace de même : le texte et le cœur, puis le cœur seul (CDC 2026, Soutenir LivePlace). */
+.lp-home-locale--cycle,
+.lp-home-support--icon {
   display: none;
 }
 
 @container lp-home (max-width: 640px) {
-  .lp-home-locale--choices {
+  .lp-home-locale--choices,
+  .lp-home-support--label {
     display: none;
   }
 
-  .lp-home-locale--cycle {
+  .lp-home-locale--cycle,
+  .lp-home-support--icon {
     display: block;
+  }
+}
+
+/* Un téléphone de 320 px : le cœur, « FR » et l'apparence se rapprochent, pour que le mot-symbole et eux tiennent sur une ligne */
+@container lp-home (max-width: 320px) {
+  .lp-home-settings {
+    gap: var(--space-1);
   }
 }
 

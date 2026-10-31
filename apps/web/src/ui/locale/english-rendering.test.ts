@@ -20,6 +20,7 @@ import { ViewportPill } from "../canvas/viewport-pill";
 import { ClaimButton } from "../design/gauge";
 import { Palette } from "../design/palette";
 import { Profile, type ProfileUser } from "../design/profile";
+import { SupportButton, SupportPill } from "../design/support";
 import { ThemePill } from "../design/theme-pill";
 import { SignInNote } from "../design/twitch";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
@@ -449,6 +450,17 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(markup).toContain('title="Zoom out"');
     expect(markup).toContain('title="Recenter the view"');
     expect(markup).not.toContain("%");
+  });
+
+  // CDC 2026, Soutenir LivePlace : la pill, et le cœur seul de l'accueil, disent la même chose en anglais
+  it("says the Support pill and its heart alone in English", () => {
+    const pill = inEnglish(createElement(SupportPill, { isDocked: false }));
+    const heart = inEnglish(createElement(SupportButton, { hasLabel: false }));
+
+    expect(pill).toContain("<span>Support LivePlace</span>");
+    expect(heart).toContain('title="Support LivePlace"');
+    expect(heart).toContain('aria-label="Support LivePlace"');
+    expect(`${pill}${heart}`).not.toMatch(/Soutenir/);
   });
 
   // La section Archives : le canvas en cours, ses dates, la ligne d'une archive

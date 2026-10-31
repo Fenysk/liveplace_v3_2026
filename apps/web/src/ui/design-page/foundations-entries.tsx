@@ -5,6 +5,7 @@ import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import {
   Brush,
   Eraser,
+  Heart,
   LocateFixed,
   LogOut,
   Minus,
@@ -29,7 +30,7 @@ type Usages = Readonly<Record<string, string>>;
 
 const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g, "$1-$2").toLowerCase();
 
-// Les 44 couleurs de `tokens.css`, rangées par famille.
+// Les couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le vide et la fresque",
@@ -117,6 +118,17 @@ const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
       twitchLiveInk: "Sa catégorie, plus foncée que le violet de marque en clair pour tenir le contraste AA.",
     },
   },
+  {
+    title: "Soutenir LivePlace",
+    usages: {
+      support:
+        "Le rose de Soutenir : la base dont le fond du bouton se teinte. Jamais le rouge de la modération.",
+      supportBg: "Le fond du bouton Soutenir LivePlace : le rose à 16 % sur la pill.",
+      supportBgHover: "Son survol : le rose à 24 %.",
+      supportInk:
+        "Son cœur et son texte, plus foncés que le rose de marque en clair, plus clairs en sombre : AA dans les deux.",
+    },
+  },
 ];
 
 const MEASURE_SETS: readonly { title: string; kind: SpecimenKind; usages: Usages }[] = [
@@ -188,6 +200,7 @@ const ICONS: readonly { icon: ButtonIcon; name: string }[] = [
   { icon: SunMoon, name: "sun-moon" },
   { icon: Sun, name: "sun" },
   { icon: Moon, name: "moon" },
+  { icon: Heart, name: "heart" },
 ];
 
 export const ColorTokensEntry = () => (

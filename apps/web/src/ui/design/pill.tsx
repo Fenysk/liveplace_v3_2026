@@ -6,10 +6,10 @@ import { classNames } from "./class-names";
 import { THEME_BAR_HEIGHT, TOP_LEFT_WIDTH, TOP_RIGHT_WIDTH } from "./top-bar";
 import { useMorph } from "./use-morph";
 
-// Le bord où la pill flotte : haut gauche, haut centre, haut droite, centre gauche, centre droite, bas droite, bas
-// centre. `toast` : en bas à gauche, là où aucune pill ne vit, et en haut au centre sur mobile, sous la pill Thème quand
-// elle y est (CDC 2026, Toasts).
-export type PillDock = "tl" | "tc" | "tr" | "cl" | "cr" | "br" | "bc" | "toast";
+// Le bord où la pill flotte : haut gauche, haut centre, haut droite, centre gauche, centre droite, bas gauche (Soutenir), bas
+// droite, bas centre. `toast` : en bas à gauche, au-dessus de la pill Soutenir, et en haut au centre sur mobile, sous la pill
+// Thème quand elle y est (CDC 2026, Toasts).
+export type PillDock = "tl" | "tc" | "tr" | "cl" | "cr" | "bl" | "br" | "bc" | "toast";
 
 // `row` : une ligne. `stack` : des lignes empilées. `rail` : une colonne large d'un seul contrôle. `title` : des lignes de
 // texte que la pill coupe plutôt que d'élargir (la pill Thème, Écart §8.1, JOURNAL 2026-10-07).
