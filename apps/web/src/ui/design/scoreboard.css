@@ -46,7 +46,7 @@
 
 .lp-rank {
   position: relative;
-  animation: lp-rank-in var(--lp-dur) var(--lp-ease);
+  animation: lp-rank-in var(--lp-dur-fade) var(--lp-ease);
 }
 
 @keyframes lp-rank-in {

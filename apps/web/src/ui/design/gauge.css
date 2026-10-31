@@ -200,7 +200,7 @@
   background: var(--claim);
   color: var(--on-claim);
   box-shadow: 0 0 14px color-mix(in srgb, var(--claim) 45%, transparent);
-  animation: lp-claim-in var(--lp-dur) var(--lp-ease);
+  animation: lp-claim-in var(--lp-dur-fade) var(--lp-ease);
 }
 
 .lp-claim::after {

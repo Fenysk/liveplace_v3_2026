@@ -183,7 +183,7 @@
 
 /* Il monte du bas en fondu, et y redescend en s'effaçant, au PC comme sur mobile */
 .lp-floating[data-dock="toast"] > .lp-pill {
-  animation: lp-toast-in var(--lp-dur) var(--lp-ease);
+  animation: lp-toast-in var(--lp-dur-fade) var(--lp-ease);
 }
 
 /* Au PC, pendant un déplacement du viewport, toutes les pills s'effacent en fondu (CDC 2026). Sur mobile (Écart §8.1, JOURNAL
