@@ -35,9 +35,12 @@
   --draft-outline-out: #10121c;
   --scrim: rgba(16, 18, 28, 0.4);
   --focus-ring: var(--accent);
+  /* Un seul niveau d'ombre, pour ce qui flotte au-dessus de la fresque : la fenêtre n'en a pas de plus grande, son voile
+     (--scrim) la détache. En sombre, le filet --pill-border dessine le bord. */
   --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
   /* Le live Twitch (Écart §4, JOURNAL 2026-10-07) : le bouton de la chaîne, teinté du violet de Twitch sur la pill.
-     L'encre fonce par rapport au violet de marque : AA (4,5:1) sur le fond teinté, au survol compris. */
+     L'encre est le violet de marque (#9146ff) foncé, de même teinte : AA (4,5:1) sur le fond teinté, 5,7:1 au repos en clair
+     et 5,1:1 au survol. Pas de rouge : --danger signale déjà la modération et l'attente (le point de l'avatar). */
   --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
   --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
   --twitch-live-ink: #6d28d9;
@@ -95,6 +98,8 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  /* Un contrôle est une pilule : le rond sépare l'interface des pixels carrés de la fresque. Une pill ou une bulle a le rayon
+     concentrique de son contrôle (contrôle / 2 + 8 px, --lp-radius-box) ; une carte ou une tuile, 6 px. */
   --radius-sm: 6px;
   --radius-pill: 999px;
   --control-size: 36px;

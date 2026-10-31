@@ -1,5 +1,7 @@
-// L'apparence (CDC 2026), clair ou sombre : auto au premier chargement, puis le choix retenu dans le navigateur
-// (JOURNAL 2026-09-24, renommée en 2026-10-07 : « thème » est celui du canvas).
+// L'apparence (CDC 2026), clair ou sombre : auto au premier chargement (`prefers-color-scheme`), puis le choix retenu dans
+// `localStorage`, parce qu'on joue souvent le soir pendant un stream (JOURNAL 2026-09-24, renommée en 2026-10-07 : « thème »
+// est celui du canvas). Au jeu, sur mobile, le choix n'est que dans Mon compte ; l'accueil le garde en haut à droite. La vue
+// OBS n'en dépend pas.
 
 export const APPEARANCE_CHOICES = ["auto", "light", "dark"] as const;
 export type AppearanceChoice = (typeof APPEARANCE_CHOICES)[number];

@@ -1,6 +1,7 @@
 // Le faux stream de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : l'écran d'un PC qui montre la disposition d'une page de stream,
-// en formes et en squelettes seulement. Aucun logo, aucun nom, aucun texte, aucune couleur de marque : on reconnaît un stream
-// sans qu'il en nomme un. Décoratif pour un lecteur d'écran.
+// en formes et en squelettes seulement : aucun chiffre, nom ni texte inventé qui passerait pour vrai, aucun logo, aucune couleur
+// de marque. On reconnaît un stream sans qu'il en nomme un ; seul le téléphone devant lui montre la vraie interface, jouable.
+// Décoratif pour un lecteur d'écran.
 
 import { useLayoutEffect, useRef } from "react";
 import { classNames } from "../design/class-names";

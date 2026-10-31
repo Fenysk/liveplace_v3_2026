@@ -1,5 +1,6 @@
-// Un nombre dont les chiffres défilent quand il change : seuls ceux qui diffèrent bougent, vers le haut
-// quand le nombre monte, vers le bas quand il descend. Au premier affichage, et avec `prefers-reduced-motion`, il change d'un coup.
+// Un nombre dont les chiffres défilent quand il change en direct : seuls ceux qui diffèrent bougent (`--lp-dur`, 340 ms), vers le
+// haut quand le nombre monte, vers le bas quand il descend. Rien ne s'anime au premier affichage ; avec `prefers-reduced-motion`,
+// il change d'un coup.
 // `value` est déjà au format de la langue : les séparateurs et les unités restent fixes. Un lecteur d'écran lit la valeur
 // finale, une fois ; les chiffres dessinés pour les yeux lui sont cachés.
 
