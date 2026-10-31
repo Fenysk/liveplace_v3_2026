@@ -102,7 +102,10 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
   // En haut à droite, en face du mot-symbole : la langue (les deux choix, et un bouton qui les remplace sur un téléphone) et l'apparence
   it("writes the language and the appearance across from the wordmark, before the sentence", () => {
     for (const [locale, words] of [
-      ["fr", { picker: "Langue", tip: "Langue : Français", code: "FR", appearance: "Apparence : Auto" }],
+      [
+        "fr",
+        { picker: "Langue", tip: "Langue\u00a0: Français", code: "FR", appearance: "Apparence\u00a0: Auto" },
+      ],
       ["en", { picker: "Language", tip: "Language: English", code: "EN", appearance: "Appearance: Auto" }],
     ] as const) {
       const html = serverHtml(locale);

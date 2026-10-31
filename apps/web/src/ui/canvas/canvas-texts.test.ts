@@ -26,15 +26,15 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
 
   // Les pixels refusés d'un envoi : un seul au singulier, le reste au pluriel, avec les milliers de la langue
   it("agrees the refused pixels, with the thousands of the language", () => {
-    expect(fr.refused(1)).toBe("1 pixel refusé : il reste dans le brouillon.");
-    expect(fr.refused(3)).toBe("3 pixels refusés : ils restent dans le brouillon.");
+    expect(fr.refused(1)).toBe("1 pixel refusé\u00a0: il reste dans le brouillon.");
+    expect(fr.refused(3)).toBe("3 pixels refusés\u00a0: ils restent dans le brouillon.");
     expect(en.refused(1)).toBe("1 pixel refused: it stays in the draft.");
     expect(en.refused(1200)).toBe("1,200 pixels refused: they stay in the draft.");
   });
 
   // Une réduction qui rapproche les dessins efface le brouillon des viewers, et la confirmation du streamer le dit (Écart §5.3, JOURNAL 2026-10-24)
   it("says a shrink wipes the drafts, to the viewer who loses one and to the streamer who confirms", () => {
-    expect(fr.draftWiped).toBe("La fresque a été réduite : ton brouillon a été effacé.");
+    expect(fr.draftWiped).toBe("La fresque a été réduite\u00a0: ton brouillon a été effacé.");
     expect(en.draftWiped).toBe("The canvas was shrunk: your draft was cleared.");
     expect(fr.closerSentence).toContain("Les dessins se rapprochent");
     expect(fr.closerSentence).toContain("brouillons en cours sont effacés");
@@ -55,7 +55,7 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(fr.cellsLabel({ width: 64, height: 36 })).toBe("64 × 36 cases");
     expect(en.cellsLabel({ width: 64, height: 36 })).toBe("64 × 36 cells");
     expect(fr.outsideSentence(1)).toBe(
-      "1 pixel sort du cadre : gardés, invisibles, ils reviennent quand la fresque s'agrandit.",
+      "1 pixel sort du cadre\u00a0: gardés, invisibles, ils reviennent quand la fresque s'agrandit.",
     );
     expect(fr.outsideSentence(2)).toContain("2 pixels sortent du cadre");
     expect(en.outsideSentence(1)).toBe(

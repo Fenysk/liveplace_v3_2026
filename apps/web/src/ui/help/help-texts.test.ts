@@ -5,14 +5,14 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   // Les textes validés par le propriétaire du produit, mot pour mot
   it("keeps the validated texts word for word", () => {
     expect(HELP_TEXTS.fr.trace).toBe("Active le tracé pour dessiner en glissant");
-    expect(HELP_TEXTS.fr.reward(20)).toBe("Une récompense t'attend : ta jauge passe à 21 pixels");
+    expect(HELP_TEXTS.fr.reward(20)).toBe("Une récompense t'attend\u00a0: ta jauge passe à 21 pixels");
     expect(HELP_TEXTS.fr.obs).toBe("Ajoute ta fresque à OBS ici");
     expect(HELP_TEXTS.fr.report).toBe("Un dessin a été signalé");
   });
 
   // La récompense dit son effet par le chiffre : la jauge actuelle + 1 ; sans les chiffres du canvas, elle n'en invente pas
   it("tells where the reward takes the gauge, without inventing a figure", () => {
-    expect(HELP_TEXTS.fr.reward(10)).toBe("Une récompense t'attend : ta jauge passe à 11 pixels");
+    expect(HELP_TEXTS.fr.reward(10)).toBe("Une récompense t'attend\u00a0: ta jauge passe à 11 pixels");
     expect(HELP_TEXTS.fr.reward(undefined)).toBe("Une récompense t'attend");
   });
 
@@ -25,7 +25,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
 
   // Les deux bulles de qui modère, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
   it("keeps the validated texts of the moderation bubbles word for word", () => {
-    expect(HELP_TEXTS.fr.moderatorWelcome).toBe("Tu modères cette fresque : tout est ici");
+    expect(HELP_TEXTS.fr.moderatorWelcome).toBe("Tu modères cette fresque\u00a0: tout est ici");
     expect(HELP_TEXTS.fr.moderationActions).toBe("Efface ses dessins ou bannis ce viewer ici");
   });
 
@@ -38,7 +38,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   it("keeps the validated texts of the Draft tips word for word", () => {
     expect(HELP_TEXTS.fr.palette).toBe("Touche ta couleur pour ouvrir la palette");
     expect(HELP_TEXTS.fr).not.toHaveProperty("keysRecent");
-    expect(HELP_TEXTS.fr.keys).toBe("Ctrl+Z : annule ton dernier trait");
+    expect(HELP_TEXTS.fr.keys).toBe("Ctrl+Z\u00a0: annule ton dernier trait");
     expect(HELP_TEXTS.fr.eyedropper).toBe("La pipette reprend une couleur de la fresque");
   });
 
@@ -53,14 +53,14 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   // Une charge toutes les 10 s : les chiffres du canvas, au singulier
   it("tells the refill of the canvas, in the singular for one pixel", () => {
     expect(HELP_TEXTS.fr.gauge({ refillMs: 10_000, refillCharges: 1 })).toBe(
-      "Ta jauge se recharge toute seule : 1 pixel toutes les 10 s",
+      "Ta jauge se recharge toute seule\u00a0: 1 pixel toutes les 10 s",
     );
   });
 
   // Plusieurs charges par recharge : au pluriel, avec le nombre
   it("tells the refill in the plural when one refill gives several pixels", () => {
     expect(HELP_TEXTS.fr.gauge({ refillMs: 30_000, refillCharges: 3 })).toBe(
-      "Ta jauge se recharge toute seule : 3 pixels toutes les 30 s",
+      "Ta jauge se recharge toute seule\u00a0: 3 pixels toutes les 30 s",
     );
   });
 

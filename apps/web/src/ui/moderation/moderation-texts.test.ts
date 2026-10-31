@@ -7,8 +7,8 @@ const en = MODERATION_TEXTS.en;
 describe("approvedToast (JOURNAL 2026-10-07)", () => {
   // Un dessin au singulier, plusieurs dessins au pluriel
   it("says one placement in the singular, several in the plural", () => {
-    expect(fr.approvedToast(1)).toBe("Dessin rétabli : il revient sur le stream");
-    expect(fr.approvedToast(3)).toBe("Dessins rétablis : ils reviennent sur le stream");
+    expect(fr.approvedToast(1)).toBe("Dessin rétabli\u00a0: il revient sur le stream");
+    expect(fr.approvedToast(3)).toBe("Dessins rétablis\u00a0: ils reviennent sur le stream");
     expect(en.approvedToast(1)).toBe("Drawing restored: it is back on the stream");
     expect(en.approvedToast(3)).toBe("Drawings restored: they are back on the stream");
   });

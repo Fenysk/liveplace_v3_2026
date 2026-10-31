@@ -92,7 +92,7 @@ describe("what a screen reader hears of the moderation window", () => {
     const markup = render({ request: { kind: "banAfterClear", author } });
 
     expect(markup).toContain(
-      '<span role="status" class="lp-visually-hidden">C&#x27;est effacé. Bannir aussi Troll42 ?</span>',
+      '<span role="status" class="lp-visually-hidden">C&#x27;est effacé. Bannir aussi Troll42\u202f?</span>',
     );
     expect(render({ request: { kind: "ban", author } })).toContain(
       '<span role="status" class="lp-visually-hidden"></span>',

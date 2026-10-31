@@ -42,9 +42,9 @@ describe("the toast of the saved background (CDC 2026, Toasts)", () => {
     const saved = (background: "transparent" | "black" | "white", locale: "fr" | "en") =>
       CANVAS_TEXTS[locale].backgroundSaved(DESIGN_TEXTS[locale].backgroundNames[background]);
 
-    expect(saved("transparent", "fr")).toBe("Fond enregistré : transparent");
-    expect(saved("black", "fr")).toBe("Fond enregistré : noir");
-    expect(saved("white", "fr")).toBe("Fond enregistré : blanc");
+    expect(saved("transparent", "fr")).toBe("Fond enregistré\u00a0: transparent");
+    expect(saved("black", "fr")).toBe("Fond enregistré\u00a0: noir");
+    expect(saved("white", "fr")).toBe("Fond enregistré\u00a0: blanc");
     expect(saved("black", "en")).toBe("Background saved: black");
     expect(saved("white", "en")).toBe("Background saved: white");
   });

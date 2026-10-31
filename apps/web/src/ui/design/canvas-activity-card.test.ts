@@ -14,7 +14,7 @@ describe("the owner of a canvas in the developer's activity (Écart §4, JOURNAL
     const notLive = renderToString(createElement(CanvasActivityOwner, { owner }));
 
     expect(live).toContain("lp-btn--live");
-    expect(live).toContain('title="Kalyss est en live sur Twitch : Art"');
+    expect(live).toContain('title="Kalyss est en live sur Twitch\u00a0: Art"');
     expect(notLive).not.toContain("lp-btn--live");
     expect(notLive).not.toContain("twitch.tv");
   });

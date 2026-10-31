@@ -43,8 +43,8 @@ describe("the Twitch button of a profile, when the person is live (Écart §4, J
     expect(html).toContain('href="https://www.twitch.tv/kalyss"');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
-    expect(html).toContain('title="Kalyss est en live sur Twitch : Art"');
-    expect(html).toContain('aria-label="Kalyss est en live sur Twitch : Art"');
+    expect(html).toContain('title="Kalyss est en live sur Twitch\u00a0: Art"');
+    expect(html).toContain('aria-label="Kalyss est en live sur Twitch\u00a0: Art"');
     expect(html).toContain('<span class="lp-live-category">Art</span>');
     expect(html).toContain("lp-btn--live");
     expect(html).not.toContain("lp-btn--ghost");

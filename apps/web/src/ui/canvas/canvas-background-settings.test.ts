@@ -174,11 +174,11 @@ describe("the image of the canvas in the settings (Écart §9.1, JOURNAL 2026-10
     const html = imageHtml({ opacity: 40 });
 
     expect(html).toMatch(
-      /<label[^>]*>Opacité de l&#x27;image<\/label><span class="lp-type-numeric">40 %<\/span>/,
+      /<label[^>]*>Opacité de l&#x27;image<\/label><span class="lp-type-numeric">40\u00a0%<\/span>/,
     );
     expect(html).toContain(`max="${BACKGROUND_IMAGE_OPACITY_STEPS.length - 1}"`);
-    expect(html).toContain('aria-valuetext="40 %"');
-    expect(html).toMatch(/<span>0 %<\/span><span>100 %<\/span>/);
+    expect(html).toContain('aria-valuetext="40\u00a0%"');
+    expect(html).toMatch(/<span>0\u00a0%<\/span><span>100\u00a0%<\/span>/);
   });
 
   // La vignette est décrite aux lecteurs d'écran, l'image elle-même est décorative
@@ -210,8 +210,8 @@ describe("the image of the canvas in the settings (Écart §9.1, JOURNAL 2026-10
   it("says the formats and the limits under the buttons, with an image or without", () => {
     for (const html of [imageHtml(), imageHtml({ imageUrl: null })]) {
       expect(html).toContain("PNG, JPEG ou WebP");
-      expect(html).toContain("2 Mo");
-      expect(html).toContain("2048 px");
+      expect(html).toContain("2\u00a0Mo");
+      expect(html).toContain("2048\u00a0px");
     }
   });
 

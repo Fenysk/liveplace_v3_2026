@@ -95,7 +95,7 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
     for (const html of [serverHtml.page(live), serverHtml.banner(false), serverHtml.banner(true)]) {
       expect(html).not.toMatch(INLINE_STYLE);
     }
-    expect(serverHtml.page(live)).toContain('title="Kalyss est en live sur Twitch : Art"');
+    expect(serverHtml.page(live)).toContain('title="Kalyss est en live sur Twitch\u00a0: Art"');
     expect(serverHtml.page(live)).toContain("lp-btn--live");
     expect(serverHtml.page()).not.toContain("lp-btn--live");
   });

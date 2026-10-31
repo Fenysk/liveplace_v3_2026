@@ -131,7 +131,7 @@ describe("the theme of the current canvas (Écart §8.1, JOURNAL 2026-10-07)", (
 
   // Chaque échec de l'enregistrement a sa phrase, courte ; la session expirée le dit, les autres invitent à réessayer
   it("gives each failure of the saving its short sentence, asking to try again unless the session expired", () => {
-    expect(fr.themeFailure("not_active")).toBe("La fresque en cours a changé : son thème est rechargé.");
+    expect(fr.themeFailure("not_active")).toBe("La fresque en cours a changé\u00a0: son thème est rechargé.");
     expect(fr.themeFailure("failed")).toBe("Le thème n'a pas pu être enregistré. Réessaie dans un instant.");
     expect(fr.themeFailure("network")).toBe(fr.themeFailure("failed"));
     expect(fr.themeFailure("unauthenticated")).toBe("Ta session a expiré. Reconnecte-toi, puis réessaie.");
@@ -185,7 +185,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
   // Rouvrir : le titre de l'archive, et ce que devient le canvas actuel, sans jargon
   it("tells what reopening does, naming the archive by its title", () => {
     expect(fr.reopenSentence("Printemps")).toBe(
-      "« Printemps » remplace ta fresque actuelle, qui part dans les archives.",
+      "«\u00a0Printemps\u00a0» remplace ta fresque actuelle, qui part dans les archives.",
     );
     expect(en.reopenSentence("Spring")).toBe(
       "“Spring” replaces your current canvas, which moves to the archives.",
@@ -194,7 +194,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
 
   // Supprimer : le titre, et pas un mot du lien
   it("tells an archive will be deleted for good, without a word about its link", () => {
-    expect(fr.discardSentence("Printemps")).toBe("« Printemps » sera supprimé pour de bon.");
+    expect(fr.discardSentence("Printemps")).toBe("«\u00a0Printemps\u00a0» sera supprimé pour de bon.");
     expect(fr.discardSentence("Printemps")).not.toContain("lien");
     expect(en.discardSentence("Spring")).toBe("“Spring” will be deleted for good.");
     expect(en.discardSentence("Spring")).not.toContain("link");
@@ -202,7 +202,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
 
   // Le champ du thème montre un exemple
   it("gives the theme field an example as its placeholder", () => {
-    expect(fr.themePlaceholder).toBe("Ex. : Halloween");
+    expect(fr.themePlaceholder).toBe("Ex.\u00a0: Halloween");
     expect(en.themePlaceholder).toBe("E.g. Halloween");
   });
 });
@@ -288,7 +288,7 @@ describe("datesTitle and switchFailure (Écart §15, JOURNAL 2026-10-06)", () =>
   // Une liste périmée se recharge d'elle-même : la phrase le dit, sans consigne pour la fenêtre ni la section
   it("says the list changed and is up to date when it was stale, without telling to close and reopen", () => {
     for (const reason of ["not_active", "not_archive"] as const) {
-      expect(fr.switchFailure(reason)).toBe("La liste a changé : la voici à jour.");
+      expect(fr.switchFailure(reason)).toBe("La liste a changé\u00a0: la voici à jour.");
       expect(fr.switchFailure(reason)).not.toContain("Ferme");
     }
   });
@@ -296,7 +296,7 @@ describe("datesTitle and switchFailure (Écart §15, JOURNAL 2026-10-06)", () =>
   // Sans réponse du serveur, il a pu finir : la phrase ne dit plus que rien n'a bougé, et envoie vérifier la liste
   it("does not say nothing moved when the server did not answer: it may have finished, so the list is to be checked", () => {
     expect(fr.switchFailure("network")).toBe(
-      "Pas de réponse du serveur. La liste est rechargée : vérifie-la avant de réessayer.",
+      "Pas de réponse du serveur. La liste est rechargée\u00a0: vérifie-la avant de réessayer.",
     );
     expect(fr.switchFailure("network")).not.toContain("rien n'a bougé");
     expect(en.switchFailure("network")).not.toContain("nothing moved");
@@ -359,7 +359,7 @@ describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () =
 describe("ownerToast (Écart §15, JOURNAL 2026-10-06)", () => {
   // Le streamer qui archive sait où sont ses viewers ; rouvrir et supprimer gardent leurs mots
   it("tells the streamer who archived where the viewers are, and keeps the words of reopening and discarding", () => {
-    expect(fr.ownerToast.archive).toBe("Fresque archivée : tes viewers sont sur la nouvelle.");
+    expect(fr.ownerToast.archive).toBe("Fresque archivée\u00a0: tes viewers sont sur la nouvelle.");
     expect(fr.ownerToast.reopen).toBe("Archive rouverte");
     expect(fr.ownerToast.discard).toBe("Archive supprimée");
     expect(en.ownerToast.archive).toBe("Canvas archived: your viewers are on the new one.");

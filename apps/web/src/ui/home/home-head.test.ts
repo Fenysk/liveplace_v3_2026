@@ -21,7 +21,7 @@ const IMAGE_URLS = { fr: `${PUBLIC_URL}/og-home.png?v=1`, en: `${PUBLIC_URL}/og-
 
 const FRENCH_TITLE = "LivePlace · Une fresque de pixels pour ton stream Twitch";
 const FRENCH_DESCRIPTION =
-  "Une fresque de pixels collaborative pour ton stream Twitch : tes viewers dessinent depuis leur téléphone ou leur PC, et la fresque s'affiche sur ton stream avec OBS.";
+  "Une fresque de pixels collaborative pour ton stream Twitch\u00a0: tes viewers dessinent depuis leur téléphone ou leur PC, et la fresque s'affiche sur ton stream avec OBS.";
 
 type Tag = Record<string, unknown>;
 

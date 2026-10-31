@@ -30,7 +30,7 @@ describe("pill Compte", () => {
   it("porte Réglages avant la photo, et l'apparence après, sans bouton de langue, pour le streamer sur son canvas", () => {
     const markup = render({ onOpenSettings: doNothing });
     const settings = positionOf(markup, "Réglages");
-    const appearance = positionOf(markup, "Apparence : Auto");
+    const appearance = positionOf(markup, "Apparence\u00a0: Auto");
     const account = positionOf(markup, "Mon compte");
     expect(settings).toBeGreaterThanOrEqual(0);
     expect(account).toBeGreaterThan(settings);
@@ -60,7 +60,7 @@ describe("pill Compte", () => {
     const markup = render({ onOpenModeration: doNothing });
     const moderation = positionOf(markup, "Modération");
     expect(moderation).toBeGreaterThanOrEqual(0);
-    expect(positionOf(markup, "Apparence : Auto")).toBeGreaterThan(moderation);
+    expect(positionOf(markup, "Apparence\u00a0: Auto")).toBeGreaterThan(moderation);
     expect(markup).not.toContain("Réglages");
     expect(render()).not.toContain("Modération");
     const withDeveloper = render({ onOpenDeveloper: doNothing, onOpenModeration: doNothing });
@@ -79,7 +79,7 @@ describe("pill Compte", () => {
     const dot = markup.indexOf("lp-avatar-dot");
     expect(moderation).toBeGreaterThanOrEqual(0);
     expect(dot).toBeGreaterThan(moderation);
-    expect(dot).toBeLessThan(positionOf(markup, "Apparence : Auto"));
+    expect(dot).toBeLessThan(positionOf(markup, "Apparence\u00a0: Auto"));
     expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
     expect(positionOf(markup, "Mon compte")).toBeGreaterThanOrEqual(0);
     expect(markup).not.toContain("Mon compte ·");
@@ -88,10 +88,10 @@ describe("pill Compte", () => {
   // Tant que des signalements attendent, le streamer garde le point sur sa photo, qui le dit
   it("keeps the streamer's dot on the photo, with no Modération button", () => {
     const markup = render({ onOpenSettings: doNothing, pendingReports: 2 });
-    expect(positionOf(markup, "Apparence : Auto")).toBeGreaterThan(
+    expect(positionOf(markup, "Apparence\u00a0: Auto")).toBeGreaterThan(
       positionOf(markup, "Mon compte · 2 signalements en attente"),
     );
-    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Apparence : Auto"));
+    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Apparence\u00a0: Auto"));
     expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
     expect(markup).not.toContain("Modération");
   });
@@ -174,12 +174,12 @@ describe("pill Compte", () => {
   // Au PC, rien ne change : l'invité garde Se connecter et l'apparence, et la pill reste visible
   it("keeps the guest's Se connecter and appearance on a PC", () => {
     const markup = render({ identity: { kind: "guest" } });
-    expect(positionOf(markup, SIGN_IN)).toBeGreaterThan(positionOf(markup, "Apparence : Auto"));
+    expect(positionOf(markup, SIGN_IN)).toBeGreaterThan(positionOf(markup, "Apparence\u00a0: Auto"));
     expect(markup).toContain("Se connecter</span>");
     expect(markup).not.toContain("Se connecter avec Twitch");
     expect(markup).not.toContain("is-hidden");
     const unknown = render({ identity: { kind: "unknown" } });
-    expect(unknown).toContain("Apparence : Auto");
+    expect(unknown).toContain("Apparence\u00a0: Auto");
     expect(unknown).not.toContain("is-hidden");
   });
 
@@ -194,7 +194,7 @@ describe("pill Compte", () => {
 });
 
 // L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (Écart §14, JOURNAL 2026-10-07).
-const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence : Auto", "Mon compte", SIGN_IN];
+const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence\u00a0: Auto", "Mon compte", SIGN_IN];
 
 const orderOf = (markup: string): string[] =>
   ALL_TITLES.map((title) => ({ title, at: positionOf(markup, title) }))
@@ -209,48 +209,48 @@ describe("la disposition de la pill Compte (Écart §14, JOURNAL 2026-10-07)", (
       "Développeur",
       "Réglages",
       "Mon compte",
-      "Apparence : Auto",
+      "Apparence\u00a0: Auto",
     ]);
     expect(orderOf(render({ onOpenSettings: doNothing }))).toEqual([
       "Réglages",
       "Mon compte",
-      "Apparence : Auto",
+      "Apparence\u00a0: Auto",
     ]);
     expect(orderOf(render({ onOpenDeveloper: doNothing }))).toEqual([
       "Développeur",
       "Mon compte",
-      "Apparence : Auto",
+      "Apparence\u00a0: Auto",
     ]);
     expect(orderOf(render({ onOpenModeration: doNothing }))).toEqual([
       "Modération",
       "Mon compte",
-      "Apparence : Auto",
+      "Apparence\u00a0: Auto",
     ]);
     expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenModeration: doNothing }))).toEqual([
       "Développeur",
       "Modération",
       "Mon compte",
-      "Apparence : Auto",
+      "Apparence\u00a0: Auto",
     ]);
   });
 
   // Un joueur connecté sans ces icônes : l'apparence, puis la photo
   it("puts the appearance, then the photo for a signed-in player without those icons", () => {
-    expect(orderOf(render())).toEqual(["Apparence : Auto", "Mon compte"]);
+    expect(orderOf(render())).toEqual(["Apparence\u00a0: Auto", "Mon compte"]);
   });
 
   // Un invité : l'apparence, puis Se connecter sur PC ; sur mobile, Se connecter seul sans barre du bas, rien avec elle
   it("puts the appearance, then Se connecter for a guest on a PC, and Se connecter alone on mobile", () => {
     const guest = { identity: { kind: "guest" } } as const;
 
-    expect(orderOf(render(guest))).toEqual(["Apparence : Auto", SIGN_IN]);
+    expect(orderOf(render(guest))).toEqual(["Apparence\u00a0: Auto", SIGN_IN]);
     expect(orderOf(render({ ...guest, isCompact: true }))).toEqual([]);
     expect(orderOf(render({ ...guest, isCompact: true, hasBottomBar: false }))).toEqual([SIGN_IN]);
   });
 
   // Tant que le gateway n'a pas répondu : l'apparence seule
   it("shows the appearance alone while the identity is unknown", () => {
-    expect(orderOf(render({ identity: { kind: "unknown" } }))).toEqual(["Apparence : Auto"]);
+    expect(orderOf(render({ identity: { kind: "unknown" } }))).toEqual(["Apparence\u00a0: Auto"]);
   });
 
   // La langue se choisit dans Mon compte : aucun bouton de langue dans la pill, quel que soit le compte

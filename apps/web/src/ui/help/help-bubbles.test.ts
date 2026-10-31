@@ -51,10 +51,10 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
     expect(text("invite-link")).toContain("Partage aussi ce lien à tes viewers");
     expect(text("theme")).toContain("Donne un thème à ta fresque");
     expect(text("twitch-sync")).toContain("Reprends tes modérateurs Twitch ici");
-    expect(text("first-reward")).toContain("Une récompense t&#x27;attend : ta jauge passe à 21 pixels");
-    expect(text("moderator-welcome")).toContain("Tu modères cette fresque : tout est ici");
+    expect(text("first-reward")).toContain("Une récompense t&#x27;attend\u00a0: ta jauge passe à 21 pixels");
+    expect(text("moderator-welcome")).toContain("Tu modères cette fresque\u00a0: tout est ici");
     expect(text("moderation-actions")).toContain("Efface ses dessins ou bannis ce viewer ici");
-    expect(text("empty-gauge")).toContain("Ta jauge se recharge toute seule : 1 pixel toutes les 10 s");
+    expect(text("empty-gauge")).toContain("Ta jauge se recharge toute seule\u00a0: 1 pixel toutes les 10 s");
     expect(text("draft-trace")).toContain("Active le tracé pour dessiner en glissant");
     expect(text("draft-space")).toContain("Maintiens Espace et glisse pour tracer");
     expect(text("first-draft")).toContain(
@@ -62,7 +62,7 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
     );
     expect(text("palette")).toContain("Touche ta couleur pour ouvrir la palette");
     expect(text("keys")).not.toContain("1 à 5");
-    expect(text("keys")).toContain("Ctrl+Z : annule ton dernier trait");
+    expect(text("keys")).toContain("Ctrl+Z\u00a0: annule ton dernier trait");
     expect(text("eyedropper")).toContain("La pipette reprend une couleur de la fresque");
     for (const bubble of HELP_BUBBLES) expect(text(bubble)).toContain('aria-hidden="true"');
   });

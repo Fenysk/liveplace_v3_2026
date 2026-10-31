@@ -88,7 +88,7 @@ describe("the refusals of the gateway (Écart §14, JOURNAL 2026-10-07)", () => 
 describe("the button that leaves the Draw mode (Écart §9.3, JOURNAL 2026-10-13)", () => {
   // Il ferme le mode Dessin et garde le brouillon : sa bulle le dit, dans chaque langue
   it("tells that the draft is kept when the Draw mode closes", () => {
-    expect(fr.closeTip).toBe("Fermer le mode Dessin : le brouillon est gardé");
+    expect(fr.closeTip).toBe("Fermer le mode Dessin\u00a0: le brouillon est gardé");
     expect(en.closeTip).toBe("Close Draw mode: your draft is kept");
   });
 });

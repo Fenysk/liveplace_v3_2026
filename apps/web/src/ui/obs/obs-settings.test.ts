@@ -117,7 +117,7 @@ describe("le lien de Vue OBS, à coller dans OBS et à partager (Écart §8.1, J
     const html = settingsHtml();
     const fields = [...html.matchAll(/<button[^>]*class="lp-btn lp-copy lp-type-body"[^>]*>/g)];
 
-    expect(html).toContain("Ton lien : à coller dans OBS, à partager à tes viewers");
+    expect(html).toContain("Ton lien\u00a0: à coller dans OBS, à partager à tes viewers");
     expect(fields).toHaveLength(1);
     expect(html.match(/<span class="lp-copy-value">liveplace\.test\/kalyss<\/span>/g)).toHaveLength(1);
     expect(html).not.toContain("https://liveplace.test/kalyss</span>");

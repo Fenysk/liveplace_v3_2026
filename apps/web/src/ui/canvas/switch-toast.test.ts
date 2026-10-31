@@ -35,10 +35,10 @@ describe("switchToast (Écart §15, JOURNAL 2026-10-06)", () => {
   // Un brouillon non vide ne suit pas : il reste sur l'ancien canvas, et le toast le dit
   it("says a draft that is not empty stays on the old canvas", () => {
     expect(switchToast(live, archived, { ...context, draftSize: 1 }, "fr")).toBe(
-      "Kalyss a changé de fresque : ton brouillon reste sur l'ancienne.",
+      "Kalyss a changé de fresque\u00a0: ton brouillon reste sur l'ancienne.",
     );
     expect(switchToast(live, archived, { ...context, draftSize: 40 }, "fr")).toBe(
-      "Kalyss a changé de fresque : ton brouillon reste sur l'ancienne.",
+      "Kalyss a changé de fresque\u00a0: ton brouillon reste sur l'ancienne.",
     );
   });
 
