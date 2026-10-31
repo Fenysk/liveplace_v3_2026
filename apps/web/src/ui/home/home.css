@@ -80,12 +80,6 @@
   gap: var(--space-3);
 }
 
-/* Le mot-symbole : « LivePlace » en lettres. Sans pill, sans icône, sans forme. */
-.lp-home-wordmark {
-  margin: 0;
-  color: var(--ink);
-}
-
 .lp-home-settings {
   display: flex;
   align-items: center;
@@ -115,10 +109,11 @@
 }
 
 /* Large : la phrase à gauche, la scène à droite, l'écran du stream autour de 60 % de la fenêtre. Entre deux : la phrase
-   au-dessus, la scène dessous. */
+   au-dessus, la scène dessous. La colonne de gauche ne descend pas sous son contenu : le bouton (`nowrap`) ne passe jamais
+   sous la scène, quelle que soit la langue. */
 @container lp-home (min-width: 840px) {
   .lp-home-layout {
-    grid-template-columns: minmax(260px, 0.3fr) minmax(0, 0.7fr);
+    grid-template-columns: minmax(min-content, 0.3fr) minmax(0, 0.7fr);
     gap: clamp(32px, 3.5cqw, 56px);
   }
 }

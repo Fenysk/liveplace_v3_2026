@@ -46,9 +46,25 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
     expect(html).toMatch(
       /<a[^>]*class="[^"]*lp-btn--twitch[^"]*"[^>]*href="\/auth\/twitch"|<a[^>]*href="\/auth\/twitch"[^>]*class="[^"]*lp-btn--twitch/,
     );
-    expect(html).toContain("Lancer ma fresque");
+    expect(html).toContain("Lancer ma fresque avec Twitch");
     expect(html).toContain("politique de confidentialité");
     expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  // Écart §9.1 (JOURNAL 2026-10-31) : le bouton dit qu'il va chez Twitch, et son nom accessible est son texte visible, sans `title` qui le contredise
+  it("names the sign-in button by its visible text alone, and opens the privacy policy in the same tab", () => {
+    for (const [locale, text] of [
+      ["fr", "Lancer ma fresque avec Twitch"],
+      ["en", "Start my canvas with Twitch"],
+    ] as const) {
+      const html = serverHtml(locale);
+      const button = html.match(/<a [^>]*href="\/auth\/twitch"[^>]*>.*?<\/a>/)?.[0] ?? "";
+      const note = html.match(/<a [^>]*href="\/confidentialite"[^>]*>/)?.[0] ?? "";
+
+      expect(button.replace(/<[^>]*>/g, "")).toBe(text);
+      expect(button).not.toMatch(/\stitle=|aria-label/);
+      expect(note).not.toMatch(/target|rel=/);
+    }
   });
 
   // L'interface est bilingue : chaque texte a sa version anglaise
@@ -56,7 +72,7 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
     const html = serverHtml("en");
 
     expect(html).toContain("Your viewers draw on your stream.");
-    expect(html).toContain("Start my canvas");
+    expect(html).toContain("Start my canvas with Twitch");
     expect(html).toContain("privacy policy");
     expect(html).not.toMatch(/Tes viewers|Lancer ma fresque|confidentialité/);
   });
@@ -74,13 +90,13 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
   // « LivePlace » est un mot-symbole : du texte en haut à gauche, avant la phrase, sans pill, sans icône, sans aucune forme
   it("writes LivePlace as a plain wordmark at the top, with no pill, no icon and no shape", () => {
     const html = serverHtml();
-    const wordmarkStart = html.indexOf('<p class="lp-type-display lp-home-wordmark">');
+    const wordmarkStart = html.indexOf('<p class="lp-type-display lp-wordmark">');
     const block = html.slice(wordmarkStart, html.indexOf("</p>", wordmarkStart));
 
-    expect(html).toContain('<p class="lp-type-display lp-home-wordmark">LivePlace</p>');
+    expect(html).toContain('<p class="lp-type-display lp-wordmark">LivePlace</p>');
     expect(block.replace(/<[^>]*>/g, "").trim()).toBe("LivePlace");
     expect(block).not.toMatch(/lp-pill|<svg|<i[ >]|lp-home-logo|lp-home-mark/);
-    expect(html.indexOf("lp-home-wordmark")).toBeLessThan(html.indexOf("lp-home-monitor"));
+    expect(html.indexOf("lp-wordmark")).toBeLessThan(html.indexOf("lp-home-monitor"));
   });
 
   // En haut à droite, en face du mot-symbole : la langue (les deux choix, et un bouton qui les remplace sur un téléphone) et l'apparence
@@ -92,7 +108,7 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
       const html = serverHtml(locale);
       const settings = html.slice(html.indexOf('<div class="lp-home-settings">'), html.indexOf("<h1"));
 
-      expect(html.indexOf("lp-home-wordmark")).toBeLessThan(html.indexOf("lp-home-settings"));
+      expect(html.indexOf("lp-wordmark")).toBeLessThan(html.indexOf("lp-home-settings"));
       expect(settings).toContain(`role="radiogroup" aria-label="${words.picker}"`);
       expect(settings).toContain("Français");
       expect(settings).toContain("English");
@@ -129,6 +145,8 @@ describe("the words of the home page", () => {
 
   // « fresque », « dessin », « viewer » : jamais joueur, compte, utilisateur, multi-sélection (anglais : canvas, drawing, viewer)
   it("uses the words of the product", () => {
+    expect(HOME_TEXTS.fr.start).toBe("Lancer ma fresque avec Twitch");
+    expect(HOME_TEXTS.en.start).toBe("Start my canvas with Twitch");
     expect(HOME_TEXTS.fr.start).toContain("fresque");
     expect(HOME_TEXTS.fr.headline).toContain("viewers");
     expect(HOME_TEXTS.en.start).toContain("canvas");

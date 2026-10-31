@@ -297,17 +297,23 @@ export const SignInEntry = () => (
     note="Son logo officiel, et Se connecter à ses couleurs : texte blanc sur violet Twitch."
   >
     <Block title="États">
-      <StateRow name="Se connecter">
+      <StateRow
+        name="Se connecter"
+        detail="Avec un libellé, le bouton n'a pas de titre : son nom accessible est son texte."
+      >
         <SignInButton href="#" label="Se connecter" />
       </StateRow>
-      <StateRow name="La ligne sous chaque bouton Se connecter">
+      <StateRow
+        name="La ligne sous chaque bouton Se connecter"
+        detail="Le lien de la politique de confidentialité s'ouvre dans l'onglet de la page."
+      >
         <Pill>
           <SignInNote />
         </Pill>
       </StateRow>
     </Block>
     <Block title="Sur mobile">
-      <StateRow name="Logo seul">
+      <StateRow name="Logo seul" detail="Son titre, « Se connecter avec Twitch », est son nom accessible.">
         <SignInButton href="#" />
       </StateRow>
     </Block>

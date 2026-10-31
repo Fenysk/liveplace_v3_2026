@@ -1,0 +1,18 @@
+/* Le mot-symbole : « LivePlace » en lettres, couleur de l'encre. Sans pill, sans icône, sans forme, sans soulignement. */
+.lp-wordmark {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* Son lien (/confidentialite → l'accueil) : un bloc de la largeur du mot, comme le texte seul, et le focus du design system */
+a.lp-wordmark {
+  display: block;
+  width: fit-content;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.lp-wordmark:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}

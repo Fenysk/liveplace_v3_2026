@@ -6,6 +6,7 @@ import { DEMO_COLOR } from "./home-art";
 import { DEMO_PALETTE } from "./home-demo";
 
 const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8");
+const wordmarkCss = readFileSync(join(import.meta.dirname, "..", "design", "wordmark.css"), "utf8");
 
 describe("the tones of the home page (CSP of production)", () => {
   // Une case et un pixel en vol prennent leur couleur d'une classe, jamais d'un `style` : chaque teinte de la
@@ -42,10 +43,19 @@ describe("the tones of the home page (CSP of production)", () => {
     expect(css).not.toMatch(/#9146ff|#772ce8|var\(--twitch/i);
   });
 
+  // Écart §9.1 (JOURNAL 2026-10-31) : la colonne de la phrase ne descend pas sous la largeur de son bouton, qui ne passe pas sous la scène
+  it("keeps the sentence column at least as wide as its content, so the button never goes under the scene", () => {
+    expect(css).toMatch(
+      /@container lp-home \(min-width: 840px\)\s*\{\s*\.lp-home-layout\s*\{[^}]*grid-template-columns:\s*minmax\(min-content,\s*0\.3fr\)\s+minmax\(0,\s*0\.7fr\)/,
+    );
+    expect(css).not.toMatch(/minmax\(\d+px,\s*0\.3fr\)/);
+  });
+
   // Ni logo ni pill autour de « LivePlace », ni collines : le mot est du texte, le lecteur un fond uni et une silhouette
   it("keeps no logo mark and no landscape, only a wordmark and a silhouette", () => {
     expect(css).not.toMatch(/lp-home-(logo|mark|hill)|--lp-home-(sky|hill)/);
-    expect(css).toMatch(/\.lp-home-wordmark\s*\{/);
+    expect(css).not.toMatch(/lp-home-wordmark/);
+    expect(wordmarkCss).toMatch(/\.lp-wordmark\s*\{/);
     expect(css).toMatch(/\.lp-home-person-head\s*\{[^}]*border-radius:\s*50%/);
     expect(css).toMatch(/\.lp-home-person-shoulders\s*\{[^}]*border-radius:/);
   });
