@@ -72,7 +72,7 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
   it("carries no inline style in the whole page, the PNG window included", () => {
     const html = serverHtml.page();
 
-    expect(html).toContain("lp-swatch"); // la fenêtre du fond y est bien rendue : le garde-fou ne regarde pas dans le vide
+    expect(html).toContain("lp-window--small"); // la fenêtre du fond y est montée, vide fermée : ouverte, les tests suivants la lisent
     expect(html).not.toMatch(INLINE_STYLE);
     expect(serverHtml.page({ ...archive, theme: "Soirée de lancement" })).not.toMatch(INLINE_STYLE);
   });

@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-31 — La petite fenêtre fermée ne garde rien dans le DOM
+
+**Contexte.** Aux 100 visites du 28/10, `read_page` lisait à un visiteur anonyme la fenêtre du banni (titre, texte, « Je comprends ») : le `<dialog>` fermé gardait son contenu dans le DOM. L'arbre d'accessibilité réel de Chromium ne l'exposait pas (`dialog:not([open])` est en `display: none`), mais les outils qui lisent le DOM, `aria-hidden` compris, la lisaient comme si elle était là.
+**Décision.** `WindowShell` ne rend ni tête, ni corps, ni actions, ni poignée, ni régions de toast d'une petite fenêtre fermée (`isEmptyWhenClosed`) ; le `<dialog>` reste monté, vide, pour son animation. `useWindowMotion` rend `isPresent`, vrai de l'ouverture jusqu'au `close()` du minuteur : le contenu naît dans le rendu où `isOpen` passe à `true`, avant `showModal()`, et reste le temps de la sortie ; une réouverture pendant la sortie le garde. Le HTML serveur d'une page d'archive n'a donc plus les pastilles du fond du PNG : son test y cherche le `<dialog>` vide à la place (même nombre d'assertions), la fenêtre ouverte restant lue par les tests suivants.
+**Renoncement.** Démonter aussi la grande fenêtre fermée (Mon compte, Développeur) : ses sections chargent leurs listes au montage (Modération), tiennent un envoi d'image en cours (Fresque) et portent d'autres petites fenêtres (Archives). C'est une autre décision, avec ses propres preuves.
+
 ## 2026-10-31 — Écart §8.1 : au doigt, le conseil de première visite annonce les deux touchers
 
 **Contexte.** Sur les 100 visites du 28/10, les 9 visiteurs mobiles ont touché un pixel, vu la fresque zoomer, et dû toucher encore pour voir l'auteur ; l'entrée du 2026-10-08 disait « Touche un pixel pour voir qui l'a posé ».

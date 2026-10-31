@@ -81,9 +81,11 @@ type WindowProps<Id extends string> = {
 // Ouvrir : `showModal()`, l'état fermé calculé une fois, puis `is-open`, pour que la transition parte de lui.
 // Fermer : retirer `is-open`, laisser la transition finir, puis `close()`. Sans CSS `display` ni `overlay` animés :
 // tous les navigateurs ne les ont pas encore (la maquette fait de même).
+// `isPresent` : vrai de l'ouverture jusqu'au `close()`, pour que le contenu reste le temps de l'animation de sortie.
 const useWindowMotion = (isOpen: boolean) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const [isShown, setIsShown] = useState(false);
+  const [isPresent, setIsPresent] = useState(false);
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
@@ -94,14 +96,22 @@ const useWindowMotion = (isOpen: boolean) => {
       element.focus({ preventScroll: true });
       element.getBoundingClientRect();
       setIsShown(true);
+      setIsPresent(true);
       return;
     }
     setIsShown(false);
-    if (!element.open) return;
-    const timer = setTimeout(() => element.close(), motionMs(element, "--lp-dur"));
+    if (!element.open) {
+      setIsPresent(false);
+      return;
+    }
+    const finish = () => {
+      element.close();
+      setIsPresent(false);
+    };
+    const timer = setTimeout(finish, motionMs(element, "--lp-dur"));
     return () => clearTimeout(timer);
   }, [isOpen]);
-  return { dialog, isShown };
+  return { dialog, isShown, isPresent };
 };
 
 const doNothing = (): void => undefined;
@@ -113,6 +123,8 @@ type WindowShellProps = {
   isSmall?: boolean;
   isLarge?: boolean;
   isLocked?: boolean;
+  // Pas la grande fenêtre : ses sections chargent au montage, tiennent un envoi et portent des petites fenêtres.
+  isEmptyWhenClosed?: boolean;
   children: ReactNode;
 };
 
@@ -124,10 +136,13 @@ const WindowShell = ({
   isSmall = false,
   isLarge = false,
   isLocked = false,
+  isEmptyWhenClosed = false,
   children,
 }: WindowShellProps) => {
-  const { dialog, isShown } = useWindowMotion(isOpen);
+  const { dialog, isShown, isPresent } = useWindowMotion(isOpen);
   const t = useTexts(DESIGN_TEXTS);
+  // Fermée, une petite fenêtre ne laisse ni titre, ni texte, ni bouton dans le DOM, que le CSS la cache ou non.
+  const hasContent = !isEmptyWhenClosed || isOpen || isPresent;
   return (
     <dialog
       ref={dialog}
@@ -151,13 +166,17 @@ const WindowShell = ({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
-      <div className="lp-window-grabber">
-        <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
-      </div>
-      {children}
-      {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}
-      <ToastAnnouncement />
+      {hasContent && (
+        <>
+          {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
+          <div className="lp-window-grabber">
+            <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
+          </div>
+          {children}
+          {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}
+          <ToastAnnouncement />
+        </>
+      )}
     </dialog>
   );
 };
@@ -223,7 +242,14 @@ export const SmallWindow = ({
   const titleId = useId();
   const close = isLocked ? doNothing : onClose;
   return (
-    <WindowShell isOpen={isOpen} onClose={close} titleId={titleId} isSmall isLocked={isLocked}>
+    <WindowShell
+      isOpen={isOpen}
+      onClose={close}
+      titleId={titleId}
+      isSmall
+      isLocked={isLocked}
+      isEmptyWhenClosed
+    >
       <section className="lp-window-main">
         <WindowHead titleId={titleId} title={title} onClose={close} />
         <div className="lp-window-body">{children}</div>
