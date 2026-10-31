@@ -29,7 +29,7 @@ type Usages = Readonly<Record<string, string>>;
 
 const toVariableName = (key: string): string => key.replace(/([a-z])([A-Z0-9])/g, "$1-$2").toLowerCase();
 
-// Les 44 couleurs de `tokens.css`, rangées par famille.
+// Les 41 couleurs de `tokens.css`, rangées par famille.
 const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le vide et la fresque",
@@ -91,12 +91,9 @@ const COLOR_FAMILIES: readonly { title: string; usages: Usages }[] = [
   {
     title: "Le classement",
     usages: {
-      rankGoldFrom: "L'anneau du 1er du classement : le départ du dégradé.",
-      rankGoldTo: "L'anneau du 1er : l'arrivée du dégradé.",
-      rankSilverFrom: "L'anneau du 2e : le départ du dégradé.",
-      rankSilverTo: "L'anneau du 2e : l'arrivée du dégradé.",
-      rankBronzeFrom: "L'anneau du 3e : le départ du dégradé.",
-      rankBronzeTo: "L'anneau du 3e : l'arrivée du dégradé.",
+      rankGoldFrom: "L'anneau du 1er du classement.",
+      rankSilverFrom: "L'anneau du 2e.",
+      rankBronzeFrom: "L'anneau du 3e.",
     },
   },
   {

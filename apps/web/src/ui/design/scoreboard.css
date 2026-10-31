@@ -89,7 +89,7 @@
   outline: 2px solid var(--focus-ring);
 }
 
-/* L'anneau : un dégradé discret pour les trois premiers, une marge transparente pour les autres. Tous les avatars
+/* L'anneau : une couleur pleine pour les trois premiers, une marge transparente pour les autres. Tous les avatars
    ont ainsi la même taille. */
 .lp-rank-ring {
   display: grid;
@@ -108,15 +108,15 @@
 }
 
 .lp-rank-ring--1 {
-  background: linear-gradient(135deg, var(--rank-gold-from), var(--rank-gold-to));
+  background: var(--rank-gold-from);
 }
 
 .lp-rank-ring--2 {
-  background: linear-gradient(135deg, var(--rank-silver-from), var(--rank-silver-to));
+  background: var(--rank-silver-from);
 }
 
 .lp-rank-ring--3 {
-  background: linear-gradient(135deg, var(--rank-bronze-from), var(--rank-bronze-to));
+  background: var(--rank-bronze-from);
 }
 
 /* Déplié, le nombre sort de la courbe de la ligne : --space-3 depuis son bord, comme l'avatar à gauche, la même

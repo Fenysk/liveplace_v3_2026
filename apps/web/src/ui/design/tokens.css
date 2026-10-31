@@ -41,13 +41,11 @@
   --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
   --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
   --twitch-live-ink: #6d28d9;
-  /* Les anneaux du classement : un dégradé discret par place, plus soutenu sur le fond clair */
-  --rank-gold-from: #c8901a;
-  --rank-gold-to: #f2cf6b;
-  --rank-silver-from: #8e95a3;
-  --rank-silver-to: #cdd2db;
+  /* Les anneaux du classement : une couleur pleine par place, au moins 3:1 sur la surface (WCAG 1.4.11), donc plus soutenue
+     sur le fond clair */
+  --rank-gold-from: #b07a0c;
+  --rank-silver-from: #7d8492;
   --rank-bronze-from: #a5653a;
-  --rank-bronze-to: #dba57a;
 }
 
 [data-appearance="dark"] {
@@ -88,11 +86,8 @@
   --twitch-live-bg-hover: color-mix(in srgb, var(--twitch) 24%, var(--pill-surface));
   --twitch-live-ink: #bf94ff;
   --rank-gold-from: #e8b84a;
-  --rank-gold-to: #f7e08a;
   --rank-silver-from: #b8bfcc;
-  --rank-silver-to: #f0f2f6;
   --rank-bronze-from: #cf8f5c;
-  --rank-bronze-to: #f3c9a4;
 }
 
 :root {
