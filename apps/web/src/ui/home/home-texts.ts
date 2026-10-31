@@ -5,6 +5,6 @@ import { defineTexts } from "../locale/texts";
 
 export const HOME_TEXTS = defineTexts({
   headline: { fr: "Tes viewers dessinent sur ton stream.", en: "Your viewers draw on your stream." },
-  start: { fr: "Lancer ma fresque", en: "Start my canvas" },
+  start: { fr: "Lancer ma fresque avec Twitch", en: "Start my canvas with Twitch" },
   demoCanvas: { fr: "Fresque de la démo", en: "Demo canvas" },
 });

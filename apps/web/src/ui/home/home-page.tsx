@@ -1,10 +1,11 @@
 // La page d'accueil `/` (Écart §9.1, JOURNAL 2026-10-22) : « LivePlace » en haut à gauche et les réglages (langue, apparence) en haut
-// à droite, puis à gauche une phrase et « Lancer ma fresque », à droite la scène. Sur un écran étroit, la phrase et le bouton, puis
-// l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le stream ; le
-// téléphone se monte dans le navigateur (phone-screen.tsx).
+// à droite, puis à gauche une phrase et « Lancer ma fresque avec Twitch », à droite la scène. Sur un écran étroit, la phrase et le
+// bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le
+// stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
 
 import { SignInButton, SignInNote } from "../design/twitch";
 import { useMediaQuery } from "../design/use-media-query";
+import { Wordmark } from "../design/wordmark";
 import { useTexts } from "../locale/use-locale";
 import { HomeScene } from "./home-scene";
 import { HomeSettings } from "./home-settings";
@@ -32,7 +33,7 @@ export const HomeContent = ({ isMotionReduced }: { isMotionReduced?: boolean }) 
   return (
     <div className="lp-home">
       <div className="lp-home-header">
-        <p className="lp-type-display lp-home-wordmark">LivePlace</p>
+        <Wordmark />
         <HomeSettings />
       </div>
       <div className="lp-home-layout">

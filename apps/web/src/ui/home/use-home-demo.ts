@@ -16,6 +16,7 @@ import { applyStep, type DemoStep } from "./home-script";
 
 export type DemoActions = {
   // Les gestes du visiteur : le premier arrête la démo seule.
+  visitorAct: () => void; // un geste qui n'est ni une case, ni une couleur, ni l'envoi : un appui, la molette, le clavier
   visitorTouch: (cell: number) => void;
   visitorPick: (colorIndex: number) => void;
   visitorSend: () => readonly LaunchedPixel[];
@@ -34,6 +35,7 @@ export const useHomeDemo = (): { state: DemoState; actions: DemoActions } => {
       setState(next);
     };
     return {
+      visitorAct: () => commit(takeOver(latest.current)),
       visitorTouch: (cell) => commit(touchCell(takeOver(latest.current), cell, Date.now())),
       visitorPick: (colorIndex) => commit(pickColor(takeOver(latest.current), colorIndex)),
       visitorSend: () => {

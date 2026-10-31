@@ -84,7 +84,7 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
     expect(markup).not.toContain('title="Switch to French"');
     expect(markup).not.toContain(">EN</span>");
     expect(accountPill({ identity: { kind: "guest" } })).toContain(">Sign in</span>");
-    expect(accountPill({ identity: { kind: "guest" } })).toContain('title="Sign in with Twitch"');
+    expect(accountPill({ identity: { kind: "guest" } })).not.toContain('title="Sign in with Twitch"');
   });
 
   // Qui modère sur le canvas d'un autre : Modération porte le point des signalements, la photo n'en a pas

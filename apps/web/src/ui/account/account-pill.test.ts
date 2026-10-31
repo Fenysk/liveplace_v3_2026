@@ -19,7 +19,11 @@ const render = (props: Partial<AccountPillProps> = {}): string =>
     }),
   );
 
-const positionOf = (markup: string, title: string): number => markup.indexOf(`title="${title}"`);
+const SIGN_IN = "Se connecter";
+
+// Un contrôle se repère à son `title`. Se connecter n'en a pas (Écart §9.1, JOURNAL 2026-10-31) : son nom est son texte visible.
+const positionOf = (markup: string, name: string): number =>
+  markup.indexOf(name === SIGN_IN ? `>${SIGN_IN}</span>` : `title="${name}"`);
 
 describe("pill Compte", () => {
   // Quand le streamer est sur son canvas, la pill Compte montre Réglages, puis sa photo, puis l'apparence
@@ -170,10 +174,9 @@ describe("pill Compte", () => {
   // Au PC, rien ne change : l'invité garde Se connecter et l'apparence, et la pill reste visible
   it("keeps the guest's Se connecter and appearance on a PC", () => {
     const markup = render({ identity: { kind: "guest" } });
-    expect(positionOf(markup, "Se connecter avec Twitch")).toBeGreaterThan(
-      positionOf(markup, "Apparence : Auto"),
-    );
+    expect(positionOf(markup, SIGN_IN)).toBeGreaterThan(positionOf(markup, "Apparence : Auto"));
     expect(markup).toContain("Se connecter</span>");
+    expect(markup).not.toContain("Se connecter avec Twitch");
     expect(markup).not.toContain("is-hidden");
     const unknown = render({ identity: { kind: "unknown" } });
     expect(unknown).toContain("Apparence : Auto");
@@ -191,7 +194,6 @@ describe("pill Compte", () => {
 });
 
 // L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (Écart §14, JOURNAL 2026-10-07).
-const SIGN_IN = "Se connecter avec Twitch";
 const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence : Auto", "Mon compte", SIGN_IN];
 
 const orderOf = (markup: string): string[] =>

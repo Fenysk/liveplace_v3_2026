@@ -31,13 +31,14 @@ export const TwitchLiveGlyph = () => (
 
 // Se connecter, toujours avec Twitch : texte blanc sur violet Twitch, et son logo. Sans libellé : le logo seul.
 // `onPress` : la page part chez Twitch, elle peut le dire en attendant.
+// Écart §9.1 (JOURNAL 2026-10-31) : avec un libellé, pas de `title` : son nom est son texte visible (WCAG 2.5.3).
 type SignInButtonProps = { href: string; label?: string; onPress?: (() => void) | undefined };
 
 export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
   const t = useTexts(DESIGN_TEXTS);
   const action = { href, ...(onPress ? { onPress } : {}) };
   return label ? (
-    <Button label={label} icon={TwitchGlyph} variant="twitch" title={t.signInWithTwitch} {...action} />
+    <Button label={label} icon={TwitchGlyph} variant="twitch" {...action} />
   ) : (
     <Button icon={TwitchGlyph} variant="twitch" title={t.signInWithTwitch} {...action} />
   );
@@ -47,14 +48,13 @@ export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
 const PRIVACY_PATH = "/confidentialite";
 
 // Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
+// Écart §9.1 (JOURNAL 2026-10-31) : le lien s'ouvre dans l'onglet de la page, le brouillon survit dans `localStorage`.
 export const SignInNote = () => {
   const t = useTexts(DESIGN_TEXTS);
   return (
     <p className="lp-sign-in-note lp-type-caption lp-muted">
       {t.signInNote}
-      <a href={PRIVACY_PATH} target="_blank" rel="noopener">
-        {t.privacyPolicy}
-      </a>
+      <a href={PRIVACY_PATH}>{t.privacyPolicy}</a>
     </p>
   );
 };

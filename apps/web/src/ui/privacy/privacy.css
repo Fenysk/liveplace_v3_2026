@@ -1,0 +1,23 @@
+/* « LivePlace » en haut à gauche de /confidentialite, là où l'accueil l'écrit : les mêmes marges (.lp-home-page) et le même bloc de
+   1600 px au plus, centré (.lp-home), dans home.css. Le mot est hors du flux : la pill du titre garde sa place, au centre. */
+.lp-privacy {
+  position: relative;
+}
+
+.lp-privacy-top {
+  --lp-privacy-margin: var(--space-4);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  max-width: calc(1600px + 2 * var(--lp-privacy-margin));
+  margin-inline: auto;
+  padding: var(--lp-privacy-margin);
+}
+
+@media (min-width: 641px) {
+  .lp-privacy-top {
+    --lp-privacy-margin: clamp(24px, 2.5vw, 40px);
+  }
+}
