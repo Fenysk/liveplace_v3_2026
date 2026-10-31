@@ -572,7 +572,7 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     const markup = inEnglish(createElement(FirstHint, { doneCount: 2, isVisible: true, isDocked: false }));
 
     expect(markup).toContain("Pinch to zoom");
-    expect(markup).toContain("Tap a pixel to see who placed it");
+    expect(markup).toContain("Tap a pixel, then tap it again to see who placed it");
     expect(markup).toContain('aria-label="2 of 3"');
   });
 

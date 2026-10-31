@@ -32,6 +32,12 @@ Tout y est absorbé par le plan d'architecture du bloc 2, qui fait foi.
 
 ---
 
+## 2026-10-31 — Écart §8.1 : au doigt, le conseil de première visite annonce les deux touchers
+
+**Contexte.** Sur les 100 visites du 28/10, les 9 visiteurs mobiles ont touché un pixel, vu la fresque zoomer, et dû toucher encore pour voir l'auteur ; l'entrée du 2026-10-08 disait « Touche un pixel pour voir qui l'a posé ».
+**Décision.** Elle amende ce texte : la ligne dit « Touche un pixel, puis encore une fois pour voir qui l'a posé » (en : « Tap a pixel, then tap it again to see who placed it »), le geste ne change pas. Pas de « touche-le », coupé au trait d'union sur un téléphone, ni de « deux fois », qui ferait croire à un double toucher. Si la case est déjà assez grande, le premier toucher montre l'auteur : la phrase reste juste à un toucher près.
+**Renoncement.** Changer le geste : zoomer d'abord reste voulu (§9.3). Le texte à la souris ne change pas dans ce correctif.
+
 ## 2026-10-29 — Écart §1 et §5.3 : retirer la taille dynamique ramène à 50 × 50, une fresque neuve naît dynamique en 10 × 10, le choix de taille se grise
 
 **Contexte.** L'entrée du 2026-10-28 laisse la fresque à sa taille quand le streamer retire la taille dynamique, fait naître tout canvas en 50 × 50, et cache le choix de taille. Alexis (29/10) veut que retirer le réglage rende une taille connue, qu'une fresque neuve naisse petite et grandisse seule, et que le choix de taille reste visible.

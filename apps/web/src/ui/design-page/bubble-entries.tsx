@@ -121,7 +121,7 @@ const HINT_STATES: readonly { name: string; detail?: string; doneCount: number }
   {
     name: "Première visite",
     detail:
-      "Deux lignes, trois points : un point par geste distinct réussi (déplacer, pincer, toucher un pixel).",
+      "Deux lignes, trois points : un point par geste distinct réussi (déplacer, pincer, toucher un pixel). Un pixel trop petit zoome d'abord au premier toucher, le second montre son auteur.",
     doneCount: 0,
   },
   { name: "Un geste fait", doneCount: 1 },
@@ -148,7 +148,7 @@ export const BubbleEntry = () => (
         detail="Sans cible, elle se pose au-dessus de la barre du bas, centrée. Elle paraît et s'efface en fondu."
       >
         <Bubble isVisible isDocked={false}>
-          <BubbleLine icon={Pointer}>Touche un pixel pour voir qui l'a posé</BubbleLine>
+          <BubbleLine icon={Pointer}>Touche un pixel, puis encore une fois pour voir qui l'a posé</BubbleLine>
         </Bubble>
       </StateRow>
       <StateRow

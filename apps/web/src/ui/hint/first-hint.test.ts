@@ -14,7 +14,9 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
     const markup = render(0);
 
     expect(markup).toContain("<span>Pince pour zoomer</span>");
-    expect(markup).toContain("<span>Touche un pixel pour voir qui l&#x27;a posé</span>");
+    expect(markup).toContain(
+      "<span>Touche un pixel, puis encore une fois pour voir qui l&#x27;a posé</span>",
+    );
     expect(markup.match(/<svg/g)).toHaveLength(2);
   });
 
