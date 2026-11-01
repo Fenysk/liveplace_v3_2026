@@ -1,4 +1,4 @@
-// Les actions de modération d'une pose (Écart §8.1, JOURNAL 2026-10-12) : jamais sur les poses du streamer ni sur les siennes
+// Les actions de modération d'une pose (§9.8) : jamais sur les poses du streamer ni sur les siennes
 // (maquette), ni sans identifiant (§4.3). La pill Inspection et la bulle d'aide qui les désigne lisent la même règle.
 
 import type { InspectEntry } from "@liveplace/domain/ports";

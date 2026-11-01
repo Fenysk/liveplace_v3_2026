@@ -1,5 +1,5 @@
-// Les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08), validés tels quels, chacun en français et en anglais (Écart §14,
-// JOURNAL 2026-10-07). Les chiffres de la jauge viennent du canvas.
+// Les mots des bulles d'aide (§9.11), validés tels quels, chacun en français et en anglais (§9.9).
+// Les chiffres de la jauge viennent du canvas.
 
 import type { Refill } from "../../state/gauge";
 import type { Locale } from "../locale/locale";
@@ -49,18 +49,18 @@ const pixelsText = (count: number): string => `${count} ${count === 1 ? "pixel" 
 export const HELP_TEXTS = defineTexts({
   report: { fr: "Un dessin a été signalé", en: "A drawing was reported" },
   obs: { fr: "Ajoute ta fresque à OBS ici", en: "Add your canvas to OBS here" },
-  // La suite de la chaîne OBS, dans la fenêtre (Écart §8.1, JOURNAL 2026-10-09) : l'onglet, puis l'adresse.
+  // La suite de la chaîne OBS, dans la fenêtre (§9.11) : l'onglet, puis l'adresse.
   obsTab: { fr: "Ton adresse OBS est dans cet onglet", en: "Your OBS address is in this tab" },
   obsAddress: {
     fr: "Copie cette adresse, colle-la dans OBS",
     en: "Copy this address and paste it into OBS",
   },
-  // La suite de la chaîne du streamer (Écart §8.1, JOURNAL 2026-10-12) : le lien à partager, sur le bouton de l'adresse OBS déjà
+  // La suite de la chaîne du streamer (§9.11) : le lien à partager, sur le bouton de l'adresse OBS déjà
   // copiée ; le thème ; la synchro Twitch.
   inviteLink: { fr: "Partage aussi ce lien à tes viewers", en: "Share this link with your viewers too" },
   theme: { fr: "Donne un thème à ta fresque", en: "Give your canvas a theme" },
   twitchSync: { fr: "Reprends tes modérateurs Twitch ici", en: "Import your Twitch moderators here" },
-  // La récompense dit son effet par le chiffre : la jauge actuelle + 1 (Écart §9.3, JOURNAL 2026-10-13).
+  // La récompense dit son effet par le chiffre : la jauge actuelle + 1 (§9.4).
   reward: localized({
     fr: (gaugeMax: number | undefined) =>
       gaugeMax === undefined
@@ -72,10 +72,10 @@ export const HELP_TEXTS = defineTexts({
         : `A reward is waiting: your gauge goes up to ${gaugeMax + 1} pixels`,
   }),
   trace: { fr: "Active le tracé pour dessiner en glissant", en: "Turn on Trace to draw by dragging" },
-  // À la souris, glisser déplace la vue : Espace tenu trace (Écart §8.1, JOURNAL 2026-10-14).
+  // À la souris, glisser déplace la vue : Espace tenu trace (§9.11).
   space: { fr: "Maintiens Espace et glisse pour tracer", en: "Hold Space and drag to draw" },
 
-  // Pour qui modère (Écart §8.1, JOURNAL 2026-10-12) : sa pill Modération, puis les actions de l'inspection.
+  // Pour qui modère (§9.11) : sa pill Modération, puis les actions de l'inspection.
   moderatorWelcome: {
     fr: "Tu modères cette fresque : tout est ici",
     en: "You moderate this canvas: everything is here",
@@ -85,7 +85,7 @@ export const HELP_TEXTS = defineTexts({
     en: "Clear their drawings or ban this viewer here",
   },
 
-  // Ce qui reste à apprendre en Dessin, une fois des dessins posés (Écart §8.1, JOURNAL 2026-10-12) : la palette au doigt, les
+  // Ce qui reste à apprendre en Dessin, une fois des dessins posés (§9.11) : la palette au doigt, les
   // Ctrl+Z à la souris (une ligne), la pipette.
   palette: { fr: "Touche ta couleur pour ouvrir la palette", en: "Tap your color to open the palette" },
   keys: { fr: "Ctrl+Z : annule ton dernier trait", en: "Ctrl+Z: undo your last stroke" },

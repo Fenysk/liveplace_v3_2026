@@ -14,7 +14,7 @@ const lineOf = (bubble: HelpBubble, isTouchScreen: boolean): string =>
     }),
   );
 
-describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10-08 et 2026-10-09)", () => {
+describe("les bulles d'aide, chacune sur sa cible (§9.11)", () => {
   // Chaque bulle vise son propre élément : le bouton au point des signalements, Réglages, l'onglet Vue OBS, l'adresse, le +1, le bouton Modération,
   // Effacer ses dessins, la jauge, le pinceau, Valider, la couleur actuelle, rien (les touches : au-dessus de la barre du bas), la pipette ;
   // le même bouton que l'adresse OBS pour le partage, le champ du thème et l'onglet Modération pour la suite de la chaîne du streamer
@@ -73,7 +73,7 @@ describe("les bulles d'aide, chacune sur sa cible (Écart §8.1, JOURNAL 2026-10
   });
 });
 
-describe("les lignes d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("les lignes d'une bulle d'aide (§9.11)", () => {
   // Une seule ligne par bulle, chacune avec son icône : celle de Ctrl+Z n'a plus que lui (Alexis a retiré « 1 à 5 »)
   it("holds exactly one line per bubble, each with its own icon, the Ctrl+Z one included", () => {
     const linesOf = (bubble: HelpBubble): number =>

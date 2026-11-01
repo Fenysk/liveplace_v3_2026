@@ -29,7 +29,7 @@ afterAll(async () => {
   await redis.quit();
 });
 
-describe("the worker presence (Écart §11.5, JOURNAL 2026-10-06)", () => {
+describe("the worker presence (§7.5)", () => {
   // Un seul worker : le premier tient le bail, le second le trouve pris
   it("lets a single worker hold the lease, the second one finds it taken", async () => {
     const first = createPresence(redis, "worker-a");

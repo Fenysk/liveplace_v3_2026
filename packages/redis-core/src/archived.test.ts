@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createArchiveWrites } from "./archive-writes";
 import { createRedisHarness } from "./test-harness";
 
-// Écart §15 (JOURNAL 2026-10-06) : les six scripts qui écrivent refusent un canvas dont `meta.archivedAt` existe.
+// §17.1 : les six scripts qui écrivent refusent un canvas dont `meta.archivedAt` existe.
 // Chaque test prend le même appel deux fois : sur le canvas actif, il passe ; une fois archivé, le script le refuse
 // avant d'écrire quoi que ce soit.
 
@@ -35,7 +35,7 @@ const placement = (requestId: string) => ({
   pixels: [{ x: 1, y: 1, colorIndex: 5 }],
 });
 
-describe("an archived canvas refuses what writes (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("an archived canvas refuses what writes (§17.1)", () => {
   // place.lua : ni pixel, ni version, ni jauge, ni mémoire de la requête
   it("place.lua refuses a placement, writing no pixel, version, gauge nor request memo", async () => {
     const { canvasId, keys } = await readyCanvas();
@@ -161,7 +161,7 @@ describe("an archived canvas refuses what writes (Écart §15, JOURNAL 2026-10-0
   });
 });
 
-describe("following a Twitch name to the successor (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("following a Twitch name to the successor (§17.1)", () => {
   // Recopie le nom Twitch de ceux qui y manquent, ne remplace jamais celui que le successeur connaît, ignore les inconnus
   it("copies the Twitch name of those missing there, never replaces what the successor knows, ignores unknown ones", async () => {
     const [from, to] = [await readyCanvas(), await readyCanvas()];

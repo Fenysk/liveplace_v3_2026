@@ -1,4 +1,4 @@
-// Les canvas d'un propriétaire (§8.2, D-14) : un actif, créé à l'inscription, et ses archives (Écart §15, JOURNAL 2026-10-06).
+// Les canvas d'un propriétaire (§8.2, D-14) : un actif, créé à l'inscription, et ses archives (§17.1).
 
 import { v } from "convex/values";
 import {
@@ -102,7 +102,7 @@ export const listForOwner = query({
   },
 });
 
-// Écart §7.2 (JOURNAL 2026-10-08) : ce canvas existe-t-il encore ? Une archive supprimée n'est pas récupérée. Un seul index.
+// §7.4 : ce canvas existe-t-il encore ? Une archive supprimée n'est pas récupérée. Un seul index.
 export const exists = query({
   args: { serviceKey: v.string(), canvasId: v.string() },
   handler: async (ctx, { serviceKey, canvasId }) => {
@@ -176,7 +176,7 @@ export const setTheme = mutation({
   },
 });
 
-// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond du canvas actif, un fichier que le web vient d'envoyer à l'adresse de
+// §8.4 : l'image du fond du canvas actif, un fichier que le web vient d'envoyer à l'adresse de
 // `snapshots:generateUploadUrl`. Elle remplace la précédente, dont le fichier part. Refusée, le fichier envoyé part avec : rien n'y renvoie.
 export const setBackgroundImage = mutation({
   args: {
@@ -241,7 +241,7 @@ export const rename = mutation({
   },
 });
 
-// Écart §8.1 (JOURNAL 2026-10-07) : `npx convex run canvases:moveNameToTheme`, juste après le push du schéma. Interne : aucun
+// §8.1 : `npx convex run canvases:moveNameToTheme`, juste après le push du schéma. Interne : aucun
 // client ne l'appelle. Non destructive et idempotente, et d'un coup : quelques centaines de canvas au plus tiennent dans
 // une transaction.
 export const moveNameToTheme = internalMutation({
@@ -254,7 +254,7 @@ export const moveNameToTheme = internalMutation({
   },
 });
 
-// Écart §8.1 (JOURNAL 2026-10-08) : le ménage n'est jamais une raison de refuser la suppression.
+// §7.6 : le ménage n'est jamais une raison de refuser la suppression.
 const purgeLater = async (ctx: MutationCtx, canvasId: string): Promise<void> => {
   try {
     await ctx.scheduler.runAfter(0, internal.purge.byCanvas, { canvasId });
@@ -271,7 +271,7 @@ export const discard = mutation({
     const image = docs.find((candidate) => candidate.canvasId === canvasId)?.backgroundImage;
     const settled = await settle(ctx.db, docs, planDiscard(docs, ownerId, canvasId));
     if (!settled.ok) return settled;
-    // Écart §8.1 (JOURNAL 2026-10-10) : le fichier de l'image part avec son canvas.
+    // §8.4 : le fichier de l'image part avec son canvas.
     if (image) await releaseFile(ctx, image.storageId, image.size);
     await purgeLater(ctx, canvasId);
     return settled;

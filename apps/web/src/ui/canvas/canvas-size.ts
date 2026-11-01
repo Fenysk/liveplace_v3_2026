@@ -16,7 +16,7 @@ import { listCutPixels, planResize } from "@liveplace/domain/resize";
 export type SizeChoice = { format: CanvasFormat; sizeIndex: number };
 
 // La taille des canvas d'avant les formats (256 × 256) n'est dans aucun : on propose alors le grand carré.
-// Écart §5.3 (JOURNAL 2026-10-28) : toute autre taille hors format (celle d'une fresque devenue dynamique) ne se range nulle part : aucun
+// §5.8 : toute autre taille hors format (celle d'une fresque devenue dynamique) ne se range nulle part : aucun
 // choix, la section dit la taille réelle.
 export function toSizeChoice({ width, height }: CanvasSize): SizeChoice | null {
   for (const { format, sizes } of CANVAS_FORMATS) {
@@ -31,13 +31,13 @@ export function toCanvasSize({ format, sizeIndex }: SizeChoice): CanvasSize {
   return sizes[sizeIndex] ?? sizes[0];
 }
 
-// Écart §5.3 (JOURNAL 2026-10-29) : retirer la taille dynamique ramène la fresque à la taille fixe par défaut par le plan d'un choix de
+// §5.8 : retirer la taille dynamique ramène la fresque à la taille fixe par défaut par le plan d'un choix de
 // format. Ce que ce retour laisse hors du cadre : sans rien (`outside` vide), il n'y a rien à confirmer.
 export function turnOffPreview(pixels: Uint8Array, current: CanvasSize): ReturnType<typeof previewResize> {
   return previewResize(pixels, current, FIXED_DEFAULT_CANVAS_SIZE);
 }
 
-// Écart §5.3 (JOURNAL 2026-10-24) : ce que montrera une nouvelle taille, du même plan que redis-core applique. `outside` : les
+// §5.8 : ce que montrera une nouvelle taille, du même plan que redis-core applique. `outside` : les
 // pixels posés qu'elle laisse hors du cadre une fois les dessins rapprochés, gardés, invisibles jusqu'à un agrandissement, à leur
 // place d'aujourd'hui. `hasMovedPixels` : au moins un dessin se rapproche.
 export function previewResize(

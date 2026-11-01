@@ -1,4 +1,4 @@
-// L'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29) : en Dessin, dans une fresque à taille dynamique, les cases qui vont
+// L'aperçu de la croissance (§9.3) : en Dessin, dans une fresque à taille dynamique, les cases qui vont
 // apparaître autour d'elle si on pose ce qu'on vise ou ce qu'on a au brouillon : le damier à demi effacé, et un contour en pointillé
 // autour de la fresque telle qu'elle sera. La règle est celle du serveur (`planGrowth` du domaine) ; ici, ce qui la nourrit, et
 // l'écriture dans les couches CSS que la scène et `/design` partagent (`GrowthPreview`).

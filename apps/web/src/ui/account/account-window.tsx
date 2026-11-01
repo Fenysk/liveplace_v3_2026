@@ -31,8 +31,8 @@ export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "sco
 // La section que Réglages ouvre : la taille et les jauges du canvas.
 export const SETTINGS_SECTION = "canvas" as const satisfies AccountSection;
 
-// Dans l'ordre du CDC 2026 : Canvas, Vue OBS, Modération, Mon compte ; Archives à côté de Canvas (Écart §15,
-// JOURNAL 2026-10-06). Le Classement du mobile se met avant Mon compte.
+// Dans l'ordre du CDC 2026 : Canvas, Vue OBS, Modération, Mon compte ; Archives à côté de Canvas (§17.1).
+// Le Classement du mobile se met avant Mon compte.
 const SECTION_ICONS = {
   canvas: Scaling,
   canvases: Layers,
@@ -42,7 +42,7 @@ const SECTION_ICONS = {
   account: User,
 } as const satisfies Record<AccountSection, LucideIcon>;
 
-// Écart §8.1 (JOURNAL 2026-10-09 et 2026-10-12) : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à
+// §9.11 : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à
 // les ouvrir.
 const TAB_TARGETS: Partial<Record<string, BubbleTargetName>> = {
   obs: "obs-tab",
@@ -63,11 +63,11 @@ type AccountWindowProps = {
   signOutHref: string;
   appearanceChoice: AppearanceChoice;
   onPickAppearance: (choice: AppearanceChoice) => void;
-  onRestartTutorial: () => void; // « Revoir le tuto » : le tutoriel repart de zéro sur cet appareil (Écart §8.1, JOURNAL 2026-10-12)
+  onRestartTutorial: () => void; // « Revoir le tuto » : le tutoriel repart de zéro sur cet appareil (§9.11)
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
   canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
-  canvasesTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (Écart §15, JOURNAL 2026-10-06)
+  canvasesTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (§17.1)
   scoreboardTab?: ReactNode | undefined; // absent : sur PC, le classement est une colonne (JOURNAL 2026-10-06)
 };
 

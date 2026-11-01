@@ -134,7 +134,7 @@ describe("the canvas section (JOURNAL 2026-10-07)", () => {
     expect(table).not.toContain("Streamers actifs");
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : en tête, le streamer seul, sans pastille ; une courbe de ses minutes streamées, aucune de ses vues OBS
+  // §16.2 : en tête, le streamer seul, sans pastille ; une courbe de ses minutes streamées, aucune de ses vues OBS
   it("puts the owner alone at the top, with no badge, and draws its streamed minutes, not its OBS views", () => {
     const streamed = render(ready("day", [{ ...canvasPoint, streamedMinutes: 1 }]));
 

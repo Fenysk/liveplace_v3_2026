@@ -1,4 +1,4 @@
-// L'axe du temps de l'historique de la capacité (écart §4.3, JOURNAL 2026-10-07) : celui de l'activité, des créneaux réguliers
+// L'axe du temps de l'historique de la capacité (§16.3) : celui de l'activité, des créneaux réguliers
 // du plus ancien au plus récent. Un point absent laisse son créneau vide, et un maillon qui n'avait rien mesuré laisse un
 // trou dans sa seule courbe : on ne comble pas.
 

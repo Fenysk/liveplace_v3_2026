@@ -21,7 +21,7 @@ export function gaugeLevels(charges: number, max: number, draft: number): GaugeL
   return { remainingLevel: share(remaining), chargesLevel: share(charges) };
 }
 
-// Le minuteur de l'anneau (Écart §9.3, JOURNAL 2026-10-13) : « 12 », « 1:05 », puis « 2h05 ». L'unique exception au format des
+// Le minuteur de l'anneau (§9.4) : « 12 », « 1:05 », puis « 2h05 ». L'unique exception au format des
 // durées : 36 px n'ont pas la place d'une unité.
 export function timerText(seconds: number): string {
   if (seconds < SECONDS_PER_MINUTE) return String(seconds);

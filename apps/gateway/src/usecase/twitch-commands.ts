@@ -14,7 +14,7 @@ import type { Broadcast } from "./broadcast";
 // Une attente bornée : à l'arrêt, la boucle ne retient pas le process plus longtemps.
 const WAIT_MS = 5000;
 
-// Écart §15 (JOURNAL 2026-10-06) : le temps qu'un successeur se pose, quelques secondes au plus.
+// §17.1 : le temps qu'un successeur se pose, quelques secondes au plus.
 const FOLLOW_RETRY_MS = 250;
 const FOLLOW_MAX_ATTEMPTS = 20;
 
@@ -29,13 +29,13 @@ export type TwitchCommandsDeps = {
     | "listBans"
     | "copyTwitchUsers"
   >;
-  broadcast: Pick<Broadcast, "announce">; // Écart §4 (JOURNAL 2026-10-07) : le live d'un compte, à toutes les pages
+  broadcast: Pick<Broadcast, "announce">; // §10.4 : le live d'un compte, à toutes les pages
   now: () => Timestamp;
   wait: (ms: number) => Promise<void>;
 };
 
 // `lost` : aucun canvas prêt n'a pu la recevoir. On ne l'acquitte pas : elle n'est pas appliquée, pas oubliée.
-// `recovering` (Écart §4.2, JOURNAL 2026-10-08) : le canvas est perdu et Redis le remet en place ; l'action attend, non acquittée.
+// `recovering` (§7.4) : le canvas est perdu et Redis le remet en place ; l'action attend, non acquittée.
 export type CommandOutcome = "done" | "lost" | "recovering";
 
 // Un script a refusé parce que le canvas vient d'être archivé : l'action repart sur son successeur.
@@ -61,7 +61,7 @@ type OwnedCommand<Kind extends CanvasTwitchCommand["kind"]> = Extract<CanvasTwit
   ownerId: string;
 };
 
-// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels. Écart §5.4 (JOURNAL 2026-10-08) :
+// Un ban ou un déban venu de Twitch, au nom du streamer. Un ban retire ensuite ses pixels. §5.4 :
 // un ban que le script refuse (modérateur nommé ici) est ignoré, sans retrait ; la synchro suivante le retentera.
 const applyBan = async (deps: TwitchCommandsDeps, command: OwnedCommand<"ban" | "unban">) => {
   const { canvasId, userId, ownerId } = command;
@@ -200,7 +200,7 @@ export async function applyTwitchCommand(
   deps: TwitchCommandsDeps,
   command: TwitchCommand,
 ): Promise<CommandOutcome> {
-  // Écart §4 (JOURNAL 2026-10-07) : un live n'a pas de canvas. Les pages du streamer et les connexions du compte le prennent.
+  // §10.4 : un live n'a pas de canvas. Les pages du streamer et les connexions du compte le prennent.
   if (command.kind === "twitchLive") {
     const { userId, twitchLive } = command;
     deps.broadcast.announce({ t: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) });
@@ -210,7 +210,7 @@ export async function applyTwitchCommand(
 }
 
 // Une action qui échoue est journalisée puis acquittée : la file continue, et la synchro suivante la rattrape.
-// Une action perdue ne l'est pas : elle reste à lire au prochain démarrage. Écart §4.2 (JOURNAL 2026-10-08) : une action sur un
+// Une action perdue ne l'est pas : elle reste à lire au prochain démarrage. §7.4 : une action sur un
 // canvas en récupération attend en mémoire, non acquittée (un redémarrage la relit), et se rejoue à chaque tour de la file,
 // sans retenir les autres.
 export async function consumeTwitchCommands(

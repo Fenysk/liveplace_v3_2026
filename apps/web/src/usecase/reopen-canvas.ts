@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : rouvrir une archive. Le canvas actif prend sa place dans les archives.
+// §17.2 : rouvrir une archive. Le canvas actif prend sa place dans les archives.
 // Tout ce qui détruit (la progression de l'archive, qu'« Garder » remplace) vient après la décision de Convex.
 
 import {
@@ -62,7 +62,7 @@ const reopen = async (deps: SwitchDeps, ownerId: string, request: ReopenRequest)
       deps.redis.copyProgress(active.canvasId, reopened.canvasId),
     );
   await bestEffort("signalements non classés", () => deps.redis.settleReports(active.canvasId));
-  // La copie de l'archive égale Convex avant qu'elle ne serve : son thème, qui s'affiche alors à tous (Écart §8.1, JOURNAL 2026-10-07).
+  // La copie de l'archive égale Convex avant qu'elle ne serve : son thème, qui s'affiche alors à tous (§17.2).
   await bestEffort("thème de l'archive rouverte non copié", () =>
     deps.redis.setTheme(reopened.canvasId, reopened.theme),
   );

@@ -1,6 +1,6 @@
-// Écart §4.2 (JOURNAL 2026-10-08) : au rendu d'une page, un canvas que Redis a perdu et dont ce scope garde une sauvegarde se dit
+// §7.4 : au rendu d'une page, un canvas que Redis a perdu et dont ce scope garde une sauvegarde se dit
 // « en récupération » tout de suite, sans attendre que le worker voie la perte. Un seul `EXISTS` quand il vit.
-// Écart §4.2 (JOURNAL 2026-10-09) : une page déjà ouverte demande le même verdict quand le gateway ne trouve pas son canvas.
+// §9.1 : une page déjà ouverte demande le même verdict quand le gateway ne trouve pas son canvas.
 
 import type { RecoveryMarks, RecoveryStore } from "@liveplace/domain/ports";
 

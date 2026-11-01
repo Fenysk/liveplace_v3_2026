@@ -14,7 +14,7 @@ export type CanvasOwner = Pick<User, "displayName" | "login"> & {
 export type CanvasVisit = { verifier: SessionVerifier; cookieHeader: string | undefined };
 
 // `isOwnerSession` : pour l'affichage seulement, le gateway décide du rôle (§10.3). Absent sans `CanvasVisit`.
-// `theme` (Écart §8.1, JOURNAL 2026-10-07) : celui de Convex, rendu avec la page ; le gateway prend ensuite le relais.
+// `theme` (§9.1) : celui de Convex, rendu avec la page ; le gateway prend ensuite le relais.
 export type ResolvedCanvas = {
   canvasId: string;
   owner: CanvasOwner;
@@ -29,7 +29,7 @@ export const toCanvasOwner = ({ displayName, login, avatarUrl }: User): CanvasOw
   ...(avatarUrl ? { avatarUrl } : {}),
 });
 
-// Écart §4 (JOURNAL 2026-10-07) : le profil, avec le live que le suivi connaît déjà. Le suivi ne fait jamais attendre le rendu.
+// §10.4 : le profil, avec le live que le suivi connaît déjà. Le suivi ne fait jamais attendre le rendu.
 export async function getCanvasOwner(
   owner: User,
   tracker?: Pick<TwitchLiveTracker, "getLive">,

@@ -1,4 +1,4 @@
-// Le bouton Développeur et sa fenêtre (écart §10.3, JOURNAL 2026-10-06 et 2026-10-07) : le web les montre au compte
+// Le bouton Développeur et sa fenêtre (§10.3) : le web les montre au compte
 // connecté qui est le développeur ; le gateway, lui, décide d'envoyer ou non. La fenêtre s'ouvre sur Ce canvas, et le choix
 // d'une section ne la ferme pas.
 

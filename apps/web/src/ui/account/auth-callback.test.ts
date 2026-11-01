@@ -21,7 +21,7 @@ const refused = async (): Promise<Response> => {
 const pageIn = (locale: "fr" | "en"): string =>
   renderToStaticMarkup(createElement(LocaleProvider, { initial: locale }, createElement(SignInExpired)));
 
-describe("the answer of the Twitch callback to a forged state (Écart §14, JOURNAL 2026-10-13)", () => {
+describe("the answer of the Twitch callback to a forged state (§9.9)", () => {
   // Quand le retour ne vient pas du navigateur qui est parti chez Twitch, le système l'envoie à la page expirée et efface le cookie de l'aller
   it("sends a forged state to the expired page, and clears the cookie of the way out", async () => {
     const answer = await refused();

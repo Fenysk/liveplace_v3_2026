@@ -103,7 +103,7 @@ describe("zoomAt (CDC 2026, molette vers le curseur)", () => {
   });
 });
 
-describe("zoomTowards (Écart §9.3, JOURNAL 2026-10-09)", () => {
+describe("zoomTowards (§9.3)", () => {
   const viewport = fitViewport(DESKTOP, CANVAS);
   const limits = zoomLimits(DESKTOP, CANVAS);
   const cursor = { x: 300, y: 500 };
@@ -149,7 +149,7 @@ describe("panBy", () => {
   });
 });
 
-describe("shiftViewport (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("shiftViewport (§5.8)", () => {
   // La case regardée au même point de l'écran porte, après le décalage, son nouveau numéro : la vue ne saute pas
   it("keeps the cell under every screen point, with its new number, when the canvas shifts", () => {
     const viewport = { scale: 8, offsetX: 120, offsetY: -35 };
@@ -232,8 +232,8 @@ describe("panToShow (CDC 2026, la vue suit la case visée)", () => {
   });
 });
 
-// Écart §9.3 (JOURNAL 2026-10-08) : sur mobile, l'arrivée se cadre dans la zone libre entre le haut et le bas des pills.
-describe("le cadrage avec des marges (Écart §9.3, JOURNAL 2026-10-08)", () => {
+// §9.7 : sur mobile, l'arrivée se cadre dans la zone libre entre le haut et le bas des pills.
+describe("le cadrage avec des marges (§9.7)", () => {
   const FREE_AREA = { top: 130, right: 0, bottom: 70, left: 0 };
 
   // Sans marges, le cadrage est celui de toujours
@@ -279,10 +279,10 @@ describe("le cadrage avec des marges (Écart §9.3, JOURNAL 2026-10-08)", () => 
   });
 });
 
-// Écart §9.3 (JOURNAL 2026-10-09) : sur un écran tactile large, la colonne laisse au canvas une zone à côté d'elle ou au-dessus
+// §9.7 : sur un écran tactile large, la colonne laisse au canvas une zone à côté d'elle ou au-dessus
 // d'elle ; il arrive dans celle où il sera le plus grand. Les marges sont celles mesurées sur le vrai écran : la rangée du haut
 // et la bande Thème, la colonne de 320 px à droite (336 px avec ses marges), sa hauteur de Vue (112 px) et ses marges (128 px).
-describe("la zone d'arrivée en Vue (Écart §9.3, JOURNAL 2026-10-09)", () => {
+describe("la zone d'arrivée en Vue (§9.7)", () => {
   const IPAD_PORTRAIT = { width: 768, height: 1024 };
   const IPAD_LANDSCAPE = { width: 1024, height: 768 };
   const PHONE_LANDSCAPE = { width: 844, height: 390 };

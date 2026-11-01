@@ -62,7 +62,7 @@ describe("parseGatewayConfig (§11.5)", () => {
     );
   });
 
-  // N'est en production qu'avec PUBLIC_URL en https et BETA_LABEL vide (écart §10.3, JOURNAL 2026-10-06)
+  // N'est en production qu'avec PUBLIC_URL en https et BETA_LABEL vide (§10.3)
   it("is in production only over https without a beta label", () => {
     expect(parseGatewayConfig({ ...env, BETA_LABEL: "" }).isProduction).toBe(true);
     expect(parseGatewayConfig({ ...env, BETA_LABEL: "feat/activity" }).isProduction).toBe(false);

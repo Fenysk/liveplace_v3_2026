@@ -81,7 +81,7 @@ describe("saved draft (CDC 2026)", () => {
   });
 });
 
-describe("saved draft and pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("saved draft and pixels moved by a resize (§5.8)", () => {
   const key = "liveplace:draft:canvas-1:user-1";
 
   // Sans rapprochement, la sauvegarde reste la liste de cases d'avant ; avec un, elle garde la version qu'elle connaît

@@ -1,4 +1,4 @@
-// Les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08) : des conseils, chacun posé une fois par appareil, au moment où il sert.
+// Les bulles d'aide (§9.11) : des conseils, chacun posé une fois par appareil, au moment où il sert.
 // Une seule bulle à la fois, la plus prioritaire que l'écran demande. Des données pures : la page lit les stores et affiche.
 
 import { canModerate, type Role } from "@liveplace/domain";
@@ -13,7 +13,7 @@ const MODERATION_SECTION = "moderation";
 // Dans l'ordre de priorité : ce qui attend un geste de la personne d'abord (modérer, brancher OBS, réclamer, trouver Modération),
 // puis ce qui explique son état (la jauge vide), puis les guides du Dessin, qui répondent à ce qu'elle vient de faire (le Tracé au
 // doigt ou Espace à la souris après un glissement, puis le premier passage), puis les trois conseils qui viennent avec les dessins
-// posés (Écart §8.1, JOURNAL 2026-10-12 et 2026-10-14). Les bulles OBS de la fenêtre suivent
+// posés (§9.11). Les bulles OBS de la fenêtre suivent
 // Réglages : la chaîne du streamer, de l'onglet Vue OBS à la synchronisation Twitch (JOURNAL 2026-10-09 et 2026-10-12).
 export const HELP_BUBBLES = [
   "pending-report",
@@ -72,7 +72,7 @@ const WISHES: Record<HelpBubble, (facts: HelpFacts) => boolean> = {
   "obs-tab": ({ role, windowSection }) =>
     role === "owner" && windowSection !== undefined && windowSection !== OBS_SECTION,
   "obs-address": ({ role, windowSection }) => role === "owner" && windowSection === OBS_SECTION,
-  // Écart §8.1 (JOURNAL 2026-10-12) : la chaîne continue après l'adresse, qui passe avant (`HELP_BUBBLES`) : le lien à partager,
+  // §9.11 : la chaîne continue après l'adresse, qui passe avant (`HELP_BUBBLES`) : le lien à partager,
   // le thème dans la section Fresque, la synchro Twitch partout sauf dans Modération.
   "invite-link": ({ role, windowSection }) => role === "owner" && windowSection === OBS_SECTION,
   theme: ({ role, windowSection, isThemeMissing }) =>
@@ -83,18 +83,18 @@ const WISHES: Record<HelpBubble, (facts: HelpFacts) => boolean> = {
     windowSection !== MODERATION_SECTION &&
     isTwitchSyncMissing,
   "first-reward": ({ pill, canClaim }) => pill === "view" && canClaim,
-  // Écart §8.1 (JOURNAL 2026-10-12) : qui modère sans être le streamer trouve sa pill Modération ; et l'inspection d'une pose d'un
+  // §9.11 : qui modère sans être le streamer trouve sa pill Modération ; et l'inspection d'une pose d'un
   // autre compte lui montre où retirer ses pixels ou le bannir.
   "moderator-welcome": ({ role, pill }) => pill === "view" && role === "moderator",
   "moderation-actions": ({ canModerateInspected }) => canModerateInspected,
   "empty-gauge": ({ pill, charges }) => pill !== undefined && charges === 0,
   "draft-trace": ({ pill, isTouchScreen, isTouchTracing, hasPannedInDraft }) =>
     pill === "draft" && isTouchScreen && !isTouchTracing && hasPannedInDraft,
-  // Écart §8.1 (JOURNAL 2026-10-14) : la souris qui glisse en Dessin déplace la vue ; tracer demande Espace, comme le Tracé au doigt.
+  // §9.11 : la souris qui glisse en Dessin déplace la vue ; tracer demande Espace, comme le Tracé au doigt.
   "draft-space": ({ pill, isTouchScreen, hasPannedInDraft }) =>
     pill === "draft" && !isTouchScreen && hasPannedInDraft,
   "first-draft": ({ pill, draftSize }) => pill === "draft" && draftSize === 0,
-  // Écart §8.1 (JOURNAL 2026-10-12) : en Dessin, une fois un premier dessin posé, ce qui reste à apprendre. Au doigt, la palette
+  // §9.11 : en Dessin, une fois un premier dessin posé, ce qui reste à apprendre. Au doigt, la palette
   // complète s'ouvre par la couleur actuelle ; à la souris, Ctrl+Z, dès qu'il y a un pixel à annuler ; la pipette, au troisième dessin,
   // des deux côtés.
   palette: ({ pill, isTouchScreen, hasColorButton, placementCount }) =>
@@ -106,11 +106,11 @@ const WISHES: Record<HelpBubble, (facts: HelpFacts) => boolean> = {
 
 export const isWished = (bubble: HelpBubble, facts: HelpFacts): boolean => WISHES[bubble](facts);
 
-// La synchro Twitch jamais faite (Écart §8.1, JOURNAL 2026-10-12) : la liste des modérateurs n'en porte aucune. Un échec ne dit rien.
+// La synchro Twitch jamais faite (§9.11) : la liste des modérateurs n'en porte aucune. Un échec ne dit rien.
 export const isTwitchSyncNever = (answer: RequestResult<ModeratorList>): boolean =>
   answer.ok && answer.value.twitchSync === undefined;
 
-// Où vit une bulle (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12) : la fenêtre du compte, ouverte, pour celles de la fenêtre ; la pill
+// Où vit une bulle (§9.11) : la fenêtre du compte, ouverte, pour celles de la fenêtre ; la pill
 // Inspection, ouverte, pour celle des actions de modération ; l'écran sans l'un ni l'autre pour les autres. Une seule surface
 // compte à la fois, jamais deux bulles.
 export type BubbleSurface = "screen" | "window" | "inspection";
@@ -169,12 +169,12 @@ const CLOSINGS: Record<HelpBubble, readonly Closing[]> = {
 export const isClosedBy = (bubble: HelpBubble, closing: Closing): boolean =>
   CLOSINGS[bubble].includes(closing);
 
-// Une bulle montrée dont la condition a cessé a servi : elle est retenue comme vue (Écart §8.1, JOURNAL 2026-10-09 : l'onglet aussi,
+// Une bulle montrée dont la condition a cessé a servi : elle est retenue comme vue (§9.11 : l'onglet aussi,
 // que la fenêtre ait fermé ou le streamer changé de section, sans jamais revenir).
 export const isDone = (bubble: HelpBubble, facts: HelpFacts): boolean =>
   isClosedBy(bubble, "done") && !isWished(bubble, facts);
 
-// Écart §8.1 (JOURNAL 2026-10-12) : après l'action qui la ferme, une bulle de tutoriel peut rester le temps d'être lue. La même durée
+// §9.11 : après l'action qui la ferme, une bulle de tutoriel peut rester le temps d'être lue. La même durée
 // que le dernier point du conseil de première visite : une seule constante.
 export const BUBBLE_LINGER_MS = 2000;
 
@@ -208,7 +208,7 @@ export const bubblesFoundIn = (sectionId: string): readonly HelpBubble[] => FOUN
 // La chaîne du streamer, de Réglages à l'adresse : copier l'adresse la finit, le streamer n'en voit plus rien.
 export const OBS_CHAIN: readonly HelpBubble[] = ["obs-settings", "obs-tab", "obs-address"];
 
-// Copier le bouton de Vue OBS (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12) : la première copie finit la chaîne OBS ; la suivante,
+// Copier le bouton de Vue OBS (§9.11) : la première copie finit la chaîne OBS ; la suivante,
 // quand l'adresse est vue et que la bulle du partage a pris sa place sur le même bouton, finit celle-ci.
 export const bubblesEndedByCopy = (isSeen: (bubble: HelpBubble) => boolean): readonly HelpBubble[] =>
   isSeen("obs-address") ? [...OBS_CHAIN, "invite-link"] : OBS_CHAIN;

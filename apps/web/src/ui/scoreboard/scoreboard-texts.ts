@@ -1,5 +1,5 @@
 // Les mots du classement (JOURNAL 2026-10-06) : le rang à la française, jamais de « # », et les pixels au pluriel.
-// Écart §14 (JOURNAL 2026-10-07) : et à l'anglaise, « 1st, 2nd, 3rd ».
+// §9.9 : et à l'anglaise, « 1st, 2nd, 3rd ».
 
 import type { ScoreboardRow } from "../../state/scoreboard";
 import { formatNumber, INTL_TAGS, type Locale } from "../locale/locale";

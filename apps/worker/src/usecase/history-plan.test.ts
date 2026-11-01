@@ -17,7 +17,7 @@ const seededPlan = () => {
   return plan;
 };
 
-describe("when an archive is due (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("when an archive is due (§7.1)", () => {
   // Quand des entrées ne sont pas archivées, le tour de cinq minutes les prend, pas avant
   it("takes entries not archived yet at the five-minute turn, not before", () => {
     const plan = seededPlan();

@@ -32,7 +32,7 @@ describe("the Twitch button of a profile, when the person is not live", () => {
   });
 });
 
-describe("the Twitch button of a profile, when the person is live (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the Twitch button of a profile, when the person is live (§10.4)", () => {
   const live: ProfileUser = { ...user, twitchLive: { category: "Art" } };
 
   // En live, le bouton devient celui de la chaîne, nouvel onglet, avec la catégorie et l'infobulle qui dit tout

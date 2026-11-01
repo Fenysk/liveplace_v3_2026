@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : les deux images du canvas que « F · Ambiance » pose sur la carte d'aperçu : le canvas net,
+// §9.10 : les deux images du canvas que « F · Ambiance » pose sur la carte d'aperçu : le canvas net,
 // à la taille exacte de sa place, et le fond, le même canvas en « cover », légèrement flou.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";

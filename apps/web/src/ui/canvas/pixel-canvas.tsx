@@ -20,10 +20,10 @@ const ZOOM_STEP = 1.5;
 // Lu à chaque accès, dans un `try` : dans une fenêtre qui refuse le stockage, l'accès lui-même lève.
 const getBrowserStorage = () => window.localStorage;
 
-// `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page de jeu, dont l'arrivée se cadre sous ses pills du haut.
-// `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue (déplacer, zoomer, ouvrir une case) ; stable, la scène est recréée sinon.
-// `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
-// `login` (Écart §9.1, JOURNAL 2026-10-10) : celui de la page, qui nomme l'adresse de l'image du fond.
+// `isFramedInFreeArea` (§9.7) : la page de jeu, dont l'arrivée se cadre sous ses pills du haut.
+// `onGesture` (§9.7) : une action reconnue (déplacer, zoomer, ouvrir une case) ; stable, la scène est recréée sinon.
+// `onNavigate` (§9.7) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `login` (§9.5) : celui de la page, qui nomme l'adresse de l'image du fond.
 // `handoff` : la page de jeu, qui suit une autre fresque quand le streamer archive, garde l'ancienne à l'écran le temps que la nouvelle arrive.
 type PixelCanvasProps = {
   store: CanvasStore;
@@ -123,8 +123,8 @@ export const PixelCanvas = ({
 
   return (
     <>
-      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, le damier, découpé au canvas, l'aperçu de la croissance (Écart §9.3,
-          JOURNAL 2026-10-29), puis le canvas. */}
+      {/* Empilés en Z (CDC 2026) : le vide, fixe à l'écran, le damier, découpé au canvas, l'aperçu de la croissance (§9.3),
+          puis le canvas. */}
       <div className="lp-void" aria-hidden="true" />
       <div ref={checker} className="lp-checker" aria-hidden="true">
         <div ref={checkerTiles} className="lp-checker-tiles" />

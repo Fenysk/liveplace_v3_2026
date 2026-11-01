@@ -12,7 +12,7 @@ const COPIED_MS = 1500;
 type CopyButtonProps = {
   value: string; // ce qu'on lit
   copyText?: string; // ce qui part dans le presse-papiers : `value` par défaut
-  onCopy?: (() => void) | undefined; // le navigateur a bien pris la valeur (Écart §8.1, JOURNAL 2026-10-09)
+  onCopy?: (() => void) | undefined; // le navigateur a bien pris la valeur (§9.11)
 };
 
 export const CopyButton = ({ value, copyText = value, onCopy }: CopyButtonProps) => {

@@ -12,7 +12,7 @@ const ready: FirstHintContext = {
 };
 const open = (...done: ("pan" | "zoom" | "inspect")[]): FirstHintView => ({ status: "open", done });
 
-describe("ce que montre le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("ce que montre le conseil de première visite (§9.11)", () => {
   // Fermé (PC, déjà vu, stockage refusé), il n'y a rien à monter
   it("mounts nothing when the hint is off", () => {
     expect(toFirstHintProps({ status: "off" }, ready)).toBeUndefined();
@@ -65,13 +65,13 @@ describe("ce que montre le conseil de première visite (Écart §8.1, JOURNAL 20
     expect(toFirstHintProps({ status: "done" }, settled)?.isVisible).toBe(false);
   });
 
-  // Les trois points restent remplis deux secondes (Écart §8.1, JOURNAL 2026-10-09)
+  // Les trois points restent remplis deux secondes (§9.11)
   it("keeps the last dot filled for two seconds", () => {
     expect(BUBBLE_LINGER_MS).toBe(2000);
   });
 });
 
-describe("le battement du dernier point (Écart §8.1, JOURNAL 2026-10-09)", () => {
+describe("le battement du dernier point (§9.11)", () => {
   const shown: HintAside = { isReady: true, isDrafting: false, isInspecting: false, isYielding: false };
 
   // Il court quand la bulle est là avec ses trois points : pas avant, tant que le troisième geste n'est pas fait

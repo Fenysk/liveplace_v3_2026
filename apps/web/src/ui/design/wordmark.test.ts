@@ -8,7 +8,7 @@ import { Wordmark } from "./wordmark";
 const css = readFileSync(join(import.meta.dirname, "wordmark.css"), "utf8");
 const designSystemCss = readFileSync(join(import.meta.dirname, "design-system.css"), "utf8");
 
-describe("le mot-symbole « LivePlace » (Écart §9.1, JOURNAL 2026-10-31)", () => {
+describe("le mot-symbole « LivePlace » (§9.10)", () => {
   // Sans adresse, c'est du texte seul, en Nunito 900 (`lp-type-display`) : ni pill, ni icône, ni forme
   it("writes the name as plain display text when it has no address", () => {
     const html = renderToStaticMarkup(createElement(Wordmark));

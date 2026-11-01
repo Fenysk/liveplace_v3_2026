@@ -1,4 +1,4 @@
-// Le thème du canvas en cours dans la section Canvas (Écart §8.1, JOURNAL 2026-10-07) : lu à l'ouverture, enregistré quand le
+// Le thème du canvas en cours dans la section Canvas (§8.1) : lu à l'ouverture, enregistré quand le
 // champ perd le focus. Sans bouton : rien n'est appelé tant que le thème nettoyé est celui qui est déjà enregistré.
 
 import { useCallback, useEffect, useState } from "react";

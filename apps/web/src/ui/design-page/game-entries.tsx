@@ -49,9 +49,9 @@ type PhoneHeaderProps = {
   fold?: CanvasPillFold;
 };
 
-// Le haut d'un téléphone en Vue : la rangée des pills Canvas et Compte, la bande Thème dessous. En Dessin (Écart §8.1, JOURNAL
-// 2026-10-08), les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut. Un invité n'a pas de pill
-// Compte (Écart §8.1, JOURNAL 2026-10-08) : la pill Canvas prend la rangée.
+// Le haut d'un téléphone en Vue : la rangée des pills Canvas et Compte, la bande Thème dessous. En Dessin (§9.7),
+// les deux pills de la rangée sont effacées : seule la bande reste, montée tout en haut. Un invité n'a pas de pill
+// Compte (§9.7) : la pill Canvas prend la rangée.
 const PhoneHeader = ({
   owner,
   identity = SIGNED_IN,
@@ -84,7 +84,7 @@ const PhoneHeader = ({
   );
 };
 
-// Écart §8.1 (JOURNAL 2026-10-08, 2026-10-09) : déplacer, zoomer, recentrer ou ouvrir une case replie la pill Canvas, la toucher la déplie.
+// §9.7 : déplacer, zoomer, recentrer ou ouvrir une case replie la pill Canvas, la toucher la déplie.
 const FoldDemo = () => {
   const [isFolded, setIsFolded] = useState(false);
   return (
@@ -254,7 +254,7 @@ type AccountScene = {
   pendingReports?: number;
   hasSettings?: boolean;
   hasModeration?: boolean;
-  isDeveloper?: boolean; // écart §10.3 (JOURNAL 2026-10-06) : le bouton Développeur
+  isDeveloper?: boolean; // §10.3 : le bouton Développeur
   isInRow?: boolean; // la rangée d'un téléphone, pour dire la place qu'une pill absente laisse à la pill Canvas
   hasBottomBar?: boolean; // faux : la page d'une archive, sans barre du bas
 };
@@ -635,13 +635,13 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
   },
 ];
 
-// Comme dans le jeu, où le +1 est enveloppé dans la cible d'une bulle : son `<span>` ne doit pas le rétrécir (Écart §9.3, JOURNAL 2026-10-09).
+// Comme dans le jeu, où le +1 est enveloppé dans la cible d'une bulle : son `<span>` ne doit pas le rétrécir (§9.6).
 const WithBubbleTargets = ({ children }: { children: ReactNode }) => {
   const targets = useBubbleTargets();
   return <BubbleTargetsContext value={targets}>{children}</BubbleTargetsContext>;
 };
 
-// Un téléphone en paysage, puis les écrans à charnière (Écart §8.1 et §9.3, JOURNAL 2026-10-08).
+// Un téléphone en paysage, puis les écrans à charnière (§9.7).
 const LandscapeBlocks = ({ nowMs }: { nowMs: number }) => (
   <>
     <Block
@@ -831,7 +831,7 @@ export const DraftPillEntry = () => {
 // Une case de brouillon dans la marge de droite d'une 10 × 10 (l'aperçu de la croissance)
 const DRAFT_IN_MARGIN = [{ x: 9, y: 4 }] as const;
 
-// Sur ordinateur, la pill est toujours là et ne dit aucun pourcentage (Écart §8.1, JOURNAL 2026-10-13).
+// Sur ordinateur, la pill est toujours là et ne dit aucun pourcentage (§9.7).
 const VIEWPORT_STATES: readonly { name: string; detail: string; framing: Framing }[] = [
   {
     name: "Zoomer, dézoomer, recentrer",
@@ -851,7 +851,7 @@ const RecenterPill = () => (
   />
 );
 
-// Recentrer et la colonne : le canvas arrive dans la plus grande zone qu'elle lui laisse (Écart §9.3, JOURNAL 2026-10-09).
+// Recentrer et la colonne : le canvas arrive dans la plus grande zone qu'elle lui laisse (§9.7).
 const WithColumn = ({ nowMs, isAbove }: { nowMs: number; isAbove: boolean }) => (
   <div
     className={

@@ -37,20 +37,20 @@ export default defineSchema({
     createdAt: v.number(),
     purgedBeforeVersion: v.number(), // curseur de purge du worker (D-18), 0 à la création
     purgedBeforeTs: v.number(),
-    // Écart §15 (JOURNAL 2026-10-06) : ajoutés, jamais requis, pour les canvas d'avant. Le code et le thème survivent à
+    // §17.1 : ajoutés, jamais requis, pour les canvas d'avant. Le code et le thème survivent à
     // une réouverture ; la date d'archivage non.
     archivedAt: v.optional(v.number()),
-    theme: v.optional(v.string()), // Écart §8.1 (JOURNAL 2026-10-07)
+    theme: v.optional(v.string()), // §8.1
     // Ancien nom du thème, recopié dans `theme` par `canvases:moveNameToTheme`, retiré au prochain changement de schéma.
     name: v.optional(v.string()),
     linkCode: v.optional(v.string()),
-    // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond, un fichier de `_storage` ; `at` date son adresse, `size` se décompte dans `storageUsage`.
+    // §8.4 : l'image du fond, un fichier de `_storage` ; `at` date son adresse, `size` se décompte dans `storageUsage`.
     backgroundImage: v.optional(v.object({ storageId: v.id("_storage"), at: v.number(), size: v.number() })),
   })
     .index("by_canvasId", ["canvasId"])
     .index("by_owner_active", ["ownerId", "isActive"]),
 
-  // Une ligne par snapshot : le contenu est un fichier (Écart §8.1, JOURNAL 2026-10-06). `scope` nomme l'environnement :
+  // Une ligne par snapshot : le contenu est un fichier (§8.1). `scope` nomme l'environnement :
   // le poste et les bêtas partagent ce déploiement, et un même `canvasId` existe dans plusieurs Redis.
   snapshots: defineTable({
     scope: v.string(),
@@ -61,7 +61,7 @@ export default defineSchema({
     schemaVersion: v.number(),
     size: v.number(), // octets du fichier
     storageId: v.id("_storage"),
-    // Écart §7.3 (JOURNAL 2026-10-08) : le dessin seul, sans auteurs. Absent : une sauvegarde complète. Un fichier peut servir
+    // §7.3 : le dessin seul, sans auteurs. Absent : une sauvegarde complète. Un fichier peut servir
     // plusieurs lignes (une promotion en ajoute une sans le copier) : `by_storage` compte ses références.
     isStateOnly: v.optional(v.boolean()),
   })
@@ -69,7 +69,7 @@ export default defineSchema({
     .index("by_canvas", ["canvasId"]) // le ménage d'un canvas supprimé, tous scopes (JOURNAL 2026-10-08)
     .index("by_storage", ["storageId"]),
 
-  // Une ligne par chunk de l'historique : les entrées du flux sont dans le fichier (Écart §7.2, JOURNAL 2026-10-08). Les
+  // Une ligne par chunk de l'historique : les entrées du flux sont dans le fichier (§7.1). Les
   // chunks d'un canvas se suivent sans se recouvrir, des trous permis.
   chunks: defineTable({
     scope: v.string(),
@@ -90,7 +90,7 @@ export default defineSchema({
     .index("by_scope_toTs", ["scope", "toTs"]) // le budget retire le plus ancien d'abord, canvas confondus
     .index("by_canvas", ["canvasId"]),
 
-  // Écart §8.1 (JOURNAL 2026-10-08) : les octets des fichiers, comptés à chaque ajout et retrait pour qu'une lecture n'en coûte
+  // §8.4 : les octets des fichiers, comptés à chaque ajout et retrait pour qu'une lecture n'en coûte
   // qu'une ligne. `files` : tous les fichiers du déploiement ; `chunks:<scope>` : l'historique d'un scope, que le budget borne.
   storageUsage: defineTable({
     key: v.string(),

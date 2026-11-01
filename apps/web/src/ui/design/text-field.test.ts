@@ -29,7 +29,7 @@ describe("le champ de texte qui charge", () => {
   });
 });
 
-describe("le champ de texte dont une bulle vise le champ (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("le champ de texte dont une bulle vise le champ (§9.11)", () => {
   const wrapped = (isLoading: boolean): string =>
     renderToStaticMarkup(
       createElement(TextField, {

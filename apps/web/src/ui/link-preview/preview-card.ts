@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : la mise en page « F · Ambiance » de l'image d'aperçu d'un lien, choisie par Alexis,
+// §9.10 : la mise en page « F · Ambiance » de l'image d'aperçu d'un lien, choisie par Alexis,
 // dessinée par Satori (infra/card-png.ts) en apparence sombre. Le fond : le canvas en cover, flou, sous un voile ; devant, le
 // canvas net, son contour et un panneau (le thème, l'invitation, la photo et le pseudo, l'adresse).
 // Des `createElement` et non du JSX : cet arbre n'est jamais une page, il n'a pas à passer par les classes du design system

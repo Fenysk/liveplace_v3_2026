@@ -1,5 +1,5 @@
 // L'échelle des courbes (TimeCharts) : x est le créneau, y la valeur de 0 au maximum. Un créneau sans point coupe
-// la courbe : le serveur était arrêté, on ne comble pas (écart §4.3, JOURNAL 2026-10-06).
+// la courbe : le serveur était arrêté, on ne comble pas (§16.1).
 
 export const CHART_HEIGHT = 100;
 const TOP_ROOM = 4; // le pic ne touche pas le haut : la ligne de 2 px y serait coupée
@@ -11,7 +11,7 @@ export function chartMax(values: readonly (number | null)[]): number {
 }
 
 // Une courbe d'un taux a une échelle fixe (`floor`, 100 %) qu'un taux plus haut dépasse : son pic ne se confond pas avec le
-// plafond de la ressource (Écart §4.3, JOURNAL 2026-10-07).
+// plafond de la ressource (§16.1).
 export function chartScale(values: readonly (number | null)[], floor: number): number {
   return Math.max(floor, chartMax(values));
 }

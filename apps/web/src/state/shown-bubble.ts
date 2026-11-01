@@ -1,4 +1,4 @@
-// La bulle d'aide à l'écran (Écart §8.1, JOURNAL 2026-10-08 et 2026-10-12) : jamais deux à la fois. Celle qu'on veut ne paraît qu'une
+// La bulle d'aide à l'écran (§9.11) : jamais deux à la fois. Celle qu'on veut ne paraît qu'une
 // fois la précédente effacée, le temps de son fondu ; une bulle close qui reste (`isLingering`) garde sa place le temps d'être lue.
 // L'horloge est injectée : les tests l'avancent sans rien attendre.
 

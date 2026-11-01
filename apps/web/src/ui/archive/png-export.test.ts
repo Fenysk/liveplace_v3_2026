@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pngFileName, pngScale, toPngPixels } from "./png-export";
 
-describe("pngScale (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("pngScale (§17.1)", () => {
   // Un facteur entier qui amène le plus grand côté à 1000 cases de pixels au moins
   it("is a whole factor that brings the larger side to 1000 pixels at least", () => {
     expect(pngScale(50, 50)).toBe(20);
@@ -20,7 +20,7 @@ describe("pngScale (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("pngFileName (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("pngFileName (§17.1)", () => {
   // Lisible : le pseudo, et le jour d'archivage à Paris
   it("is readable: the login, and the archive day in Paris", () => {
     expect(pngFileName("kalyss", Date.UTC(2026, 9, 18, 10))).toBe("liveplace-kalyss-2026-10-18.png");
@@ -28,7 +28,7 @@ describe("pngFileName (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("toPngPixels (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("toPngPixels (§17.1)", () => {
   const palette = ["#00000000", "#ff0000", "#10203040"];
 
   // Agrandit chaque case en bloc, au plus proche voisin : aucune couleur intermédiaire
@@ -68,7 +68,7 @@ describe("toPngPixels (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("toPngPixels, the background of the download (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("toPngPixels, the background of the download (§17.1)", () => {
   const palette = ["#00000000", "#ff0000", "#10203040"];
   const state = Uint8Array.from([1, 0, 2]); // une case rouge, une vide, une à moitié transparente
 

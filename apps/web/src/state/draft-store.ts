@@ -1,4 +1,4 @@
-// Le mode Dessin (CDC 2026, écart §9.3, JOURNAL 2026-09-24) : le mode, le brouillon, la couleur active, le tracé et l'envoi.
+// Le mode Dessin (CDC 2026, §9.3) : le mode, le brouillon, la couleur active, le tracé et l'envoi.
 // Séparé du store du canvas : la vue OBS partagera celui-là, et elle n'a pas de brouillon.
 
 import {
@@ -60,7 +60,7 @@ export type DraftStore = {
   exitDraftMode(): void; // le brouillon est gardé
   discardDraft(): Draft | undefined; // Vider : rend le brouillon vidé (`undefined` s'il n'y avait rien à vider), de quoi le rétablir
   restoreDraft(cleared: Draft): void; // Rétablir, dans le toast de Vider : seulement tant que Vider est la dernière étape
-  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, le brouillon (non vide) est effacé, sans rétablissement possible.
+  // §5.8 : des pixels ont changé de case, le brouillon (non vide) est effacé, sans rétablissement possible.
   // Un simple décalage de la fresque (JOURNAL 2026-10-28) ne l'efface pas : ses cases suivent.
   listenWiped(listener: () => void): () => void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
@@ -91,7 +91,7 @@ const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", 
 // Du store du canvas, ce que le brouillon lit et appelle : un ajout au store n'a pas à toucher ses tests.
 export type DraftCanvas = Pick<CanvasStore, "subscribe" | "getView" | "placeBatch">;
 
-// `onPlaced` : tout le brouillon vient d'être posé (Écart §8.1, JOURNAL 2026-10-12), de quoi compter les dessins de l'appareil.
+// `onPlaced` : tout le brouillon vient d'être posé (§9.11), de quoi compter les dessins de l'appareil.
 export function createDraftStore(
   canvasId: string,
   canvas: DraftCanvas,
@@ -113,7 +113,7 @@ export function createDraftStore(
     canRedo: false,
   };
   let lastColorIndex = FIRST_COLOR_INDEX;
-  // Écart §9.3 (JOURNAL 2026-10-08) : gardé d'un Dessin au suivant, pas au rechargement ; la vue ne le porte qu'en Dessin.
+  // §9.6 : gardé d'un Dessin au suivant, pas au rechargement ; la vue ne le porte qu'en Dessin.
   let isTouchTracingRemembered = false;
   let loadedUserId: string | undefined;
   let hasShakenThisTrace = false;
@@ -121,11 +121,11 @@ export function createDraftStore(
   let history: DraftHistory = EMPTY_DRAFT_HISTORY;
   let isTraceRecorded = false; // l'étape du tracé en cours est déjà dans l'historique
   const listeners = new Set<() => void>();
-  // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement que ce brouillon connaît, et combien de fois il a été effacé.
+  // §5.8 : la version du dernier rapprochement que ce brouillon connaît, et combien de fois il a été effacé.
   let knownMovedAtVersion = 0;
   let wipeCount = 0;
   const wipedListeners = new Set<() => void>();
-  // Écart §5.3 (JOURNAL 2026-10-28) : le repère que ce brouillon connaît. `successors` : un brouillon décalé prend la place de
+  // §5.8 : le repère que ce brouillon connaît. `successors` : un brouillon décalé prend la place de
   // celui d'avant (l'historique, le toast de Vider), pour que Rétablir retrouve le sien.
   let knownOrigin: CanvasOrigin = START_ORIGIN;
   const successors = new WeakMap<Draft, Draft>();
@@ -155,7 +155,7 @@ export function createDraftStore(
   };
 
   // Le brouillon d'un utilisateur ne se lit qu'après le `welcome` : c'est lui qui donne le `userId`.
-  // Écart §5.3 (JOURNAL 2026-10-24) : sauvegardé avant un rapprochement, il est jeté, effacé du stockage, et dit.
+  // §5.8 : sauvegardé avant un rapprochement, il est jeté, effacé du stockage, et dit.
   const applySavedDraft = (): void => {
     const { userId, status, width, height, palette, movedAtVersion, origin } = canvas.getView();
     if (!userId || status !== "live" || userId === loadedUserId) return;
@@ -170,7 +170,7 @@ export function createDraftStore(
     saveDraft(getStorage, canvasId, userId, EMPTY_DRAFT, knownMovedAtVersion, knownOrigin);
     notifyWiped();
   };
-  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. Écart §15 (JOURNAL 2026-10-06) : une archive aussi,
+  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. §17.1 : une archive aussi,
   // personne n'y pose ; le brouillon reste rangé sous ce canvas et ne suit pas sur le nouveau.
   const leaveIfReadOnly = (): void => {
     const { isBanned, isArchived } = canvas.getView();
@@ -199,7 +199,7 @@ export function createDraftStore(
     if (loadedUserId) saveDraft(getStorage, canvasId, loadedUserId, draft, knownMovedAtVersion, knownOrigin);
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, ses x, y sont faux, et Annuler parle d'un autre dessin.
+  // §5.8 : des pixels ont changé de case, ses x, y sont faux, et Annuler parle d'un autre dessin.
   // Sans étape dans l'historique, rien n'est proposé à Rétablir.
   const wipeIfMoved = (): boolean => {
     const moved = canvas.getView().movedAtVersion ?? 0;
@@ -214,7 +214,7 @@ export function createDraftStore(
     return true;
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque a grandi à gauche ou en haut, ou s'est resserrée : ses cases ont changé de numéro de
+  // §5.8 : la fresque a grandi à gauche ou en haut, ou s'est resserrée : ses cases ont changé de numéro de
   // colonne ou de ligne, et celles du brouillon, de l'historique comme du toast de Vider suivent. Rien n'est effacé.
   const followOrigin = (): void => {
     const { origin } = canvas.getView();
@@ -288,7 +288,7 @@ export function createDraftStore(
     setDraft(draft);
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque peut être décalée pendant l'attente. Un lot prévu dans le repère `plannedOrigin` se redit
+  // §5.8 : la fresque peut être décalée pendant l'attente. Un lot prévu dans le repère `plannedOrigin` se redit
   // dans celui d'aujourd'hui avant de partir, sans les cases que le brouillon a quittées.
   const batchNow = (planned: readonly Pixel[], plannedOrigin: CanvasOrigin): Pixel[] =>
     shiftBatch(planned, originShift(plannedOrigin, knownOrigin)).filter(({ x, y }) =>
@@ -336,7 +336,7 @@ export function createDraftStore(
       publish({ isSending: false });
     }
     // Tout est posé : retour en Vue (CDC 2026). Des refus restent, ils restent visibles en Dessin. Effacé en route par un
-    // rapprochement (Écart §5.3, JOURNAL 2026-10-24), il est vide sans que rien n'ait été posé.
+    // rapprochement (§5.8), il est vide sans que rien n'ait été posé.
     if (view.draft.size === 0 && wipeCount === wipesBefore) {
       leaveDraftMode();
       onPlaced?.();

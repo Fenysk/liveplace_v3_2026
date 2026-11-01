@@ -1,4 +1,4 @@
-// La capacité : chaque ressource face à son plafond (Écart §5.1 et §6, JOURNAL 2026-10-07). Les règles du cahier des
+// La capacité : chaque ressource face à son plafond (§16.3). Les règles du cahier des
 // charges, pures : le taux, la valeur d'une ressource, la saturation. Les mesures viennent du gateway et du web.
 // Hors de `index.ts`, comme `ports.ts` : `@liveplace/domain/capacity`.
 
@@ -26,7 +26,7 @@ export const CAPACITY_RESOURCE_IDS = [
   "convexDatabaseIo",
   "convexEgress",
   "convexCompute",
-  "convexFiles", // Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers de Convex, face à son quota
+  "convexFiles", // §16.3 : le stock de fichiers de Convex, face à son quota
   "snapshotDelay", // et le retard de la sauvegarde, face à ses 15 minutes
 ] as const;
 export type CapacityResourceId = (typeof CAPACITY_RESOURCE_IDS)[number];
@@ -57,7 +57,7 @@ export const INSTANT_WINDOW_MS = 5 * MINUTE_MS; // la valeur d'une ressource ins
 
 // Les plafonds fixés par l'infrastructure ou mesurés par le test de charge du 26/09 (§3).
 export const GATEWAY_OUTBOUND_CEILING_BPS = 200_000_000; // le port du VPS, 200 Mbit/s
-export const BROADCAST_DELAY_CEILING_MS = 100; // la cible de 250 ms du plan d'architecture, §12.3, moins le tick et le réseau (Écart §6, JOURNAL 2026-10-07)
+export const BROADCAST_DELAY_CEILING_MS = 100; // la cible de 250 ms du plan d'architecture, §12.3, moins le tick et le réseau (§16.3)
 export const CANVAS_CONNECTIONS_CEILING = 1000;
 export const TOTAL_CONNECTIONS_CEILING = 1750;
 // Le retard de la sauvegarde : l'âge de la plus ancienne modification pas encore sauvegardée. Un worker sain en a cinq minutes
@@ -296,7 +296,7 @@ export function toStockResource(
   };
 }
 
-// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections du gateway, compté par minute. Sans plafond ni
+// §16.3 : ce que bloquent les protections du gateway, compté par minute. Sans plafond ni
 // taux : ce n'est pas une ressource, la saturation l'ignore.
 export type GuardCount = { refusedPlacements: number; closedConnections: number };
 export type GuardMinute = { at: Timestamp } & GuardCount;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toThumbnailPixels } from "./thumbnail-pixels";
 
-describe("toThumbnailPixels (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("toThumbnailPixels (§17.1)", () => {
   // Rend les cases qui ont une couleur, avec leur place, et jamais les cases transparentes
   it("gives the cells that have a colour, with their place, and never the transparent ones", () => {
     const state = Uint8Array.from([0, 5, 0, 0, 0, 7]);

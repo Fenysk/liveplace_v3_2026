@@ -102,9 +102,8 @@ const RoleRow = ({ author, onSetModerator }: RoleRowProps) => {
   );
 };
 
-// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant (`moderableUserId`). Écart §5.4
-// (JOURNAL 2026-10-08) : pas de Bannir sur un modérateur nommé ici. Retirer ses pixels est la cible de la bulle des actions de
-// modération (Écart §8.1, JOURNAL 2026-10-12).
+// Jamais sur les pixels du streamer, ni sur les siens (maquette). §4.3 : ni sans identifiant (`moderableUserId`). §5.4 : pas de Bannir sur un modérateur nommé ici. Retirer ses pixels est la cible de la bulle des actions de
+// modération (§9.11).
 const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const t = useTexts(INSPECTION_TEXTS);
   const userId = moderableUserId(moderation, author);

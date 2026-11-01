@@ -1,4 +1,4 @@
-// Ce que dit la pill Dessin aux bulles d'aide (Écart §8.1, JOURNAL 2026-10-08) : si elle est en Vue ou en Dessin, la jauge
+// Ce que dit la pill Dessin aux bulles d'aide (§9.11) : si elle est en Vue ou en Dessin, la jauge
 // qu'elle montre, le +1 qui attend. Une reprise de connexion garde ce que la pill montrait : la bulle attend, elle n'est pas close.
 
 import type { HelpFacts } from "../../state/help-bubbles";

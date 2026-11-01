@@ -16,7 +16,7 @@ const meta: CanvasMeta = { ...defaultCanvasMeta(OWNER), width: CANVAS_WIDTH, hei
 const revokeHere = () => revokeBannedModerators(redis, `${runId}-*`);
 
 // L'état laissé par l'ancien bug, que les scripts ne savent plus écrire, est posé à la main dans chaque test.
-describe("revokeBannedModerators (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("revokeBannedModerators (§5.4)", () => {
   // Un modérateur nommé ici et banni perd son rôle, y compris dans mods ; ce que Twitch nomme, ou que personne ne bannit, reste
   it("removes the role named here from a banned moderator, mods included, and touches nobody else", async () => {
     const { canvasId, keys } = await harness.readyCanvas(meta);

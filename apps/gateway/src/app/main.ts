@@ -30,7 +30,7 @@ const redis = new Redis(config.redisUrl);
 // En mode abonné, Redis n'accepte plus les autres commandes : il faut sa propre connexion (§6.3).
 const liveSubscriber = new Redis(config.redisUrl);
 const core = createCanvasCore(redis, liveSubscriber);
-// Écart §5.4 (JOURNAL 2026-10-08) : avant la première page, les modérateurs nommés ici que le bug avait laissés bannis perdent ce
+// §5.4 : avant la première page, les modérateurs nommés ici que le bug avait laissés bannis perdent ce
 // rôle. Un échec se journalise : les scripts tiennent déjà la règle, et le prochain démarrage recommence.
 await revokeBannedModerators(redis).then(
   (revoked) => {
@@ -38,7 +38,7 @@ await revokeBannedModerators(redis).then(
   },
   (error: unknown) => console.error("gateway: modérateurs bannis non retirés", error),
 );
-// Écart §5.1 et §6 (JOURNAL 2026-10-07) : le retard de diffusion, d'une pose reçue à l'envoi de sa frame, sans l'attente du tick.
+// §16.3 : le retard de diffusion, d'une pose reçue à l'envoi de sa frame, sans l'attente du tick.
 const tickMs = Math.round(1000 / config.broadcastHz);
 const delays = createDelayTally();
 const broadcast = createBroadcast(core, { now: Date.now, record: delays.record, tickMs });
@@ -47,7 +47,7 @@ setInterval(broadcast.tick, tickMs);
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
 setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
 
-// Écart §4.3 et §5.1 (JOURNAL 2026-10-06) : la température d'avant le redémarrage, avant la première page.
+// §16.2 : la température d'avant le redémarrage, avant la première page.
 const activity = createActivity({
   store: createActivityStore(redis),
   core,
@@ -61,7 +61,7 @@ setInterval(() => {
     .catch((error: unknown) => console.error("gateway: activité non écrite ou non envoyée", error));
 }, ACTIVITY_TICK_MS);
 
-// Écart §4.3 et §5.1 (JOURNAL 2026-10-07) : la capacité se mesure toutes les 10 s, et part toutes les 2 s à qui la regarde.
+// §16.3 : la capacité se mesure toutes les 10 s, et part toutes les 2 s à qui la regarde.
 const capacity = createCapacity({
   store: createCapacityStore(redis),
   host: createHostProbe(),

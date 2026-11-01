@@ -1,4 +1,4 @@
-// La pyramide des sauvegardes (Écart §7.3, JOURNAL 2026-10-08) : le worker tient en mémoire les lignes de chaque palier, lues
+// La pyramide des sauvegardes (§7.3) : le worker tient en mémoire les lignes de chaque palier, lues
 // une fois à son démarrage, et applique le plan de `planRetention` à chaque passe. Une passe rejouée ne fait rien de plus :
 // le worker peut s'arrêter au milieu et reprendre.
 

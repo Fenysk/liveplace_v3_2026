@@ -34,7 +34,7 @@ const render = (author: InspectEntry, moderation?: ModerationControls) =>
     }),
   );
 
-describe("Bannir in the Inspection pill (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("Bannir in the Inspection pill (§5.4)", () => {
   // Qui modère efface ses dessins et bannit un viewer, et un modérateur venu de Twitch seul
   it("is offered to whoever moderates on a player, and on a moderator who comes from Twitch only", () => {
     const player = render(entry, moderating);
@@ -123,8 +123,8 @@ describe("the Inspection pill while its pixel loads", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : « Effacer ses dessins » est la cible de la bulle des actions de modération
-describe("Effacer ses dessins, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : « Effacer ses dessins » est la cible de la bulle des actions de modération
+describe("Effacer ses dessins, cible d'une bulle d'aide (§9.11)", () => {
   const renderInGame = (moderation?: ModerationControls) =>
     renderToStaticMarkup(
       createElement(

@@ -56,7 +56,7 @@ type Setup = {
   onPlace?: () => void;
   entries?: Map<string, string>;
   isStorageRefused?: boolean;
-  onPlaced?: () => void; // tout le brouillon vient d'être posé (Écart §8.1, JOURNAL 2026-10-12)
+  onPlaced?: () => void; // tout le brouillon vient d'être posé (§9.11)
 };
 
 const setup = ({
@@ -486,7 +486,7 @@ describe("createDraftStore — submit (CDC 2026, §6.3)", () => {
     expect(store.getView().mode).toBe("view");
   });
 
-  // Un dessin posé en entier se compte une fois, qu'il parte en un lot ou en plusieurs (Écart §8.1, JOURNAL 2026-10-12)
+  // Un dessin posé en entier se compte une fois, qu'il parte en un lot ou en plusieurs (§9.11)
   it("tells once that a whole draft is placed, in one batch or in several", async () => {
     const onPlaced = vi.fn();
     const { store } = setup({ onPlaced });
@@ -707,7 +707,7 @@ describe("createDraftStore — Retour arrière (CDC 2026, raccourcis)", () => {
   });
 });
 
-describe("createDraftStore — an archive (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("createDraftStore — an archive (§17.1)", () => {
   // N'entre jamais en Dessin sur une archive, quel que soit le raccourci, et n'envoie rien
   it("never enters draft mode on an archive, whatever the shortcut, and sends nothing", async () => {
     const { store, sentBatches } = setup({ view: liveView({ isArchived: true }) });
@@ -1325,7 +1325,7 @@ describe("createDraftStore — the history (CDC 2026, §8 Historique)", () => {
   });
 });
 
-describe("createDraftStore — taking a cleared draft back (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("createDraftStore — taking a cleared draft back (§9.6)", () => {
   const drawing = () => {
     const context = setup();
     context.store.enterDraftMode();
@@ -1384,7 +1384,7 @@ describe("createDraftStore — taking a cleared draft back (Écart §9.3, JOURNA
   });
 });
 
-describe("createDraftStore — pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("createDraftStore — pixels moved by a resize (§5.8)", () => {
   const key = "liveplace:draft:canvas-1:user-1";
 
   const drawing = (view = liveView()) => {
@@ -1528,7 +1528,7 @@ describe("createDraftStore — pixels moved by a resize (Écart §5.3, JOURNAL 2
   });
 });
 
-describe("createDraftStore — the canvas shifted (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("createDraftStore — the canvas shifted (§5.8)", () => {
   const key = "liveplace:draft:canvas-1:user-1";
 
   const drawing = (view = liveView()) => {

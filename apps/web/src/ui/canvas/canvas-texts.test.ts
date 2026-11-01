@@ -4,7 +4,7 @@ import { CANVAS_TEXTS } from "./canvas-texts";
 const fr = CANVAS_TEXTS.fr;
 const en = CANVAS_TEXTS.en;
 
-describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the sentences of the canvas in both languages (§9.9)", () => {
   // Le nom accessible de la scène dit le propriétaire, et la taille quand elle est connue
   it("names the canvas surface with its owner, and its size once it is known", () => {
     expect(fr.surfaceLabel({ ownerName: "Kalyss", size: { width: 32, height: 32 } })).toBe(
@@ -17,7 +17,7 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(en.pageTitle("Kalyss")).toBe("Kalyss's canvas");
   });
 
-  // La pill Pratique n'a plus de pourcentage (Écart §8.1, JOURNAL 2026-10-13) : ses trois boutons se nomment dans chaque langue
+  // La pill Pratique n'a plus de pourcentage (§9.7) : ses trois boutons se nomment dans chaque langue
   it("names the three buttons of the Practice pill in each language", () => {
     expect([fr.zoomIn, fr.zoomOut, fr.recenter]).toEqual(["Zoomer", "Dézoomer", "Recentrer la vue"]);
     expect([en.zoomIn, en.zoomOut, en.recenter]).toEqual(["Zoom in", "Zoom out", "Recenter the view"]);
@@ -32,7 +32,7 @@ describe("the sentences of the canvas in both languages (Écart §14, JOURNAL 20
     expect(en.refused(1200)).toBe("1,200 pixels refused: they stay in the draft.");
   });
 
-  // Une réduction qui rapproche les dessins efface le brouillon des viewers, et la confirmation du streamer le dit (Écart §5.3, JOURNAL 2026-10-24)
+  // Une réduction qui rapproche les dessins efface le brouillon des viewers, et la confirmation du streamer le dit (§5.8)
   it("says a shrink wipes the drafts, to the viewer who loses one and to the streamer who confirms", () => {
     expect(fr.draftWiped).toBe("La fresque a été réduite\u00a0: ton brouillon a été effacé.");
     expect(en.draftWiped).toBe("The canvas was shrunk: your draft was cleared.");

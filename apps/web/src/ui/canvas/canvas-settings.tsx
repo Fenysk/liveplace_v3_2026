@@ -1,5 +1,5 @@
 // La section Canvas de la fenêtre (CDC 2026, Fenêtre ; JOURNAL 2026-09-29), pour le streamer : le thème du canvas, son fond et son image
-// (Écart §9.1, JOURNAL 2026-10-10), la taille dynamique (Écart §5.3, JOURNAL 2026-10-28), un format puis Petit, Moyen ou Grand (grisés tant
+// (§9.5), la taille dynamique (§5.8), un format puis Petit, Moyen ou Grand (grisés tant
 // qu'elle est activée, JOURNAL 2026-10-29), et la confirmation qui montre ce qui sort du cadre.
 // L'affichage seul, nourri par `CanvasTab`.
 
@@ -54,7 +54,7 @@ export type ThemeField = {
   onCommit: () => void;
 };
 
-// Le champ du thème est la cible de la bulle qui invite le streamer à en donner un (Écart §8.1, JOURNAL 2026-10-12).
+// Le champ du thème est la cible de la bulle qui invite le streamer à en donner un (§9.11).
 export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
   const t = useTexts(ARCHIVE_TEXTS);
   return (
@@ -76,7 +76,7 @@ export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
   );
 };
 
-// Le fond de la fresque (Écart §9.1, JOURNAL 2026-10-10) : transparent, noir ou blanc. `value` est le fond choisi, ou demandé tant que
+// Le fond de la fresque (§9.5) : transparent, noir ou blanc. `value` est le fond choisi, ou demandé tant que
 // le gateway ne l'a pas confirmé.
 export type BackgroundField = {
   value: ObsBackground;
@@ -113,7 +113,7 @@ export const BackgroundSettings = ({ background }: { background: BackgroundField
   );
 };
 
-// L'image de la fresque (Écart §9.1, JOURNAL 2026-10-10), un réglage à part : posée par-dessus n'importe quel fond, à son opacité.
+// L'image de la fresque (§9.5), un réglage à part : posée par-dessus n'importe quel fond, à son opacité.
 // `imageUrl` à `null` : pas d'image, un seul bouton la demande. `background` : le fond que la vignette montre sous l'image.
 // `opacity` : l'opacité choisie, ou demandée tant que le gateway ne l'a pas confirmée. `isSending` : l'image part, les boutons attendent.
 export type BackgroundImageField = {
@@ -196,7 +196,7 @@ export const BackgroundImageSettings = ({ image }: { image: BackgroundImageField
   );
 };
 
-// Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique. `isOn` est la valeur choisie, ou demandée tant que le gateway ne l'a pas
+// §5.8 : la taille dynamique. `isOn` est la valeur choisie, ou demandée tant que le gateway ne l'a pas
 // confirmée ; `isBusy`, la demande attend sa réponse.
 export type DynamicSizeField = {
   isOn: boolean;
@@ -208,7 +208,7 @@ type SizeChoiceSettingsProps = {
   current: CanvasSize;
   choice: SizeChoice | null; // `null` : la taille d'aujourd'hui n'est dans aucun format, aucun n'est présenté comme choisi
   chosen: CanvasSize | null; // la taille de `choice`
-  isLocked: boolean; // Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique est activée, le choix reste visible mais grisé
+  isLocked: boolean; // §5.8 : la taille dynamique est activée, le choix reste visible mais grisé
   onChoose: (choice: SizeChoice) => void;
   onApply: () => void; // ouvre la confirmation
 };
@@ -321,7 +321,7 @@ export type ResizeStatus = "idle" | "running" | "failed";
 type ResizeWindowProps = {
   next: CanvasSize | null; // `null` : fermée
   outside: readonly Pixel[]; // ce qui sort du cadre une fois les dessins rapprochés, à leur place d'aujourd'hui
-  hasMovedPixels: boolean; // Écart §5.3 (JOURNAL 2026-10-24) : des dessins se rapprochent, les brouillons sont effacés
+  hasMovedPixels: boolean; // §5.8 : des dessins se rapprochent, les brouillons sont effacés
   status: ResizeStatus;
   canvas: CanvasPreviewProps;
   onConfirm: () => void;

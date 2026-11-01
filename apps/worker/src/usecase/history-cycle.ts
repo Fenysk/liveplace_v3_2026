@@ -1,4 +1,4 @@
-// Le cycle de l'historique (Écart §7.2, JOURNAL 2026-10-08) : écouter le canal, balayer les versions, ranger ce qui est dû.
+// Le cycle de l'historique (§7.1) : écouter le canal, balayer les versions, ranger ce qui est dû.
 
 import {
   CHUNK_SCHEMA_VERSION,
@@ -54,7 +54,7 @@ export function createHistoryCycle({ source, store, plan, encode, now, log }: Hi
         toTs: last[2].occurredAt,
         count: entries.length,
         schemaVersion: CHUNK_SCHEMA_VERSION,
-        // Écart §7.2 (JOURNAL 2026-10-08) : le saut d'une récupération n'est pas un trou, mais le premier chunk d'après la date
+        // §7.1 : le saut d'une récupération n'est pas un trou, mais le premier chunk d'après la date
         // et note les versions perdues avant elle.
         ...listChunkGaps(
           cursor,

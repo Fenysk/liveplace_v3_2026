@@ -1,4 +1,4 @@
-// La miniature d'un canvas (Écart §15, JOURNAL 2026-10-06) : ses cases non transparentes, pour `PixelPreview`.
+// La miniature d'un canvas (§17.1) : ses cases non transparentes, pour `PixelPreview`.
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";

@@ -1,4 +1,4 @@
-// Suivre le canvas actif (Écart §15, JOURNAL 2026-10-06) : quand le canvas ouvert est archivé, la page du jeu
+// Suivre le canvas actif (§17.1) : quand le canvas ouvert est archivé, la page du jeu
 // ou la vue OBS relit son loader, qui rend le canvas actif, et se rebranche dessus, sans recharger. Tant que le loader rend
 // encore l'ancien (Convex n'a pas fini de changer), elle réessaie, de plus en plus lentement.
 

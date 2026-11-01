@@ -143,7 +143,7 @@ export function createGestureTracker(
   };
 }
 
-// Écart §8.1 (JOURNAL 2026-10-08) : déplacer, pincer et zoomer replient la pill Canvas ; viser et tracer non.
+// §9.7 : déplacer, pincer et zoomer replient la pill Canvas ; viser et tracer non.
 export const movesViewport = ({ kind }: Gesture): boolean =>
   kind === "pan" || kind === "pinch" || kind === "zoom";
 
@@ -153,7 +153,7 @@ export function wheelFactor(amount: number, mode: number, isTrackpadPinch: boole
   return Math.exp(-pixels * (isTrackpadPinch ? TRACKPAD_PINCH_SPEED : WHEEL_SPEED));
 }
 
-// Un cran de molette de souris, par opposition au pas d'un trackpad ou d'un Ctrl + molette (Écart §9.3, JOURNAL 2026-10-09) :
+// Un cran de molette de souris, par opposition au pas d'un trackpad ou d'un Ctrl + molette (§9.3) :
 // le cran arrive d'un coup, en lignes ou d'au moins `WHEEL_NOTCH_MIN_PIXELS`, et la scène l'anime ; les pas, déjà continus, restent directs.
 export function isWheelNotch(amount: number, mode: number, isTrackpadPinch: boolean): boolean {
   return !isTrackpadPinch && (mode !== 0 || Math.abs(amount) >= WHEEL_NOTCH_MIN_PIXELS);

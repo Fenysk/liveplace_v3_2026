@@ -153,7 +153,7 @@ export const CurrentColorButton = ({ color, onPress }: CurrentColorButtonProps) 
   );
 };
 
-// Un choix de couleur au clavier de la palette (Écart §15, JOURNAL 2026-10-06) : les mêmes pastilles en une rangée, sans nom
+// Un choix de couleur au clavier de la palette (§17.1) : les mêmes pastilles en une rangée, sans nom
 // dessous ; la choisie se nomme à droite du titre, comme le Délai (JOURNAL 2026-10-10). Aucune n'est choisie d'avance : `value`
 // à `null`, rien à droite. Sans `tone`, la pastille est le damier du pixel transparent.
 // Une teinte est une classe de palette.css, jamais un `style` (swatch-tones.ts).

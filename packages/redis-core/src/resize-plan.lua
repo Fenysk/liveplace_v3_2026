@@ -1,6 +1,6 @@
 -- Appliquer un plan de `planResize` (domain) à un canvas : son nouvel `state`, ses piles et leurs auteurs, sa version et le `ctl`.
--- Collé devant resize.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (JOURNAL 2026-09-29 ; Écart §5.3, JOURNAL 2026-10-24
--- et 2026-10-29). Le plan est supposé calculé sur la version actuelle : l'appelant a déjà relu `stale`. `env` : les clés et préfixes
+-- Collé devant resize.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (JOURNAL 2026-09-29 ; §5.8).
+-- Le plan est supposé calculé sur la version actuelle : l'appelant a déjà relu `stale`. `env` : les clés et préfixes
 -- du canvas, sa taille d'avant (`width`, `height`) et `cellStride`. `width` et `height` : la nouvelle taille. Rend la version prise.
 
 local function applyResizePlan(env, plan, width, height)

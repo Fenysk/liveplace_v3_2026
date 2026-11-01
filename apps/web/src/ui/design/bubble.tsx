@@ -1,4 +1,4 @@
-// La bulle (Écart §8.1, JOURNAL 2026-10-08) : une surface de pill sans action qui guide un geste, avec un contenu libre.
+// La bulle (§9.11) : une surface de pill sans action qui guide un geste, avec un contenu libre.
 // Sans cible, elle se pose au-dessus de la barre du bas ; avec une cible, contre la pill qui la porte, et une flèche la vise.
 // Elle ne se montre qu'une fois : `useSeenBubble` la retient, et c'est l'appelant qui décide de quand l'afficher.
 
@@ -22,7 +22,7 @@ type BubbleProps = {
   isDocked?: boolean; // absent : posée sur place, comme sur /design
   side?: BubbleSide; // posée sur place seulement : de quel côté de la cible elle est ; absent : au-dessus
   sides?: readonly BubbleSide[]; // posée sur l'écran seulement : les côtés essayés, dans l'ordre (une constante) ; absent : tous
-  isOverWindow?: boolean; // Écart §8.1 (JOURNAL 2026-10-09) : dans une fenêtre ouverte, par-dessus elle, contre l'élément visé
+  isOverWindow?: boolean; // §9.11 : dans une fenêtre ouverte, par-dessus elle, contre l'élément visé
   children: ReactNode;
 };
 
@@ -38,7 +38,7 @@ const ROOM_VARIABLE = "--lp-bubble-room";
 const AIMED_DOCK_ATTRIBUTE = "data-aimed-dock";
 // L'élément visé est sorti du cadre qui le rogne (le corps de la fenêtre a défilé) : le CSS efface la bulle avec lui.
 const CLIPPED_ATTRIBUTE = "data-clipped";
-// L'élément visé porte un anneau tant que la bulle est montrée (Écart §8.1, JOURNAL 2026-10-12) : sa flèche s'arrête contre la pill
+// L'élément visé porte un anneau tant que la bulle est montrée (§9.11) : sa flèche s'arrête contre la pill
 // qui le porte, parfois loin de lui (bubble.css).
 const AIMED_ATTRIBUTE = "data-aimed";
 
@@ -63,7 +63,7 @@ const rectOf = (element: Element): TargetRect => {
 type Docking = { sides: readonly BubbleSide[] | undefined; isOverWindow: boolean };
 
 // Posée sur l'écran : la bulle se pose contre la pill qui porte la cible, sans la couvrir, du côté où elle tient ;
-// sa flèche vise la cible. Écart §8.1 (JOURNAL 2026-10-08). Dans une fenêtre, cette pill est la fenêtre entière : contre la cible
+// sa flèche vise la cible. §9.11. Dans une fenêtre, cette pill est la fenêtre entière : contre la cible
 // elle-même (JOURNAL 2026-10-09).
 const dockAtTarget = (element: HTMLElement, aimed: HTMLElement, { sides, isOverWindow }: Docking) => {
   const pill = element.firstElementChild;
@@ -137,7 +137,7 @@ const followTarget = (
   let watched: Element[] = [];
   const resizing = new ResizeObserver(() => settle());
   // Ce qui se suit : la cible, et dans une fenêtre dont la hauteur suit son contenu (la feuille du mobile) la fenêtre qui l'abrite :
-  // changer de section déplace la cible sans la redimensionner (Écart §8.1, JOURNAL 2026-10-12).
+  // changer de section déplace la cible sans la redimensionner (§9.11).
   const watch = (aimed: HTMLElement) => {
     for (const element of watched) resizing.unobserve(element);
     const dialog = isOverWindow ? aimed.closest(WINDOW_SELECTOR) : null;
@@ -206,7 +206,7 @@ const useBubblePosition = (
   }, [box, target, isDocked, side, sides, isOverWindow, isActive]);
 };
 
-// Écart §8.1 (JOURNAL 2026-10-09) : une fenêtre modale couvre tout hors de la couche supérieure du navigateur, quel que soit le
+// §9.11 : une fenêtre modale couvre tout hors de la couche supérieure du navigateur, quel que soit le
 // `z-index`. La bulle y monte après la fenêtre (`popover` natif), donc au-dessus, et redescend après son fondu.
 const useTopLayer = (box: RefObject<HTMLDivElement | null>, isOverWindow: boolean, isVisible: boolean) => {
   useLayoutEffect(() => {

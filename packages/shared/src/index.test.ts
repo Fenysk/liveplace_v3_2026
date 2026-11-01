@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cookieValue, fromBase64, serializeCookie, toBase64 } from "./index";
 
-describe("toBase64 and fromBase64 (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("toBase64 and fromBase64 (§17.1)", () => {
   // Écrit les octets en base64, comme tout le monde le fait
   it("writes bytes in base64, as everyone does", () => {
     expect(toBase64(Uint8Array.from([104, 105]))).toBe("aGk=");

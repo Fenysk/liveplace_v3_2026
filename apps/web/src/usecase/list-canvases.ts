@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : ce que la section « Archives » montre.
+// §17.2 : ce que la section « Archives » montre.
 
 import type { Timestamp } from "@liveplace/domain";
 import type { Archive, ArchiveWrites, DurableStore } from "@liveplace/domain/ports";

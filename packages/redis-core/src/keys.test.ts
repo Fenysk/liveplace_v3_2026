@@ -50,7 +50,7 @@ describe("buildCanvasKeys (§5.1)", () => {
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-06) : l'activité, des nombres sous `activity:`.
+// §16.2 : l'activité, des nombres sous `activity:`.
 describe("buildActivityKeys", () => {
   const keys = buildActivityKeys();
   const names = [
@@ -98,7 +98,7 @@ describe("buildActivityKeys", () => {
     expect(buildActivityKeys("activity:run-1-").seen).toBe("activity:run-1-seen");
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : l'heure où un canvas a été vu streamé est gardée 10 minutes, le double de la tolérance
+  // §16.2 : l'heure où un canvas a été vu streamé est gardée 10 minutes, le double de la tolérance
   it("keeps the time a canvas was seen streamed 10 minutes, twice the grace", () => {
     expect(buildActivityKeys().seen).toBe("activity:seen");
     expect(ACTIVITY_SEEN_RETENTION_MS).toBe(2 * STREAM_GRACE_MS);

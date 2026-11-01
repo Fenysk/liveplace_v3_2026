@@ -6,7 +6,7 @@ import { type SwitchDeps, withOwnerLock } from "./canvas-switch";
 import { discardOwnerArchive } from "./discard-owner-archive";
 import { reopenCanvas } from "./reopen-canvas";
 
-// Écart §10.3 (JOURNAL 2026-10-06) : l'ordre des écritures fait l'opération fiable. Chaque double note ce qu'on lui
+// §17.2 : l'ordre des écritures fait l'opération fiable. Chaque double note ce qu'on lui
 // demande, dans l'ordre ; un test lit ce journal de bout en bout, et chaque échec y laisse son défaire.
 
 const ownerId = "owner-1";
@@ -166,7 +166,7 @@ beforeEach(() => {
 });
 afterEach(() => logged.mockRestore());
 
-describe("withOwnerLock (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("withOwnerLock (§17.2)", () => {
   // Refuse quand un autre changement tient le verrou, sans rien faire
   it("refuses when another change holds the lock, doing nothing", async () => {
     const { deps, log } = setup({ isLocked: true });
@@ -204,7 +204,7 @@ describe("withOwnerLock (Écart §10.3, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("archiveCanvas (§17.2)", () => {
   // Dans l'ordre : le nouveau canvas sans `ready`, l'ancien figé, le commun, la progression, `ready`, Convex, les
   // signalements classés, le thème de l'archive, le statut publié, le verrou rendu
   it("goes in order: the new canvas without ready, the old one frozen, the shared part, the progress, ready, Convex, reports settled, the theme of the archive, status published, lock given back", async () => {
@@ -247,7 +247,7 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
     expect(sent.prepared).not.toHaveProperty("archivedAt");
   });
 
-  // Écart §5.3 (JOURNAL 2026-10-29) : archivé en taille dynamique, le canvas neuf naît dynamique et 10 × 10, pour Redis comme pour Convex
+  // §5.8 : archivé en taille dynamique, le canvas neuf naît dynamique et 10 × 10, pour Redis comme pour Convex
   it("makes the new canvas dynamic and 10 × 10 when the archived one was dynamic, for Redis and for Convex", async () => {
     const { deps, sent } = setup({
       activeMeta: { width: 60, height: 20, isDynamicSize: true, origin: { x: 4, y: 7 } },
@@ -444,7 +444,7 @@ describe("archiveCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("reopenCanvas (§17.2)", () => {
   // Dans l'ordre : le successeur de l'archive retiré, l'actif figé, le commun, Convex, la progression, les
   // signalements classés, le thème de l'archive, l'archive défigée, les statuts publiés, le verrou rendu
   it("goes in order: the archive's successor removed, the active one frozen, the shared part, Convex, the progress, reports settled, the archive's theme, the archive thawed, statuses published, lock given back", async () => {
@@ -618,7 +618,7 @@ describe("reopenCanvas (Écart §10.3, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("discardOwnerArchive (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("discardOwnerArchive (§17.2)", () => {
   // Dans l'ordre : Convex supprime, le statut est publié, les clés sont effacées, le verrou est rendu
   it("goes in order: Convex discards, the status is published, the keys are erased, the lock is given back", async () => {
     const { deps, log } = setup();

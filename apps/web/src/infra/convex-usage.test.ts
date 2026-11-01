@@ -59,7 +59,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// Écart §2 et §9 (JOURNAL 2026-10-07) : l'usage du mois d'un déploiement, lu par `GET /api/v1/get_current_usage`.
+// §16.3 : l'usage du mois d'un déploiement, lu par `GET /api/v1/get_current_usage`.
 describe("createConvexUsageSource (JOURNAL 2026-10-07)", () => {
   // Appelle l'API du déploiement avec sa clé, dans l'en-tête, et dans un délai borné
   it("calls the API of the deployment with its key in the header, within a bounded time", async () => {
@@ -151,7 +151,7 @@ describe("createConvexUsageSource (JOURNAL 2026-10-07)", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers, lu par `POST /api/query` sur la fonction interne `usage:files`.
+// §16.3 : le stock de fichiers, lu par `POST /api/query` sur la fonction interne `usage:files`.
 describe("the file stock of a deployment (JOURNAL 2026-10-08)", () => {
   const filesReply = (bytes: number, isReady = true) =>
     `{"status":"success","value":{"bytes":${bytes},"count":12,"isReady":${isReady}},"logLines":[]}`;

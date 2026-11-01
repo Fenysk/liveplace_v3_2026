@@ -13,7 +13,7 @@ const screen = { width: 375, height: 812 };
 const bubble = { width: 200, height: 60 };
 const margin = 8;
 
-describe("où poser une bulle qui vise un élément (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("où poser une bulle qui vise un élément (§9.11)", () => {
   // Centrée sur la cible, juste au-dessus d'elle, la flèche au milieu de la bulle
   it("centers the bubble on the target, right above it, with the arrow in the middle", () => {
     const target = { left: 150, top: 700, width: 40, height: 40 };
@@ -55,7 +55,7 @@ const pill = { width: 200, height: 50 };
 const arrowSpace = 12;
 const landscape = { width: 812, height: 375 };
 
-describe("où poser une bulle d'aide contre la pill de sa cible (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("où poser une bulle d'aide contre la pill de sa cible (§9.11)", () => {
   // La cible est dans une pill de plusieurs rangées : la bulle se pose au-dessus de la pill, sans la couvrir, la flèche vers la cible
   it("sits above the whole pill that holds the target, the arrow still aiming at the target", () => {
     const sheet = { left: 15, top: 600, width: 345, height: 200 };
@@ -132,9 +132,9 @@ describe("où poser une bulle d'aide contre la pill de sa cible (Écart §8.1, J
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-13, qui défait l'entrée du même jour sur la flèche au centre de la pill) : la bulle se pose contre la
+// §9.11 : la bulle se pose contre la
 // pill qui porte le bouton, et sa flèche en vise le centre le long de ce bord, jamais le centre de la pill ; l'anneau en plus
-describe("la flèche vise le centre du bouton, pas celui de la pill (Écart §8.1, JOURNAL 2026-10-13)", () => {
+describe("la flèche vise le centre du bouton, pas celui de la pill (§9.11)", () => {
   const centerX = (rect: TargetRect): number => rect.left + rect.width / 2;
   const centerY = (rect: TargetRect): number => rect.top + rect.height / 2;
   // Où la flèche pointe dans l'écran : son abscisse dessus et dessous, son ordonnée à gauche et à droite
@@ -193,9 +193,9 @@ describe("la flèche vise le centre du bouton, pas celui de la pill (Écart §8.
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : un téléphone couché étroit (667 × 375) ou un pliable : la pill est une colonne contre le bord droit,
+// §9.11 : un téléphone couché étroit (667 × 375) ou un pliable : la pill est une colonne contre le bord droit,
 // et le texte d'une ligne (415 px) ne tient ni dessus ni dessous, ni à sa gauche. La bulle se resserre au lieu de la couvrir.
-describe("une bulle à l'étroit se resserre au lieu de couvrir la pill (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("une bulle à l'étroit se resserre au lieu de couvrir la pill (§9.11)", () => {
   const narrow = { width: 667, height: 375 };
   const panel = { left: 339, top: 8, width: 320, height: 359 };
   const wide = { width: 415, height: 42 };
@@ -249,8 +249,8 @@ describe("une bulle à l'étroit se resserre au lieu de couvrir la pill (Écart 
   });
 });
 
-// Dans une fenêtre (Écart §8.1, JOURNAL 2026-10-09) : la bulle se pose contre l'élément lui-même, sur les côtés qu'on lui laisse.
-describe("où poser une bulle contre un onglet de la fenêtre (Écart §8.1, JOURNAL 2026-10-09)", () => {
+// Dans une fenêtre (§9.11) : la bulle se pose contre l'élément lui-même, sur les côtés qu'on lui laisse.
+describe("où poser une bulle contre un onglet de la fenêtre (§9.11)", () => {
   const desktop = { width: 1440, height: 900 };
 
   // Un onglet au bord gauche de la fenêtre, avec de la place avant elle : à sa gauche, la flèche vers lui
@@ -297,7 +297,7 @@ describe("où poser une bulle contre un onglet de la fenêtre (Écart §8.1, JOU
   });
 });
 
-describe("la cible est-elle à la vue dans la fenêtre qui défile (Écart §8.1, JOURNAL 2026-10-09)", () => {
+describe("la cible est-elle à la vue dans la fenêtre qui défile (§9.11)", () => {
   const body = { left: 548, top: 260, width: 550, height: 300 };
   const field = { left: 564, top: 283, width: 520, height: 36 };
 

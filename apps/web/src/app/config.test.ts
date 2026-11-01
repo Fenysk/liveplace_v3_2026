@@ -70,7 +70,7 @@ describe("parseWebConfig (§11.5)", () => {
   });
 });
 
-// Écart §2 et §9 (JOURNAL 2026-10-07) : les déploiements Convex dont le web lit l'usage, facultatifs.
+// §16.3 : les déploiements Convex dont le web lit l'usage, facultatifs.
 describe("CONVEX_USAGE_DEPLOYMENTS (JOURNAL 2026-10-07)", () => {
   const prod = "https://watchful-spider-409.eu-west-1.convex.cloud";
   const dev = "https://happy-otter-123.convex.cloud";

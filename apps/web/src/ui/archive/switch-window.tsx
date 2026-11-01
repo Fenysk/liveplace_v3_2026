@@ -1,4 +1,4 @@
-// Les fenêtres de confirmation de la section « Archives » (Écart §15, JOURNAL 2026-10-06) : la même pour Archiver et
+// Les fenêtres de confirmation de la section « Archives » (§17.1) : la même pour Archiver et
 // Rouvrir, qui dit ce qui va se passer et pose le choix des jauges ; une petite à part pour Supprimer.
 // Rien ne se fait avant que le streamer confirme, et la fenêtre se verrouille pendant l'action.
 

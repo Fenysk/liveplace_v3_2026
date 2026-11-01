@@ -28,7 +28,7 @@ const setup = (options: { userIds?: string[]; isListFailing?: boolean; failingOn
   return { deps: { accounts, tracker, wait }, tracked, waits };
 };
 
-describe("following every known account at the web's start (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("following every known account at the web's start (§10.4)", () => {
   // Suit chaque compte connu, dans l'ordre, avec une attente entre deux : Twitch ne reçoit pas tous les appels d'un coup
   it("tracks each known account in order, with a wait after each so Twitch is not hit all at once", async () => {
     const { deps, tracked, waits } = setup({ userIds: ["1", "2", "3"] });

@@ -6,14 +6,14 @@ import { describe, expect, it } from "vitest";
 import { ThemePill } from "./theme-pill";
 import { THEME_BAR_HEIGHT, TOP_LEFT_WIDTH, TOP_RIGHT_WIDTH } from "./top-bar";
 
-// Écart §8.1 (JOURNAL 2026-10-07) : la pill Thème, en haut au centre, pour tout le monde.
+// §9.7 : la pill Thème, en haut au centre, pour tout le monde.
 
 const render = (theme: string | undefined, isDocked = true): string =>
   renderToStaticMarkup(createElement(ThemePill, { theme, isDocked }));
 
 const pillCss = readFileSync(join(import.meta.dirname, "pill.css"), "utf8");
 
-describe("la pill Thème (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("la pill Thème (§9.7)", () => {
   // Montre le thème en gros sous un petit texte discret, avec les deux phrases du petit texte : le CSS garde celle de l'écran
   it("shows the theme big under a small discreet text, carrying both phrases of it: the CSS keeps the one for the screen", () => {
     const markup = render("Halloween");
@@ -73,7 +73,7 @@ describe("la pill Thème (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("la place de la pill Thème dans pill.css (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("la place de la pill Thème dans pill.css (§9.7)", () => {
   // Se coupe entre les pills Canvas et Compte : elle réserve, des deux côtés, la plus large des deux, mesurée
   it("cuts between the Canvas and Account pills: it keeps, on both sides, the wider of the two, as measured", () => {
     expect(pillCss).toContain(

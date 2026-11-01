@@ -27,7 +27,7 @@ export const TWITCH_COMMANDS_MAXLEN = 10_000; // `MAXLEN ~` : une action acquitt
 export const TWITCH_COMMANDS_READER = "gateway";
 export const TWITCH_COMMANDS_CONSUMER = "gateway"; // un seul gateway : au redémarrage, il retrouve ce qu'il n'a pas fini
 
-// Écart §5.1 (JOURNAL 2026-10-08) : un message EventSub déjà reçu, retenu 10 minutes (la fraîcheur que le web accepte) + 1 de marge.
+// §10.1 : un message EventSub déjà reçu, retenu 10 minutes (la fraîcheur que le web accepte) + 1 de marge.
 export const TWITCH_MESSAGE_TTL_SECONDS = 11 * 60;
 
 export function twitchMessageKey(messageId: string): string {
@@ -105,13 +105,13 @@ export function userKey(userId: string): string {
   return `user:${userId}`;
 }
 
-// Écart §4 (JOURNAL 2026-10-07) : le live Twitch d'un compte, un HASH `checkedAt` et, en live seulement, `category`.
+// §10.4 : le live Twitch d'un compte, un HASH `checkedAt` et, en live seulement, `category`.
 // Sans EXPIRE : « hors live » est un état connu, et le web revérifie celui qui date.
 export function twitchLiveKey(userId: string): string {
   return `twitch:live:${userId}`;
 }
 
-// Écart §15 (JOURNAL 2026-10-06) : le verrou d'un propriétaire, pris par le web le temps d'un changement de canvas actif.
+// §17.2 : le verrou d'un propriétaire, pris par le web le temps d'un changement de canvas actif.
 // Il expire de lui-même : un web tombé en plein changement ne bloque personne plus de 30 s.
 export const OWNER_LOCK_TTL_MS = 30_000;
 
@@ -119,17 +119,17 @@ export function ownerLockKey(ownerId: string): string {
   return `lock:owner:${ownerId}`;
 }
 
-// Écart §5.1 (JOURNAL 2026-10-06) : l'activité, des nombres seulement. Un autre préfixe isole les clés d'un test.
+// §16.2 : l'activité, des nombres seulement. Un autre préfixe isole les clés d'un test.
 export const ACTIVITY_MINUTES_RETENTION_MS = 7 * 24 * 3600 * 1000;
 export const ACTIVITY_HOURS_RETENTION_MS = 366 * 24 * 3600 * 1000;
-// Écart §5.1 (JOURNAL 2026-10-07) : les minutes d'un canvas ne servent qu'aux 24 h ; ses heures vivent comme celles du global.
+// §16.2 : les minutes d'un canvas ne servent qu'aux 24 h ; ses heures vivent comme celles du global.
 export const ACTIVITY_CANVAS_MINUTES_RETENTION_MS = 2 * 24 * 3600 * 1000;
-// Écart §5.1 (JOURNAL 2026-10-08) : un canvas vu streamé il y a plus de 10 minutes, le double de la tolérance, ne comble plus rien.
+// §16.2 : un canvas vu streamé il y a plus de 10 minutes, le double de la tolérance, ne comble plus rien.
 export const ACTIVITY_SEEN_RETENTION_MS = 10 * 60 * 1000;
 export const CANVAS_PIXELS_TTL_SECONDS = 61 * 60; // la température relit les 59 minutes d'avant la minute en cours
 export const SIGNUPS_TTL_SECONDS = 31 * 24 * 3600; // les 30 jours des nouveaux comptes venus de la page d'un streamer
 export const WITHOUT_DISCOVERED_VIA = "none"; // un nouveau compte venu de l'accueil (§8.1)
-// Écart §5.1 (JOURNAL 2026-10-07) : un jour de plus que les 30 de l'audience, pour que le jour qui sort s'y compte encore.
+// §16.2 : un jour de plus que les 30 de l'audience, pour que le jour qui sort s'y compte encore.
 export const ACTIVE_TTL_SECONDS = 31 * 24 * 3600;
 
 // Les nouveaux comptes d'un point, à côté de lui dans le même HASH : le web les compte sans script.
@@ -143,7 +143,7 @@ export function toActiveField(dayAt: number): string {
   return `${dayAt}:active`;
 }
 
-// Écart §5.1 (JOURNAL 2026-10-07) : la capacité, des nombres seulement, sous `capacity:`, avec la pyramide de l'activité.
+// §16.3 : la capacité, des nombres seulement, sous `capacity:`, avec la pyramide de l'activité.
 export const CAPACITY_MINUTES_RETENTION_MS = ACTIVITY_MINUTES_RETENTION_MS;
 export const CAPACITY_HOURS_RETENTION_MS = ACTIVITY_HOURS_RETENTION_MS;
 
@@ -154,7 +154,7 @@ export function buildCapacityKeys(prefix = "capacity:") {
     minutes: `${prefix}minute`, // élagué au-delà de 7 jours
     hours: `${prefix}hour`, // élagué au-delà de 366 jours
     days: `${prefix}day`, // le début du jour de Paris, sans limite
-    // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : `HASH` début de minute → `refusedPlacements,closedConnections`, seulement les
+    // §16.3 : `HASH` début de minute → `refusedPlacements,closedConnections`, seulement les
     // minutes où une protection du gateway a joué ; élagué avec les minutes de la capacité.
     guards: `${prefix}guard`,
     // Déposé par le web : `STRING` `at,utilization`, son occupation à l'instant de sa mesure.
@@ -178,7 +178,7 @@ export function buildActivityKeys(prefix = "activity:") {
     hours: `${prefix}hour`, // élagué au-delà de 366 jours
     days: `${prefix}day`, // le début du jour de Paris, sans limite
     canvasPixels: (minuteAt: number) => `${prefix}pixels:${minuteAt}`, // `canvasId` → pixels de la minute, EXPIRE
-    // Écart §5.1 (JOURNAL 2026-10-08) : `HASH` `canvasId` → l'heure où il a été vu streamé, en millisecondes (l'ancien format,
+    // §16.2 : `HASH` `canvasId` → l'heure où il a été vu streamé, en millisecondes (l'ancien format,
     // `obsSeenAt,liveSeenAt`, se relit par sa dernière heure), versé à la minute et à la fermeture de la dernière vue OBS, relu
     // au démarrage ; élagué au-delà de 10 minutes.
     seen: `${prefix}seen`,
@@ -187,7 +187,7 @@ export function buildActivityKeys(prefix = "activity:") {
     activeAccounts: (parisDay: string) => `${prefix}accounts:${parisDay}`, // les comptes qui ont ouvert le jeu
     activePlayers: (parisDay: string) => `${prefix}players:${parisDay}`, // les comptes dont une pose a été acceptée
     activeStreamers: (parisDay: string) => `${prefix}streamers:${parisDay}`, // les canvas streamés
-    // Écart §5.1 (JOURNAL 2026-10-07) : l'historique d'un canvas, hors de `cv:<canvasId>:` (des nombres d'observation, que le
+    // §16.2 : l'historique d'un canvas, hors de `cv:<canvasId>:` (des nombres d'observation, que le
     // worker ne sauvegarde pas). Les mêmes trois niveaux, écrits seulement pour une minute où il s'y passe quelque chose.
     canvas: (canvasId: string) => ({
       // `HASH` comme ceux du global, `people,obsViews,pixels,visits,phoneVisits,visitMinutes,live` (activity.lua ; `live` y est

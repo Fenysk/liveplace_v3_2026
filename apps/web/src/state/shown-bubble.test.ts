@@ -44,7 +44,7 @@ const setup = () => {
   return { bubble, advance, show, pendingCount };
 };
 
-describe("la bulle d'aide à l'écran (Écart §8.1, JOURNAL 2026-10-08 et 2026-10-12)", () => {
+describe("la bulle d'aide à l'écran (§9.11)", () => {
   // Rien à l'écran : la bulle voulue paraît après le temps d'un fondu, jamais avant
   it("shows the wanted bubble once a fade has passed, never before", () => {
     const { bubble, advance } = setup();

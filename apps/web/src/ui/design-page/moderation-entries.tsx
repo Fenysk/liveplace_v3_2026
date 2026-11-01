@@ -44,7 +44,7 @@ const TROLL = {
   placementId: SAMPLE_PLACEMENT_ID,
 };
 
-// Écart §5.4 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit pas.
+// §5.4 : un modérateur nommé ici ne se bannit pas.
 const NAMED_HERE = { isFromTwitch: false, isNamedHere: true };
 
 const MODERATING: ModerationControls = { isProtected: () => false, onModerate: noop };
@@ -290,7 +290,7 @@ const BannedUsersScene = () => {
   );
 };
 
-// Débannir échoue une fois, la liste reste et la ligne le dit (Écart §8.1, JOURNAL 2026-10-13) ; Réessayer relance, et la
+// Débannir échoue une fois, la liste reste et la ligne le dit (§9.8) ; Réessayer relance, et la
 // ligne part comme dans le jeu. Cette illustration reste interactive.
 const UnbanFailureScene = () => {
   const [users, setUsers] = useState(SAMPLE_BANNED_USERS);

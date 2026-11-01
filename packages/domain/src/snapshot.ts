@@ -1,4 +1,4 @@
-// Le snapshot complet d'un canvas : de quoi le rendre à son streamer après une perte totale (Écart §7.2, JOURNAL 2026-10-06).
+// Le snapshot complet d'un canvas : de quoi le rendre à son streamer après une perte totale (§7.2).
 
 import { type CanvasSize, CELL_STRIDE, type Timestamp, toStateOffset } from "./index";
 

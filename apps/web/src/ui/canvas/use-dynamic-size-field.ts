@@ -1,4 +1,4 @@
-// La taille dynamique dans la section Canvas (Écart §5.3, JOURNAL 2026-10-28), branchée sur le store : la valeur affichée est la demandée
+// La taille dynamique dans la section Canvas (§5.8), branchée sur le store : la valeur affichée est la demandée
 // tant que le `welcome` du gateway ne l'a pas confirmée, comme le fond ; un refus la rend à celle d'avant et le dit.
 
 import { useSyncExternalStore } from "react";
@@ -8,7 +8,7 @@ import { useTexts } from "../locale/use-locale";
 import { CANVAS_TEXTS } from "./canvas-texts";
 import { useRequested } from "./use-background-fields";
 
-// `set` rend vrai quand le gateway a répondu : la fenêtre de confirmation (Écart §5.3, JOURNAL 2026-10-29) s'y attache pour se fermer.
+// `set` rend vrai quand le gateway a répondu : la fenêtre de confirmation (§5.8) s'y attache pour se fermer.
 export type DynamicSizeControl = {
   isOn: boolean;
   isBusy: boolean;

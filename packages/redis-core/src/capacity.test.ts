@@ -39,7 +39,7 @@ const usage = (counts: Partial<ConvexUsage> = {}): ConvexUsage => ({
   ...counts,
 });
 
-describe("the capacity history in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
+describe("the capacity history in Redis (§16.3)", () => {
   // Garde le pic de la saturation, la ressource qui la portait et le plus haut taux de chaque maillon, minute, heure, jour
   it("keeps the peak of the saturation, the resource that carried it and the highest ratio of each link, on the minute, hour and day", async () => {
     const { store } = stores();
@@ -224,7 +224,7 @@ describe("the guards of the gateway in Redis (JOURNAL 2026-10-09)", () => {
   });
 });
 
-describe("what the web deposits (écart §2 et §9, JOURNAL 2026-10-07)", () => {
+describe("what the web deposits (§16.3)", () => {
   // Garde l'occupation du web avec l'instant de sa mesure, et dit qu'il n'a rien déposé quand c'est le cas
   it("keeps the utilization of the web with the instant of its measure, and says it deposited nothing when it did not", async () => {
     const { store, writes } = stores();

@@ -1,4 +1,4 @@
-// Le zoom qui vise une case confortable, Écart §9.3 (JOURNAL 2026-10-08, 2026-10-09) : au toucher d'une case trop petite en Vue.
+// Le zoom qui vise une case confortable, §9.3 : au toucher d'une case trop petite en Vue.
 // Entrer en Dessin n'y touche plus. Tout en pixels CSS et sans DOM.
 
 import type { Cell, Insets, ScreenPoint, Size, Viewport, ZoomLimits } from "./viewport";
@@ -15,7 +15,7 @@ export const COMFORTABLE_CELL: Record<PointerGrain, { min: number; target: numbe
   fine: { min: 10, target: 16 },
 };
 
-// Cases à voir au moins sur le petit côté de la zone libre (Écart §9.3, JOURNAL 2026-10-09). À 28 px, un téléphone en portrait
+// Cases à voir au moins sur le petit côté de la zone libre (§9.3). À 28 px, un téléphone en portrait
 // en montre 13 à 14 (375 à 390 px), un en paysage 10 à 12 (290 à 361 px de haut, selon la barre du navigateur et le thème).
 export const MIN_VISIBLE_CELLS: Record<PointerGrain, number> = { coarse: 14, fine: 24 };
 

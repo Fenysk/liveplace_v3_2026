@@ -1,4 +1,4 @@
--- Une minute de la capacité, reportée d'un coup sur ses trois niveaux (écart §5.1, JOURNAL 2026-10-07) : le pic de la
+-- Une minute de la capacité, reportée d'un coup sur ses trois niveaux (§16.3) : le pic de la
 -- saturation avec la ressource qui le portait, et le plus haut taux de chaque maillon.
 -- KEYS : les HASH des minutes, des heures, des jours. ARGV : le début du point de chacun, puis saturation, position de la
 -- ressource porteuse (-1 : aucune), et le taux de redis, gateway, web, machine, convex (-1 : maillon sans mesure).

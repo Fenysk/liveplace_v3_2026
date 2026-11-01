@@ -42,7 +42,7 @@ const chunk: Chunk = {
 
 const compressed = (value: unknown) => new Uint8Array(brotliCompressSync(Buffer.from(JSON.stringify(value))));
 
-describe("the chunk file format (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("the chunk file format (§7.1)", () => {
   // Un chunk encodé puis décodé redevient exactement lui-même, poses et modération comprises
   it("gives back exactly the chunk after a round trip", async () => {
     expect(await decodeChunk(await encodeChunk(chunk))).toEqual({ ok: true, value: chunk });

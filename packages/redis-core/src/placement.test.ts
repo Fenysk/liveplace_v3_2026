@@ -379,7 +379,7 @@ describe("approvePlacement and the reports list (JOURNAL 2026-09-28)", () => {
     await redis.del("user:troll");
   });
 
-  // Dit d'où vient l'auteur d'une pose signalée quand il est modérateur, pour que Bannir se cache (Écart §4.3, JOURNAL 2026-10-08)
+  // Dit d'où vient l'auteur d'une pose signalée quand il est modérateur, pour que Bannir se cache (§4.3)
   it("tells where the author of a reported placement comes from when he is a moderator, and nothing otherwise", async () => {
     const { canvasId } = await readyCanvas();
     await placeAs(canvasId, "troll", "ptroll001", [{ x: 0, y: 0, colorIndex: 4 }]);

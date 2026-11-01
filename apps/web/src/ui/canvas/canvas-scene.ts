@@ -88,12 +88,12 @@ export type CanvasScene = {
 // `onFraming` : à chaque changement du zoom ou du « la vue a bougé » (Recentrer sur mobile).
 // `checker` : la couche CSS du damier, sous le canvas. La scène lui donne le rectangle du canvas et la taille des cases,
 // et fait dériver son motif (`checkerTiles`).
-// `preview` (Écart §9.3, JOURNAL 2026-10-29) : les couches de l'aperçu de la croissance (growth-preview.tsx), entre le damier et le canvas ;
+// `preview` (§9.3) : les couches de l'aperçu de la croissance (growth-preview.tsx), entre le damier et le canvas ;
 // son damier dérive avec l'autre, au même instant, pour que les deux se prolongent.
-// `isFramedInFreeArea` (Écart §9.3, JOURNAL 2026-10-08) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
-// `onGesture` (Écart §8.1, JOURNAL 2026-10-08) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
-// `onNavigate` (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pour le conseil de première visite.
-// `login` (Écart §9.1, JOURNAL 2026-10-10) : celui de la page, qui nomme l'adresse de l'image du fond.
+// `isFramedInFreeArea` (§9.7) : la page a un en-tête de pills, et sur mobile l'arrivée se cadre dessous.
+// `onGesture` (§9.7) : une action reconnue sur le canvas (déplacer, pincer, zoomer, ouvrir une case).
+// `onNavigate` (§9.7) : un déplacement ou un zoom réussi, pour le conseil de première visite.
+// `login` (§9.5) : celui de la page, qui nomme l'adresse de l'image du fond.
 // `handoff` : le passage d'une scène à la suivante, quand la page suit une autre fresque.
 type SceneOptions = {
   login: string;
@@ -262,7 +262,7 @@ export function createCanvasScene(
     options.checker.style.setProperty("--lp-checker-clip", insetOf(frameBox(current, canvas), screen));
   };
 
-  // Écart §9.3 (JOURNAL 2026-10-29) : l'aperçu de la croissance. Au toucher, rien ne survole : seul le brouillon le nourrit.
+  // §9.3 : l'aperçu de la croissance. Au toucher, rien ne survole : seul le brouillon le nourrit.
   const showPreview = createGrowthPreview(options.preview);
   let isAimTouched = false;
   const showGrowth = (view: CanvasView, canvas: Size, viewport: Viewport) => {
@@ -382,7 +382,7 @@ export function createCanvasScene(
     return fades;
   };
 
-  // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque et son image, sous les pixels ; le damier ne se retire que pour un fond plein.
+  // §9.5 : le fond de la fresque et son image, sous les pixels ; le damier ne se retire que pour un fond plein.
   const getBackdrop = (params: CanvasView["params"]) => {
     const imageAt = params?.backgroundImageAt;
     backdropImage.set(imageAt ? backgroundImagePath(options.login, imageAt) : null);
@@ -448,7 +448,7 @@ export function createCanvasScene(
     if (frameRequest === 0) frameRequest = requestAnimationFrame(render);
   };
 
-  // Écart §9.3 (JOURNAL 2026-10-13) : la main fermée tient tant que la vue se déplace.
+  // §9.3 : la main fermée tient tant que la vue se déplace.
   let isViewMoving = false;
   const setPanning = (isPanning: boolean) => {
     root.toggleAttribute(PANNING_ATTRIBUTE, isPanning);
@@ -494,7 +494,7 @@ export function createCanvasScene(
   const pointerGrain = (): PointerGrain =>
     window.matchMedia(COARSE_POINTER_QUERY).matches ? "coarse" : "fine";
 
-  // Écart §9.3 (JOURNAL 2026-10-13) : le curseur dit ce que fera le clic (canvas-cursor.ts). La loupe, seulement sur une case
+  // §9.3 : le curseur dit ce que fera le clic (canvas-cursor.ts). La loupe, seulement sur une case
   // que le clic zoomerait (`tapZoomTarget` ne prend le point que pour placer la vue : nul ou non, il dit si le clic zoome) ;
   // posé par le CSSOM, et seulement quand il change.
   let shownCursor = "";
@@ -568,7 +568,7 @@ export function createCanvasScene(
   // Les pills se mesurent après le premier cadrage (le thème arrive, l'encoche change) : si la vue n'a pas bougé depuis
   // l'arrivée, elle suit la nouvelle zone libre ; sinon, seul le cadrage se relit.
   const refreshInsets = () => {
-    // Écart §9.3 (JOURNAL 2026-10-09) : pas en Dessin, où la bande Thème, plus étroite, passe sur deux lignes et recadrerait la vue.
+    // §9.7 : pas en Dessin, où la bande Thème, plus étroite, passe sur deux lignes et recadrerait la vue.
     if (screen.width === 0 || draftStore.getView().mode === "draft") return;
     const next = measureInsets();
     if (isSameInsets(next, insets)) return;
@@ -620,7 +620,7 @@ export function createCanvasScene(
   };
 
   // Un clic immobile ou un tap (A5 du plan du J10) : en Dessin, la case entre dans le brouillon ou en sort ;
-  // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026). Écart §9.3 (JOURNAL 2026-10-09) : une case
+  // en Vue, elle s'inspecte, et un clic dans le vide ferme l'inspection (CDC 2026). §9.3 : une case
   // trop petite pour viser ne s'inspecte pas, la vue zoome sous le doigt ; un zoom, pour le conseil et la pill Canvas.
   const tap = (current: Viewport, point: ScreenPoint) => {
     const cell = cellAt(current, point);
@@ -722,7 +722,7 @@ export function createCanvasScene(
   };
   const unobserveZone = options.isFramedInFreeArea ? observeZone(root, refreshZone) : () => undefined;
 
-  // Écart §5.3 (JOURNAL 2026-10-28) : la fresque a été décalée de `shift` cases (vers la droite et le bas) : tout ce que la scène
+  // §5.8 : la fresque a été décalée de `shift` cases (vers la droite et le bas) : tout ce que la scène
   // tient par case suit, pour que la vue, le viseur et les animations en cours restent sous les yeux de la personne.
   const moveCell = (cell: Cell | null, shift: Cell): Cell | null =>
     cell && clampCell({ x: cell.x + shift.x, y: cell.y + shift.y }, canvasSize());
@@ -764,8 +764,8 @@ export function createCanvasScene(
     if (shift.x !== 0 || shift.y !== 0) followShift(shift);
   };
 
-  // §5.3 : une nouvelle taille ramène la vue à l'arrivée. Écart §9.3 (JOURNAL 2026-10-09) : sa forme dit aussi la zone d'arrivée.
-  // Écart §5.3 (JOURNAL 2026-10-28) : sauf une taille dynamique (`keepViewThrough`).
+  // §5.3 : une nouvelle taille ramène la vue à l'arrivée. §9.7 : sa forme dit aussi la zone d'arrivée.
+  // §5.8 : sauf une taille dynamique (`keepViewThrough`).
   const unsubscribe = store.subscribe(() => {
     const { width, height, isDynamicSize } = store.getView();
     const { isFirstSize, isResized, shift } = takeSeenCanvas();
@@ -802,7 +802,7 @@ export function createCanvasScene(
 
   let lastDraft = draftStore.getView().draft;
   let wasTracing = false;
-  // Écart §9.3 (JOURNAL 2026-10-09) : entrer en Dessin, comme en sortir, ne touche pas à la vue.
+  // §9.3 : entrer en Dessin, comme en sortir, ne touche pas à la vue.
   const unsubscribeDraft = draftStore.subscribe(() => {
     const { isTracing, mode, draft } = draftStore.getView();
     if (draft !== lastDraft) {
@@ -891,7 +891,7 @@ export function createCanvasScene(
       apply({ kind: "zoom", point: { x: screen.width / 2, y: screen.height / 2 }, factor }, true);
     },
     // Recentrer revient à l'arrivée, sur l'écran d'aujourd'hui, en douceur ; la vue n'est à l'arrivée qu'une fois arrivée.
-    // Écart §8.1 (JOURNAL 2026-10-09) : comme un déplacement, il replie la pill Canvas.
+    // §9.7 : comme un déplacement, il replie la pill Canvas.
     recenter() {
       if (!viewport || store.getView().width === 0) return;
       options.onGesture();

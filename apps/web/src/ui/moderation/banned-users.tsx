@@ -28,7 +28,7 @@ export type BannedUsersProps = {
   list: BannedList;
   preview: BanPreview | null;
   unbanningUserId: string | null; // Débannir attend sa réponse
-  failedUserId?: string | null | undefined; // Débannir a échoué : la ligne le dit, la liste reste (Écart §8.1, JOURNAL 2026-10-13)
+  failedUserId?: string | null | undefined; // Débannir a échoué : la ligne le dit, la liste reste (§9.8)
   canvas: CanvasPreviewProps;
   onPreview: (userId: string) => void; // l'œil : ouvre son aperçu, ou le referme
   onUnban: (userId: string) => void;

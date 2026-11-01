@@ -1,4 +1,4 @@
-// Écart §4 (JOURNAL 2026-10-07) : le live Twitch de chaque compte. Le web l'écrit, le gateway le lit.
+// §10.4 : le live Twitch de chaque compte. Le web l'écrit, le gateway le lit.
 
 import type { AccountList, TwitchLive, TwitchLiveState, TwitchLiveStore } from "@liveplace/domain/ports";
 import type { Redis } from "ioredis";

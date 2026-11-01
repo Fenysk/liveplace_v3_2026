@@ -12,7 +12,7 @@ const CLOSE_POLICY = 1008;
 const CLOSE_INTERNAL = 1011;
 // « try again later » : la page se reconnecte et reprend par `lastVersion`, on ne garde jamais de file qui grossit pour elle.
 const CLOSE_TRY_AGAIN_LATER = 1013;
-// §6.3, Écart §6.3 (JOURNAL 2026-10-09) : 1 Mio de plus que la plus grosse frame déjà envoyée, que la page met le temps de vider.
+// §6.3 : 1 Mio de plus que la plus grosse frame déjà envoyée, que la page met le temps de vider.
 export const MAX_BUFFERED_BYTES = 1024 * 1024;
 // Une réponse HTTP brute : avant l'upgrade, la socket n'est encore qu'un flux TCP.
 const FORBIDDEN_HANDSHAKE = ["HTTP/1.1 403 Forbidden", "Connection: close", "Content-Length: 0", "", ""].join(
@@ -24,8 +24,8 @@ export type GatewayServerDeps = {
   publicOrigin: string;
   verifier: SessionVerifier;
   openConnection: (socket: ClientSocket, session: Session | null, device: Device) => ClientConnection;
-  onBytesSent: (bytes: number) => void; // Écart §5.1 (JOURNAL 2026-10-07) : le débit sortant, compté à chaque envoi
-  onClosedBehind: () => void; // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : une connexion fermée en 1013, comptée une fois
+  onBytesSent: (bytes: number) => void; // §16.3 : le débit sortant, compté à chaque envoi
+  onClosedBehind: () => void; // §16.3 : une connexion fermée en 1013, comptée une fois
 };
 
 // Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
@@ -76,7 +76,7 @@ export function isAllowedOrigin(origin: string | undefined, publicOrigin: string
   return origin === undefined || origin === publicOrigin;
 }
 
-// Écart §4.3 (JOURNAL 2026-10-06) : PC ou téléphone, pour le suivi d'activité. Sans `User-Agent`, un PC.
+// §16.2 : PC ou téléphone, pour le suivi d'activité. Sans `User-Agent`, un PC.
 const PHONE_USER_AGENT = /Mobi|Android|iPhone|iPad|iPod/;
 
 export function toDevice(userAgent: string | undefined): Device {

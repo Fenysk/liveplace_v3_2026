@@ -8,7 +8,7 @@ import { CANVAS_TEXTS } from "./canvas-texts";
 
 const DOCK: PillDock = "tl";
 
-// Écart §8.1 (JOURNAL 2026-10-08, 2026-10-09) : la page replie la pill quand on déplace, zoome, recentre ou ouvre une case, et la déplie au toucher.
+// §9.7 : la page replie la pill quand on déplace, zoome, recentre ou ouvre une case, et la déplie au toucher.
 export type CanvasPillFold = { isFolded: boolean; onUnfold: () => void };
 
 type CanvasPillProps = {

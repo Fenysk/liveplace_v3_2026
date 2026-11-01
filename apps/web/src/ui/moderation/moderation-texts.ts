@@ -1,5 +1,5 @@
 // Les phrases de la modération (JOURNAL 2026-09-25) : la confirmation, la fenêtre du banni et l'onglet Modération.
-// Écart §14 (JOURNAL 2026-10-07) : chacune en français et en anglais.
+// §9.9 : chacune en français et en anglais.
 
 import { formatNumber, isSingular } from "../locale/locale";
 import { defineTexts, localized } from "../locale/texts";
@@ -12,7 +12,7 @@ export const MODERATION_TEXTS = defineTexts({
     fr: "La connexion a sauté. Réessaie dans un instant : la page se reconnecte seule.",
     en: "The connection dropped. Try again in a moment: the page reconnects by itself.",
   },
-  // Sur la ligne dont l'action a échoué, Écart §8.1 (JOURNAL 2026-10-13) : elle relance la même.
+  // Sur la ligne dont l'action a échoué, §9.8 : elle relance la même.
   retry: { fr: "Réessayer", en: "Try again" },
 
   // JOURNAL 2026-09-28 : combien de comptes ont signalé une pose.

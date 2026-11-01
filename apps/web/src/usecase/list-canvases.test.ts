@@ -34,7 +34,7 @@ const depsWith = (
   redis: { getCanvasImage: async (canvasId) => images[canvasId] ?? null },
 });
 
-describe("sortArchives (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("sortArchives (§17.2)", () => {
   // De la plus récemment archivée à la plus ancienne, sans toucher à la liste reçue
   it("goes from the most recently archived to the oldest, leaving the received list alone", () => {
     const received = [archiveOf(2), archiveOf(5), archiveOf(1), archiveOf(4)];
@@ -62,7 +62,7 @@ describe("sortArchives (Écart §10.3, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("listCanvases (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("listCanvases (§17.2)", () => {
   // Rend le canvas actif puis les archives de la plus récente à la plus ancienne, chacune avec sa miniature en base64
   it("gives the active canvas then the archives from the most recent, each with its thumbnail in base64", async () => {
     const images = {

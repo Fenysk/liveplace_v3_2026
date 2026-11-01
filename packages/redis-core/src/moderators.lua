@@ -5,7 +5,7 @@ local metaKey, modsKey, twitchKey, liveplaceKey = KEYS[1], KEYS[2], KEYS[3], KEY
 local bansKey = KEYS[5]
 local liveChannel, userId, source, isModerator = ARGV[1], ARGV[2], ARGV[3], ARGV[4] == "1"
 
--- Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "archivedAt")
 if meta[1] ~= "1" then
   return "canvas_not_found"
@@ -17,7 +17,7 @@ end
 if userId == meta[2] then
   return "forbidden"
 end
--- Écart §5.4 (JOURNAL 2026-10-08) : on ne nomme pas ici un banni ; le rôle Twitch, lui, se reflète tel quel.
+-- §5.4 : on ne nomme pas ici un banni ; le rôle Twitch, lui, se reflète tel quel.
 if isModerator and source == "liveplace" and redis.call("SISMEMBER", bansKey, userId) == 1 then
   return "forbidden"
 end

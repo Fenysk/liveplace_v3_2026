@@ -17,11 +17,11 @@ import {
 const resolveFrom = (cookieHeader: string | undefined, preferenceHeader?: string) =>
   resolveLocale({ cookieHeader, preferenceHeader });
 
-// La requête vise `/` : l'accueil parle anglais à qui ne dit aucune langue (Écart §14, JOURNAL 2026-10-28)
+// La requête vise `/` : l'accueil parle anglais à qui ne dit aucune langue (§9.9)
 const resolveHome = (cookieHeader: string | undefined, preferenceHeader?: string) =>
   resolveLocale({ cookieHeader, preferenceHeader, isHome: true });
 
-describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la langue du premier affichage (§9.9)", () => {
   // Quand le navigateur préfère l'anglais, le système doit rendre la page en anglais
   it("takes English from a browser that prefers English", () => {
     expect(resolveFrom(undefined, "en-US,en;q=0.9")).toBe("en");
@@ -98,7 +98,7 @@ describe("la langue du premier affichage (Écart §14, JOURNAL 2026-10-07)", () 
   });
 });
 
-describe("la langue d'une requête et d'une page déjà rendue (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la langue d'une requête et d'une page déjà rendue (§9.9)", () => {
   // Une route serveur en texte brut lit les mêmes en-têtes que la page
   it("reads the cookie and Accept-Language of a request like the page does", () => {
     const request = (headers: Record<string, string>) => ({ headers: new Headers(headers) });
@@ -137,7 +137,7 @@ describe("la langue d'une requête et d'une page déjà rendue (Écart §14, JOU
   });
 });
 
-describe("le choix de la langue retenu dans le navigateur (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("le choix de la langue retenu dans le navigateur (§9.9)", () => {
   // Le cookie dure un an, couvre tout le site, ne part pas d'un autre site, et reste lisible par la page
   it("writes a cookie of one year for the whole site, SameSite=Lax, that the page can read", () => {
     const cookie = localeCookie("en", false);
@@ -175,7 +175,7 @@ describe("le choix de la langue retenu dans le navigateur (Écart §14, JOURNAL 
   });
 });
 
-describe("les nombres et les pluriels de chaque langue (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("les nombres et les pluriels de chaque langue (§9.9)", () => {
   // Un nombre s'écrit comme la langue le veut : l'espace insécable en français, la virgule en anglais
   it("writes a number the way each language does", () => {
     expect(formatNumber(1204, "fr")).toBe((1204).toLocaleString("fr-FR"));

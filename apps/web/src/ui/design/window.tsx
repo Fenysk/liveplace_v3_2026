@@ -26,7 +26,7 @@ export const useShownWhileClosing = <T,>(value: T | null): T | null => {
   return value ?? lastShown.current;
 };
 
-// Enveloppe un onglet : la cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09).
+// Enveloppe un onglet : la cible d'une bulle d'aide (§9.11).
 type WrapTab<Id extends string> = (id: Id, tab: ReactNode) => ReactNode;
 
 type WindowNavProps<Id extends string> = {
@@ -262,7 +262,7 @@ export const SmallWindow = ({
 // Une ligne de la fenêtre : un libellé à gauche, sa valeur ou son contrôle à droite.
 // `hasProfile` : le libellé est un profil, dont le nom se coupe plutôt que de pousser les actions.
 // `isListed` : une ligne d'une liste, qui arrive en fondu avec elle (arrival.css).
-// `isFailed` (Écart §8.1, JOURNAL 2026-10-13) : son action a échoué, le message et Réessayer passent dessous.
+// `isFailed` (§9.8) : son action a échoué, le message et Réessayer passent dessous.
 type WindowRowProps = {
   label: ReactNode;
   hasProfile?: boolean;

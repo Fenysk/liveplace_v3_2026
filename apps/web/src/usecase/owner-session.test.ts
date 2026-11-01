@@ -11,7 +11,7 @@ beforeEach(() => {
 });
 afterEach(() => logged.mockRestore());
 
-describe("withOwnerSession (Écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("withOwnerSession (§17.2)", () => {
   // Fait agir l'opération pour le propriétaire du cookie, et pour lui seul
   it("runs the operation for the owner of the cookie, and for that owner only", async () => {
     const verifier: SessionVerifier = {

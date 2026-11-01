@@ -18,7 +18,7 @@ const getCanvasPage = createServerFn({ method: "GET" })
   .validator((login: string) => login)
   .handler(async ({ data: login, context }) => {
     const page = await resolveCanvas(context.deps.durable, login);
-    // Écart §4.2 (JOURNAL 2026-10-08) : un canvas que Redis a perdu se dit « en récupération » dès ce rendu.
+    // §7.4 : un canvas que Redis a perdu se dit « en récupération » dès ce rendu.
     if (page)
       await markRecoveringIfLost(
         { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },
@@ -35,7 +35,7 @@ const getGameCanvasPage = createServerFn({ method: "GET" })
       context.deps.durable,
       login,
       { verifier: context.deps.verifier, cookieHeader: getRequestHeader("cookie") },
-      context.deps.tracker, // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, lu à Redis, jamais à Twitch
+      context.deps.tracker, // §10.4 : le live du streamer, lu à Redis, jamais à Twitch
     );
     if (!page) return null;
     await markRecoveringIfLost(

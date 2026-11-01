@@ -1,4 +1,4 @@
-// Le suivi d'activité vu du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-06, 2026-10-07 et 2026-10-08) : qui est connecté,
+// Le suivi d'activité vu du gateway (§16.2) : qui est connecté,
 // où, depuis quand, les pixels acceptés, et l'audience : visites, temps passé, comptes, joueurs et streamers. La liste des
 // connexions reste en mémoire ; Redis ne garde que des nombres. Chaque canvas a aussi ses nombres (`canvas-activity.ts`), pour
 // `here`. Un seul état : un canvas est streamé tant qu'une vue OBS est ouverte et que son streamer est en live, l'état réel.
@@ -50,7 +50,7 @@ const OWNER_CACHE_MS = 10 * MINUTE_MS; // le nom ou la photo d'un streamer peut 
 
 export type ActivityDeps = {
   store: ActivityStore;
-  // Le streamer d'un canvas où il ne reste que des pixels récents, et le live de chaque streamer listé (Écart §4, JOURNAL 2026-10-07)
+  // Le streamer d'un canvas où il ne reste que des pixels récents, et le live de chaque streamer listé (§10.4)
   core: Pick<CanvasCore, "getCanvas" | "listTwitchLives">;
   now: () => Timestamp;
   isProduction: boolean; // là seulement, les pages et les pixels du développeur ne comptent pas
@@ -213,7 +213,7 @@ export function createActivity(deps: ActivityDeps): Activity {
   let isTicking = false;
   const owners = new Map<string, { user: ActivityUser; readAt: Timestamp }>();
   const canvasOwners = new Map<string, string>(); // `canvasId` → `ownerId`, qui ne change jamais
-  // Écart §5.1 (JOURNAL 2026-10-08) : les canvas streamés, une vue OBS comptée ouverte et le streamer en live à la dernière
+  // §16.2 : les canvas streamés, une vue OBS comptée ouverte et le streamer en live à la dernière
   // lecture, et par canvas la dernière heure où il l'était. Elle ne sert qu'à combler une coupure de moins de `STREAM_GRACE_MS` :
   // jamais à dire l'état de l'instant.
   const streamedCanvasIds = new Set<string>();
@@ -346,7 +346,7 @@ export function createActivity(deps: ActivityDeps): Activity {
     return { canvasId, ...(owner ? { owner } : {}), point };
   };
 
-  // Écart §4 (JOURNAL 2026-10-07) : le streamer porte son live Twitch, lu à chaque frame (le miroir `user:` est gardé, pas le live).
+  // §10.4 : le streamer porte son live Twitch, lu à chaque frame (le miroir `user:` est gardé, pas le live).
   const getOwnerWithLive = async (
     ownerId: string,
     nowMs: Timestamp,
@@ -674,7 +674,7 @@ export function createActivity(deps: ActivityDeps): Activity {
       const nowMs = deps.now();
       const at = toMinuteStart(nowMs);
       pastMinutes = await deps.store.listCanvasPixels(at - HEAT_PAST_MINUTES * MINUTE_MS, at);
-      // Les canvas qui redeviennent streamés après ce redémarrage comblent leur coupure depuis ces heures (Écart §5.1, JOURNAL 2026-10-08).
+      // Les canvas qui redeviennent streamés après ce redémarrage comblent leur coupure depuis ces heures (§16.2).
       for (const [canvasId, seenAt] of await deps.store.listSeen()) streamedSeenAt.set(canvasId, seenAt);
       await deps.store.pruneActivity(nowMs);
       await deps.store.pruneSeen(nowMs);

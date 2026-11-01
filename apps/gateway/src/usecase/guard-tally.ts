@@ -1,4 +1,4 @@
-// Ce que bloquent les protections du gateway (Écart §4.3 et §5.1, JOURNAL 2026-10-09) : les poses refusées pour le débit, les
+// Ce que bloquent les protections du gateway (§16.3) : les poses refusées pour le débit, les
 // connexions fermées en 1013. Un compteur par minute, en mémoire : un refus ne coûte qu'une addition, Redis n'en voit rien.
 
 import { MINUTE_MS, type Timestamp, toMinuteStart } from "@liveplace/domain";

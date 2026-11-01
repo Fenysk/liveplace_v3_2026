@@ -1,4 +1,4 @@
-// Les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08) dans l'entrée Bulle : chacune sur la vraie pill qu'elle désigne, avec
+// Les bulles d'aide (§9.11) dans l'entrée Bulle : chacune sur la vraie pill qu'elle désigne, avec
 // sa flèche, puis les côtés d'où une bulle vise sa cible. Les mêmes textes et les mêmes cibles que dans le jeu. Les deux de la
 // chaîne OBS vivent dans la fenêtre (JOURNAL 2026-10-09) : leur bloc montre l'onglet et l'adresse tels que la fenêtre les pose.
 

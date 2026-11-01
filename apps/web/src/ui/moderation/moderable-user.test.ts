@@ -4,7 +4,7 @@ import { moderableUserId } from "./moderable-user";
 // Le streamer (`owner-1`) et soi-même (`me`) ne se modèrent jamais.
 const moderation = { isProtected: (userId: string) => userId === "owner-1" || userId === "me" };
 
-describe("les actions de modération d'une pose (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("les actions de modération d'une pose (§9.11)", () => {
   // La pose d'un autre compte : son auteur se modère
   it("gives the author of a pose placed by another account", () => {
     expect(moderableUserId(moderation, { userId: "viewer-1" })).toBe("viewer-1");

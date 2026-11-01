@@ -10,7 +10,7 @@ import {
   CanvasSettings,
 } from "./canvas-settings";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque (Transparent, Noir ou Blanc) et son image, deux réglages de la section
+// §9.5 : le fond de la fresque (Transparent, Noir ou Blanc) et son image, deux réglages de la section
 // Fresque, sous le thème. L'image se pose par-dessus n'importe quel fond, à une opacité de 0 à 100 % par crans de 10.
 
 const doNothing = (): void => undefined;
@@ -70,7 +70,7 @@ const buttonsOf = (html: string): string[] =>
     (label ?? "").replaceAll("&#x27;", "'"),
   );
 
-describe("the background of the canvas in the settings (CDC 2026 §1, Écart §9.1)", () => {
+describe("the background of the canvas in the settings (CDC 2026 §1, §9.5)", () => {
   // Un clavier de couleurs sous « Fond de la fresque », sans interrupteur
   it("shows the color keyboard under « Fond de la fresque », and no switch", () => {
     const html = backgroundHtml();
@@ -139,7 +139,7 @@ describe("the background of the canvas in the settings (CDC 2026 §1, Écart §9
   });
 });
 
-describe("the image of the canvas in the settings (Écart §9.1, JOURNAL 2026-10-10)", () => {
+describe("the image of the canvas in the settings (§9.5)", () => {
   // Sans image : le seul bouton « Choisir une image », ni vignette ni curseur
   it("asks for the file with a single button when there is no image, with no thumbnail and no slider", () => {
     const html = imageHtml({ imageUrl: null });
@@ -223,7 +223,7 @@ describe("the image of the canvas in the settings (Écart §9.1, JOURNAL 2026-10
   });
 });
 
-describe("the background and the image in the Canvas section (Écart §9.1, JOURNAL 2026-10-10)", () => {
+describe("the background and the image in the Canvas section (§9.5)", () => {
   // Sous le thème, avant la taille : le fond puis l'image sont les deuxième et troisième réglages de la section
   it("comes under the theme and before the size, the background first and the image after it", () => {
     const html = sectionHtml();

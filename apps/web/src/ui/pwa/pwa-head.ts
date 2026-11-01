@@ -1,4 +1,4 @@
-// Les balises de la page du jeu qui en font une application installable (Écart §9.1, JOURNAL 2026-10-08).
+// Les balises de la page du jeu qui en font une application installable (§9.10).
 
 import type { CanvasOwner } from "../../usecase/resolve-canvas";
 

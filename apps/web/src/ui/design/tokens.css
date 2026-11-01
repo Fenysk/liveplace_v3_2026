@@ -38,7 +38,7 @@
   /* Un seul niveau d'ombre, pour ce qui flotte au-dessus de la fresque : la fenêtre n'en a pas de plus grande, son voile
      (--scrim) la détache. En sombre, le filet --pill-border dessine le bord. */
   --pill-shadow: 0 2px 8px rgba(16, 18, 28, 0.16);
-  /* Le live Twitch (Écart §4, JOURNAL 2026-10-07) : le bouton de la chaîne, teinté du violet de Twitch sur la pill.
+  /* Le live Twitch (§10.4) : le bouton de la chaîne, teinté du violet de Twitch sur la pill.
      L'encre est le violet de marque (#9146ff) foncé, de même teinte : AA (4,5:1) sur le fond teinté, 5,7:1 au repos en clair
      et 5,1:1 au survol. Pas de rouge : --danger signale déjà la modération et l'attente (le point de l'avatar). */
   --twitch-live-bg: color-mix(in srgb, var(--twitch) 16%, var(--pill-surface));
@@ -120,7 +120,7 @@
   --obs-white: #ffffff;
 
   /* Les fonds du PNG qu'on télécharge : du vrai noir et du vrai blanc, les mêmes dans les deux apparences
-     (Écart §15, JOURNAL 2026-10-06) */
+     (§17.1) */
   --png-black: #000000;
   --png-white: #ffffff;
 

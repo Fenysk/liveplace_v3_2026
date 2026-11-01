@@ -21,7 +21,7 @@ export const submitDraft = (draftStore: DraftStore): void => {
     .catch((error: unknown) => console.error("draft-pill : envoi du brouillon interrompu", error));
 };
 
-// Vider se rattrape : un toast « Brouillon vidé » porte Rétablir, qui remet le brouillon vidé (Écart §9.3, JOURNAL 2026-10-13).
+// Vider se rattrape : un toast « Brouillon vidé » porte Rétablir, qui remet le brouillon vidé (§9.6).
 export const discardWithRestore = (
   draftStore: Pick<DraftStore, "discardDraft" | "restoreDraft">,
   toast: ShowToast,
@@ -36,7 +36,7 @@ export const discardWithRestore = (
 };
 
 // Une minuterie calée sur la seconde du compte à rebours, jamais `requestAnimationFrame` : le texte de l'infobulle et
-// celui d'Attendre en dépendent (§9.4, Écart §9.3, JOURNAL 2026-10-08). Elle repart quand la jauge change d'échéance.
+// celui d'Attendre en dépendent (§9.4, §9.6). Elle repart quand la jauge change d'échéance.
 export const useCountdownTick = (endsAt: number | undefined, setNowMs: (nowMs: number) => void): void => {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -64,7 +64,7 @@ export const toGaugeProps = (
   const { gauge, params } = canvas;
   if (!gauge || !params) return null;
   const { charges, max, nextRefillAt, claimable } = predictGauge(gauge, params, nowMs);
-  // Le brouillon gardé est réservé en Vue aussi (Écart §9.3, JOURNAL 2026-10-13).
+  // Le brouillon gardé est réservé en Vue aussi (§9.6).
   const reserved = draft.draft.size;
   const refill =
     charges < max
@@ -92,7 +92,7 @@ export const toGaugeProps = (
   };
 };
 
-// Plus aucune charge et rien à poser : de quoi dire « Attendre 12 s » (Écart §9.3, JOURNAL 2026-10-08).
+// Plus aucune charge et rien à poser : de quoi dire « Attendre 12 s » (§9.6).
 const toWaitSeconds = (gauge: GaugeProps | null, draftSize: number, nowMs: number): number | undefined =>
   gauge?.refill && gauge.charges === 0 && draftSize === 0
     ? waitSecondsOf(gauge.refill.endsAt - nowMs)

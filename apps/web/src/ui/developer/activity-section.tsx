@@ -1,4 +1,4 @@
-// La section Tout LivePlace de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07), de haut en bas : le choix
+// La section Tout LivePlace de la fenêtre Développeur (§16.1), de haut en bas : le choix
 // du jour (JOURNAL 2026-10-14), les chiffres de l'instant, l'audience, les canvas, puis l'historique. L'audience et les canvas se
 // mettent côte à côte quand la place le permet. L'affichage seul : `LiveActivitySection` la branche sur le store.
 

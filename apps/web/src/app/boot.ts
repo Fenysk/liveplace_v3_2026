@@ -1,6 +1,6 @@
 // Plugin Nitro, exécuté une fois au démarrage : une variable manquante arrête le process en la nommant (§10.2).
 // Sans lui, Nitro ne charge l'application qu'à la première requête, et chaque requête rendrait 500.
-// Écart §2 et §9 (JOURNAL 2026-10-07) : il lance aussi les minuteries de la capacité, que le gateway lit dans Redis.
+// §16.3 : il lance aussi les minuteries de la capacité, que le gateway lit dans Redis.
 
 import { definePlugin } from "nitro";
 import { createConvexUsageSource } from "../infra/convex-usage";
@@ -23,7 +23,7 @@ export default definePlugin(() => {
     },
   });
   void report.start(); // ne rejette jamais : chaque minuterie journalise ses échecs
-  // Écart §4 (JOURNAL 2026-10-07) : tous les comptes connus sont suivis, en arrière-plan, sans retarder le démarrage ; il ne rejette jamais.
+  // §10.4 : tous les comptes connus sont suivis, en arrière-plan, sans retarder le démarrage ; il ne rejette jamais.
   const { accounts, tracker } = getServerDeps();
   void trackKnownAccounts({
     accounts,

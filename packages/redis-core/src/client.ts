@@ -99,7 +99,7 @@ declare module "ioredis" {
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
 
-// Écart §5.3 (JOURNAL 2026-10-24) : combien de fois resizeCanvas relit et recalcule son plan avant de rendre `busy`.
+// §5.8 : combien de fois resizeCanvas relit et recalcule son plan avant de rendre `busy`.
 const RESIZE_ATTEMPTS = 5;
 
 type PileHead = { authorId: string; colorIndex: number; placedAt: Timestamp; placementId: string };
@@ -120,7 +120,7 @@ const placementArgsOf = (action: Moderation["action"]): [string, number | "", nu
   return [action.placementId, action.range?.from ?? "", action.range?.to ?? ""];
 };
 
-// Un script qui ne sert pas le canvas le dit par son statut : absent, pas prêt (§5.5), ou archivé (Écart §15, JOURNAL 2026-10-06).
+// Un script qui ne sert pas le canvas le dit par son statut : absent, pas prêt (§5.5), ou archivé (§17.1).
 const isRefusal = (status: string): status is CanvasRefusal =>
   status === "canvas_not_found" || status === "canvas_archived";
 
@@ -137,7 +137,7 @@ const metaNumber = (fields: Record<string, string>, field: string): number => {
 };
 
 // `null` tant que `ready` n'est pas à 1 : on ne sert jamais un canvas en cours de restore (§5.5).
-// Écart §15 (JOURNAL 2026-10-06) : une archive reste prête et se sert ; `archivedAt` la dit, `successorId` où suivre.
+// §17.1 : une archive reste prête et se sert ; `archivedAt` la dit, `successorId` où suivre.
 export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<CanvasMeta | null> {
   const fields = await redis.hgetall(buildCanvasKeys(canvasId).meta);
   if (fields.ready !== "1") return null;
@@ -153,22 +153,22 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
     // CDC 2026 §1 : absent sur un canvas d'avant, ou d'une valeur inconnue, donc transparent.
     obsBackground:
       OBS_BACKGROUNDS.find((background) => background === fields.obsBackground) ?? OBS_BACKGROUND,
-    // Écart §8.1 (JOURNAL 2026-10-10) : absent, le canvas n'a pas d'image de fond.
+    // §8.4 : absent, le canvas n'a pas d'image de fond.
     ...(fields.backgroundImageAt === undefined
       ? {}
       : { backgroundImageAt: metaNumber(fields, "backgroundImageAt") }),
-    // Écart §9.1 (JOURNAL 2026-10-10) : absente, ou hors des crans, 40 % ; le web sait lire une opacité qui manque.
+    // §9.5 : absente, ou hors des crans, 40 % ; le web sait lire une opacité qui manque.
     ...(fields.backgroundImageOpacity !== undefined &&
     isBackgroundImageOpacity(Number(fields.backgroundImageOpacity))
       ? { backgroundImageOpacity: Number(fields.backgroundImageOpacity) }
       : {}),
     ...(fields.archivedAt === undefined ? {} : { archivedAt: metaNumber(fields, "archivedAt") }),
     ...(fields.successorId === undefined ? {} : { successorId: metaText(fields, "successorId") }),
-    // Écart §8.1 (JOURNAL 2026-10-07) : un champ vide vaut pas de thème.
+    // §8.1 : un champ vide vaut pas de thème.
     ...(fields.theme ? { theme: fields.theme } : {}),
-    // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a encore déplacé de pixel.
+    // §5.8 : absent, aucun rapprochement n'a encore déplacé de pixel.
     ...(fields.movedAtVersion === undefined ? {} : { movedAtVersion: metaNumber(fields, "movedAtVersion") }),
-    // Écart §5.3 (JOURNAL 2026-10-28) : absents, la taille dynamique est retirée et la fresque n'a jamais été décalée.
+    // §5.8 : absents, la taille dynamique est retirée et la fresque n'a jamais été décalée.
     ...(fields.dynamicSize === "1" ? { isDynamicSize: true } : {}),
     ...(fields.originX === undefined
       ? {}
@@ -195,8 +195,8 @@ const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
   return value;
 };
 
-// Les champs de `meta` tels que Redis les garde : ceux de `CanvasMeta`, sauf le réglage et l'origine de la taille dynamique (Écart §5.3,
-// JOURNAL 2026-10-28), qui s'écrivent sous d'autres noms.
+// Les champs de `meta` tels que Redis les garde : ceux de `CanvasMeta`, sauf le réglage et l'origine de la taille dynamique (§5.8),
+// qui s'écrivent sous d'autres noms.
 export const toMetaFields = ({
   isDynamicSize,
   origin,
@@ -210,9 +210,9 @@ export const toMetaFields = ({
 // Ce que le web écrit à la connexion (§2) : ni script ni connexion abonnée, il ne pose jamais un pixel.
 export function createSignInWrites(redis: Redis): SignInWrites {
   return {
-    ...createSignupWrites(redis), // écart §5.1 (JOURNAL 2026-10-06) : un nouveau compte, à sa première connexion
+    ...createSignupWrites(redis), // §16.2 : un nouveau compte, à sa première connexion
     // `NX` partout : idempotent, et `ready` n'est jamais remis à 1 sur un canvas en cours de restore.
-    // Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique naît avec le canvas, un canvas qui existe déjà garde son réglage (sans champ : retiré).
+    // §5.8 : la taille dynamique naît avec le canvas, un canvas qui existe déjà garde son réglage (sans champ : retiré).
     async createCanvas(canvasId: string, meta: CanvasMeta): Promise<void> {
       const keys = buildCanvasKeys(canvasId);
       const isExisting = (await redis.exists(keys.meta)) === 1;
@@ -362,7 +362,7 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
         // NOGROUP : le groupe est parti. UNBLOCKED : le flux est supprimé pendant que la lecture l'attendait.
         const isReaderLost = error instanceof Error && /^(NOGROUP|UNBLOCKED)/.test(error.message);
         if (!isReaderLost) throw error;
-        // Écart §7.2 (JOURNAL 2026-10-08) : Redis a tout perdu, le groupe avec : il se refait, sans arrêter le gateway.
+        // §7.1 : Redis a tout perdu, le groupe avec : il se refait, sans arrêter le gateway.
         hasReader = false;
         isRecovered = false;
         pendingFrom = "0";
@@ -376,7 +376,7 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   };
 }
 
-// Écart §5.3 (JOURNAL 2026-10-24) : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle
+// §5.8 : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle
 // taille. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
 const getPlanInput = async (
   redis: Redis,
@@ -408,7 +408,7 @@ const getResizePlan = async (
   return { version, plan: input && isChanging ? planResize(input.state, input.from, to) : null };
 };
 
-// Écart §5.3 (JOURNAL 2026-10-28 et 2026-10-29) : ce que change le réglage, du même état lu. Activé : le resserrement sur les dessins
+// §5.8 : ce que change le réglage, du même état lu. Activé : le resserrement sur les dessins
 // (`reframe`). Retiré : le retour à la taille fixe par défaut par le plan de taille d'un format (`resize`, absent si la fresque y est déjà).
 // Sans plan, un canvas pas prêt.
 type DynamicPlan = { reframe: Reframe; resize: ResizePlan | null };
@@ -497,7 +497,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
   // §5.3 : gauge.lua, collé devant les deux scripts qui écrivent une jauge.
   const gauge = scriptOf("gauge.lua");
-  // Écart §5.3 (JOURNAL 2026-10-28) : pile-moves.lua, collé après pile.lua devant les scripts qui déplacent des piles, et reframe.lua
+  // §5.8 : pile-moves.lua, collé après pile.lua devant les scripts qui déplacent des piles, et reframe.lua
   // devant ceux qui agrandissent ou resserrent la fresque.
   const moves = `${pile}\n${scriptOf("pile-moves.lua")}`;
   const withResize = (name: string): string => `${moves}\n${scriptOf("resize-plan.lua")}\n${scriptOf(name)}`;
@@ -596,7 +596,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     isRecovering: async (canvasId: string): Promise<boolean> =>
       (await redis.hget(buildCanvasKeys(canvasId).meta, "ready")) === "0",
 
-    // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère pas, même modérateur Twitch ; un MULTI, comme getModeratorOrigin.
+    // §10.3 : un banni ne modère pas, même modérateur Twitch ; un MULTI, comme getModeratorOrigin.
     async isModerator(canvasId: string, userId: string): Promise<boolean> {
       const keys = buildCanvasKeys(canvasId);
       const results = await redis.multi().sismember(keys.mods, userId).sismember(keys.bans, userId).exec();
@@ -907,7 +907,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
           const reportedAt = Number(flat[index * 2 + 1]);
           return {
             ...profile,
-            ...(moderatorOrigin ? { moderatorOrigin } : {}), // Écart §4.3 (JOURNAL 2026-10-08) : Bannir se cache
+            ...(moderatorOrigin ? { moderatorOrigin } : {}), // §4.3 : Bannir se cache
             placementId,
             reportCount,
             reportedAt,
@@ -932,7 +932,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return entry.placementId === placementId ? listVisiblePixels(keys, entry.authorId) : null;
     },
 
-    // Écart §5.3 (JOURNAL 2026-10-24) : le plan se calcule ici sur `state`, lu avec la version ; resize.lua le refuse (`stale`)
+    // §5.8 : le plan se calcule ici sur `state`, lu avec la version ; resize.lua le refuse (`stale`)
     // si une pose a couru depuis, et on le recalcule.
     async resizeCanvas(canvasId, { by, width, height }) {
       const keys = buildCanvasKeys(canvasId);
@@ -945,7 +945,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return { ok: false, error: "busy" };
     },
 
-    // Écart §5.3 (JOURNAL 2026-10-28 et 2026-10-29) : de même que la taille, le plan se relit si une pose a couru.
+    // §5.8 : de même que la taille, le plan se relit si une pose a couru.
     async setDynamicSize(canvasId, { by, isDynamicSize }) {
       const keys = buildCanvasKeys(canvasId);
       for (let attempt = 0; attempt < RESIZE_ATTEMPTS; attempt++) {
@@ -1075,7 +1075,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       return { status, syncedAt: Number(syncedAt) };
     },
 
-    // Écart §15 (JOURNAL 2026-10-06) : `HSETNX`, ce que le successeur sait déjà de cette personne reste.
+    // §17.1 : `HSETNX`, ce que le successeur sait déjà de cette personne reste.
     async copyTwitchUsers(fromCanvasId, toCanvasId, userIds) {
       if (userIds.length === 0) return;
       const names = await redis.hmget(buildCanvasKeys(fromCanvasId).twitchUsers, ...userIds);
@@ -1148,7 +1148,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         .exec();
     },
 
-    // Écart §9.1 (JOURNAL 2026-10-10) : comme le fond, `meta` et le `ctl` ensemble, sans version.
+    // §9.5 : comme le fond, `meta` et le `ctl` ensemble, sans version.
     async setBackgroundImageOpacity(canvasId, backgroundImageOpacity) {
       const keys = buildCanvasKeys(canvasId);
       const control: LiveMessage = { ctl: { t: "backgroundImageOpacity", backgroundImageOpacity } };

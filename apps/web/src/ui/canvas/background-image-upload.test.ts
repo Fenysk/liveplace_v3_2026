@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { uploadBackgroundImage } from "./background-image-upload";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : la page poste l'image du fond au web, à son adresse : jamais à Convex, que la CSP n'ouvre pas.
+// §9.5 : la page poste l'image du fond au web, à son adresse : jamais à Convex, que la CSP n'ouvre pas.
 
 afterEach(() => vi.restoreAllMocks());
 

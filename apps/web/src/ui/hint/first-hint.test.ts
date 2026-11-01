@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FirstHint } from "./first-hint";
 
-// Écart §8.1 (JOURNAL 2026-10-08) : le conseil de première visite, dans une bulle.
+// §9.11 : le conseil de première visite, dans une bulle.
 
 const render = (doneCount: number, isVisible = true): string =>
   renderToStaticMarkup(createElement(FirstHint, { doneCount, isVisible, isDocked: false }));
 
-describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("le conseil de première visite (§9.11)", () => {
   // Les deux phrases du croquis validé, chacune avec son icône
   it("says the two sentences of the validated sketch, each with its icon", () => {
     const markup = render(0);
@@ -20,7 +20,7 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
     expect(markup.match(/<svg/g)).toHaveLength(2);
   });
 
-  // À la souris (Écart §8.1, JOURNAL 2026-10-12) : la molette et le clic, avec leurs icônes et les mêmes trois points
+  // À la souris (§9.11) : la molette et le clic, avec leurs icônes et les mêmes trois points
   it("says the wheel and the click with a mouse, with the same three dots", () => {
     const markup = renderToStaticMarkup(
       createElement(FirstHint, { doneCount: 1, isVisible: true, isDocked: false, isTouchScreen: false }),

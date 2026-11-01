@@ -1,4 +1,4 @@
-/* Les écrans à charnière (Écart §8.1 et §9.3, JOURNAL 2026-10-08) : Surface Duo ou Galaxy Z Fold à moitié plié, deux écrans
+/* Les écrans à charnière (§9.7) : Surface Duo ou Galaxy Z Fold à moitié plié, deux écrans
    côte à côte ; Galaxy Z Flip en Flex mode, un en haut, un en bas. Une charnière n'a jamais de pill ni de bouton à cheval :
    le canvas (avec les pills Canvas et Thème, et Recentrer) occupe le premier écran, les commandes (la pill Compte, la
    colonne de la barre du bas, l'inspection, les fenêtres) le second : une disposition d'écran tactile large (pill-landscape.css),

@@ -127,7 +127,7 @@ describe("createBroadcast (§6.2, §6.3)", () => {
     expect(received).toHaveLength(1);
   });
 
-  // Au-delà de 500 clients, ne vide le canvas qu'un tick sur deux, en conflatant les deux (écart D-13, JOURNAL 2026-09-26)
+  // Au-delà de 500 clients, ne vide le canvas qu'un tick sur deux, en conflatant les deux (D-13)
   it("flushes a canvas of more than 500 clients every second tick, conflating across both", async () => {
     const { core, publish } = fakeCore();
     const broadcast = createBroadcast(core);
@@ -215,7 +215,7 @@ describe("createBroadcast (§6.2, §6.3)", () => {
   });
 });
 
-describe("announcing a control to every page (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("announcing a control to every page (§10.4)", () => {
   // Remet un message à chaque page de chaque canvas joint, tout de suite, sans attendre le tick, et rien après le départ
   it("hands a message at once to every page of every joined canvas, and to nobody after they leave", async () => {
     const { core } = fakeCore();
@@ -484,7 +484,7 @@ describe("the scoreboard window of a canvas (JOURNAL 2026-10-06)", () => {
   });
 });
 
-// Écart §5.1 et §6 (JOURNAL 2026-10-07) : la capacité lit le retard de diffusion et les connexions, sans rien coûter par pose.
+// §16.3 : la capacité lit le retard de diffusion et les connexions, sans rien coûter par pose.
 // Le retard d'une pose : l'envoi de sa frame − `occurredAt` − l'attente voulue, de son arrivée à l'heure prévue du tick qui
 // l'envoie (le tick précédent + l'intervalle, un tick sauté par la diffusion adaptative compris).
 describe("what the broadcast tells the capacity (JOURNAL 2026-10-07)", () => {

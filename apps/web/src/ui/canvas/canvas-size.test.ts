@@ -11,7 +11,7 @@ describe("the canvas size (JOURNAL 2026-09-29)", () => {
   });
 
   // Liste les pixels posés qui sortent du cadre une fois les dessins rapprochés, jamais une case transparente
-  // (Écart §5.3, JOURNAL 2026-10-24 : le pixel en (3, 0) se rapproche de l'origine, seul celui en (1, 2) sort)
+  // (§5.8 : le pixel en (3, 0) se rapproche de l'origine, seul celui en (1, 2) sort)
   it("lists the placed pixels leaving the frame once drawings are brought closer, never a transparent cell", () => {
     const current = { width: 4, height: 3 };
     const pixels = new Uint8Array(12);
@@ -38,7 +38,7 @@ describe("the canvas size (JOURNAL 2026-09-29)", () => {
   });
 });
 
-describe("turning the dynamic size off (Écart §5.3, JOURNAL 2026-10-29)", () => {
+describe("turning the dynamic size off (§5.8)", () => {
   // Retirer la taille dynamique ramène la fresque à 50 × 50 comme un choix de Petit carré : les dessins se rapprochent d'abord (le vide
   // de 4 colonnes entre eux perd 3 colonnes, il en garde une), puis la coupe prend les 7 colonnes qui dépassent encore, à leur place d'aujourd'hui
   it("brings drawings closer before cutting what still does not fit, like a manual choice of 50 × 50", () => {

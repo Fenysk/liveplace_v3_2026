@@ -1,4 +1,4 @@
-// L'écran du téléphone de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : la vraie interface mobile, à sa taille réelle. Au PC,
+// L'écran du téléphone de l'accueil (§9.10) : la vraie interface mobile, à sa taille réelle. Au PC,
 // home.css le réduit dans un cadre ; sur un écran étroit, il est la page. La pill d'identité n'a pas de nom (une barre de
 // squelette), la feuille a sa poignée, la vraie jauge, le bouton d'envoi et six couleurs de la vraie palette.
 // Monté dans le navigateur seulement : la jauge et la palette posent des `style`, que la CSP de production bloque dans le HTML

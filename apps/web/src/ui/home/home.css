@@ -1,4 +1,4 @@
-/* L'accueil `/` (Écart §9.1, JOURNAL 2026-10-22). Le serveur écrit la phrase, le bouton et le stream ; le téléphone arrive à
+/* L'accueil `/` (§9.10). Le serveur écrit la phrase, le bouton et le stream ; le téléphone arrive à
    l'hydratation. Aucun attribut `style` dans ce que le serveur écrit (CSP de production) : formes, tailles et teintes sont des classes.
    La mise en page suit la largeur du conteneur, pas celle de la fenêtre : /design montre la même page à 375 px dans un PC. */
 

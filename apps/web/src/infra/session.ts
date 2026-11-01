@@ -24,7 +24,7 @@ export function createSessionSigner(secret: string): SessionSigner {
   };
 }
 
-// Écart §10.2 (JOURNAL 2026-10-06) : le web lit aussi le cookie, pour l'affichage seulement. Même règle que le gateway.
+// §10.2 : le web lit aussi le cookie, pour l'affichage seulement. Même règle que le gateway.
 export function createSessionVerifier(secret: string): SessionVerifier {
   const key = new TextEncoder().encode(secret);
   return {

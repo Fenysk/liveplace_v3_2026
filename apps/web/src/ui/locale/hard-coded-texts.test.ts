@@ -1,4 +1,4 @@
-// Le garde-fou de la langue (Écart §14, JOURNAL 2026-10-07) : une phrase française oubliée en dur dans un composant
+// Le garde-fou de la langue (§9.9) : une phrase française oubliée en dur dans un composant
 // ne se voit qu'en passant la page en anglais. Ce test la trouve avant : il lit les chaînes et le texte JSX du code
 // de l'interface, hors commentaires, et refuse ce qui est du français.
 
@@ -106,7 +106,7 @@ const INTERFACE_FILES = listSourceFiles(WEB_SOURCE)
       !FRENCH_BY_DESIGN.some((french) => name.startsWith(french)),
   );
 
-describe("the French left in the code of the interface (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the French left in the code of the interface (§9.9)", () => {
   // Quand une phrase française est écrite en dur hors d'un module de textes, le système doit la refuser
   it("finds no French sentence outside the text modules", () => {
     const found = INTERFACE_FILES.flatMap(({ path, name }) =>

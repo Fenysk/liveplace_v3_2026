@@ -1,4 +1,4 @@
-// Le fond de la fresque et son image dans la section Canvas (Écart §9.1, JOURNAL 2026-10-10), branchés sur le store : le fond et l'opacité
+// Le fond de la fresque et son image dans la section Canvas (§9.5), branchés sur le store : le fond et l'opacité
 // choisis partent au gateway, et la valeur affichée est la demandée tant que la frame du gateway ne l'a pas confirmée, comme le délai
 // OBS. L'image se prépare dans la page, part au web, et revient d'elle-même par la frame `backgroundImage`.
 

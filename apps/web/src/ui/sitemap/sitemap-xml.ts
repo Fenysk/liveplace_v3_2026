@@ -1,4 +1,4 @@
-// `/sitemap.xml` : le plan du site, la page d'accueil seule (Écart §9.1, JOURNAL 2026-10-22). Les moteurs de recherche n'indexent
+// `/sitemap.xml` : le plan du site, la page d'accueil seule (§9.1). Les moteurs de recherche n'indexent
 // rien d'autre : les pages de canvas, la vue OBS et les archives n'y sont jamais.
 
 export const sitemapXmlResponse = (publicUrl: string): Response =>

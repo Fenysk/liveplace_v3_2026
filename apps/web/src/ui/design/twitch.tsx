@@ -16,7 +16,7 @@ export const TwitchGlyph = () => (
   </svg>
 );
 
-// Écart §4 (JOURNAL 2026-10-07) : le logo d'un compte en live, en violet de Twitch, un rond à son angle. Ses yeux sont à
+// §10.4 : le logo d'un compte en live, en violet de Twitch, un rond à son angle. Ses yeux sont à
 // part du contour pour cligner (twitch.css) ; le CSS seul anime, et le mouvement réduit le fige.
 export const TwitchLiveGlyph = () => (
   <span className="lp-twitch-live-glyph">
@@ -31,7 +31,7 @@ export const TwitchLiveGlyph = () => (
 
 // Se connecter, toujours avec Twitch : texte blanc sur violet Twitch, et son logo. Sans libellé : le logo seul.
 // `onPress` : la page part chez Twitch, elle peut le dire en attendant.
-// Écart §9.1 (JOURNAL 2026-10-31) : avec un libellé, pas de `title` : son nom est son texte visible (WCAG 2.5.3).
+// §9.12 : avec un libellé, pas de `title` : son nom est son texte visible (WCAG 2.5.3).
 type SignInButtonProps = { href: string; label?: string; onPress?: (() => void) | undefined };
 
 export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
@@ -48,7 +48,7 @@ export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
 const PRIVACY_PATH = "/confidentialite";
 
 // Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
-// Écart §9.1 (JOURNAL 2026-10-31) : le lien s'ouvre dans l'onglet de la page, le brouillon survit dans `localStorage`.
+// §9.10 : le lien s'ouvre dans l'onglet de la page, le brouillon survit dans `localStorage`.
 export const SignInNote = () => {
   const t = useTexts(DESIGN_TEXTS);
   return (

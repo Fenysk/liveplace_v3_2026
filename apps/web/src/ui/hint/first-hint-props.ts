@@ -1,11 +1,11 @@
-// Ce que montre le conseil de première visite à un instant (Écart §8.1, JOURNAL 2026-10-08) : ce que dit son état,
+// Ce que montre le conseil de première visite à un instant (§9.11) : ce que dit son état,
 // et ce que la page en cache. Des données pures, sans React.
 
 import { type FirstHintView, HINT_STEPS } from "../../state/first-hint";
 import type { FirstHintProps } from "./first-hint";
 
 // Une visite regarde le canvas un moment avant que la bulle paraisse ; le dernier point reste rempli `BUBBLE_LINGER_MS` avant son
-// fondu (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12).
+// fondu (§9.11).
 export const HINT_SHOW_DELAY_MS = 1200;
 
 export type HintAside = {
@@ -23,7 +23,7 @@ const isAside = ({ isReady, isDrafting, isInspecting, isYielding }: HintAside): 
   !isReady || isDrafting || isInspecting || isYielding;
 
 // Le dernier point se compte quand la bulle le montre : cachée au troisième geste, elle ne perd pas son temps sous la
-// feuille, il court à son retour (Écart §8.1, JOURNAL 2026-10-09).
+// feuille, il court à son retour (§9.11).
 export const isHintBeating = (view: FirstHintView, aside: HintAside): boolean =>
   view.status === "done" && !isAside(aside);
 

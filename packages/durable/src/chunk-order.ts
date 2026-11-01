@@ -1,4 +1,4 @@
-// Quel chunk Convex range, et lequel il refuse (Écart §7.2, JOURNAL 2026-10-08).
+// Quel chunk Convex range, et lequel il refuse (§7.1).
 
 type Interval = { fromVersion: number; toVersion: number; count: number };
 

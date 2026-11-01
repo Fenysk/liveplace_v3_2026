@@ -28,7 +28,7 @@ const visit = (storage: BubbleStorage): FirstHint => {
   return createFirstHint(deps);
 };
 
-describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("le conseil de première visite (§9.11)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   // Quand rien n'a été fait, il s'ouvre sans geste fait
@@ -36,7 +36,7 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
     expect(visit(createFakeStorage()).getView()).toEqual({ status: "open", done: [] });
   });
 
-  // À la souris comme au doigt (Écart §8.1, JOURNAL 2026-10-12) : l'état ne connaît pas l'écran, les trois mêmes gestes le ferment
+  // À la souris comme au doigt (§9.11) : l'état ne connaît pas l'écran, les trois mêmes gestes le ferment
   it("opens and counts the same three steps with a mouse as with a finger, the state not knowing the screen", () => {
     const storage = createFakeStorage();
     const hint = visit(storage);
@@ -171,8 +171,8 @@ describe("le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08)", ()
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : rejouer le tutoriel remet le conseil à zéro, une fois ses bulles oubliées
-describe("rejouer le conseil de première visite (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : rejouer le tutoriel remet le conseil à zéro, une fois ses bulles oubliées
+describe("rejouer le conseil de première visite (§9.11)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   // Les gestes et la fin sont oubliés : le conseil se rouvre sans geste fait, et prévient qui écoute

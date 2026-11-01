@@ -10,7 +10,7 @@ local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[9]), tonumber(A
 -- Vides sans plage : la pose seule.
 local rangeFrom, rangeTo = tonumber(ARGV[13]), tonumber(ARGV[14])
 
--- 0. Canvas prêt, comme place.lua. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- 0. Canvas prêt, comme place.lua. §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt")
 if meta[1] ~= "1" then
   return "canvas_not_found"

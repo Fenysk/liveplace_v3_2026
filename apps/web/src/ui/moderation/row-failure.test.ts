@@ -9,7 +9,7 @@ import { ModeratorUsers } from "./moderator-users";
 import { type PendingReport, pendingReportKey } from "./pending-reports";
 import { ReportedPlacements } from "./reported-placements";
 
-// Une action qui échoue sur une ligne ne vide pas la liste (Écart §8.1, JOURNAL 2026-10-13) : la ligne le dit, avec Réessayer.
+// Une action qui échoue sur une ligne ne vide pas la liste (§9.8) : la ligne le dit, avec Réessayer.
 
 const noop = () => undefined;
 const canvas = { width: 4, height: 4, palette: PALETTE };
@@ -91,7 +91,7 @@ const moderators = (failedUserId: string | null) =>
 const alertsOf = (markup: string): string[] =>
   [...markup.matchAll(/<span[^>]* role="alert"[^>]*>(.*?)<\/span>/g)].map(([, text]) => text ?? "");
 
-describe("a failed action on a row of the Modération tab (Écart §8.1, JOURNAL 2026-10-13)", () => {
+describe("a failed action on a row of the Modération tab (§9.8)", () => {
   // Rétablir échoue : les deux signalements restent, et seule la ligne concernée dit l'échec, avec Réessayer
   it("keeps both reports when Rétablir fails, and says it on its own row with Réessayer", () => {
     const html = reports(pendingReportKey(REPORTS[0] as PendingReport));

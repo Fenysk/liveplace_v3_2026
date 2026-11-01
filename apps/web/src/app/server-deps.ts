@@ -33,7 +33,7 @@ const buildServerDeps = () => {
   const redis = new Redis(config.redisUrl);
   const twitchWrites = createTwitchWrites(redis); // JOURNAL 2026-09-27
   const durable = createDurableStore(config.convexUrl, config.convexServiceKey);
-  const archiveWrites = createArchiveWrites(redis); // Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer
+  const archiveWrites = createArchiveWrites(redis); // §17.2 : archiver, rouvrir, supprimer
   const eventSub = createTwitchEventSub({
     clientId: config.twitchClientId,
     clientSecret: config.twitchClientSecret,
@@ -49,7 +49,7 @@ const buildServerDeps = () => {
     }),
     durable,
     redis: createSignInWrites(redis),
-    // Écart §7.2 (JOURNAL 2026-10-08) : sans `DURABLE_SCOPE`, rien n'est demandé à Convex et aucune page n'est marquée.
+    // §7.4 : sans `DURABLE_SCOPE`, rien n'est demandé à Convex et aucune page n'est marquée.
     recovery:
       config.durableScope === null
         ? undefined
@@ -57,7 +57,7 @@ const buildServerDeps = () => {
     recoveryMarks: createRecoveryMarks(redis),
     twitchWrites,
     archiveWrites,
-    // Écart §9.1 (JOURNAL 2026-10-10) : l'image de la carte d'aperçu d'un lien, un rendu par canvas et par minute, avec la
+    // §9.10 : l'image de la carte d'aperçu d'un lien, un rendu par canvas et par minute, avec la
     // photo Twitch du streamer que le serveur récupère lui-même
     canvasPreviews: createCanvasPreviews({
       durable,
@@ -67,13 +67,13 @@ const buildServerDeps = () => {
       }),
       now: Date.now,
     }),
-    // Écart §9.1 (JOURNAL 2026-10-10) : l'image du fond d'une fresque, lue dans Convex une fois par login et par instant
+    // §9.5 : l'image du fond d'une fresque, lue dans Convex une fois par login et par instant
     backgroundImages: createBackgroundImages({ durable, now: Date.now }),
-    capacityWrites: createCapacityWrites(redis), // Écart §2 et §9 (JOURNAL 2026-10-07) : l'occupation du web, l'usage de Convex
+    capacityWrites: createCapacityWrites(redis), // §16.3 : l'occupation du web, l'usage de Convex
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub,
-    accounts: createAccountList(redis), // Écart §4 (JOURNAL 2026-10-07) : les comptes que le démarrage suit tous
-    // Écart §4 et §10.1 (JOURNAL 2026-10-07) : le live des comptes, par EventSub, avec helix/streams en filet
+    accounts: createAccountList(redis), // §10.4 : les comptes que le démarrage suit tous
+    // §10.4 : le live des comptes, par EventSub, avec helix/streams en filet
     tracker: createTwitchLiveTracker({
       source: createTwitchLiveSource({
         clientId: config.twitchClientId,
@@ -86,14 +86,14 @@ const buildServerDeps = () => {
     }),
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
-    verifier: createSessionVerifier(config.sessionSecret), // Écart §10.2 (JOURNAL 2026-10-06) : l'affichage de `/{login}`
+    verifier: createSessionVerifier(config.sessionSecret), // §10.2 : l'affichage de `/{login}`
     randomCanvasId: randomUUID,
-    // Écart §10.3 (JOURNAL 2026-10-06) : le code d'une archive, tiré par le web, sans biais de modulo.
+    // §17.2 : le code d'une archive, tiré par le web, sans biais de modulo.
     randomLinkCode: () => generateLinkCode((size) => randomBytes(size)),
     publicUrl: config.publicUrl, // les en-têtes de sécurité en tirent HTTPS et l'hôte du WebSocket (JOURNAL 2026-09-29)
     // Derrière Traefik, la requête arrive en http : c'est l'URL publique qui dit si le site est en https.
     isSecure: config.publicUrl.startsWith("https://"),
-    betaLabel: config.betaLabel, // Écart §11.1 (JOURNAL 2026-10-04) : le bandeau et le `noindex` d'une bêta
+    betaLabel: config.betaLabel, // §11.1 : le bandeau et le `noindex` d'une bêta
   };
 };
 

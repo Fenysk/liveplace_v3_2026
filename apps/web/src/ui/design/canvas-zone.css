@@ -1,4 +1,4 @@
-/* La zone libre du canvas (Écart §9.3, JOURNAL 2026-10-08) : ce que les pills lui laissent à l'arrivée, à gauche, à droite et en
+/* La zone libre du canvas (§9.7) : ce que les pills lui laissent à l'arrivée, à gauche, à droite et en
    bas. Les pills du haut se mesurent (arrival-insets.ts) ; le reste se dit ici, une fois par disposition : la barre du bas, la
    colonne d'un téléphone en paysage (pill-landscape.css), le premier écran d'un double écran (pill-hinge.css). La sonde est
    invisible : la page lit sa boîte. Sans propriété, elle couvre tout l'écran. */
@@ -12,7 +12,7 @@
   pointer-events: none;
 }
 
-/* La zone au-dessus de la colonne (Écart §9.3, JOURNAL 2026-10-09) : l'autre que la colonne d'un écran tactile large laisse au
+/* La zone au-dessus de la colonne (§9.7) : l'autre que la colonne d'un écran tactile large laisse au
    canvas en Vue (pill-landscape.css). Le cadrage d'arrivée compare les deux sondes et prend la plus grande ; en Dessin, le panneau
    garde celle à côté de la colonne. Sans colonne large, les deux sondes sont la même. */
 .lp-canvas-zone--above {

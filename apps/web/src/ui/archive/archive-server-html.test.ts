@@ -87,7 +87,7 @@ describe("the HTML the server writes for the archive page (CSP of production)", 
     expect(serverHtml.notFound("Kalyss")).not.toMatch(INLINE_STYLE);
   });
 
-  // Écart §4 (JOURNAL 2026-10-07) : le bandeau d'une archive dont le streamer est en live porte son bouton teinté, sur PC et
+  // §10.4 : le bandeau d'une archive dont le streamer est en live porte son bouton teinté, sur PC et
   // sur mobile, et le HTML du serveur n'y met toujours aucun `style`
   it("carries the live button of a streamer who is live, on desktop and on mobile, with no inline style", () => {
     const live = { ...archive, owner: { ...archive.owner, twitchLive: { category: "Art" } } };

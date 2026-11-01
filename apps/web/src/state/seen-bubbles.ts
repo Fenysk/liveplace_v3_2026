@@ -1,4 +1,4 @@
-// Les bulles déjà vues (Écart §8.1, JOURNAL 2026-10-08), retenues par clé dans le navigateur : une bulle ne s'affiche qu'une fois.
+// Les bulles déjà vues (§9.11), retenues par clé dans le navigateur : une bulle ne s'affiche qu'une fois.
 // Le stockage est injecté ; quand la bulle s'affiche, l'appelant décide.
 
 export type BubbleStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -6,7 +6,7 @@ export type BubbleStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export type SeenBubbles = {
   isSeen(key: string): boolean;
   markSeen(key: string): void;
-  // Rejouer le tutoriel (Écart §8.1, JOURNAL 2026-10-12) : ces bulles ne sont plus vues, et reviennent à leur moment.
+  // Rejouer le tutoriel (§9.11) : ces bulles ne sont plus vues, et reviennent à leur moment.
   forget(keys: readonly string[]): void;
   subscribe(listener: () => void): () => void;
 };

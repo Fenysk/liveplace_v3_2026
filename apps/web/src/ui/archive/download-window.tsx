@@ -1,4 +1,4 @@
-// La fenêtre du téléchargement (Écart §15, JOURNAL 2026-10-06) : le fond du PNG, transparent, noir ou blanc, à choisir.
+// La fenêtre du téléchargement (§17.1) : le fond du PNG, transparent, noir ou blanc, à choisir.
 // Aucun fond n'est présélectionné : Télécharger reste inactif tant que le choix n'est pas fait, et il ferme la fenêtre.
 
 import { Button } from "../design/button";

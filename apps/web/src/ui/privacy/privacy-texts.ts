@@ -1,4 +1,4 @@
-// Les mots de la page Confidentialité (Écart §14, JOURNAL 2026-10-07) : son titre, la ligne qui la dit en chantier, et le titre de l'onglet.
+// Les mots de la page Confidentialité (§9.9) : son titre, la ligne qui la dit en chantier, et le titre de l'onglet.
 
 import { defineTexts } from "../locale/texts";
 

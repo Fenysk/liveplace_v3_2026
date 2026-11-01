@@ -1,4 +1,4 @@
-// La rétention des sauvegardes et du budget de l'historique (Écart §7.3 et §8.1, JOURNAL 2026-10-08). Deux fonctions pures,
+// La rétention des sauvegardes et du budget de l'historique (§7.3). Deux fonctions pures,
 // sans réseau : la pyramide d'un canvas, et les plages de chunks que le budget permet de purger. Le worker les applique.
 
 import { HOUR_MS, type Timestamp } from "./index";

@@ -1,4 +1,4 @@
-// Ce que l'utilisateur fait de la vue (Écart §8.1, JOURNAL 2026-10-08) : un déplacement ou un zoom réussi, pas un tremblement.
+// Ce que l'utilisateur fait de la vue (§9.7) : un déplacement ou un zoom réussi, pas un tremblement.
 // Sans DOM : la scène lui donne les gestes et le moment où le dernier doigt se lève.
 
 import type { Gesture } from "./gestures";

@@ -1,4 +1,4 @@
-// Les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08), l'une sur la cible qu'elle désigne : l'affichage seul, nourri par
+// Les bulles d'aide (§9.11), l'une sur la cible qu'elle désigne : l'affichage seul, nourri par
 // `useHelpBubbles`. Une seule est visible à la fois ; les autres attendent dans la page, invisibles, pour paraître en fondu.
 
 import {
@@ -37,7 +37,7 @@ export type HelpTextContext = {
 
 type HelpTexts = (typeof HELP_TEXTS)["fr"];
 
-// Les côtés d'où une bulle de la fenêtre vise sa cible (Écart §8.1, JOURNAL 2026-10-09), des constantes : la bulle suit ce qui
+// Les côtés d'où une bulle de la fenêtre vise sa cible (§9.11), des constantes : la bulle suit ce qui
 // change. L'onglet d'une barre latérale (PC) se vise de la gauche, sur le voile, puis de la droite, par-dessus le contenu ; celui
 // d'une rangée d'onglets (la feuille), de dessous, par-dessus le contenu. Vue OBS comme Modération (JOURNAL 2026-10-12).
 const TAB_SIDES: Record<"wide" | "sheet", readonly BubbleSide[]> = {

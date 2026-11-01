@@ -73,7 +73,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the live of a channel, told by Twitch (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the live of a channel, told by Twitch (§10.4)", () => {
   // Quand une chaîne passe en live, l'état prend la catégorie de la chaîne et le gateway est prévenu
   it("keeps the channel's category when it goes live, and has the gateway told", async () => {
     const { tracker, states, commands, asked } = setup({ category: "Art" });
@@ -158,7 +158,7 @@ describe("the live of a channel, told by Twitch (Écart §4, JOURNAL 2026-10-07)
   });
 });
 
-describe("tracking an account at its sign-in (Écart §4 et §10.1, JOURNAL 2026-10-07)", () => {
+describe("tracking an account at its sign-in (§10.4)", () => {
   // À la connexion, le compte est abonné et son état de départ vient de helix/streams
   it("subscribes the account and takes its starting state from helix/streams, in the background", async () => {
     const { tracker, states, commands, subscribed, asked } = setup({ streaming: art });
@@ -195,7 +195,7 @@ describe("tracking an account at its sign-in (Écart §4 et §10.1, JOURNAL 2026
   });
 });
 
-describe("reading the live of an owner when its page is rendered (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("reading the live of an owner when its page is rendered (§10.4)", () => {
   // Un état récent est rendu tel quel, sans un seul appel à Twitch
   it("gives a recent state as it is, without a single call to Twitch", async () => {
     const { tracker, asked, subscribed } = setup({ state: live("Art") });

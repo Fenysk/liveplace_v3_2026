@@ -1,4 +1,4 @@
-// Les dessins de la démo de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : la fresque est un carré de 12 cases.
+// Les dessins de la démo de l'accueil (§9.10) : la fresque est un carré de 12 cases.
 
 export const GRID_SIDE = 12;
 

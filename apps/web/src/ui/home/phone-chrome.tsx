@@ -1,4 +1,4 @@
-// Le décor d'iPhone de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : l'îlot, la barre d'état (l'heure, le réseau, le wifi, la batterie) et
+// Le décor d'iPhone de l'accueil (§9.10) : l'îlot, la barre d'état (l'heure, le réseau, le wifi, la batterie) et
 // la barre d'accueil, en formes seulement. Décoratif pour un lecteur d'écran. Le serveur l'écrit avec la place du téléphone ;
 // home.css le masque sur un écran étroit, où le vrai téléphone du visiteur en tient lieu.
 

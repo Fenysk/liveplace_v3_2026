@@ -1,4 +1,4 @@
-// L'entrée Bulle (Écart §8.1, JOURNAL 2026-10-08) : la surface qui guide un geste, sans cible, avec une flèche, et portant
+// L'entrée Bulle (§9.11) : la surface qui guide un geste, sans cible, avec une flèche, et portant
 // la progression du conseil de première visite.
 
 import { Brush, Eraser, Pipette, Pointer, Trash } from "lucide-react";

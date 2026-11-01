@@ -3,7 +3,7 @@ import { judgeChunk } from "./chunk-order";
 
 const incoming = { fromVersion: 11, toVersion: 20, count: 10 };
 
-describe("judgeChunk (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("judgeChunk (§7.1)", () => {
   // Le premier chunk d'un canvas se range, quel que soit son intervalle
   it("accepts the first chunk of a canvas", () => {
     expect(judgeChunk(incoming, undefined)).toBe("accepted");

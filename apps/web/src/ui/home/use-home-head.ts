@@ -1,4 +1,4 @@
-// Le titre de l'onglet et la description de `/` suivent la langue (Écart §14, JOURNAL 2026-10-22) : le serveur les écrit dans la langue
+// Le titre de l'onglet et la description de `/` suivent la langue (§9.9) : le serveur les écrit dans la langue
 // rendue ; un changement de langue sans recharger les réécrit ici, comme la page Confidentialité.
 
 import { useEffect } from "react";

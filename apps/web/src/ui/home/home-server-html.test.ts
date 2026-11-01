@@ -51,7 +51,7 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
-  // Écart §9.1 (JOURNAL 2026-10-31) : le bouton dit qu'il va chez Twitch, et son nom accessible est son texte visible, sans `title` qui le contredise
+  // §9.10 : le bouton dit qu'il va chez Twitch, et son nom accessible est son texte visible, sans `title` qui le contredise
   it("names the sign-in button by its visible text alone, and opens the privacy policy in the same tab", () => {
     for (const [locale, text] of [
       ["fr", "Lancer ma fresque avec Twitch"],

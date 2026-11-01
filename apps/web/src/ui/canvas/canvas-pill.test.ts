@@ -7,7 +7,7 @@ import type { ProfileUser } from "../design/profile";
 import { CanvasPill, type CanvasPillFold } from "./canvas-pill";
 import { createGestureTracker, type Gesture, movesViewport, type PointerInput } from "./gestures";
 
-// Écart §8.1 (JOURNAL 2026-10-08) : sur mobile, la pill Canvas se replie sur la photo quand on déplace, zoome ou ouvre une case.
+// §9.7 : sur mobile, la pill Canvas se replie sur la photo quand on déplace, zoome ou ouvre une case.
 
 // Un attribut `style` : la CSP de production bloque celui du HTML que le serveur écrit (archive-server-html.test.ts).
 const INLINE_STYLE = /\sstyle=/;
@@ -93,7 +93,7 @@ describe("the Canvas pill, when it stays whole", () => {
   });
 });
 
-describe("the game page folding the Canvas pill (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("the game page folding the Canvas pill (§9.7)", () => {
   const source = (...path: string[]) => readFileSync(join(import.meta.dirname, "..", "..", ...path), "utf8");
 
   // Le canvas dit ses actions à la page : sans cet appel, rien ne se replie
@@ -107,7 +107,7 @@ describe("the game page folding the Canvas pill (Écart §8.1, JOURNAL 2026-10-0
   });
 });
 
-describe("what folds the Canvas pill (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("what folds the Canvas pill (§9.7)", () => {
   const finger = (pointerId: number, x: number, y: number): PointerInput => ({
     pointerId,
     pointerType: "touch",
@@ -179,7 +179,7 @@ describe("what folds the Canvas pill (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(folds([{ kind: "zoom", point: { x: 10, y: 10 }, factor: 1 / 1.5 }])).toBe(true);
   });
 
-  // Ouvrir une case ou zoomer dessus replie (Écart §9.3, JOURNAL 2026-10-09) ; un appui qui n'ouvre rien non : dans le vide il
+  // Ouvrir une case ou zoomer dessus replie (§9.7) ; un appui qui n'ouvre rien non : dans le vide il
   // ferme, en Dessin il bascule la case
   it("folds when a tap opens an inspection or zooms onto a cell, and not when it opens nothing", () => {
     expect(scene()).toMatch(
@@ -189,7 +189,7 @@ describe("what folds the Canvas pill (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(scene()).not.toMatch(/store\.closeInspection\(\);\s*options\.onGesture/);
   });
 
-  // Recentrer replie aussi (Écart §8.1, JOURNAL 2026-10-09) : un appel suffit, comme pour un déplacement
+  // Recentrer replie aussi (§9.7) : un appel suffit, comme pour un déplacement
   it("folds when Recenter is called", () => {
     expect(scene()).toMatch(/recenter\(\) \{[^}]*options\.onGesture\(\);[\s\S]*?startZoom\(/);
   });

@@ -1,4 +1,4 @@
-// Le fichier d'un palier en `state` seul (Écart §7.3, JOURNAL 2026-10-08) : le dessin en base64 dans du JSON compressé en
+// Le fichier d'un palier en `state` seul (§7.3) : le dessin en base64 dans du JSON compressé en
 // brotli, sans auteurs ni modération. Au-delà de 7 jours, un retour en arrière rend ce dessin et rien de plus.
 
 import { promisify } from "node:util";

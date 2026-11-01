@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Bubble, BubbleLine } from "./bubble";
 
-// Écart §8.1 (JOURNAL 2026-10-08) : la bulle, une surface de pill qui guide un geste.
+// §9.11 : la bulle, une surface de pill qui guide un geste.
 
 // Le contenu : les composants le demandent dans leurs props, que `createElement` n'accepte qu'ainsi.
 const text = { children: "Touche un pixel" };
@@ -34,7 +34,7 @@ const render = (props: {
 const bubbleCss = readFileSync(join(import.meta.dirname, "bubble.css"), "utf8");
 const bubbleSource = readFileSync(join(import.meta.dirname, "bubble.tsx"), "utf8");
 
-describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la bulle (§9.11)", () => {
   // Jamais montrée, elle n'est pas même dans la page : un lecteur d'écran n'a rien à sauter
   it("is not in the page until it is first shown", () => {
     expect(render({ isVisible: false })).toBe("");
@@ -143,7 +143,7 @@ describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
     }
   });
 
-  // Écart §8.1 (JOURNAL 2026-10-12) : sa flèche s'arrête contre la pill qui porte la cible ; l'élément visé porte l'anneau du focus
+  // §9.11 : sa flèche s'arrête contre la pill qui porte la cible ; l'élément visé porte l'anneau du focus
   // tant que la bulle est montrée, qui paraît et part en fondu avec elle
   it("rings the element it aims at while it is shown, and takes the ring away with it", () => {
     expect(bubbleSource).toContain('const AIMED_ATTRIBUTE = "data-aimed";');
@@ -157,7 +157,7 @@ describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
     expect(render({ isVisible: true, hasTarget: true })).not.toContain("data-aimed");
   });
 
-  // Écart §8.1 (JOURNAL 2026-10-13, qui défait l'entrée du même jour) : la bulle se pose contre la pill qui porte la cible, mais sa
+  // §9.11 : la bulle se pose contre la pill qui porte la cible, mais sa
   // flèche vise la cible elle-même, dans l'écran comme posée sur place ; l'anneau marque aussi le bouton
   it("sits against the pill that holds the target, its arrow aiming at the target itself and not at the pill", () => {
     expect(bubbleSource).toContain(
@@ -177,7 +177,7 @@ describe("la bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
     expect(bubbleSource).toContain("setVariable(element, ROOM_VARIABLE, squeezed)");
   });
 
-  // Écart §9.3 (JOURNAL 2026-10-09) : le bouton visé remplit son `<span>`, qui s'étire où le bouton seul s'étirerait
+  // §9.6 : le bouton visé remplit son `<span>`, qui s'étire où le bouton seul s'étirerait
   // (la colonne latérale) : le +1 prend la place de Dessiner, comme lui, sans que le `<span>` y change rien
   it("lets the button it wraps fill the span, so the +1 stretches wherever Dessiner does", () => {
     expect(bubbleCss).toMatch(/\.lp-bubble-target > \.lp-btn \{[^}]*flex: 1 1 auto;/);

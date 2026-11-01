@@ -1,4 +1,4 @@
-// La démo de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : un brouillon, une jauge de 10 pixels qui se recharge, deux fresques.
+// La démo de l'accueil (§9.10) : un brouillon, une jauge de 10 pixels qui se recharge, deux fresques.
 // De la logique pure : ni React ni horloge, l'instant arrive en paramètre.
 
 import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";

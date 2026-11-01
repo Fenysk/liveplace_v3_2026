@@ -32,8 +32,8 @@ import { parseWorkerConfig } from "./config";
 
 const TICK_MS = 250; // la modération doit tenir dans les 2 s : un tour tous les quarts de seconde
 const KEEP_MS = 5_000; // le bail dure 30 s : six tentatives pour le prolonger
-const SWEEP_MS = 5 * 60_000; // le balayage de rattrapage (Écart §7.2, JOURNAL 2026-10-06)
-const DELAY_REPORT_MS = 10_000; // le retard de la sauvegarde, déposé pour la Capacité à sa cadence (Écart §8.1, JOURNAL 2026-10-08)
+const SWEEP_MS = 5 * 60_000; // le balayage de rattrapage (§7.2)
+const DELAY_REPORT_MS = 10_000; // le retard de la sauvegarde, déposé pour la Capacité à sa cadence (§7.5)
 
 // Fail-closed : sans une variable obligatoire, le process s'arrête ici en la nommant (§11.5).
 const config = parseWorkerConfig(process.env);
@@ -59,7 +59,7 @@ const subscriber = new Redis(config.redisUrl);
 const historySubscriber = new Redis(config.redisUrl);
 const log = (message: string, error?: unknown): void => console.error(`worker: ${message}`, error ?? "");
 const historyPlan = createHistoryPlan();
-// Écart §7.2 (JOURNAL 2026-10-08) : un canvas que Redis a perdu revient de sa sauvegarde, un pipeline Redis toutes les 5 s.
+// §7.4 : un canvas que Redis a perdu revient de sa sauvegarde, un pipeline Redis toutes les 5 s.
 const recovery =
   config.scope === null
     ? null
@@ -71,7 +71,7 @@ const recovery =
         now: Date.now,
         log,
       });
-// Écart §7.3 (JOURNAL 2026-10-08) : la pyramide des sauvegardes (heure, jour, semaine), lue une fois dans Convex puis tenue en mémoire.
+// §7.3 : la pyramide des sauvegardes (heure, jour, semaine), lue une fois dans Convex puis tenue en mémoire.
 const retention =
   config.scope === null
     ? null
@@ -95,7 +95,7 @@ const cycle =
         onSaved: (canvasId) => recovery?.noteSaved(canvasId),
         onStored: (stored) => retention?.noteStored(stored),
       });
-// Écart §7.2 (JOURNAL 2026-10-08) : l'historique des poses, lu dans le flux depuis le curseur de Convex.
+// §7.1 : l'historique des poses, lu dans le flux depuis le curseur de Convex.
 const history =
   config.scope === null
     ? null
@@ -107,7 +107,7 @@ const history =
         now: Date.now,
         log,
       });
-// Écart §8.1 (JOURNAL 2026-10-08) : l'historique fin tient dans son budget (700 Mo en prod, 50 Mo ailleurs), le plus ancien d'abord.
+// §7.3 : l'historique fin tient dans son budget (700 Mo en prod, 50 Mo ailleurs), le plus ancien d'abord.
 const budget =
   config.scope === null
     ? null

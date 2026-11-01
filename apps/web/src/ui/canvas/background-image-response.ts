@@ -1,5 +1,5 @@
 // `/{login}/background` : l'image du fond lue par toutes les pages (GET) et postée par le streamer (POST). Séparée de la route
-// pour se tester sans routeur (Écart §9.1, JOURNAL 2026-10-10).
+// pour se tester sans routeur (§9.5).
 
 import { BACKGROUND_IMAGE_MAX_BYTES } from "@liveplace/domain";
 import type { SessionVerifier } from "@liveplace/domain/ports";

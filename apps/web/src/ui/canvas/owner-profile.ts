@@ -1,4 +1,4 @@
-// Le profil du streamer d'une page (pill Canvas, bandeau d'archive), avec son live (Écart §4, JOURNAL 2026-10-07) : celui que
+// Le profil du streamer d'une page (pill Canvas, bandeau d'archive), avec son live (§10.4) : celui que
 // le serveur a lu au rendu, puis, dès le `welcome`, celui du gateway, qui le redit à chaque changement.
 
 import { useSyncExternalStore } from "react";

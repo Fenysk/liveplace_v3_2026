@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : ce que partagent archiver, rouvrir et supprimer. Le web les fait après avoir vérifié
+// §17.2 : ce que partagent archiver, rouvrir et supprimer. Le web les fait après avoir vérifié
 // le cookie du streamer, avec un verrou par propriétaire ; Convex tranche, Redis suit, et les pages l'apprennent.
 
 import type { Timestamp } from "@liveplace/domain";

@@ -1,4 +1,4 @@
-// La pyramide de l'historique, la même pour l'activité et la capacité (écart §5.1, JOURNAL 2026-10-06 et 2026-10-07) : un point
+// La pyramide de l'historique, la même pour l'activité et la capacité (§16.3) : un point
 // par minute, par heure, par jour de Paris, chacun dans un HASH dont le champ est le début du point.
 
 import type { Timestamp } from "@liveplace/domain";

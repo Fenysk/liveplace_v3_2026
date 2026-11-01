@@ -1,4 +1,4 @@
-// Les phrases du canvas (Écart §14, JOURNAL 2026-10-07) : la page, ses toasts, la section Canvas de la fenêtre, la pill Pratique.
+// Les phrases du canvas (§9.9) : la page, ses toasts, la section Canvas de la fenêtre, la pill Pratique.
 
 import type { CanvasFormat } from "@liveplace/domain";
 import { isSingular } from "../locale/locale";
@@ -46,7 +46,7 @@ export const CANVAS_TEXTS = defineTexts({
     en: "With the keyboard: the arrow keys aim at a cell, Shift goes ten times farther. D, Enter or Space to draw. In Draw mode: Space adds the aimed cell, Backspace removes it, E picks the eraser, I the eyedropper, Enter confirms, Esc cancels.",
   },
 
-  // La pill Canvas repliée sur mobile (Écart §8.1, JOURNAL 2026-10-08) : la photo seule, en bouton qui la déplie.
+  // La pill Canvas repliée sur mobile (§9.7) : la photo seule, en bouton qui la déplie.
   unfoldProfile: localized({
     fr: ({ name, isLive }: { name: string; isLive: boolean }) =>
       `Déplier le profil de ${name}${isLive ? ", en live sur Twitch" : ""}`,
@@ -74,7 +74,7 @@ export const CANVAS_TEXTS = defineTexts({
         ? `${ownerName} switched canvas: your draft stays on the old one.`
         : `${ownerName} switched canvas.`,
   }),
-  // Écart §5.3 (JOURNAL 2026-10-24) : la fresque a rapproché ses dessins, le brouillon parlait d'un autre dessin.
+  // §5.8 : la fresque a rapproché ses dessins, le brouillon parlait d'un autre dessin.
   draftWiped: {
     fr: "La fresque a été réduite : ton brouillon a été effacé.",
     en: "The canvas was shrunk: your draft was cleared.",
@@ -90,7 +90,7 @@ export const CANVAS_TEXTS = defineTexts({
         : `${MODERATION_TEXTS.en.pixelCount(count)} refused: they stay in the draft.`,
   }),
 
-  // Le fond de la fresque, puis son image, dans la section Canvas de la fenêtre (Écart §9.1, JOURNAL 2026-10-10).
+  // Le fond de la fresque, puis son image, dans la section Canvas de la fenêtre (§9.5).
   background: { fr: "Fond de la fresque", en: "Canvas background" },
   backgroundNote: {
     fr: "Noir ou blanc : les cases vides prennent cette couleur. Transparent : le damier dans le jeu, rien dans la vue OBS.",
@@ -174,7 +174,7 @@ export const CANVAS_TEXTS = defineTexts({
     en: ({ width, height }) => `Size changed: ${width} × ${height} cells`,
   }),
   canvasSize: { fr: "Taille de la fresque", en: "Canvas size" },
-  // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique, et une taille qui n'est dans aucun format.
+  // §5.8 : la taille dynamique, et une taille qui n'est dans aucun format.
   dynamicSize: { fr: "Taille dynamique", en: "Dynamic size" },
   dynamicSizeNote: {
     fr: "La fresque garde 3 cases vides autour de ses dessins : elle grandit seule quand un dessin approche d'un bord, et ne rétrécit jamais. En l'activant, elle se resserre sur ses dessins, 10 × 10 au moins. En la désactivant, elle revient à 50 × 50.",
@@ -241,7 +241,7 @@ export const CANVAS_TEXTS = defineTexts({
     fr: "Aucun pixel posé ne sort du cadre.",
     en: "No placed pixel falls outside the frame.",
   },
-  // Écart §5.3 (JOURNAL 2026-10-24) : réduire rapproche les dessins avant de couper, et efface les brouillons qui en parlaient.
+  // §5.8 : réduire rapproche les dessins avant de couper, et efface les brouillons qui en parlaient.
   closerSentence: {
     fr: "Les dessins se rapprochent pour en garder le plus. Les brouillons en cours sont effacés.",
     en: "Drawings are brought closer to keep as many as possible. Drafts in progress are cleared.",

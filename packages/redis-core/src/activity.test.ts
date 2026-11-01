@@ -65,7 +65,7 @@ const canvasMinute = (counts: Partial<CanvasMinute> = {}): CanvasMinute => ({
 const inMinute = (at: number, canvases: Record<string, CanvasMinute>) =>
   minute(at, { canvases: new Map(Object.entries(canvases)) });
 
-describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
+describe("the activity in Redis (§16.2)", () => {
   // Garde le pic des personnes et des canvas streamés, et la somme des pixels, sur la minute, l'heure et le jour
   it("keeps the peak of people and streamed canvases, and the sum of pixels, on the minute, hour and day", async () => {
     const { keys, store } = stores();
@@ -239,8 +239,8 @@ describe("the activity in Redis (écart §5.1, JOURNAL 2026-10-06)", () => {
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-07) : l'audience, ses sommes dans les points et ses distincts dans des HyperLogLog.
-describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
+// §16.2 : l'audience, ses sommes dans les points et ses distincts dans des HyperLogLog.
+describe("the audience in Redis (§16.2)", () => {
   const dayMinute = (daysAgo: number) => toActivityPointStarts(now - daysAgo * DAY_MS).minute;
   const zero = {
     visits: 0,
@@ -471,8 +471,8 @@ describe("the audience in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-07) : l'historique d'un canvas, ses trois niveaux, ses joueurs actifs et son audience.
-describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", () => {
+// §16.2 : l'historique d'un canvas, ses trois niveaux, ses joueurs actifs et son audience.
+describe("the history of a canvas in Redis (§16.2)", () => {
   const players = (...playerIds: string[]) => ({ playerIds: new Set(playerIds) });
   const quiet = { streamedMinutes: 0, visits: 0, visitMinutes: 0, signups: 0 };
 
@@ -700,8 +700,8 @@ describe("the history of a canvas in Redis (écart §5.1, JOURNAL 2026-10-07)", 
   });
 });
 
-/// Écart §5.1 (JOURNAL 2026-10-08) : le seul état, « streamé » : un pic de canvas pour tout LivePlace, une somme de minutes pour un canvas.
-describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", () => {
+/// §16.2 : le seul état, « streamé » : un pic de canvas pour tout LivePlace, une somme de minutes pour un canvas.
+describe("the streamed state in the points (§16.2)", () => {
   // Garde le pic des canvas streamés de tout LivePlace, jamais leur somme, sur la minute, l'heure et le jour, dans ses deux champs
   it("keeps the peak of the streamed canvases of the whole of LivePlace, never their sum, on the minute, hour and day, in both fields", async () => {
     const { keys, store } = stores();
@@ -805,8 +805,8 @@ describe("the streamed state in the points (écart §5.1, JOURNAL 2026-10-08)", 
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes se comble, atomiquement, dans les points.
-describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)", () => {
+// §16.2 : une coupure de moins de 5 minutes se comble, atomiquement, dans les points.
+describe("the gap of a stream in the points (§16.2)", () => {
   const at = (minutesAgo: number) => minuteAt - minutesAgo * MINUTE_MS;
   const streamedBy = (...ats: number[]) =>
     ats.map((minuteStart) => minute(minuteStart, { people: 1, streamed: 1 }));
@@ -969,8 +969,8 @@ describe("the gap of a stream in the points (écart §5.1, JOURNAL 2026-10-08)",
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : la dernière heure où chaque canvas a été vu streamé survit à un redémarrage.
-describe("the time a canvas was seen streamed, in Redis (écart §5.1, JOURNAL 2026-10-08)", () => {
+// §16.2 : la dernière heure où chaque canvas a été vu streamé survit à un redémarrage.
+describe("the time a canvas was seen streamed, in Redis (§16.2)", () => {
   // Verse l'heure vue de chaque canvas et la relit, en la remplaçant au versement suivant
   it("stores the time each canvas was seen and reads it back, replaced at the next storing", async () => {
     const { keys, store } = stores();
@@ -1047,7 +1047,7 @@ describe("the time a canvas was seen streamed, in Redis (écart §5.1, JOURNAL 2
 });
 
 // JOURNAL 2026-10-14 : un jour passé se lit dans ce qui est déjà gardé, rien de plus.
-describe("a past day in Redis (écart §4.2, JOURNAL 2026-10-14)", () => {
+describe("a past day in Redis (§16.1)", () => {
   const pastDayAt = toActivityPointStarts(now - 2 * DAY_MS).day; // le 4/10 à Paris
   const at = pastDayAt + 10 * HOUR_MS + 5 * MINUTE_MS; // 10 h 05 ce jour-là
   // Par ordre des caractères, que SCAN ne garantit pas : la langue du poste n'y change rien.

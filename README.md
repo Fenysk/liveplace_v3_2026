@@ -6,7 +6,7 @@ Une URL par streamer, la même page dans le navigateur et dans une source Naviga
 ## Où vivent les décisions
 
 Le **quoi** est dans le cahier des charges 2026, le **comment** dans le plan d'architecture V3,
-version du bloc 2 — les deux dans le vault Obsidian (dossier LivePlace, à chercher toi-même).
+version du bloc 3 — les deux dans le vault Obsidian (dossier LivePlace, à chercher toi-même).
 Le plan ne se réécrit qu'au bilan d'un bloc : entre deux bilans, une décision prise en route
 s'écrit dans le JOURNAL.
 
@@ -95,7 +95,7 @@ et c'est ce qui le garde à l'abri.
 
 ## L'état du dépôt
 
-Au 30 septembre 2026, fin du bloc 1 : LivePlace est en ligne sur `liveplace.tv`, protocole 10.
+Au 1er novembre 2026, fin du bloc 2 : LivePlace est en ligne sur `liveplace.tv`, protocole 23.
 
 | Morceau | Ce qu'il fait |
 |---|---|
@@ -105,6 +105,6 @@ Au 30 septembre 2026, fin du bloc 1 : LivePlace est en ligne sur `liveplace.tv`,
 | `packages/redis-core` | Les scripts Lua (pose, modération, signalement, taille, jauge, restauration) et le client typé. Testé contre un vrai Redis. |
 | `packages/durable` | Convex : les comptes et leurs canvas, et les snapshots (un fichier par snapshot, une ligne d'index). |
 | `apps/gateway` | Le serveur WebSocket : arrivée, reprise, diffusion au tick, modération, et les actions venues de Twitch. |
-| `apps/web` | La page canvas, la vue OBS, la connexion Twitch, la synchro de la modération Twitch, le design system (`/design`). |
+| `apps/web` | L'accueil, la page canvas et ses archives, la vue OBS, la connexion Twitch, la synchro de la modération Twitch, la fenêtre Développeur, le design system (`/design`). |
 | `apps/worker` | La sauvegarde : un snapshot complet de chaque canvas dans Convex, l'historique des poses par chunks, et la récupération d'un canvas que Redis a perdu, sous le `DURABLE_SCOPE` de l'environnement. |
 | `tools/bench` | Vide : le bench s'efface après chaque test de charge. |

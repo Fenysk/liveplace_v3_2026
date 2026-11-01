@@ -246,14 +246,14 @@ describe("session claims (§10.2)", () => {
     expect(toSession({ sub: 1234, login: "fenysk", displayName: "Fenysk" })).toBeNull();
   });
 
-  // Ne met jamais l'e-mail d'un compte dans la session (écart §10.1, JOURNAL 2026-09-27)
+  // Ne met jamais l'e-mail d'un compte dans la session (§10.1)
   it("never puts an account's email in the session", () => {
     const signedIn = { ...session, avatarUrl: "https://avatar", email: "fenysk@example.com" };
     expect(toSessionClaims(signedIn)).not.toHaveProperty("email");
     expect(toSession({ ...toSessionClaims(signedIn), email: signedIn.email })).not.toHaveProperty("email");
   });
 
-  // Porte la photo Twitch quand la session en a une, et la retrouve (écart §10.2, JOURNAL 2026-09-24)
+  // Porte la photo Twitch quand la session en a une, et la retrouve (§10.2)
   it("carries the Twitch photo when the session has one, and reads it back", () => {
     const withPhoto: Session = {
       ...session,
@@ -289,7 +289,7 @@ describe("defaultCanvasMeta (CDC §1)", () => {
   });
 });
 
-describe("birthCanvasMeta (Écart §5.3, JOURNAL 2026-10-29)", () => {
+describe("birthCanvasMeta (§5.8)", () => {
   // Fait naître le canvas de la première connexion en taille dynamique et 10 × 10, avec les valeurs par défaut du reste
   it("makes the canvas of a first sign-in dynamic and 10 × 10, with the game defaults for the rest", () => {
     expect(birthCanvasMeta("owner-1")).toEqual({
@@ -384,7 +384,7 @@ describe("the canvas sizes (CDC 2026 §1)", () => {
 });
 
 describe("the OBS backgrounds (CDC 2026 §1)", () => {
-  // Transparent par défaut, puis noir et blanc : l'image n'est pas un fond, elle se pose par-dessus (Écart §9.1, JOURNAL 2026-10-10)
+  // Transparent par défaut, puis noir et blanc : l'image n'est pas un fond, elle se pose par-dessus (§9.5)
   it("lists transparent, black and white, transparent being the default, and no image: it lies over any of them", () => {
     expect(OBS_BACKGROUNDS).toEqual(["transparent", "black", "white"]);
     expect(OBS_BACKGROUND).toBe("transparent");
@@ -424,7 +424,7 @@ describe("the OBS delay steps (JOURNAL 2026-09-25)", () => {
   });
 });
 
-describe("the archives (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the archives (§17.1)", () => {
   // Un canvas se dit en trois statuts, et un streamer garde cinq archives au plus
   it("speaks of three statuses, and an owner keeps five archives at most", () => {
     expect(CANVAS_STATUSES).toEqual(["archived", "active", "discarded"]);
@@ -498,8 +498,8 @@ describe("the archives (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-// Écart §10.3 et §5.1 (JOURNAL 2026-10-06) : le développeur, et le début des points de l'historique d'activité.
-describe("the activity (écart §5.1, JOURNAL 2026-10-06)", () => {
+// §10.3 et §16.2 : le développeur, et le début des points de l'historique d'activité.
+describe("the activity (§16.2)", () => {
   // Le développeur est le compte Twitch de fenysk, et lui seul
   it("names fenysk's Twitch account as the developer, and no one else", () => {
     expect(DEVELOPER_USER_ID).toBe("68710381");
@@ -584,8 +584,8 @@ describe("the Paris day before and after another (JOURNAL 2026-10-14)", () => {
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes se comble dans l'historique.
-describe("the gap of a stream (écart §5.1, JOURNAL 2026-10-08)", () => {
+// §16.2 : une coupure de moins de 5 minutes se comble dans l'historique.
+describe("the gap of a stream (§16.2)", () => {
   const at = (minutes: number, seconds = 0) => Date.UTC(2026, 9, 8, 12, minutes, seconds);
 
   // La tolérance est de 5 minutes

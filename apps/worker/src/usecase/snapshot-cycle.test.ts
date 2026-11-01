@@ -166,7 +166,7 @@ describe("what the snapshot cycle tells the others (JOURNAL 2026-10-08)", () => 
   });
 });
 
-describe("the snapshot cycle (Écart §7.2, JOURNAL 2026-10-06)", () => {
+describe("the snapshot cycle (§7.2)", () => {
   // Quand le balayage voit un canvas qui a des poses et aucune sauvegarde, le tour la fait et la range sous son palier
   it("saves a canvas the sweep finds, as a working snapshot with its players", async () => {
     const { cycle, stored, reads } = await setup({ "canvas-1": 4 }, { "canvas-1": ["a", "b"] });

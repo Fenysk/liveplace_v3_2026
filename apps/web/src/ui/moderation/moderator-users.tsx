@@ -20,7 +20,7 @@ export type ModeratorListView =
 type ModeratorUsersProps = {
   list: ModeratorListView;
   removingUserId?: string | null | undefined; // Retirer attend sa réponse
-  failedUserId?: string | null | undefined; // Retirer a échoué : la ligne le dit, la liste reste (Écart §8.1, JOURNAL 2026-10-13)
+  failedUserId?: string | null | undefined; // Retirer a échoué : la ligne le dit, la liste reste (§9.8)
   onRemove?: ((userId: string) => void) | undefined;
 };
 

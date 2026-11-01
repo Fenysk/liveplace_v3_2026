@@ -6,7 +6,7 @@ import type { BackgroundImages } from "../../usecase/background-images";
 import type { BackgroundImageDeps } from "../../usecase/canvas-background-image";
 import { backgroundImageResponse, uploadBackgroundImageResponse } from "./background-image-response";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : `/{login}/background`, l'image du fond lue par toutes les pages et postée par le streamer.
+// §9.5 : `/{login}/background`, l'image du fond lue par toutes les pages et postée par le streamer.
 
 const AT = 1_760_000_000_000;
 const WEBP = new Uint8Array(64);

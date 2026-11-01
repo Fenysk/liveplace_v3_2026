@@ -42,7 +42,7 @@ const render = (view: CapacityWatchView): string =>
 
 const loading: CapacityWatchView["history"] = { status: "loading" };
 
-describe("the capacity section (écart §4.3, JOURNAL 2026-10-07)", () => {
+describe("the capacity section (§16.3)", () => {
   // Montre, de haut en bas, la saturation, les ressources par maillon, puis l'historique de la période
   it("shows, top to bottom, the saturation, the resources by link, then the history of the period", () => {
     const markup = render({

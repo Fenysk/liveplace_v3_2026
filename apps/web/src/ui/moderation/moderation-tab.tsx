@@ -70,7 +70,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
   useEffect(relist, [relist]);
   useRelistOnStale(canvas, "moderators", relist);
 
-  // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour. Écart §8.1 (JOURNAL 2026-10-13) :
+  // Le streamer retire un modérateur qu'il a nommé ici : la réponse est la liste à jour. §9.8 :
   // un échec garde la liste et se dit sur la ligne, qui relance la même action.
   const onRemove = (userId: string) => {
     setRemovingUserId(userId);
@@ -87,7 +87,7 @@ const useModeratorsProps = (canvas: CanvasStore) => {
 };
 
 // `relist` à l'ouverture de l'onglet, puis à chaque signalement ou décision, ici ou chez un autre modérateur, et quand des
-// pixels ont changé de case (Écart §5.3, JOURNAL 2026-10-24) : les positions de la liste sont fausses.
+// pixels ont changé de case (§5.8) : les positions de la liste sont fausses.
 const useRelistOnReports = (canvas: CanvasStore, relist: () => void) => {
   useEffect(() => {
     let listed: string | null = null;
@@ -120,7 +120,7 @@ const useReportsProps = (canvas: CanvasStore, onModerate: ModerationControls["on
   }, [canvas]);
   useRelistOnReports(canvas, relist);
 
-  // Un dessin après l'autre, un seul toast à la fin (JOURNAL 2026-10-07). Écart §8.1 (JOURNAL 2026-10-13) : un échec garde la
+  // Un dessin après l'autre, un seul toast à la fin (JOURNAL 2026-10-07). §9.8 : un échec garde la
   // liste et se dit sur la ligne.
   const approve = async (report: PendingReport): Promise<void> => {
     const key = pendingReportKey(report);
@@ -180,7 +180,7 @@ const useModerationTabProps = (canvas: CanvasStore) => {
     else listing.drop();
   };
 
-  // Écart §8.1 (JOURNAL 2026-10-13) : un échec garde la liste et se dit sur la ligne, qui relance la même action.
+  // §9.8 : un échec garde la liste et se dit sur la ligne, qui relance la même action.
   const onUnban = (userId: string) => {
     setUnbanningUserId(userId);
     setFailedUserId(null);

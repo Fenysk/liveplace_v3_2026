@@ -79,7 +79,7 @@ const cellsOf = (snapshot: CanvasSnapshot) =>
 const stateOf = async (canvasId: string) =>
   new Uint8Array((await redis.getBuffer(buildCanvasKeys(canvasId).state)) ?? []);
 
-describe("getCanvasSnapshot: the pixels (Écart §7.2, JOURNAL 2026-10-06)", () => {
+describe("getCanvasSnapshot: the pixels (§7.2)", () => {
   // Chaque case porte le pixel visible : son auteur, sa pose, sa couleur, son heure et sa version
   it("carries, for each cell, the visible pixel with its author, placement, color, date and version", async () => {
     const { canvasId } = await readyCanvas();
@@ -147,7 +147,7 @@ describe("getCanvasSnapshot: the pixels (Écart §7.2, JOURNAL 2026-10-06)", () 
   it("carries a cell outside the frame after a shrink, and leaves it out of the rebuilt state", async () => {
     const { canvasId } = await readyCanvas({ width: 100, height: 100 });
     // Une ligne de 60 pixels ne tient pas dans 50 colonnes : rien ne peut se rapprocher, les 10 derniers sortent du cadre
-    // (Écart §5.3, JOURNAL 2026-10-24).
+    // (§5.8).
     const inside = Array.from({ length: 50 }, (_, x) => ({ x, y: 10, colorIndex: 3 }));
     const outside = Array.from({ length: 10 }, (_, index) => ({ x: 50 + index, y: 10, colorIndex: 4 }));
     await placeAs(canvasId, "author-a", "pinside001", inside);
@@ -216,7 +216,7 @@ describe("getCanvasSnapshot: the pixels (Écart §7.2, JOURNAL 2026-10-06)", () 
   });
 });
 
-describe("getCanvasSnapshot: the rest of what binds a canvas to its streamer (Écart §7.2, JOURNAL 2026-10-06)", () => {
+describe("getCanvasSnapshot: the rest of what binds a canvas to its streamer (§7.2)", () => {
   // Le state refait des cases visibles est celui de Redis, après des poses, un retrait, un ban et une pose retirée
   it("rebuilds exactly the state Redis holds after placements, removals and bans", async () => {
     const { canvasId } = await readyCanvas();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { wordingOf } from "./use-label-morph";
 
-describe("wordingOf (Écart §9.3, JOURNAL 2026-10-08)", () => {
+describe("wordingOf (§9.6)", () => {
   // Seuls les chiffres changent : même texte, le bouton ne passe pas en fondu à chaque seconde ni à chaque pixel
   it("gives the same wording when only the digits change", () => {
     expect(wordingOf("Valider · 3")).toBe(wordingOf("Valider · 12"));

@@ -24,7 +24,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("la langue de la page (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la langue de la page (§9.9)", () => {
   // Quand la page est rendue sans fournisseur, le système doit parler français
   it("speaks French outside a provider", () => {
     expect(renderToStaticMarkup(createElement(Probe))).toBe("<span>fr</span>");
@@ -46,7 +46,7 @@ describe("la langue de la page (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("le choix de la langue (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("le choix de la langue (§9.9)", () => {
   // Sous une langue imposée (la fenêtre Développeur), le choix reste dans cette langue, quelle que soit celle de la page
   it("keeps the picker in a fixed language, whatever the language of the page", () => {
     const html = inLocale("en", createElement(FixedLocale, { locale: "fr" }, createElement(LocalePicker)));
@@ -74,7 +74,7 @@ describe("le choix de la langue (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("le cookie écrit par la page (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("le cookie écrit par la page (§9.9)", () => {
   // Quand le visiteur choisit une langue, le cookie est écrit, Secure en https seulement
   it("writes the cookie of the choice, Secure over https only", () => {
     const written: string[] = [];
@@ -115,7 +115,7 @@ describe("le cookie écrit par la page (Écart §14, JOURNAL 2026-10-07)", () =>
   });
 });
 
-describe("le cookie lu par la page (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("le cookie lu par la page (§9.9)", () => {
   // Quand le navigateur porte plusieurs cookies, la langue lue est celle de lp_locale
   it("reads the language of the cookie among the others", () => {
     vi.stubGlobal("document", { cookie: "lp_session=abc; lp_locale=en; theme=dark" });
@@ -147,7 +147,7 @@ describe("le cookie lu par la page (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("la page suit le cookie (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la page suit le cookie (§9.9)", () => {
   const plugWindow = () => {
     const listeners = new Map<string, () => void>();
     vi.stubGlobal("window", {

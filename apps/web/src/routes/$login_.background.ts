@@ -1,5 +1,5 @@
 // `/{login}/background` : l'image du fond de la fresque, servie par le web pour que la page ne charge rien d'une autre origine
-// (la CSP reste `default-src 'self'`). Écart §9.1 (JOURNAL 2026-10-10).
+// (la CSP reste `default-src 'self'`). §9.5.
 
 import { createFileRoute } from "@tanstack/react-router";
 import {

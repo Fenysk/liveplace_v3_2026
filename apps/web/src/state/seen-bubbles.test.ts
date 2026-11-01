@@ -21,7 +21,7 @@ const refuse = (): never => {
 
 const refusing = (): BubbleStorage => ({ getItem: refuse, setItem: refuse, removeItem: refuse });
 
-describe("les bulles déjà vues (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("les bulles déjà vues (§9.11)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   // Quand rien n'est retenu, une bulle n'est pas vue
@@ -79,8 +79,8 @@ describe("les bulles déjà vues (Écart §8.1, JOURNAL 2026-10-08)", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : rejouer le tutoriel efface les bulles vues, et elles reviennent à leur moment
-describe("oublier des bulles vues (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : rejouer le tutoriel efface les bulles vues, et elles reviennent à leur moment
+describe("oublier des bulles vues (§9.11)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   // Les clés oubliées ne sont plus vues, ici et à la visite suivante ; les autres le restent

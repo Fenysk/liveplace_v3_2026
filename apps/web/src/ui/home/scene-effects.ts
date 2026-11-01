@@ -1,4 +1,4 @@
-// Ce qui bouge par-dessus la scène de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : l'onde du doigt et le vol des pixels.
+// Ce qui bouge par-dessus la scène de l'accueil (§9.10) : l'onde du doigt et le vol des pixels.
 // Des éléments posés sur une couche au-dessus de tout, animés par WAAPI en pixels concrets, retirés à la fin. Des classes
 // donnent leur forme et leur couleur : aucun attribut `style`, que la CSP de production bloque dans le HTML du serveur.
 

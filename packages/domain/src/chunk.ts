@@ -1,4 +1,4 @@
-// L'historique d'un canvas : les entrées de son flux, rangées dans Convex par `chunk` (Écart §7.2, JOURNAL 2026-10-08).
+// L'historique d'un canvas : les entrées de son flux, rangées dans Convex par `chunk` (§7.1).
 
 import type { Event } from "@liveplace/protocol";
 import type { Timestamp } from "./index";
@@ -41,7 +41,7 @@ export type ChunkFile = ChunkIndex & { payload: Uint8Array };
 export type GapNotes = Pick<ChunkIndex, "gaps" | "resizedAt">;
 
 // La dernière récupération d'un canvas : sa date, la version où il reprend (au-dessus de sa sauvegarde et du curseur
-// d'archive d'alors), et la version de la sauvegarde remise en place (Écart §7.2, JOURNAL 2026-10-08).
+// d'archive d'alors), et la version de la sauvegarde remise en place (§7.1).
 export type Recovered = { at: Timestamp; version: number; snapshotVersion: number };
 
 // Le chunk que le curseur d'archive attend est le premier d'après la récupération : le curseur n'a pas passé sa reprise.

@@ -49,7 +49,7 @@ describe("protocol frames", () => {
     if (result.ok && result.value.t === "place") expect(result.value.pixels.length).toBe(3);
   });
 
-  // Garde la photo Twitch de `you` dans un welcome, et accepte un welcome sans elle (écart §4.3, JOURNAL 2026-09-24)
+  // Garde la photo Twitch de `you` dans un welcome, et accepte un welcome sans elle (§4.3)
   it("keeps the Twitch photo of `you` in a welcome, and accepts a welcome without one", () => {
     const welcome = {
       t: "welcome",
@@ -75,7 +75,7 @@ describe("protocol frames", () => {
     expect(withoutPhoto.ok).toBe(true);
   });
 
-  // Accepte un cran du délai OBS, et refuse toute autre valeur (écart CDC v3 §1, JOURNAL 2026-09-25)
+  // Accepte un cran du délai OBS, et refuse toute autre valeur (CDC 2026 §1)
   it("accepts an OBS delay step, and refuses any other value", () => {
     const setObsDelay = (obsDelayMs: number) =>
       decodeClientFrame({ t: "setObsDelay", requestId: "r-1", obsDelayMs });
@@ -95,7 +95,7 @@ describe("protocol frames", () => {
     expect(decodeServerFrame({ t: "role", role: "admin" }).ok).toBe(false);
   });
 
-  // Accepte la liste périmée de qui modère, bannis ou modérateurs, et aucune autre (écart §4.3, JOURNAL 2026-10-06)
+  // Accepte la liste périmée de qui modère, bannis ou modérateurs, et aucune autre (§4.3)
   it("accepts a stale list for the banned users or the moderators, and no other list", () => {
     expect(decodeServerFrame({ t: "staleList", list: "bans" })).toEqual({
       ok: true,
@@ -106,7 +106,7 @@ describe("protocol frames", () => {
     expect(decodeServerFrame({ t: "staleList" }).ok).toBe(false);
   });
 
-  // Accepte le classement du canvas avec la place de qui regarde, ou sans elle, et un top vide (écart §4.3, JOURNAL 2026-10-06)
+  // Accepte le classement du canvas avec la place de qui regarde, ou sans elle, et un top vide (§5.9)
   it("accepts the scoreboard with the place of whoever watches, or without it, and an empty top", () => {
     const top = [
       {
@@ -154,7 +154,7 @@ describe("protocol frames", () => {
   });
 
   // Refuse une page du protocole 11 à 16 : elle se recharge pour reprendre le protocole du moment, 16 depuis le thème du
-  // canvas, 17 depuis le live Twitch (écart §4.3, JOURNAL 2026-10-07)
+  // canvas, 17 depuis le live Twitch (§4.3)
   it("refuses a page of protocol 11 to 16, which reloads to take the current protocol", () => {
     const hello = (protocolVersion: number) =>
       decodeClientFrame({ t: "hello", protocolVersion, canvasId: "abc123", mode: "ui" });
@@ -168,7 +168,7 @@ describe("protocol frames", () => {
     expect(hello(PROTOCOL_VERSION).ok).toBe(true);
   });
 
-  // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (écart §4.3, JOURNAL 2026-09-27)
+  // Accepte un auteur inspecté sans identifiant, et un refus qui nomme sa requête (§4.3)
   it("accepts an inspected author without its id, and a refusal that names its request", () => {
     const inspected = {
       t: "inspected",
@@ -296,7 +296,7 @@ describe("protocol 14: the OBS background", () => {
   });
 });
 
-// Protocole 14 (Écart §15, JOURNAL 2026-10-06) : le welcome dit l'archive, et une frame annonce le statut du canvas
+// Protocole 14 (§17.1) : le welcome dit l'archive, et une frame annonce le statut du canvas
 describe("protocol 14: the archive", () => {
   const welcome = {
     t: "welcome",
@@ -444,7 +444,7 @@ describe("strict client frames", () => {
   });
 });
 
-// Protocole 13 (écart §4.2 et §4.3, JOURNAL 2026-10-06) : le développeur suit l'activité par le WebSocket.
+// Protocole 13 (§4.2 et §4.3) : le développeur suit l'activité par le WebSocket.
 describe("activity frames", () => {
   const account = {
     userId: "68710381",
@@ -598,7 +598,7 @@ describe("activity frames", () => {
     expect(decodeServerFrame({ ...history, points: [{ ...point, later: true }] }).ok).toBe(true);
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : le protocole reste en 17, un seul état « streamé » : ni live dans les chiffres et les points, ni isLive
+  // §16.2 : le protocole reste en 17, un seul état « streamé » : ni live dans les chiffres et les points, ni isLive
   it("keeps one streamed state in the numbers of the moment, the canvases and the points, without changing the version", () => {
     const beforeActivity = z.object({
       t: z.literal("activity"),
@@ -716,7 +716,7 @@ describe("the canvas of the socket in the activity frames", () => {
     expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, signups: -1 }] }).ok).toBe(false);
     const { visits, ...withoutVisits } = canvasPoint;
     expect(decodeServerFrame({ ...frame, canvasPoints: [withoutVisits] }).ok).toBe(false);
-    // Écart §5.1 (JOURNAL 2026-10-08) : les minutes streamées, un nombre entier comme le reste
+    // §16.2 : les minutes streamées, un nombre entier comme le reste
     expect(decodeServerFrame({ ...frame, canvasPoints: [{ ...canvasPoint, streamedMinutes: 0.5 }] }).ok).toBe(
       false,
     );
@@ -755,7 +755,7 @@ describe("the canvas of the socket in the activity frames", () => {
   });
 });
 
-// Protocole 20 (Écart §4.3, JOURNAL 2026-10-10) : l'image du fond, dans le welcome et dans la frame `backgroundImage`, et son opacité
+// Protocole 20 (§4.3) : l'image du fond, dans le welcome et dans la frame `backgroundImage`, et son opacité
 describe("protocol 20: the background image of the canvas", () => {
   const welcome = {
     t: "welcome",
@@ -855,7 +855,7 @@ describe("protocol 20: the background image of the canvas", () => {
   });
 });
 
-// Protocole 16 (Écart §4.3, JOURNAL 2026-10-07) : le thème du canvas, dans le welcome et dans la frame `theme`
+// Protocole 16 (§4.3) : le thème du canvas, dans le welcome et dans la frame `theme`
 describe("protocol 16: the canvas theme", () => {
   const welcome = {
     t: "welcome",
@@ -917,7 +917,7 @@ describe("protocol 16: the canvas theme", () => {
   });
 });
 
-// Protocole 15 (écart §4.2 et §4.3, JOURNAL 2026-10-07) : le développeur suit la capacité par le WebSocket.
+// Protocole 15 (§4.2 et §4.3) : le développeur suit la capacité par le WebSocket.
 describe("capacity frames", () => {
   const measured = {
     link: "redis",
@@ -1090,7 +1090,7 @@ describe("capacity frames", () => {
   });
 });
 
-// Protocole 17 (écart §4.3, JOURNAL 2026-10-07) : le live Twitch d'un compte, dans le welcome, l'inspected et une frame.
+// Protocole 17 (§4.3) : le live Twitch d'un compte, dans le welcome, l'inspected et une frame.
 describe("protocol 17: the Twitch live of an account", () => {
   const welcome = {
     t: "welcome",
@@ -1196,7 +1196,7 @@ describe("protocol 17: the Twitch live of an account", () => {
   });
 });
 
-// Écart §4.3 (JOURNAL 2026-10-08) : l'origine d'un modérateur part à tout modérateur, dans l'inspected et les signalements.
+// §4.3 : l'origine d'un modérateur part à tout modérateur, dans l'inspected et les signalements.
 describe("the origin of a moderator, for whoever moderates", () => {
   const origin = { isFromTwitch: false, isNamedHere: true };
   const inspected = {
@@ -1240,7 +1240,7 @@ describe("the origin of a moderator, for whoever moderates", () => {
   });
 });
 
-// Protocole 21 (écart §4.2 et §4.3, JOURNAL 2026-10-14) : le développeur relit un jour passé.
+// Protocole 21 (§4.2 et §4.3) : le développeur relit un jour passé.
 describe("past day frames", () => {
   const listDay = { t: "listActivityDay", requestId: "day-1", dayAt: 1_759_615_200_000 };
   const point = {
@@ -1342,7 +1342,7 @@ describe("past day frames", () => {
   });
 });
 
-// Protocole 22 (Écart §5.3, JOURNAL 2026-10-24) : le welcome dit la version du dernier rapprochement qui a déplacé des pixels
+// Protocole 22 (§5.8) : le welcome dit la version du dernier rapprochement qui a déplacé des pixels
 describe("protocol 22: pixels moved by a resize", () => {
   const welcome = {
     t: "welcome",
@@ -1381,7 +1381,7 @@ describe("protocol 22: pixels moved by a resize", () => {
   });
 });
 
-// Protocole 23 (Écart §4.2, §4.3 et §5.3, JOURNAL 2026-10-28) : la taille dynamique et le repère des pages
+// Protocole 23 (§4.2, §4.3 et §5.8) : la taille dynamique et le repère des pages
 describe("protocol 23: the dynamic size", () => {
   const welcome = {
     t: "welcome",

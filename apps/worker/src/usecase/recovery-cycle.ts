@@ -1,11 +1,11 @@
-// Remettre en place un canvas que Redis a perdu (Écart §7.2, JOURNAL 2026-10-08). Toutes les 5 s, un seul pipeline Redis nomme
+// Remettre en place un canvas que Redis a perdu (§7.4). Toutes les 5 s, un seul pipeline Redis nomme
 // les canvas sauvegardés qui manquent ; Convex n'est lu que pour un canvas à remettre, jamais en boucle.
 
 import type { RecoveryStore, RecoveryTarget } from "@liveplace/domain/ports";
 import { type CanvasSnapshot, RECOVERY_VERSION_JUMP } from "@liveplace/domain/snapshot";
 import type { Result } from "@liveplace/shared";
 
-export const RECOVERY_CHECK_MS = 5_000; // une page n'attend plus ce tour (Écart §4.2, JOURNAL 2026-10-09)
+export const RECOVERY_CHECK_MS = 5_000; // une page n'attend plus ce tour (§7.4)
 export const RECOVERY_RETRY_MS = 30_000; // un canvas qui n'a pas pu revenir : Convex a coupé, ou aucune sauvegarde lisible
 
 export type RecoveryCycleDeps = {

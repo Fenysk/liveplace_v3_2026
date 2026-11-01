@@ -1,4 +1,4 @@
-// `/{login}/archives/{code}` (Écart §15, JOURNAL 2026-10-06) : l'archive d'un canvas, en lecture seule, qui
+// `/{login}/archives/{code}` (§17.1) : l'archive d'un canvas, en lecture seule, qui
 // ne se trouve que par son lien. Une route non imbriquée, comme `/{login}/obs` : elle n'a rien de la page du jeu, et aucune
 // vue OBS. `noindex` : un lien qu'on partage, jamais une page qu'un moteur de recherche liste.
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createArchiveWrites } from "./archive-writes";
 import { createRedisHarness } from "./test-harness";
 
-// Écart §15 (JOURNAL 2026-10-06) : le classement est propre à chaque canvas. Rouvrir recopie les bannis du canvas actif
+// §17.1 : le classement est propre à chaque canvas. Rouvrir recopie les bannis du canvas actif
 // sur l'archive, et le classement de l'archive les suit avec la règle de moderate.lua : un banni sort de `scoreboard`,
 // son score attend dans `scoreboard:banned`, un débanni revient avec le même.
 
@@ -59,7 +59,7 @@ const archivedWithScores = async (scores: Record<string, number>) => {
   return archive;
 };
 
-describe("the scoreboard of a reopened archive follows the bans it takes (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the scoreboard of a reopened archive follows the bans it takes (§17.1)", () => {
   // Un ban posé sur le canvas actif : le banni quitte le classement de l'archive rouverte, son score attend à l'écart
   it("takes a player out when the active canvas banned them since, keeping their score aside", async () => {
     const [ada, bob, eve] = [playerOf("ada"), playerOf("bob"), playerOf("eve")];
@@ -126,7 +126,7 @@ describe("the scoreboard of a reopened archive follows the bans it takes (Écart
   });
 });
 
-describe("a new canvas starts on an empty scoreboard (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("a new canvas starts on an empty scoreboard (§17.1)", () => {
   // Archiver recopie le commun et, si on garde, la progression : jamais le classement, qui est celui de chaque canvas
   it("is never filled by what archiving copies, shared things and progress included", async () => {
     const [ada, bob] = [playerOf("ada"), playerOf("bob")];

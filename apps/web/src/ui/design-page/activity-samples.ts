@@ -1,4 +1,4 @@
-// Les chiffres d'exemple du suivi d'activité (écart §10.3, JOURNAL 2026-10-06 et 2026-10-07) : des courbes, des canvas,
+// Les chiffres d'exemple du suivi d'activité (§10.3) : des courbes, des canvas,
 // une frame. Aucune connexion : /design montre l'affichage, jamais le gateway.
 
 import {

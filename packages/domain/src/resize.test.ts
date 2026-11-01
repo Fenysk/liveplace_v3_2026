@@ -54,7 +54,7 @@ const resize = (from: CanvasSize, to: CanvasSize, ...rects: Rect[]) => {
 
 const picture = (to: CanvasSize, ...rects: Rect[]): string => show(stateOf(to, ...rects), to.width);
 
-describe("planResize : les exemples validés (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("planResize : les exemples validés (§5.8)", () => {
   // E1 : le vide entre deux dessins se resserre, le bord bas se coupe sans rien bouger
   it("E1 : 16×8 → 8×4 closes the void between two drawings and trims the empty bottom", () => {
     const { plan, shown } = resize(size(16, 8), size(8, 4), rect(0, 2, 0, 2, 1), rect(13, 15, 0, 2, 2));

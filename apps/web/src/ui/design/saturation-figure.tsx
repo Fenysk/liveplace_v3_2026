@@ -1,4 +1,4 @@
-// La saturation, en tête de la section Capacité (Écart §4.3, JOURNAL 2026-10-07) : son pourcentage en grand, et sous
+// La saturation, en tête de la section Capacité (§16.3) : son pourcentage en grand, et sous
 // « Saturation » la ressource qui la porte, et si elle est large, à surveiller ou proche.
 
 import { type CapacityTone, TONE_CLASSES } from "./capacity-tone";

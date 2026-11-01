@@ -1,4 +1,4 @@
-// La pill Pratique (CDC 2026), en bas à droite : de haut en bas, zoomer, dézoomer, recentrer. Écart §8.1 (JOURNAL 2026-10-13) : plus de pourcentage.
+// La pill Pratique (CDC 2026), en bas à droite : de haut en bas, zoomer, dézoomer, recentrer. §9.7 : plus de pourcentage.
 // Sur mobile, recentrer seul, et seulement quand la vue a bougé.
 
 import { LocateFixed, Minus, Plus } from "lucide-react";

@@ -1,4 +1,4 @@
-// Télécharger une archive en PNG (Écart §15, JOURNAL 2026-10-06) : le dessin visible, case par case, sans lissage.
+// Télécharger une archive en PNG (§17.1) : le dessin visible, case par case, sans lissage.
 // Chaque case devient un bloc de pixels entiers, au plus proche voisin ; une case transparente prend le fond choisi.
 
 import { type Timestamp, toParisDay } from "@liveplace/domain";

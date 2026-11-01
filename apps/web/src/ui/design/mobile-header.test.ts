@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DRAFTING_ATTRIBUTE } from "../draft/use-drafting-attribute";
 import { COMPACT_SCREEN_QUERY } from "./use-media-query";
 
-// Écart §8.1 (JOURNAL 2026-10-08) : le haut de l'écran sur mobile, en Vue puis en Dessin. Le CSS est la source : ces
+// §9.7 : le haut de l'écran sur mobile, en Vue puis en Dessin. Le CSS est la source : ces
 // garde-fous lisent ses règles, comme ceux de la pill Thème (theme-pill.test.ts).
 
 const read = (file: string) => readFileSync(join(import.meta.dirname, file), "utf8");
@@ -33,7 +33,7 @@ const ruleOf = (css: string, selector: string): string =>
 const compact = mediaBlockOf(pillCss, COMPACT_MEDIA);
 const narrow = mediaBlockOf(pillCss, NARROW_MEDIA, pillCss.indexOf(compact) + compact.length);
 
-describe("la pill Canvas sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la pill Canvas sur mobile (§9.7)", () => {
   // Elle ne dépasse jamais la place que la pill Compte lui laisse : sa largeur publiée, et un espace entre les deux
   it("never goes past the room the Account pill leaves it: its published width, and a gap between the two", () => {
     for (const block of [compact, narrow]) {
@@ -65,7 +65,7 @@ describe("la pill Canvas sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("la pill Canvas sans pill Compte sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la pill Canvas sans pill Compte sur mobile (§9.7)", () => {
   // Tant qu'aucune pill Compte n'est visible (l'invité n'en a pas, un viewer l'attend du gateway), rien n'est réservé
   const alone =
     'html:not(:has(.lp-floating[data-dock="tr"] > .lp-pill:not(.is-hidden))) .lp-floating[data-dock="tl"]';
@@ -99,7 +99,7 @@ describe("la pill Canvas sans pill Compte sur mobile (Écart §8.1, JOURNAL 2026
   });
 });
 
-describe("la bande Thème sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la bande Thème sur mobile (§9.7)", () => {
   // Même largeur que la rangée du haut : de la marge d'un côté à la marge de l'autre, comme les docks du haut
   it("spans the top row: from one margin to the other, as the top docks do", () => {
     const band = ruleOf(compact, '.lp-floating[data-dock="tc"]');
@@ -129,7 +129,7 @@ describe("la bande Thème sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => 
   });
 });
 
-describe("le mode Dessin sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("le mode Dessin sur mobile (§9.7)", () => {
   const drafting = `html[${DRAFTING_ATTRIBUTE}]`;
 
   // Seul le thème reste en haut : les pills Canvas et Compte s'effacent, puis quittent aussi le clavier
@@ -172,7 +172,7 @@ describe("le mode Dessin sur mobile (Écart §8.1, JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("la route du jeu et le mode Dessin (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la route du jeu et le mode Dessin (§9.7)", () => {
   // La page pose l'attribut que lit le CSS : sans cet appel, rien ne s'efface en Dessin
   it("sets the attribute the CSS reads, from the game page", () => {
     const route = readFileSync(join(import.meta.dirname, "..", "..", "routes", "$login.tsx"), "utf8");
@@ -182,7 +182,7 @@ describe("la route du jeu et le mode Dessin (Écart §8.1, JOURNAL 2026-10-08)",
   });
 });
 
-describe("le haut pendant un geste de vue sur mobile (Écart §8.1, JOURNAL 2026-10-09)", () => {
+describe("le haut pendant un geste de vue sur mobile (§9.7)", () => {
   const panning = "html[data-panning]";
   const TOP_DOCKS = '[data-dock="tl"], [data-dock="tr"], [data-dock="tc"]';
   // Tout ce qui n'est pas le haut : la barre du bas, Recentrer, l'inspection, le classement et le toast

@@ -1,4 +1,4 @@
-// Écart §8.1 (JOURNAL 2026-10-07) : donner un thème au canvas en cours, ou le lui retirer. Convex tranche : ce doit être
+// §8.1 : donner un thème au canvas en cours, ou le lui retirer. Convex tranche : ce doit être
 // l'actif de ce propriétaire. Redis suit en best effort, journalisé : la copie du gateway, puis le `ctl` qui l'apprend aux pages.
 
 import { toTheme } from "@liveplace/domain";

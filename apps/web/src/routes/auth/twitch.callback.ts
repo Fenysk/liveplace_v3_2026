@@ -15,7 +15,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
     handlers: {
       GET: async ({ request, context }) => {
         const { deps } = context;
-        // Écart §14 (JOURNAL 2026-10-07) : le visiteur lit cette phrase brute dans sa langue.
+        // §9.9 : le visiteur lit cette phrase brute dans sa langue.
         const texts = ACCOUNT_TEXTS[resolveRequestLocale(request)];
         const url = new URL(request.url);
         const pending = parseOAuthCookie(
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/auth/twitch/callback")({
         const clearOAuth = serializeCookie(OAUTH_COOKIE, "", 0, deps.isSecure);
 
         // Sans le bon `state`, ce retour ne vient pas du navigateur qui est parti chez Twitch : la page le dit, avec Se connecter
-        // (Écart §14, JOURNAL 2026-10-13).
+        // (§9.9).
         if (!pending || url.searchParams.get("state") !== pending.state)
           return redirectWithCookies("/auth/expired", [clearOAuth]);
 

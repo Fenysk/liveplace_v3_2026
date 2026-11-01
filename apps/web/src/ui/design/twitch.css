@@ -1,11 +1,11 @@
-/* Le bouton de la chaîne d'un compte en live (Écart §4, JOURNAL 2026-10-07) : teinté du violet de Twitch, le logo puis la
+/* Le bouton de la chaîne d'un compte en live (§10.4) : teinté du violet de Twitch, le logo puis la
    catégorie du stream. Il se pose sur la base `.lp-btn` (button.css), importée avant ce fichier. */
 .lp-btn--live {
   padding: 0 14px 0 11px;
   background: var(--twitch-live-bg);
   color: var(--twitch-live-ink);
   animation: lp-live-in var(--lp-dur-fade) ease;
-  /* Quand la place manque (la pill Canvas sur mobile, Écart §4, JOURNAL 2026-10-08), il rétrécit avant tout le reste, même
+  /* Quand la place manque (la pill Canvas sur mobile, §9.7), il rétrécit avant tout le reste, même
      le nom : un facteur si grand que le nom n'en perd jamais un pixel tant que le bouton peut céder. La catégorie se coupe
      par « … » ; sous trois lettres, elle passe à la ligne, hors du bouton, qui la rogne : le logo et le rond restent. */
   flex: 0 100000 auto;

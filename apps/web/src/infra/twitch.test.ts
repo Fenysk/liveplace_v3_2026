@@ -270,7 +270,7 @@ describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
   });
 });
 
-describe("createTwitchWebhook, the live of a channel (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("createTwitchWebhook, the live of a channel (§10.4)", () => {
   const secret = "eventsub-secret";
   const sentAt = Date.parse("2026-10-07T12:00:00Z");
   const webhook = createTwitchWebhook(secret);
@@ -345,7 +345,7 @@ describe("createTwitchWebhook, the live of a channel (Écart §4, JOURNAL 2026-1
   });
 });
 
-describe("createTwitchEventSub, the live of a channel (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("createTwitchEventSub, the live of a channel (§10.4)", () => {
   const options = {
     clientId: "client-id",
     clientSecret: "client-secret",
@@ -440,7 +440,7 @@ describe("createTwitchEventSub, the live of a channel (Écart §4, JOURNAL 2026-
   });
 });
 
-describe("createTwitchLiveSource (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("createTwitchLiveSource (§10.4)", () => {
   const source = createTwitchLiveSource({ clientId: "client-id", clientSecret: "client-secret" });
 
   // Twitch, joué par URL, avec le jeton de l'application ; chaque appel garde son en-tête et son délai.

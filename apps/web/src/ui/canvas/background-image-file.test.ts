@@ -2,7 +2,7 @@ import { BACKGROUND_IMAGE_MAX_BYTES, BACKGROUND_IMAGE_MAX_SIDE } from "@liveplac
 import { describe, expect, it } from "vitest";
 import { fitSide, type ImageCodec, prepareBackgroundImage } from "./background-image-file";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : l'image du fond est réduite (2048 px au plus), encodée en WebP, et refusée au-delà de 2 Mo,
+// §9.5 : l'image du fond est réduite (2048 px au plus), encodée en WebP, et refusée au-delà de 2 Mo,
 // dans la page, avant d'être envoyée.
 
 describe("fitSide", () => {

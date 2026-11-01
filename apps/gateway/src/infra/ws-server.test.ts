@@ -30,7 +30,7 @@ describe("isAllowedOrigin (audit de sécurité §4, JOURNAL 2026-09-29)", () => 
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-07) : le débit sortant du gateway se compte aux octets envoyés par socket.
+// §16.3 : le débit sortant du gateway se compte aux octets envoyés par socket.
 describe("toClientSocket (JOURNAL 2026-10-07)", () => {
   const silent = { bufferedAmount: 0, send: () => undefined, close: () => undefined };
 
@@ -139,7 +139,7 @@ const openPair = async (isReading: boolean) => {
   };
 };
 
-// §6.3 : une connexion qui ne suit pas se ferme en 1013, et se resynchronise seule ; Écart §6.3 (JOURNAL 2026-10-09).
+// §6.3 : une connexion qui ne suit pas se ferme en 1013, et se resynchronise seule.
 describe("toClientSocket — a connection that does not keep up (§6.3)", () => {
   // Ferme en 1013 une page qui ne lit plus, ne lui envoie plus rien, et elle l'entend dès qu'elle relit
   it("closes in 1013 a page that no longer reads, sends it nothing more, and the page hears it once it reads again", async () => {
@@ -286,7 +286,7 @@ describe("toClientSocket — a connection that does not keep up (§6.3)", () => 
   });
 });
 
-describe("toDevice (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("toDevice (§16.1)", () => {
   // Lit un téléphone au User-Agent d'un mobile, un PC sinon, et sans User-Agent
   it("reads a phone in a mobile User-Agent, a desktop otherwise and without one", () => {
     const iphone =

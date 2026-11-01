@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : ce que la police de l'image d'aperçu sait écrire. Satori n'a que Nunito latin : un glyphe
+// §9.10 : ce que la police de l'image d'aperçu sait écrire. Satori n'a que Nunito latin : un glyphe
 // qui manque y serait un carré vide. Les plages sont celles que Fontsource donne à son sous-ensemble latin (unicode.json),
 // sans les caractères de contrôle.
 

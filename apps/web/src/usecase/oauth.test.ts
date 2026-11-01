@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseOAuthCookie, toOAuthCookieValue, toReturnPath } from "./oauth";
 
-describe("toReturnPath (Écart §10.1)", () => {
+describe("toReturnPath (§10.1)", () => {
   // Accepte le chemin d'un canvas, en minuscules comme les pseudos Twitch
   it("accepts a canvas path, lowercased like Twitch logins", () => {
     expect(toReturnPath("/fenysk")).toBe("/fenysk");

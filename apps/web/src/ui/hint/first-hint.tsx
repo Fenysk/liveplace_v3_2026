@@ -1,4 +1,4 @@
-// Le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08), dans une bulle : deux gestes à connaître, et trois points,
+// Le conseil de première visite (§9.11), dans une bulle : deux gestes à connaître, et trois points,
 // un par geste distinct réussi. Au doigt ou à la souris (JOURNAL 2026-10-12) : les mêmes gestes, dits autrement. L'affichage
 // seul, nourri par `useFirstHintProps`.
 

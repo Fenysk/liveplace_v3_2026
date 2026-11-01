@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : l'image de la carte d'aperçu d'un lien. Satori dessine l'arbre d'éléments en SVG (le texte
+// §9.10 : l'image de la carte d'aperçu d'un lien. Satori dessine l'arbre d'éléments en SVG (le texte
 // en tracés, avec Nunito), resvg le rastérise en PNG. Rien n'est lu sur le disque : les polices sont incrustées au build.
 
 import nunito700 from "@fontsource/nunito/files/nunito-latin-700-normal.woff?inline";

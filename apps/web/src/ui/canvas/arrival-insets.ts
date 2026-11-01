@@ -1,4 +1,4 @@
-// Les marges du cadrage d'arrivée sur mobile (Écart §9.3, JOURNAL 2026-10-08) : le canvas se cadre dans la zone libre entre
+// Les marges du cadrage d'arrivée sur mobile (§9.7) : le canvas se cadre dans la zone libre entre
 // le bas de l'en-tête (la rangée des pills Canvas et Compte, puis la bande Thème quand elle est là) et ce que la disposition
 // laisse en bas et sur les côtés : la barre du bas, la colonne d'un téléphone en paysage, le premier écran d'une charnière
 // (canvas-zone.css). Lues dans la page à chaque appel, jamais gardées : elles suivent le thème, l'encoche et l'écran.
@@ -10,7 +10,7 @@ import { type ArrivalZone, type Insets, NO_INSETS, pickArrivalZone, type Size } 
 
 const px = (value: string): number => Number.parseFloat(value) || 0;
 
-// Deux sondes, deux zones libres en Vue (Écart §9.3, JOURNAL 2026-10-09) : à côté de la colonne (celle que le Dessin garde) et
+// Deux sondes, deux zones libres en Vue (§9.7) : à côté de la colonne (celle que le Dessin garde) et
 // au-dessus d'elle ; sans colonne large, la même.
 const SIDE_ZONE_SELECTOR = ".lp-canvas-zone:not(.lp-canvas-zone--above)";
 const ABOVE_ZONE_SELECTOR = ".lp-canvas-zone--above";
@@ -64,7 +64,7 @@ export function observeZone(root: HTMLElement, onChange: () => void): () => void
   return () => observer.disconnect();
 }
 
-// La zone libre en Dessin, sur mobile, Écart §9.3 (JOURNAL 2026-10-08) : la bande Thème a pris la place de la rangée des pills
+// La zone libre en Dessin, sur mobile, §9.7 : la bande Thème a pris la place de la rangée des pills
 // (pill.css), et la feuille Dessin, plus haute que la barre de la Vue, tient le bas. Les mesures sont celles de la mise en
 // page finale : la bande monte par `transform` et la feuille se déploie par `animate`, tous deux en cours à l'entrée.
 // Les côtés disent la disposition (la sonde de zone à côté de la colonne) ; en colonne sur le côté, le panneau y tient aussi le bas.

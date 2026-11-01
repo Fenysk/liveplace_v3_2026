@@ -11,7 +11,7 @@ export type Viewport = { scale: number; offsetX: number; offsetY: number };
 export type ZoomLimits = { minScale: number; maxScale: number };
 // Les marges à garder aux bords de l'écran, en pixels CSS : les pills y flottent.
 export type Insets = { top: number; right: number; bottom: number; left: number };
-// Le cadrage : le pourcentage de zoom (plus affiché, Écart §8.1 JOURNAL 2026-10-13), et si la vue a bougé depuis l'arrivée.
+// Le cadrage : le pourcentage de zoom (plus affiché, §9.7), et si la vue a bougé depuis l'arrivée.
 export type Framing = { zoomPercent: number; isArrival: boolean };
 
 export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -19,8 +19,8 @@ export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 const ARRIVAL_RATIO = 0.9;
 const MAX_CELL_SIZE = 64;
 
-// Centré, à 90 % du côté qui limite : jamais de débordement à l'arrivée (CDC 2026). Avec des marges (Écart §9.3, JOURNAL
-// 2026-10-08), c'est dans la zone libre entre elles : sur mobile, celle que les pills du haut et du bas laissent.
+// Centré, à 90 % du côté qui limite : jamais de débordement à l'arrivée (CDC 2026). Avec des marges (§9.7),
+// c'est dans la zone libre entre elles : sur mobile, celle que les pills du haut et du bas laissent.
 export function fitViewport(screen: Size, canvas: Size, insets: Insets = NO_INSETS): Viewport {
   const freeWidth = Math.max(1, screen.width - insets.left - insets.right);
   const freeHeight = Math.max(1, screen.height - insets.top - insets.bottom);
@@ -35,8 +35,8 @@ export function fitViewport(screen: Size, canvas: Size, insets: Insets = NO_INSE
   };
 }
 
-// En Vue, la colonne d'un écran tactile large laisse au canvas deux zones, à côté d'elle ou au-dessus (Écart §9.3, JOURNAL
-// 2026-10-09) : il arrive où il est le plus grand, à sa forme et non à celle de l'écran ; à égalité, à côté. Avant le `welcome`, un carré.
+// En Vue, la colonne d'un écran tactile large laisse au canvas deux zones, à côté d'elle ou au-dessus (§9.7)
+// : il arrive où il est le plus grand, à sa forme et non à celle de l'écran ; à égalité, à côté. Avant le `welcome`, un carré.
 export type ArrivalZone = "side" | "above";
 
 export function pickArrivalZone(screen: Size, canvas: Size, side: Insets, above: Insets): ArrivalZone {
@@ -67,7 +67,7 @@ export function zoomAt(viewport: Viewport, point: ScreenPoint, factor: number, l
   };
 }
 
-// Un zoom de plus pendant qu'un autre avance (Écart §9.3, JOURNAL 2026-10-09) : `factor` s'ajoute à l'échelle visée, `goalScale`,
+// Un zoom de plus pendant qu'un autre avance (§9.3) : `factor` s'ajoute à l'échelle visée, `goalScale`,
 // et le point garde sa case sous lui comme dans la vue d'aujourd'hui.
 export function zoomTowards(
   viewport: Viewport,
@@ -83,7 +83,7 @@ export function panBy(viewport: Viewport, dx: number, dy: number): Viewport {
   return { ...viewport, offsetX: viewport.offsetX + dx, offsetY: viewport.offsetY + dy };
 }
 
-// Le rectangle du canvas à l'écran, agrandi de `growth` cases de chaque côté (Écart §9.3, JOURNAL 2026-10-29) : sans elle, le canvas tel qu'il est.
+// Le rectangle du canvas à l'écran, agrandi de `growth` cases de chaque côté (§9.7) : sans elle, le canvas tel qu'il est.
 export type Box = { left: number; top: number; width: number; height: number };
 
 export function frameBox(viewport: Viewport, canvas: Size, growth: Growth = NO_GROWTH): Box {
@@ -107,7 +107,7 @@ export function insetOf(box: Box, screen: Size): string {
   return `inset(${sides.map((side) => `${Math.max(0, side)}px`).join(" ")})`;
 }
 
-// Écart §5.3 (JOURNAL 2026-10-28) : les cases du canvas ont été décalées de `shift` colonnes et lignes (une taille dynamique a grandi à
+// §5.8 : les cases du canvas ont été décalées de `shift` colonnes et lignes (une taille dynamique a grandi à
 // gauche ou en haut, ou s'est resserrée). La vue suit : ce que la personne regardait reste sous ses yeux, sans saut.
 export function shiftViewport(viewport: Viewport, shift: Cell): Viewport {
   return panBy(viewport, -shift.x * viewport.scale, -shift.y * viewport.scale);

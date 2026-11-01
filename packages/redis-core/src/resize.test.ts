@@ -40,7 +40,7 @@ describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
   // Rétrécir rapproche les dessins ; ce qui ne tient toujours pas sort du cadre, invisible, et revient à l'agrandissement
   it("shrinking brings drawings closer, and what still does not fit stays outside the frame, invisible; growing again brings it back where it was", async () => {
     const { canvasId, keys } = await readyCanvas();
-    // Une ligne de 60 pixels ne tient pas dans 50 colonnes ; les deux autres pixels se rapprochent (Écart §5.3, JOURNAL 2026-10-24).
+    // Une ligne de 60 pixels ne tient pas dans 50 colonnes ; les deux autres pixels se rapprochent (§5.8).
     const wide = Array.from({ length: 60 }, (_, x) => ({ x, y: 10, colorIndex: 5 }));
     await placeAs(canvasId, "author-a", [
       ...wide,
@@ -105,7 +105,7 @@ describe("resizeCanvas (JOURNAL 2026-09-29)", () => {
       { x: 0, y: 0, colorIndex: 5 },
       { x: 60, y: 0, colorIndex: 6 },
     ]);
-    // Une ligne sans vide sous le troll : rien ne se rapproche, la case en (60, 0) sort du cadre (Écart §5.3, JOURNAL 2026-10-24).
+    // Une ligne sans vide sous le troll : rien ne se rapproche, la case en (60, 0) sort du cadre (§5.8).
     await placeAs(
       canvasId,
       "author-a",

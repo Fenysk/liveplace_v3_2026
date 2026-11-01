@@ -1,4 +1,4 @@
-// Le curseur de la fresque à la souris, Écart §9.3 (JOURNAL 2026-10-13) : il dit ce que fera le clic, et un outil a l'icône
+// Le curseur de la fresque à la souris, §9.3 : il dit ce que fera le clic, et un outil a l'icône
 // de son bouton. La croix pour inspecter ou colorer, la loupe quand le clic zoome, la main fermée pendant un déplacement,
 // puis la gomme, la pipette et le pinceau du Tracé. Sans DOM : la scène applique la valeur CSS par le CSSOM (la CSP de prod
 // bloque un attribut `style` rendu par le serveur, pas un `style.cursor` posé par le navigateur).

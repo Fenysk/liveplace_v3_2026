@@ -7,7 +7,7 @@ import {
   MAX_CACHED_BACKGROUND_IMAGES,
 } from "./background-images";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : l'image du fond d'un login, lue dans Convex une fois par login et par instant, puis gardée en
+// §9.5 : l'image du fond d'un login, lue dans Convex une fois par login et par instant, puis gardée en
 // mémoire : mille pages qui s'ouvrent ne coûtent pas mille lectures de fichier.
 
 const AT = 1_760_000_000_000;

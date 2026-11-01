@@ -1,4 +1,4 @@
-// Le fond de la fresque (Écart §9.1, JOURNAL 2026-10-10), peint sous les pixels : le même pinceau en jeu et dans la vue OBS.
+// Le fond de la fresque (§9.5), peint sous les pixels : le même pinceau en jeu et dans la vue OBS.
 // Un fond noir ou blanc remplit le cadre. L'image se pose par-dessus n'importe quel fond, transparent compris, à son opacité : elle
 // couvre le cadre comme `object-fit: cover`, lissée à sa propre résolution (jamais ramenée à la grille des cases).
 

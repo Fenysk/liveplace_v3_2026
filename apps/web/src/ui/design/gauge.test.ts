@@ -14,7 +14,7 @@ const markup = (props: GaugeProps): string => renderToStaticMarkup(createElement
 const tubeTexts = (html: string): string[] =>
   [...html.matchAll(/<span class="lp-gauge-text[^"]*"[^>]*>([^<]*)<\/span>/g)].map(([, text]) => text ?? "");
 
-describe("the number in the tube (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the number in the tube (§9.4)", () => {
   // Le nombre dit ce que tu as sur ta capacité, écrit une fois par couche de couleur
   it("says the pixels over the capacity, in each of its three color layers", () => {
     expect(tubeTexts(markup(REFILLING))).toEqual(["8/20", "8/20", "8/20"]);
@@ -35,7 +35,7 @@ describe("the number in the tube (Écart §9.3, JOURNAL 2026-10-13)", () => {
   });
 });
 
-describe("the timer of the ring (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the timer of the ring (§9.4)", () => {
   // Une recharge en cours : les secondes seules dans l'anneau, sans unité
   it("shows the seconds until the next pixel", () => {
     const html = markup(REFILLING);

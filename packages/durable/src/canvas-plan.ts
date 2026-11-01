@@ -1,4 +1,4 @@
-// Écart §15 (JOURNAL 2026-10-06) : les règles des changements de canvas actif, pures pour se tester sans Convex. Chaque
+// §17.1 : les règles des changements de canvas actif, pures pour se tester sans Convex. Chaque
 // mutation lit les canvas du propriétaire, applique un `plan…` et écrit ses écritures dans la même transaction.
 // Aucun import : les fonctions Convex sont empaquetées seules, sans les packages du dépôt.
 
@@ -11,13 +11,13 @@ export type StoredCanvas = {
   createdAt: number;
   archivedAt?: number;
   theme?: string;
-  // Écart §8.1 (JOURNAL 2026-10-07) : l'ancien nom du thème, que seule `planNameToTheme` lit, retiré au prochain changement de schéma.
+  // §8.1 : l'ancien nom du thème, que seule `planNameToTheme` lit, retiré au prochain changement de schéma.
   name?: string;
   linkCode?: string;
   backgroundImage?: StoredBackgroundImage;
 };
 
-// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond d'un canvas, un fichier de Convex ; `at` la date, et date son adresse.
+// §8.4 : l'image du fond d'un canvas, un fichier de Convex ; `at` la date, et date son adresse.
 export type StoredBackgroundImage = { storageId: string; at: number; size: number };
 
 // Un champ à `undefined` est retiré du document par `db.patch`.
@@ -162,7 +162,7 @@ export function planSetTheme(
   return { ok: true, writes: [{ kind: "patch", canvasId, fields: themeFields(theme) }] };
 }
 
-// Écart §8.1 (JOURNAL 2026-10-10) : poser ou retirer l'image du fond n'a lieu que sur le canvas actif de ce propriétaire. Le plan
+// §8.4 : poser ou retirer l'image du fond n'a lieu que sur le canvas actif de ce propriétaire. Le plan
 // rend l'image que l'écriture remplace, dont le fichier doit partir.
 export function planBackgroundImage(
   canvases: readonly StoredCanvas[],
@@ -180,7 +180,7 @@ export const pickBackgroundImage = (
   at: number,
 ): StoredBackgroundImage | null => (canvas?.backgroundImage?.at === at ? canvas.backgroundImage : null);
 
-// Écart §8.1 (JOURNAL 2026-10-07) : la migration de `name` vers `theme`, idempotente et non destructive : `name` reste, le
+// §8.1 : la migration de `name` vers `theme`, idempotente et non destructive : `name` reste, le
 // code d'avant l'affiche encore. Elle ne copie que dans un thème vide, jamais sur un thème posé ; un nom vide ne donne
 // aucun thème. Tous les canvas, de tous les propriétaires : elle ne regarde que ce qu'elle trouve.
 export function planNameToTheme(canvases: readonly StoredCanvas[]): CanvasWrite[] {

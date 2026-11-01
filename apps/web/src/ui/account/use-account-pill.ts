@@ -7,7 +7,7 @@ import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
 import type { AccountIdentity, AccountPillProps } from "./account-pill";
 import { signInHref, signOutHref } from "./auth-links";
 
-// Écart §4 (JOURNAL 2026-10-07) : son profil dit aussi s'il est en live sur Twitch.
+// §10.4 : son profil dit aussi s'il est en live sur Twitch.
 export const toIdentity = ({
   role,
   userId,

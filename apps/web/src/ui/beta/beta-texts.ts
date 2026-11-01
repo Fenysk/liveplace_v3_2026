@@ -1,4 +1,4 @@
-// Le mot du bandeau d'une bêta (Écart §14, JOURNAL 2026-10-07).
+// Le mot du bandeau d'une bêta (§9.9).
 
 import { defineTexts, localized } from "../locale/texts";
 

@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : l'image d'un canvas pour la carte d'aperçu de son lien. L'interface écrit la mise en page
+// §9.10 : l'image d'un canvas pour la carte d'aperçu de son lien. L'interface écrit la mise en page
 // et dessine le canvas et son fond, l'infra mesure les textes, rend la photo et le PNG : cette composition les assemble.
 
 import { toBase64 } from "@liveplace/shared";

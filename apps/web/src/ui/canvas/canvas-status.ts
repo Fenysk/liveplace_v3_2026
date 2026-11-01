@@ -1,4 +1,4 @@
-// Ce que la page lit du statut du canvas ouvert (Écart §15, JOURNAL 2026-10-06) : archivé, redevenu actif,
+// Ce que la page lit du statut du canvas ouvert (§17.1) : archivé, redevenu actif,
 // supprimé. Chacun ne vaut qu'une fois la connexion établie : avant le `welcome`, le store ne sait encore rien.
 
 import { useSyncExternalStore } from "react";

@@ -1,4 +1,4 @@
-// Le thème que montre la page du jeu (Écart §8.1, JOURNAL 2026-10-07) : celui que le loader a rendu avec elle, puis celui
+// Le thème que montre la page du jeu (§8.1) : celui que le loader a rendu avec elle, puis celui
 // du gateway, qui suit en direct. Sans store (rendu serveur, ou le temps d'ouvrir le WebSocket), il n'y a que le premier.
 
 import { useCallback, useSyncExternalStore } from "react";

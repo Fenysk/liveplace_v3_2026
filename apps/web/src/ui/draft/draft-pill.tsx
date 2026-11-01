@@ -1,10 +1,10 @@
 // La pill Dessin (CDC 2026), en bas au centre : l'affichage seul, nourri par `useDraftPillProps` (JOURNAL 2026-09-24).
-// Vue : la jauge et Dessiner, ou le +1 quand une récompense attend, qui s'étire comme lui (Écart §9.3, JOURNAL 2026-10-09).
+// Vue : la jauge et Dessiner, ou le +1 quand une récompense attend, qui s'étire comme lui (§9.6).
 // Dessin : la palette, puis la jauge, Annuler et Rétablir (grisés sans étape à refaire), Vider (invisible tant que le brouillon est vide), Fermer, Valider (sa taille, ou l'attente d'une charge).
-// Les boutons suivent le brouillon et la jauge, et leur largeur glisse (Écart §9.3, JOURNAL 2026-10-08). Invité : l'invitation.
-// Vider et Fermer gardent leur place, brouillon vide ou non : rien ne bouge sous le pointeur (Écart §9.3, JOURNAL 2026-10-13).
+// Les boutons suivent le brouillon et la jauge, et leur largeur glisse (§9.6). Invité : l'invitation.
+// Vider et Fermer gardent leur place, brouillon vide ou non : rien ne bouge sous le pointeur (§9.6).
 // Sur mobile, en Dessin : une feuille à poignée, la palette complète repliée (design system, Mobile). En paysage sur un écran bas,
-// un panneau sur le côté : sans poignée, la palette complète dedans (Écart §8.1, JOURNAL 2026-10-08).
+// un panneau sur le côté : sans poignée, la palette complète dedans (§9.7).
 
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Redo2, Trash, Undo2 } from "lucide-react";
@@ -61,7 +61,7 @@ export type DraftPillActions = {
   onToggleEraser: () => void;
   onTogglePicker: () => void; // la pipette, pour un seul clic (CDC 2026, `I`)
   onToggleTouchTracing: () => void;
-  onOpenPalette?: (() => void) | undefined; // la feuille déplie la palette complète (Écart §8.1, JOURNAL 2026-10-12)
+  onOpenPalette?: (() => void) | undefined; // la feuille déplie la palette complète (§9.11)
   onReload: () => void;
   onSignIn: () => void; // la page part chez Twitch
 };
@@ -90,7 +90,7 @@ const Refusal = ({ code }: { code: RefusalCode | undefined }) => {
   return code ? <span className="lp-type-caption lp-danger">{t.refusal(code)}</span> : null;
 };
 
-// Écart §9.3 (JOURNAL 2026-10-13) : avec un brouillon gardé, « Dessiner · 12 » ; son libellé change, la largeur glisse.
+// §9.6 : avec un brouillon gardé, « Dessiner · 12 » ; son libellé change, la largeur glisse.
 const EnterButton = ({
   draftSize = 0,
   onEnter,
@@ -108,14 +108,14 @@ const EnterButton = ({
   );
 };
 
-// Fermer, pas Annuler : il sort du Dessin et garde le brouillon (Écart §9.3, JOURNAL 2026-10-13).
+// Fermer, pas Annuler : il sort du Dessin et garde le brouillon (§9.6).
 const CloseButton = ({ onExit }: Pick<DraftPillActions, "onExit">) => {
   const t = useTexts(DRAFT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   return <Button label={design.close} kbd={design.escapeKey} title={t.closeTip} onPress={onExit} />;
 };
 
-// Valider garde la largeur de « Valider · 99 » : son libellé change au fil des pixels, Fermer ne bouge pas à côté (Écart §9.3, JOURNAL 2026-10-13).
+// Valider garde la largeur de « Valider · 99 » : son libellé change au fil des pixels, Fermer ne bouge pas à côté (§9.6).
 const WIDEST_DRAFT_SIZE = 99;
 
 // Dans l'attente, plus de raccourci : Entrée ne poserait rien.
@@ -143,7 +143,7 @@ const SubmitButton = ({ state, onSubmit }: { state: DraftModeState; onSubmit: ()
 };
 
 // Vider garde sa place brouillon vide, invisible : il paraît au premier pixel et s'efface avec le dernier, rien ne bouge autour de lui
-// (Écart §9.3, JOURNAL 2026-10-13).
+// (§9.6).
 const DiscardButton = ({ state, onDiscard }: { state: DraftModeState; onDiscard: () => void }) => (
   <Reveal isOpen={state.draftSize > 0}>
     <Button
@@ -168,7 +168,7 @@ const TraceButton = ({ state, actions }: { state: DraftModeState; actions: Draft
   </BubbleTarget>
 );
 
-// La pipette, que sa bulle d'aide vise (Écart §8.1, JOURNAL 2026-10-12).
+// La pipette, que sa bulle d'aide vise (§9.11).
 const PickerButton = ({ state, actions }: { state: DraftModeState; actions: DraftPillActions }) => {
   const t = useTexts(DRAFT_TEXTS);
   return (
@@ -205,7 +205,7 @@ const RedoButton = ({ state, onRedo }: { state: DraftModeState; onRedo: () => vo
   />
 );
 
-// La jauge, que la bulle de la jauge vide vise (Écart §8.1, JOURNAL 2026-10-08).
+// La jauge, que la bulle de la jauge vide vise (§9.11).
 const PillGauge = ({ gauge, isFill = false }: { gauge: GaugeProps; isFill?: boolean }) => (
   <BubbleTarget name="gauge">
     <Gauge {...gauge} isFill={isFill} />

@@ -136,7 +136,7 @@ const setup = (
   };
 };
 
-describe("the recovery cycle (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("the recovery cycle (§7.4)", () => {
   // Un canvas que Redis a perdu et dont Convex garde une sauvegarde revient, avec une version qui saute d'un million
   it("restores a lost canvas from its latest save, with a version a million above", async () => {
     const { cycle, restorations, advance } = setup(

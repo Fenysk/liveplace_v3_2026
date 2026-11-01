@@ -73,7 +73,7 @@ const noAudience = {
 
 const noCanvasAudience = { visits: 0, phoneVisits: 0, visitMinutes: 0, activePlayers: 0, signups: 0 };
 
-// Le suivi d'activité garde ses nombres ailleurs : ici, il n'y a rien à relire (écart §5.1, JOURNAL 2026-10-06).
+// Le suivi d'activité garde ses nombres ailleurs : ici, il n'y a rien à relire (§16.2).
 const activityStore: ActivityStore = {
   storeActivityMinute: async () => undefined,
   pruneActivity: async () => undefined,
@@ -93,7 +93,7 @@ const activityStore: ActivityStore = {
   listSeen: async () => new Map(),
   pruneSeen: async () => undefined,
 };
-// La capacité non plus : rien à relire, la machine est celle d'un test (écart §5.1, JOURNAL 2026-10-07).
+// La capacité non plus : rien à relire, la machine est celle d'un test (§16.3).
 const capacityStore: CapacityStore = {
   getRedisUsage: async () => ({
     usedMemoryBytes: 1,
@@ -168,7 +168,7 @@ const ack: AckFrame = {
   gauge: { charges: 2, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0 },
 };
 
-// Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (écart §4.3, JOURNAL 2026-09-27).
+// Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (§4.3).
 const publicEntry: InspectEntry = {
   login: "user2",
   displayName: "User 2",
@@ -225,23 +225,23 @@ type SetupOptions = {
   reportCount?: number; // ce que rend `getReportCount`
   canReport?: boolean; // ce que rend `canReport`
   report?: Awaited<ReturnType<CanvasCore["report"]>>; // ce que rend `report`
-  archivedAt?: number; // le canvas est une archive (Écart §15, JOURNAL 2026-10-06)
-  theme?: string; // le thème lu dans `meta` (Écart §8.1, JOURNAL 2026-10-07)
-  backgroundImageAt?: number; // l'instant de l'image du fond lu dans `meta` (Écart §8.1, JOURNAL 2026-10-10)
-  backgroundImageOpacity?: number; // l'opacité de cette image lue dans `meta` (Écart §9.1, JOURNAL 2026-10-10)
+  archivedAt?: number; // le canvas est une archive (§17.1)
+  theme?: string; // le thème lu dans `meta` (§8.4)
+  backgroundImageAt?: number; // l'instant de l'image du fond lu dans `meta` (§8.4)
+  backgroundImageOpacity?: number; // l'opacité de cette image lue dans `meta` (§9.5)
   isRefusedByScripts?: boolean; // les scripts répondent `canvas_archived`, comme après un archivage que le gateway ignore encore
   isForbiddenByScripts?: boolean; // les scripts répondent `forbidden`, comme après un rôle perdu que le gateway ignore encore
-  movedAtVersion?: number; // la version du dernier rapprochement qui a déplacé des pixels, lue dans `meta` (Écart §5.3, JOURNAL 2026-10-24)
+  movedAtVersion?: number; // la version du dernier rapprochement qui a déplacé des pixels, lue dans `meta` (§5.8)
   movedOnResize?: number; // la version que pose un rapprochement qui déplace des pixels, comme resize.lua
-  isBusyResizing?: boolean; // resizeCanvas rend `busy` : des poses ont couru pendant chaque essai (Écart §5.3, JOURNAL 2026-10-24)
-  isDynamicSize?: boolean; // la taille dynamique est activée, lue dans `meta` (Écart §5.3, JOURNAL 2026-10-28)
+  isBusyResizing?: boolean; // resizeCanvas rend `busy` : des poses ont couru pendant chaque essai (§5.8)
+  isDynamicSize?: boolean; // la taille dynamique est activée, lue dans `meta` (§5.8)
   origin?: CanvasOrigin; // le repère de la fresque, lu dans `meta`
   originOnDynamicSize?: CanvasOrigin; // le repère que pose `setDynamicSize`, comme dynamic-size.lua
-  isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (Écart §4.2, JOURNAL 2026-10-08)
+  isRecovering?: boolean; // ce que rend `isRecovering` : Redis remet le canvas en place (§7.4)
   isLost?: boolean; // les scripts répondent `canvas_not_found` : Redis a perdu le canvas depuis le `hello`
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
-  twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (Écart §4, JOURNAL 2026-10-07)
+  twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (§10.4)
 };
 
 // Ce que répond un script à qui écrit sur une archive.
@@ -531,7 +531,7 @@ describe("createConnection (§6.1)", () => {
     });
   });
 
-  // Recopie la photo Twitch de la session dans le welcome, et rien sans elle (écart §4.3, JOURNAL 2026-09-24)
+  // Recopie la photo Twitch de la session dans le welcome, et rien sans elle (§4.3)
   it("copies the session's Twitch photo into the welcome, and nothing without one", async () => {
     const avatarUrl = "https://static-cdn.jtvnw.net/jtv_user_pictures/fenysk-profile_image-300x300.png";
     const withPhoto = setup({ session: { ...session, avatarUrl } });
@@ -575,7 +575,7 @@ describe("createConnection (§6.1)", () => {
     expect(closed).toEqual([1008]);
   });
 
-  // Un canvas que Redis remet en place se dit « en récupération », jamais « introuvable » (Écart §4.2, JOURNAL 2026-10-08)
+  // Un canvas que Redis remet en place se dit « en récupération », jamais « introuvable » (§7.4)
   it("says a canvas being recovered is being recovered, not that it is missing", async () => {
     const { connection, sent, closed } = setup({ isRecovering: true });
 
@@ -670,7 +670,7 @@ describe("createConnection (§6.1)", () => {
     expect(closed).toEqual([1008]);
   });
 
-  // Répond à une inspection par l'auteur du pixel sans son identifiant, invité compris (écart §4.3, JOURNAL 2026-09-27)
+  // Répond à une inspection par l'auteur du pixel sans son identifiant, invité compris (§4.3)
   it("answers an inspection with the pixel's author but not its id, for a guest too", async () => {
     const { connection, sent } = setup({ session: null });
     await connection.receive(hello());
@@ -698,7 +698,7 @@ describe("createConnection (§6.1)", () => {
   });
 
   // Dit à qui modère, en inspectant, que l'auteur est modérateur et d'où il vient, au streamer (JOURNAL 2026-09-27) comme à un
-  // modérateur (Écart §4.3, JOURNAL 2026-10-08), et à personne d'autre
+  // modérateur (§4.3), et à personne d'autre
   it("tells whoever moderates, on inspection, that the author is a moderator and where from, and no one else", async () => {
     const namedHere = { isFromTwitch: false, isNamedHere: true };
     const fromTwitch = { isFromTwitch: true, isNamedHere: false };
@@ -1056,7 +1056,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     expect(other.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual(["welcome", "snapshot"]);
   });
 
-  // Un modérateur banni perd son rôle en direct et ne modère plus, jusqu'à son déban (Écart §10.3, JOURNAL 2026-10-08)
+  // Un modérateur banni perd son rôle en direct et ne modère plus, jusqu'à son déban (§10.3)
   it("rereads, live, the role of a moderator who is banned then unbanned: he moderates nothing while banned", async () => {
     const context = setup({ isModerator: true });
     await context.connection.receive(hello());
@@ -1086,7 +1086,7 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     expect(context.moderations).toHaveLength(1);
   });
 
-  // Un ban tombé pendant l'arrivée d'un modérateur lui ôte son rôle juste après le welcome (Écart §10.3, JOURNAL 2026-10-08)
+  // Un ban tombé pendant l'arrivée d'un modérateur lui ôte son rôle juste après le welcome (§10.3)
   it("takes the role of a moderator whose ban lands during his arrival, right after the welcome", async () => {
     const during: { run?: () => void } = {};
     const context = setup({ isModerator: true, duringSnapshot: () => during.run?.() });
@@ -1271,7 +1271,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
       expect(opened.sent.at(-1)).toEqual({ t: "obsBackground", obsBackground: "white" });
   });
 
-  // L'opacité de l'image se demande comme le fond : le streamer seul, le cœur l'écrit, toutes les pages la reçoivent (Écart §9.1, JOURNAL 2026-10-10)
+  // L'opacité de l'image se demande comme le fond : le streamer seul, le cœur l'écrit, toutes les pages la reçoivent (§9.5)
   it("passes the image opacity only for the owner, and hands it to every page", async () => {
     const context = setup({ session: owner });
     const viewer = context.open(session);
@@ -1306,7 +1306,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     expect(context.backgroundImageOpacities).toEqual([]);
   });
 
-  // Donne l'instant de l'image du fond dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-10)
+  // Donne l'instant de l'image du fond dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (§8.4)
   it("gives the instant of the background image in the params of the welcome, to everyone, and none when the canvas has none", async () => {
     const pictured = setup({
       session: owner,
@@ -1353,7 +1353,7 @@ describe("resync and the OBS view (§4.5, §9.5, JOURNAL 2026-09-25)", () => {
     for (const opened of [context, viewer, obs]) expect(opened.sent.at(-1)).toEqual({ t: "backgroundImage" });
   });
 
-  // Donne le thème du canvas dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (Écart §8.1, JOURNAL 2026-10-07)
+  // Donne le thème du canvas dans les params du welcome, à qui qu'il soit, et rien quand le canvas n'en a pas (§8.1)
   it("gives the canvas theme in the params of the welcome, to everyone, and none when the canvas has none", async () => {
     const themed = setup({ session: owner, theme: "Halloween" });
     const viewer = themed.open(session);
@@ -1778,7 +1778,7 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
   });
 
   // Dit dans le welcome la version du dernier rapprochement qui a déplacé des pixels, et rien avant le premier
-  it("tells the welcome the version of the last move of pixels, and nothing before the first (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+  it("tells the welcome the version of the last move of pixels, and nothing before the first (§5.8)", async () => {
     const never = setup();
     const moved = setup({ movedAtVersion: 7 });
     for (const { connection } of [never, moved]) await connection.receive(hello());
@@ -1790,7 +1790,7 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
   });
 
   // Un rapprochement qui déplace des pixels : le nouveau welcome de chaque page en porte la version
-  it("at a resize that moves pixels, the new welcome of each page carries its version (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+  it("at a resize that moves pixels, the new welcome of each page carries its version (§5.8)", async () => {
     const context = setup({ session: owner, movedOnResize: 9 });
     const other = context.open(session);
     for (const opened of [context, other]) await opened.connection.receive(hello());
@@ -1806,7 +1806,7 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
   });
 
   // Des poses ont couru pendant chaque essai : le streamer l'apprend comme d'un débit dépassé, la page ne change pas
-  it("answers a resize that stayed busy as a rate limit, and leaves the page as it is (Écart §5.3, JOURNAL 2026-10-24)", async () => {
+  it("answers a resize that stayed busy as a rate limit, and leaves the page as it is (§5.8)", async () => {
     const context = setup({ session: owner, isBusyResizing: true });
     await context.connection.receive(hello());
 
@@ -1838,7 +1838,7 @@ describe("resizing the canvas (JOURNAL 2026-09-29)", () => {
   });
 });
 
-describe("the status of the canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the status of the canvas (§17.1)", () => {
   // Annonce le statut du canvas à toutes ses pages, page et vue OBS, invité compris
   it("announces the status of the canvas to every page of it, OBS view and guest included", async () => {
     const context = setup({ session: owner });
@@ -1870,7 +1870,7 @@ describe("the status of the canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the dynamic size (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("the dynamic size (§5.8)", () => {
   const setDynamic = (isDynamicSize: boolean) =>
     JSON.stringify({ t: "setDynamicSize", requestId: "dynamic-1", isDynamicSize });
   const welcomeOf = ({ sent }: { sent: readonly unknown[] }) =>
@@ -1986,7 +1986,7 @@ describe("the dynamic size (Écart §5.3, JOURNAL 2026-10-28)", () => {
   });
 });
 
-describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("an archive in the connection (§17.1)", () => {
   const archivedAt = now - 86_400_000;
   const frames = {
     place: JSON.parse(place()),
@@ -2213,7 +2213,7 @@ describe("an archive in the connection (Écart §15, JOURNAL 2026-10-06)", () =>
   });
 });
 
-describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", () => {
+describe("the activity in the connection (§16.1)", () => {
   const watch = JSON.stringify({ t: "watchActivity", isWatching: true });
   const listHistory = JSON.stringify({ t: "listActivityHistory", requestId: "history-1", period: "day" });
 
@@ -2369,7 +2369,7 @@ describe("the activity in the connection (écart §4.2, JOURNAL 2026-10-06)", ()
   });
 });
 
-describe("the capacity in the connection (écart §4.2, JOURNAL 2026-10-07)", () => {
+describe("the capacity in the connection (§16.1)", () => {
   const watch = JSON.stringify({ t: "watchCapacity", isWatching: true });
   const listHistory = JSON.stringify({ t: "listCapacityHistory", requestId: "history-1", period: "day" });
 
@@ -2509,7 +2509,7 @@ describe("the scoreboard of a canvas, for each page (JOURNAL 2026-10-06)", () =>
   });
 });
 
-describe("the Twitch live in the connection (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the Twitch live in the connection (§10.4)", () => {
   const art: TwitchLive = { category: "Art" };
   const chatting: TwitchLive = { category: "Just Chatting" };
   const lives = { [meta.ownerId]: art, [session.userId]: chatting, "user-2": { category: "Music" } };

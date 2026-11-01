@@ -1,4 +1,4 @@
-// Se connecter et se déconnecter depuis un canvas : écart §10.1 (JOURNAL 2026-09-22), on revient là d'où l'on part.
+// Se connecter et se déconnecter depuis un canvas : §10.1, on revient là d'où l'on part.
 
 const returnTo = (login: string): string => encodeURIComponent(`/${login}`);
 

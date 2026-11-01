@@ -21,7 +21,7 @@ export function getRouter() {
           mode,
           now: Date.now,
           reload: () => window.location.reload(),
-          // Écart §4.2 (JOURNAL 2026-10-09) : le web marque le canvas perdu, et dit si rien ne le ramènera.
+          // §9.1 : le web marque le canvas perdu, et dit si rien ne le ramènera.
           isMissingConfirmed: async (id: string) => (await getCanvasVerdictFn({ data: id })) === "missing",
         }),
     },

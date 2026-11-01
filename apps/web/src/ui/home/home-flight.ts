@@ -1,4 +1,4 @@
-// Le vol d'un pixel de la fresque du téléphone à SA case sur la fresque du stream (Écart §9.1, JOURNAL 2026-10-22).
+// Le vol d'un pixel de la fresque du téléphone à SA case sur la fresque du stream (§9.10).
 // Un carré de 1 px que `scale` agrandit à la taille de la case : tout est en pixels concrets, calculés d'après
 // `getBoundingClientRect`, qui tient compte de la réduction du téléphone. Jamais `var()` dans des `@keyframes` : ça saccade.
 

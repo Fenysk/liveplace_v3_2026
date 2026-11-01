@@ -80,7 +80,7 @@ const viewMarkup = (keptCells: number, claimable = 0): string =>
     }),
   );
 
-describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09 et 2026-10-13)", () => {
+describe("the Draft button in View (§9.6)", () => {
   // Sans brouillon gardé, le bouton dit Dessiner, même jauge vide
   it("says Dessiner when no draft is kept", () => {
     const markup = viewMarkup(0);
@@ -112,7 +112,7 @@ describe("the Draft button in View (Écart §9.3, JOURNAL 2026-10-09 et 2026-10-
   });
 });
 
-describe("enterLabel (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("enterLabel (§9.6)", () => {
   // Dessiner seul sans brouillon, puis sa taille derrière un point médian, dans les deux langues
   it("adds the draft size to Dessiner only when there is one", () => {
     expect(enterLabel(0, "fr")).toBe("Dessiner");
@@ -122,7 +122,7 @@ describe("enterLabel (Écart §9.3, JOURNAL 2026-10-13)", () => {
   });
 });
 
-describe("the gauge reserves the kept draft in View too (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the gauge reserves the kept draft in View too (§9.6)", () => {
   const NOW = -5_000; // la prochaine recharge de `canvasView` est à 0 : la jauge est encore à 6
   const view = (canvas: CanvasView): CanvasView => ({
     ...canvas,
@@ -148,7 +148,7 @@ describe("the gauge reserves the kept draft in View too (Écart §9.3, JOURNAL 2
   });
 });
 
-describe("submitLabel (Écart §9.3, JOURNAL 2026-10-08)", () => {
+describe("submitLabel (§9.6)", () => {
   // Brouillon vide avec des charges : Valider, comme avant
   it("says Valider alone for an empty draft", () => {
     expect(submitLabel(0, undefined, "fr")).toBe("Valider");
@@ -245,7 +245,7 @@ describe("msToNextSecond", () => {
   });
 });
 
-describe("the Draw pill buttons in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the Draw pill buttons in English (§9.9)", () => {
   // Confirm, sa taille dans le bouton, puis l'attente : « Wait 12 s »
   it("says Confirm with the draft size, then counts down with Wait", () => {
     expect(submitLabel(0, undefined, "en")).toBe("Confirm");

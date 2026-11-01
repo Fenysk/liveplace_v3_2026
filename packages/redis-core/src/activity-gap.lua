@@ -1,4 +1,4 @@
--- Les minutes d'une coupure de moins de 5 minutes, comblées d'un coup (écart §5.1, JOURNAL 2026-10-08) : le canvas compte comme
+-- Les minutes d'une coupure de moins de 5 minutes, comblées d'un coup (§16.2) : le canvas compte comme
 -- streamé dans chacune. Le point du canvas dit si la minute était déjà comptée : sinon le script la rejoue sans dégât. Pour tout
 -- LivePlace, le canvas s'ajoute à une minute qui existe, jamais là où le serveur était arrêté ; l'heure et le jour prennent le
 -- pic de la minute comblée.

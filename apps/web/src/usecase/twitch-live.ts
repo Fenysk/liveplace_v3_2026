@@ -1,4 +1,4 @@
-// Écart §4 et §10.1 (JOURNAL 2026-10-07) : le live Twitch des comptes. Le web garde l'état de chacun et confie
+// §10.4 : le live Twitch des comptes. Le web garde l'état de chacun et confie
 // ses changements au gateway (§2) ; il ne touche à aucun pixel.
 
 import { MINUTE_MS, type Timestamp } from "@liveplace/domain";

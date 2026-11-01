@@ -1,4 +1,4 @@
-// Un canvas de la section Activité (écart §4.3, JOURNAL 2026-10-06) : son streamer, ses chiffres, et, déplié, ses comptes
+// Un canvas de la section Activité (§16.1) : son streamer, ses chiffres, et, déplié, ses comptes
 // connectés puis ses invités. Une ligne sur grand écran, une carte sur mobile.
 // Avatars et noms suivent la règle des profils (profile.tsx) : ils mènent au canvas de la personne.
 // Le streamer et la liste des comptes servent aussi seuls, dans la section Ce canvas (JOURNAL 2026-10-07).

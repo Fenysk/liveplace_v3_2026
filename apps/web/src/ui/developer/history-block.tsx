@@ -1,4 +1,4 @@
-// Le bloc de l'historique des sections de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07) : le choix de
+// Le bloc de l'historique des sections de la fenêtre Développeur (§16.1) : le choix de
 // la période, puis les courbes. Ce que les courbes montrent, tout LivePlace, un canvas ou la capacité, vient de `toChart`.
 
 import type { ActivityPeriod } from "@liveplace/domain";

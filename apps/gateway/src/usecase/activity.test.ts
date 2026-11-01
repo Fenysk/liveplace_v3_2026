@@ -72,7 +72,7 @@ type SetupOptions = {
   audience?: ActivityAudience; // ce que rend `getAudience`, sans la minute en cours
   canvasAudience?: CanvasAudience; // ce que rend `getCanvasAudience`, sans la minute en cours
   canvasPoints?: CanvasActivityPoint[]; // ce que rend `listCanvasHistory`
-  lives?: Record<string, TwitchLive>; // le live de chaque streamer, par `listTwitchLives` (Écart §4, JOURNAL 2026-10-07)
+  lives?: Record<string, TwitchLive>; // le live de chaque streamer, par `listTwitchLives` (§10.4)
   firstDayAt?: number; // ce que rend `getFirstDayAt` (JOURNAL 2026-10-14)
   activityDay?: ActivityDayRead; // ce que rend `listActivityDay`
   canvasDay?: CanvasDayRead; // ce que rend `listCanvasDay`
@@ -94,7 +94,7 @@ const setup = (options: SetupOptions = {}) => {
   const dayReads: { dayAt: number; nowMs: number }[] = []; // les jours lus pour tout LivePlace (JOURNAL 2026-10-14)
   const canvasDayReads: { canvasId: string; dayAt: number }[] = [];
   const dayCanvasReads: number[] = [];
-  const gaps: ActivityGap[] = []; // les coupures comblées (Écart §5.1, JOURNAL 2026-10-08)
+  const gaps: ActivityGap[] = []; // les coupures comblées (§16.2)
   const savedSeen = new Map<string, number>(); // ce que `activity:seen` garde, relu par un nouveau gateway
   const prunedSeenAt: number[] = [];
   const store: ActivityStore = {
@@ -264,7 +264,7 @@ const setup = (options: SetupOptions = {}) => {
   };
 };
 
-describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("the activity in the gateway (§16.1)", () => {
   // Compte un compte une fois quels que soient ses onglets, un invité par onglet, et jamais une vue OBS
   it("counts an account once whatever its tabs, a guest per tab, and never an OBS view", async () => {
     const { join, watched } = setup();
@@ -488,7 +488,7 @@ describe("the activity in the gateway (écart §4.3, JOURNAL 2026-10-06)", () =>
   });
 });
 
-describe("the developer in production (écart §10.3, JOURNAL 2026-10-06)", () => {
+describe("the developer in production (§10.3)", () => {
   // En production, ses pages et ses pixels sortent des chiffres et de l'historique, il reste dans la liste de son canvas
   it("in production, leaves his pages and pixels out of the numbers and the history, and keeps him listed", async () => {
     const { activity, clock, join, stored, watched } = setup({ isProduction: true });
@@ -1001,7 +1001,7 @@ describe("the canvas of the socket in the gateway (JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("the Twitch live of the owners in the activity (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the Twitch live of the owners in the activity (§10.4)", () => {
   // Joint à chaque canvas listé le live de son streamer, en une seule lecture pour toutes les cartes, et relit à chaque frame
   it("joins the live of each listed owner in a single read for all the cards, read again at each frame", async () => {
     const lives: Record<string, TwitchLive> = { "owner-a": art, "owner-b": { category: "" } };
@@ -1052,10 +1052,10 @@ describe("the Twitch live of the owners in the activity (Écart §4, JOURNAL 202
   });
 });
 
-// Écart §5.1 (JOURNAL 2026-10-08) : un seul état, « streamé » (une vue OBS ouverte et le streamer en live) ; à l'instant, l'état
+// §16.2 : un seul état, « streamé » (une vue OBS ouverte et le streamer en live) ; à l'instant, l'état
 // réel ; une coupure de moins de 5 minutes se comble dans l'historique, jamais à l'instant, et la fin d'un stream n'est jamais
 // prolongée.
-describe("the streamed state and the gaps of a stream in the gateway (écart §5.1, JOURNAL 2026-10-08)", () => {
+describe("the streamed state and the gaps of a stream in the gateway (§16.2)", () => {
   const obs = { mode: "obs" } as const;
   const at = (minutes: number, seconds = 0) => minuteAt + minutes * MINUTE_MS + seconds * 1000;
 
@@ -1439,7 +1439,7 @@ describe("the streamed state and the gaps of a stream in the gateway (écart §5
 });
 
 // JOURNAL 2026-10-14 : le développeur relit un jour passé, dans ce qui est déjà gardé.
-describe("a past day in the gateway (écart §4.2, JOURNAL 2026-10-14)", () => {
+describe("a past day in the gateway (§16.1)", () => {
   const todayAt = toActivityPointStarts(now).day;
   const yesterdayAt = toPreviousDayStart(todayAt);
   const dayPoint = {

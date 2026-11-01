@@ -31,20 +31,20 @@ import { z } from "zod";
 // 11 : une liste de l'onglet Modération se périme en direct, frame `staleList` (JOURNAL 2026-10-06).
 // 12 : le classement du canvas et la place de chaque page, frame `scoreboard` (JOURNAL 2026-10-06).
 // 13 : le développeur suit l'activité, `watchActivity`, `listActivityHistory`, `activity`, `activityHistory` (JOURNAL 2026-10-06).
-// 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (Écart §15, JOURNAL 2026-10-06), et le fond
+// 14 : l'archive en lecture seule, la frame qui annonce le statut d'un canvas (§17.1), et le fond
 // noir de la vue OBS.
 // 15 : le développeur suit la capacité, `watchCapacity`, `listCapacityHistory`, `capacity`, `capacityHistory` (JOURNAL 2026-10-07).
-// 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (Écart §4.3, JOURNAL 2026-10-07).
-// 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (Écart §4 et §10.1, JOURNAL 2026-10-07).
-// 18 : un canvas en récupération, le code d'erreur `canvas_recovering` (Écart §4.2, JOURNAL 2026-10-08).
-// 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (Écart §4.3, JOURNAL 2026-10-08).
+// 16 : le thème du canvas, dans le `welcome` et dans la frame `theme` (§4.6).
+// 17 : le live Twitch d'un compte, dans le `welcome`, l'`inspected` et la frame `twitchLive` (§4.6 et §10.4).
+// 18 : un canvas en récupération, le code d'erreur `canvas_recovering` (§4.6).
+// 19 : deux ressources de plus dans la frame `capacity`, `convexFiles` et `snapshotDelay`, et l'unité `seconds` (§4.6).
 // 20 : l'image du fond de la fresque, dans le `welcome` et dans la frame `backgroundImage`, et son opacité, `setBackgroundImageOpacity`
-// et `backgroundImageOpacity` (Écart §4.3, JOURNAL 2026-10-10).
+// et `backgroundImageOpacity` (§4.6).
 // 21 : le développeur relit un jour passé, `listActivityDay` et `activityDay`, et `firstDayAt` dans `activityHistory`
-// (Écart §4.2 et §4.3, JOURNAL 2026-10-14).
-// 22 : le `welcome` dit la version du dernier rapprochement qui a déplacé des pixels, `movedAtVersion` (Écart §5.3, JOURNAL 2026-10-24).
+// (§4.6).
+// 22 : le `welcome` dit la version du dernier rapprochement qui a déplacé des pixels, `movedAtVersion` (§5.8).
 // 23 : la taille dynamique, `setDynamicSize`, `isDynamicSize` et `origin` dans le `welcome`, et l'`origin` de la page dans `place`
-// (Écart §4.2, §4.3 et §5.3, JOURNAL 2026-10-28).
+// (§4.6 et §5.8).
 export const PROTOCOL_VERSION = 23;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
@@ -92,7 +92,7 @@ const PixelSchema = z.object({
   colorIndex: ColorIndexSchema,
 });
 
-// Écart §5.3 (JOURNAL 2026-10-28) : le repère d'une page, les décalages cumulés d'une taille dynamique (négatifs après un resserrement).
+// §5.8 : le repère d'une page, les décalages cumulés d'une taille dynamique (négatifs après un resserrement).
 const OriginShape = { x: z.number().int(), y: z.number().int() };
 const OriginSchema = z.object(OriginShape);
 
@@ -147,16 +147,16 @@ const RejectedPixelSchema = z.object({
 // L'origine d'un rôle de modérateur : nommé sur Twitch, ici, ou les deux (JOURNAL 2026-09-27).
 const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
 
-// Écart §4.3 (JOURNAL 2026-10-07) : le live Twitch d'un compte ; `category` vide : le stream n'en a pas. Absent : hors live.
+// §4.3 : le live Twitch d'un compte ; `category` vide : le stream n'en a pas. Absent : hors live.
 const TwitchLiveSchema = z.object({ category: z.string() });
 
 const InspectEntrySchema = z.object({
   userId: UserIdSchema.optional(), // §4.3 : seulement pour qui modère
-  moderatorOrigin: ModeratorOriginSchema.optional(), // pour qui modère (Écart §4.3, JOURNAL 2026-10-08), quand l'auteur est modérateur
+  moderatorOrigin: ModeratorOriginSchema.optional(), // pour qui modère (§4.3), quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
-  twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : lu à l'inspection
+  twitchLive: TwitchLiveSchema.optional(), // §4.3 : lu à l'inspection
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
   placementId: PlacementIdSchema, // §4.3 : la pose, pour la signaler ou la retirer
@@ -170,8 +170,8 @@ const ErrorCodeSchema = z.enum([
   "rate_limited",
   "invalid_frame",
   "canvas_not_found",
-  "canvas_archived", // Écart §15 (JOURNAL 2026-10-06) : une écriture sur une archive, refusée sans fermer la connexion
-  "canvas_recovering", // Écart §4.2 (JOURNAL 2026-10-08) : Convex le connaît, Redis le remet en place ; la page reprend seule
+  "canvas_archived", // §17.1 : une écriture sur une archive, refusée sans fermer la connexion
+  "canvas_recovering", // §7.4 : Convex le connaît, Redis le remet en place ; la page reprend seule
   "server_full",
 ]);
 
@@ -190,7 +190,7 @@ const PlaceFrameSchema = z.strictObject({
   t: z.literal("place"),
   requestId: RequestIdSchema,
   placementId: ClientPlacementIdSchema, // le même pour chaque lot d'un brouillon validé (JOURNAL 2026-09-28)
-  // Écart §5.3 (JOURNAL 2026-10-28) : le repère des `pixels`, celui du dernier `welcome` de la page ; le serveur les traduit vers le sien.
+  // §5.8 : le repère des `pixels`, celui du dernier `welcome` de la page ; le serveur les traduit vers le sien.
   origin: z.strictObject(OriginShape),
   pixels: z.array(z.strictObject(PixelSchema.shape)).min(1).max(64), // strict ici seulement : `PixelSchema` sert aussi au serveur
 });
@@ -295,20 +295,20 @@ const ResizeCanvasFrameSchema = z
   })
   .refine(isCanvasSize, "pas une taille du cahier des charges");
 
-// Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul. Activée, la fresque se resserre sur ses dessins puis grandit avec eux ; répond par `resized`.
+// §5.8 : le streamer seul. Activée, la fresque se resserre sur ses dessins puis grandit avec eux ; répond par `resized`.
 const SetDynamicSizeFrameSchema = z.strictObject({
   t: z.literal("setDynamicSize"),
   requestId: RequestIdSchema,
   isDynamicSize: z.boolean(),
 });
 
-// Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de l'image du fond, un cran de dix points de 0 à 100.
+// §9.5 : l'opacité de l'image du fond, un cran de dix points de 0 à 100.
 const BackgroundImageOpacitySchema = z
   .number()
   .int()
   .refine(isBackgroundImageOpacity, "pas un cran de l'opacité de l'image");
 
-// Écart §9.1 (JOURNAL 2026-10-10) : le streamer seul, pris aussitôt par chaque page, comme le fond.
+// §9.5 : le streamer seul, pris aussitôt par chaque page, comme le fond.
 const SetBackgroundImageOpacityFrameSchema = z.strictObject({
   t: z.literal("setBackgroundImageOpacity"),
   requestId: RequestIdSchema,
@@ -336,7 +336,7 @@ const SetGaugeLimitsFrameSchema = GaugeLimitsSchema.extend({
   requestId: RequestIdSchema,
 }).refine(isGaugeLimits, "hors des bornes de la jauge");
 
-// Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; venues d'une autre session, le gateway les ignore.
+// §16.1 : le développeur seul ; venues d'une autre session, le gateway les ignore.
 const WatchActivityFrameSchema = z.strictObject({ t: z.literal("watchActivity"), isWatching: z.boolean() });
 
 const ListActivityHistoryFrameSchema = z.strictObject({
@@ -345,7 +345,7 @@ const ListActivityHistoryFrameSchema = z.strictObject({
   period: z.enum(ACTIVITY_PERIODS),
 });
 
-// Écart §4.2 (JOURNAL 2026-10-14) : un jour passé, lu une fois. `dayAt` : un instant de ce jour de Paris, que le gateway
+// §16.1 : un jour passé, lu une fois. `dayAt` : un instant de ce jour de Paris, que le gateway
 // ramène à son début ; au-delà du dernier instant d'une `Date` (ECMA-262), `Intl` lève une erreur au lieu d'un refus.
 const LAST_DATE_MS = 8_640_000_000_000_000;
 const ListActivityDayFrameSchema = z.strictObject({
@@ -354,7 +354,7 @@ const ListActivityDayFrameSchema = z.strictObject({
   dayAt: TimestampSchema.int().nonnegative().max(LAST_DATE_MS),
 });
 
-// Écart §4.2 (JOURNAL 2026-10-07) : la capacité, comme l'activité, pour le développeur seul.
+// §16.1 : la capacité, comme l'activité, pour le développeur seul.
 const WatchCapacityFrameSchema = z.strictObject({ t: z.literal("watchCapacity"), isWatching: z.boolean() });
 
 const ListCapacityHistoryFrameSchema = z.strictObject({
@@ -398,7 +398,7 @@ export type ClientFrame = z.infer<typeof ClientFrameSchema>;
 // Le snapshot est hors bande : une frame binaire (width × height octets),
 // jamais un objet `t`-discriminé, donc pas de schéma Zod ici.
 
-// Écart §4.3 (JOURNAL 2026-10-07) : borné par caractères comme `toTheme` ; `.max` compterait les unités UTF-16, et un
+// §4.3 : borné par caractères comme `toTheme` ; `.max` compterait les unités UTF-16, et un
 // thème de 40 émojis serait refusé.
 const ThemeSchema = z
   .string()
@@ -412,10 +412,10 @@ const WelcomeFrameSchema = z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     ownerId: UserIdSchema,
-    archivedAt: TimestampSchema.optional(), // Écart §15 (JOURNAL 2026-10-06) : présent, le canvas est une archive
-    ownerTwitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : le streamer est en live
-    movedAtVersion: VersionSchema.optional(), // Écart §5.3 (JOURNAL 2026-10-24) : absent, aucun rapprochement n'a déplacé de pixel
-    // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique est activée ; et le repère de la fresque (absent : jamais décalée).
+    archivedAt: TimestampSchema.optional(), // §17.1 : présent, le canvas est une archive
+    ownerTwitchLive: TwitchLiveSchema.optional(), // §4.3 : le streamer est en live
+    movedAtVersion: VersionSchema.optional(), // §5.8 : absent, aucun rapprochement n'a déplacé de pixel
+    // §5.8 : la taille dynamique est activée ; et le repère de la fresque (absent : jamais décalée).
     isDynamicSize: z.boolean().optional(),
     origin: OriginSchema.optional(),
   }),
@@ -426,9 +426,9 @@ const WelcomeFrameSchema = z.object({
     refillCharges: z.number().int().positive(),
     obsDelayMs: z.number().int().nonnegative(),
     obsBackground: z.enum(OBS_BACKGROUNDS), // JOURNAL 2026-09-29
-    backgroundImageAt: TimestampSchema.int().positive().optional(), // Écart §4.3 (JOURNAL 2026-10-10) : absent, le canvas n'a pas d'image
+    backgroundImageAt: TimestampSchema.int().positive().optional(), // §4.3 : absent, le canvas n'a pas d'image
     backgroundImageOpacity: BackgroundImageOpacitySchema.optional(), // de même : absent, 40 %
-    theme: ThemeSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : absent, le canvas n'a pas de thème
+    theme: ThemeSchema.optional(), // §4.3 : absent, le canvas n'a pas de thème
   }),
   palette: z.array(z.string()),
   version: VersionSchema,
@@ -437,7 +437,7 @@ const WelcomeFrameSchema = z.object({
     login: TwitchLoginSchema.optional(),
     displayName: DisplayNameSchema.optional(),
     avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
-    twitchLive: TwitchLiveSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-07) : la personne connectée est en live
+    twitchLive: TwitchLiveSchema.optional(), // §4.3 : la personne connectée est en live
     role: RoleSchema,
   }),
   gauge: GaugeSchema.optional(),
@@ -542,7 +542,7 @@ const ReportedPlacementSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   hasAccount: z.boolean(),
-  moderatorOrigin: ModeratorOriginSchema.optional(), // Écart §4.3 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit pas
+  moderatorOrigin: ModeratorOriginSchema.optional(), // §4.3 : un modérateur nommé ici ne se bannit pas
   placementId: PlacementIdSchema,
   reportCount: z.number().int().positive(),
   reportedAt: TimestampSchema, // le premier signalement
@@ -553,7 +553,7 @@ const ReportedPlacementSchema = z.object({
 const ReportedFrameSchema = z.object({ t: z.literal("reported"), requestId: RequestIdSchema });
 
 // La nouvelle taille arrive ensuite par un `welcome` et un snapshot, à toutes les pages du canvas (JOURNAL 2026-09-29).
-// Écart §5.3 (JOURNAL 2026-10-28) : c'est aussi la réponse à `setDynamicSize`.
+// §5.8 : c'est aussi la réponse à `setDynamicSize`.
 const ResizedFrameSchema = z.object({ t: z.literal("resized"), requestId: RequestIdSchema });
 
 const ReportsFrameSchema = z.object({
@@ -571,10 +571,10 @@ const ReportCountFrameSchema = z.object({
 // §10.3 : ses droits ont changé pendant la session.
 const RoleFrameSchema = z.object({ t: z.literal("role"), role: RoleSchema });
 
-// Écart §4.3 (JOURNAL 2026-10-06) : pour qui modère, la liste des bannis ou celle des modérateurs a bougé, la page la relit.
+// §5.9 : pour qui modère, la liste des bannis ou celle des modérateurs a bougé, la page la relit.
 const StaleListFrameSchema = z.object({ t: z.literal("staleList"), list: z.enum(["bans", "moderators"]) });
 
-// Écart §4.3 (JOURNAL 2026-10-06) : une ligne du classement, sans identifiant ; `you.rank` désigne la ligne du top.
+// §5.9 : une ligne du classement, sans identifiant ; `you.rank` désigne la ligne du top.
 const ScoreboardEntrySchema = z.object({
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
@@ -603,21 +603,21 @@ const ObsBackgroundFrameSchema = z.object({
   obsBackground: z.enum(OBS_BACKGROUNDS),
 });
 
-// L'opacité de l'image du fond vient de changer : toutes les pages du canvas la prennent aussitôt (Écart §4.3, JOURNAL 2026-10-10).
+// L'opacité de l'image du fond vient de changer : toutes les pages du canvas la prennent aussitôt (§4.3).
 const BackgroundImageOpacityFrameSchema = z.object({
   t: z.literal("backgroundImageOpacity"),
   backgroundImageOpacity: BackgroundImageOpacitySchema,
 });
 
 // L'image du fond vient de changer : toutes les pages du canvas la prennent aussitôt ; sans `at`, il n'y en a plus
-// (Écart §4.3, JOURNAL 2026-10-10).
+// (§4.3).
 const BackgroundImageFrameSchema = z.object({
   t: z.literal("backgroundImage"),
   at: TimestampSchema.int().positive().optional(),
 });
 
 // Le thème vient de changer : toutes les pages du canvas le prennent aussitôt ; sans `theme`, il n'y en a plus
-// (Écart §4.3, JOURNAL 2026-10-07).
+// (§4.3).
 const ThemeFrameSchema = z.object({ t: z.literal("theme"), theme: ThemeSchema.optional() });
 
 // Les bornes viennent de changer : chaque page les prend, et reçoit ensuite sa jauge (JOURNAL 2026-09-30).
@@ -627,11 +627,11 @@ const GaugeLimitsFrameSchema = z.object({
   gaugeMaxCeiling: z.number().int().positive(),
 });
 
-// Écart §15 (JOURNAL 2026-10-06), à toutes les pages du canvas : archivé, la page du jeu et la vue OBS relisent le canvas
+// §17.1, à toutes les pages du canvas : archivé, la page du jeu et la vue OBS relisent le canvas
 // actif ; redevenu actif, une page d'archive part sur `/{login}` ; supprimé, elle montre l'introuvable.
 const CanvasStatusFrameSchema = z.object({ t: z.literal("canvasStatus"), status: z.enum(CANVAS_STATUSES) });
 
-// Écart §4.3 (JOURNAL 2026-10-07) : le live du streamer de la page ou de la personne connectée vient de changer.
+// §16.1 : le live du streamer de la page ou de la personne connectée vient de changer.
 // `twitchLive` absent : plus en live.
 const TwitchLiveFrameSchema = z.object({
   t: z.literal("twitchLive"),
@@ -639,13 +639,13 @@ const TwitchLiveFrameSchema = z.object({
   twitchLive: TwitchLiveSchema.optional(),
 });
 
-// Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, pour le développeur seul.
+// §16.1 : le suivi d'activité, pour le développeur seul.
 const CountSchema = z.number().int().nonnegative();
 
-// Ce que l'historique garde, et ce que disent les chiffres de l'instant : des nombres, aucun nom (écart §5.1, JOURNAL 2026-10-06).
+// Ce que l'historique garde, et ce que disent les chiffres de l'instant : des nombres, aucun nom (§16.2).
 const ActivityCountsSchema = z.object({
   people: CountSchema,
-  streamed: CountSchema, // les canvas streamés : une vue OBS ouverte et le streamer en live (Écart §5.1, JOURNAL 2026-10-08)
+  streamed: CountSchema, // les canvas streamés : une vue OBS ouverte et le streamer en live (§16.2)
   pixels: CountSchema,
   signups: CountSchema,
 });
@@ -666,8 +666,8 @@ const ConnectedAccountSchema = ActivityUserSchema.extend({
 });
 
 // `isStreamed` : une vue OBS est ouverte et son streamer est en live, l'état de l'instant sans la tolérance de l'historique
-// (Écart §5.1, JOURNAL 2026-10-08) ; `obsViews`, ses vues OBS ouvertes, n'en est qu'un détail. `heat` : ses pixels de la dernière
-// heure. Le streamer porte son live Twitch quand il en a un (Écart §4.3, JOURNAL 2026-10-07) ; les comptes connectés, eux, n'en
+// (§16.2) ; `obsViews`, ses vues OBS ouvertes, n'en est qu'un détail. `heat` : ses pixels de la dernière
+// heure. Le streamer porte son live Twitch quand il en a un (§4.3) ; les comptes connectés, eux, n'en
 // portent pas.
 const ActivityCanvasSchema = z.object({
   canvasId: CanvasIdSchema,
@@ -746,7 +746,7 @@ const CanvasPointSchema = z.object({
 });
 
 // `canvasPoints` : ceux du canvas de la socket, sur la même période ; un point absent vaut zéro. Absent : un gateway d'avant.
-// `firstDayAt` : le début du plus ancien jour gardé (Écart §4.3, JOURNAL 2026-10-14) ; absent, aucun jour n'est gardé.
+// `firstDayAt` : le début du plus ancien jour gardé (§4.3) ; absent, aucun jour n'est gardé.
 const ActivityHistoryFrameSchema = z.object({
   t: z.literal("activityHistory"),
   requestId: RequestIdSchema,
@@ -755,7 +755,7 @@ const ActivityHistoryFrameSchema = z.object({
   firstDayAt: TimestampSchema.optional(),
 });
 
-// Écart §4.3 (JOURNAL 2026-10-14) : un jour passé d'un canvas, avec ses visites au téléphone, que ses courbes ne gardent pas.
+// §4.3 : un jour passé d'un canvas, avec ses visites au téléphone, que ses courbes ne gardent pas.
 const CanvasDayPointSchema = CanvasPointSchema.extend({ phoneVisits: CountSchema });
 
 // `owner` absent : le canvas, ou le miroir `user:` de son streamer, est introuvable. Le streamer ne vient jamais de l'historique.
@@ -786,7 +786,7 @@ const ActivityDayFrameSchema = z.object({
   here: ActivityDayHereSchema,
 });
 
-// Écart §4.3 (JOURNAL 2026-10-07) : la capacité, pour le développeur seul. Un taux est un pourcentage de son plafond.
+// §4.3 : la capacité, pour le développeur seul. Un taux est un pourcentage de son plafond.
 const RatioSchema = z.number().nonnegative();
 const CapacityResourceIdSchema = z.enum(CAPACITY_RESOURCE_IDS);
 
@@ -811,7 +811,7 @@ const CapacityResourceSchema = z.discriminatedUnion("state", [
   CapacityResourceBaseSchema.extend({ state: z.literal("unmeasured") }),
 ]);
 
-// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections du gateway, sur la dernière heure et sur 24 h.
+// §4.3 et §16.3 : ce que bloquent les protections du gateway, sur la dernière heure et sur 24 h.
 const GuardCountSchema = z.object({
   refusedPlacements: z.number().int().nonnegative(),
   closedConnections: z.number().int().nonnegative(),

@@ -1,4 +1,4 @@
-// Écart §5.3 (JOURNAL 2026-10-28) : le resserrement d'une fresque qui passe en taille dynamique. Pur : redis-core l'applique.
+// §5.8 : le resserrement d'une fresque qui passe en taille dynamique. Pur : redis-core l'applique.
 // Une case vide est un `colorIndex` 0 dans `state`.
 
 import {
@@ -42,7 +42,7 @@ export function planDynamicSize(state: Uint8Array, from: CanvasSize): Reframe {
   return { width: horizontal.length, height: vertical.length, dx: horizontal.shift, dy: vertical.shift };
 }
 
-// Écart §9.3 (JOURNAL 2026-10-29) : de combien la fresque grandit, de chaque côté, quand `cells` se posent dans une fresque de `size`.
+// §9.3 : de combien la fresque grandit, de chaque côté, quand `cells` se posent dans une fresque de `size`.
 // C'est la règle de `planGrowth` de reframe.lua, que la page montre avant la pose : 3 cases vides par bord, et un axe au plafond (256)
 // ne grandit plus, la gauche (le haut) avant la droite (le bas). Rien à ajouter : tout à zéro.
 export type Growth = { left: number; top: number; right: number; bottom: number };

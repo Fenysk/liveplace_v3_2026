@@ -1,4 +1,4 @@
-// Les octets des fichiers (Écart §8.1, JOURNAL 2026-10-08) : un compteur par clé, tenu à chaque ajout et retrait de fichier, pour que
+// Les octets des fichiers (§8.4) : un compteur par clé, tenu à chaque ajout et retrait de fichier, pour que
 // les lire coûte une ligne et jamais un parcours de `_storage` (1 Go d'E/S par mois pour la prod et le dev ensemble).
 
 import { v } from "convex/values";
@@ -80,8 +80,8 @@ const getUsageRow = (ctx: Pick<QueryCtx, "db">, key: string) =>
     .first();
 
 // Interne : appelée avec la clé de déploiement (la Capacité de la fenêtre Développeur), jamais avec celle du service.
-// `isReady` : avant le premier recompte (`ensure`), le compteur est vide ou partiel : son chiffre n'est pas un stock (Écart §8.1,
-// JOURNAL 2026-10-08). Un champ de plus : le web d'avant ne lit que `bytes`.
+// `isReady` : avant le premier recompte (`ensure`), le compteur est vide ou partiel : son chiffre n'est pas un stock (§8.4).
+// Un champ de plus : le web d'avant ne lit que `bytes`.
 export const files = internalQuery({
   args: {},
   handler: async (ctx) => {

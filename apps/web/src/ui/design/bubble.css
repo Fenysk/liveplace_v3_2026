@@ -1,4 +1,4 @@
-/* La bulle (Écart §8.1, JOURNAL 2026-10-08) : une surface de pill sans action. Le doigt la traverse : un pincement qui
+/* La bulle (§9.11) : une surface de pill sans action. Le doigt la traverse : un pincement qui
    commence dessous zoome quand même. Importée après pill.css, dont elle reprend la main sur le pointeur des pills posées. */
 
 .lp-bubble {
@@ -113,7 +113,7 @@
   visibility: hidden;
 }
 
-/* Dans une fenêtre ouverte (Écart §8.1, JOURNAL 2026-10-09) : dans la couche supérieure du navigateur (`popover`), au-dessus
+/* Dans une fenêtre ouverte (§9.11) : dans la couche supérieure du navigateur (`popover`), au-dessus
    de la fenêtre modale. Ses styles de base (cadre, fond, marge, remplissage, défilement) tombent ; sans `:where`, ils
    écraseraient les rembourrages de la flèche, qui valent plus. */
 :where(.lp-bubble[popover]) {
@@ -143,13 +143,13 @@
 }
 
 /* Le bouton visé remplit son <span>, qui s'étire où le bouton seul s'étirerait (la colonne latérale) : le +1 y prend la place
-   de Dessiner, aussi large (Écart §9.3, JOURNAL 2026-10-09). Sans place en plus, il garde sa taille. */
+   de Dessiner, aussi large (§9.6). Sans place en plus, il garde sa taille. */
 .lp-bubble-target > .lp-btn {
   flex: 1 1 auto;
 }
 
 /* Tant que la bulle est montrée, l'élément qu'elle désigne (`data-aimed`, posé par bubble.tsx) porte l'anneau du focus : sa flèche
-   s'arrête contre la pill qui le porte, à sa colonne ou à sa rangée, et l'anneau marque le bouton (Écart §8.1, JOURNAL 2026-10-12).
+   s'arrête contre la pill qui le porte, à sa colonne ou à sa rangée, et l'anneau marque le bouton (§9.11).
    Il paraît et part en fondu avec elle. */
 .lp-bubble-target {
   position: relative;

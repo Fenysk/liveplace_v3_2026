@@ -27,7 +27,7 @@ const point = (at: number, people = 1): ActivityPoint => ({
   visitMinutes: 30,
 });
 
-describe("the time axis of the history (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("the time axis of the history (§16.1)", () => {
   // Tient 1 440 minutes jusqu'à la dernière écoulée, et laisse vide le créneau d'un point absent
   it("holds 1,440 minutes up to the last one gone by, and leaves empty the slot of a missing point", () => {
     const slots = toActivitySlots([point(minute - 3 * MINUTE_MS), point(minute - MINUTE_MS, 7)], "day", now);

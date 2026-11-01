@@ -1,4 +1,4 @@
--- Activer ou retirer la taille dynamique d'un canvas (Écart §5.3, JOURNAL 2026-10-28 et 2026-10-29). Ordre des KEYS et ARGV :
+-- Activer ou retirer la taille dynamique d'un canvas (§5.8). Ordre des KEYS et ARGV :
 -- client.ts. `reframe` vient de reframe.lua, `applyResizePlan` de resize-plan.lua. Activée, la fresque se resserre sur ses dessins
 -- (`reframe`). Retirée, elle revient à la taille fixe par défaut par le plan de taille d'un format, comme un choix manuel : le réglage
 -- et la taille changent d'un seul script, aucune pose ne grandit la fresque entre les deux. Dans les deux cas, le plan a été
@@ -13,7 +13,7 @@ local expectedVersion, dx, dy, width, height =
   tonumber(ARGV[10]), tonumber(ARGV[11]), tonumber(ARGV[12]), tonumber(ARGV[13]), tonumber(ARGV[14])
 local resizePlanJson = ARGV[15]
 
--- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Une archive ne reçoit plus rien (Écart §15, JOURNAL 2026-10-06).
+-- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Une archive ne reçoit plus rien (§17.1).
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize", "originX", "originY")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }

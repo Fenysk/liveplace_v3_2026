@@ -8,9 +8,9 @@ import type { Draft } from "./draft";
 export type DraftStorage = Pick<Storage, "getItem" | "setItem">;
 
 // Ce qu'une case sauvegardée doit respecter pour revenir : sinon le serveur la refuserait à jamais.
-// Écart §5.3 (JOURNAL 2026-10-24) : `movedAtVersion`, la version du dernier rapprochement que le canvas connaît ; un brouillon
+// §5.8 : `movedAtVersion`, la version du dernier rapprochement que le canvas connaît ; un brouillon
 // sauvegardé sous une autre ne revient pas, ses cases ont changé de place.
-// Écart §5.3 (JOURNAL 2026-10-28) : `origin`, le repère du canvas ; un brouillon sauvegardé dans un autre revient décalé.
+// §5.8 : `origin`, le repère du canvas ; un brouillon sauvegardé dans un autre revient décalé.
 export type DraftBounds = {
   width: number;
   height: number;

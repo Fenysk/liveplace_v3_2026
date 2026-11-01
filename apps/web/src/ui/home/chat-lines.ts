@@ -1,4 +1,4 @@
-// Le tchat du faux stream (Écart §9.1, JOURNAL 2026-10-22) : des lignes sans texte, de largeurs variées, qui arrivent en bas
+// Le tchat du faux stream (§9.10) : des lignes sans texte, de largeurs variées, qui arrivent en bas
 // et poussent les autres vers le haut, à un rythme irrégulier. Tout se déduit du numéro d'une ligne : ni hasard ni horloge,
 // le serveur et le navigateur écrivent le même tchat.
 

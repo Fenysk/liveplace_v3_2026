@@ -1,4 +1,4 @@
-// Quand sauvegarder chaque canvas (Écart §7.2, JOURNAL 2026-10-06). Pur : l'heure vient toujours de l'appelant.
+// Quand sauvegarder chaque canvas (§7.2). Pur : l'heure vient toujours de l'appelant.
 
 export const URGENT_DEBOUNCE_MS = 500; // une modération attend une demi-seconde de calme : ses tranches s'enchaînent
 export const URGENT_MAX_WAIT_MS = 3_000; // et jamais plus, même si les actions ne s'arrêtent pas

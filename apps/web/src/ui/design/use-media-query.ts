@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 // La même requête que `--control-size` dans tokens.css : écran étroit ou tactile, contrôles de 44 px.
 export const COMPACT_SCREEN_QUERY = "(max-width: 640px), (pointer: coarse)";
-// La barre du bas en colonne sur le côté (Écart §8.1 et §9.3, JOURNAL 2026-10-08), et la feuille Dessin en panneau : un téléphone
+// La barre du bas en colonne sur le côté (§9.7), et la feuille Dessin en panneau : un téléphone
 // en paysage (écran bas, étroit ou tactile), et un écran tactile large dont les deux côtés font au moins 560 px (pliable déplié,
 // tablette). Aucune API ne distingue un pliable déplié d'une tablette. 560 : un téléphone n'atteint jamais ses deux côtés (440 px
 // au plus, en portrait comme en paysage), le plus étroit des pliables dépliés mesurés fait 626 px (iPhone Duo).

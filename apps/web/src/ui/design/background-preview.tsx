@@ -1,4 +1,4 @@
-// La vignette de l'image du fond (Écart §9.1, JOURNAL 2026-10-10) : l'image par-dessus le fond choisi, à l'opacité du curseur. Rendue par le
+// La vignette de l'image du fond (§9.5) : l'image par-dessus le fond choisi, à l'opacité du curseur. Rendue par le
 // serveur comme le reste de la fenêtre : la teinte du fond et l'opacité passent par des classes et un attribut, jamais par `style`
 // (la CSP de production le bloque).
 

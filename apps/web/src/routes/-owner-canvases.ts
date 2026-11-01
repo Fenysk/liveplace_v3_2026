@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : lister, archiver, rouvrir, supprimer et régler le thème, des fonctions serveur `POST`. Le cookie
+// §17.2 : lister, archiver, rouvrir, supprimer et régler le thème, des fonctions serveur `POST`. Le cookie
 // `lp_session` (`HttpOnly; SameSite=Lax`) ne part pas d'un autre site : sans lui, aucune ne fait rien, et le propriétaire
 // est toujours celui de la session, jamais un paramètre. Le tiret en tête du nom : le routeur ignore ce fichier.
 
@@ -91,7 +91,7 @@ export const setCanvasThemeFn = createServerFn({ method: "POST" })
     ),
   );
 
-// Écart §9.1 (JOURNAL 2026-10-10) : retirer l'image du fond. La poser est la requête `POST /{login}/background`, qui porte les octets.
+// §9.5 : retirer l'image du fond. La poser est la requête `POST /{login}/background`, qui porte les octets.
 export const clearCanvasBackgroundImageFn = createServerFn({ method: "POST" })
   .validator(BackgroundImageRequestSchema)
   .handler(({ data, context }) =>

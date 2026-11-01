@@ -21,7 +21,7 @@ const render = (props: Partial<AccountPillProps> = {}): string =>
 
 const SIGN_IN = "Se connecter";
 
-// Un contrôle se repère à son `title`. Se connecter n'en a pas (Écart §9.1, JOURNAL 2026-10-31) : son nom est son texte visible.
+// Un contrôle se repère à son `title`. Se connecter n'en a pas (§9.12) : son nom est son texte visible.
 const positionOf = (markup: string, name: string): number =>
   markup.indexOf(name === SIGN_IN ? `>${SIGN_IN}</span>` : `title="${name}"`);
 
@@ -96,7 +96,7 @@ describe("pill Compte", () => {
     expect(markup).not.toContain("Modération");
   });
 
-  // Sur mobile (Écart §8.1, JOURNAL 2026-10-08), l'apparence quitte la pill : elle est dans Mon compte
+  // Sur mobile (§9.7), l'apparence quitte la pill : elle est dans Mon compte
   it("has no appearance button on a compact screen, and keeps the photo", () => {
     const markup = render({ isCompact: true });
     expect(markup).not.toContain("Apparence");
@@ -184,7 +184,7 @@ describe("pill Compte", () => {
   });
 
   // Si le compte connecté est le développeur, alors la pill Compte porte le bouton Développeur, avant Réglages
-  // (écart §10.3, JOURNAL 2026-10-06)
+  // (§10.3)
   it("porte le bouton Développeur pour le développeur seul, avant Réglages", () => {
     const markup = render({ onOpenDeveloper: doNothing, onOpenSettings: doNothing });
     expect(positionOf(markup, "Développeur")).toBeGreaterThanOrEqual(0);
@@ -193,7 +193,7 @@ describe("pill Compte", () => {
   });
 });
 
-// L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (Écart §14, JOURNAL 2026-10-07).
+// L'ordre des contrôles, de gauche à droite, tel que le HTML les écrit (§9.9).
 const ALL_TITLES = ["Développeur", "Réglages", "Modération", "Apparence\u00a0: Auto", "Mon compte", SIGN_IN];
 
 const orderOf = (markup: string): string[] =>
@@ -202,7 +202,7 @@ const orderOf = (markup: string): string[] =>
     .sort((a, b) => a.at - b.at)
     .map(({ title }) => title);
 
-describe("la disposition de la pill Compte (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la disposition de la pill Compte (§9.9)", () => {
   // Avec Développeur, Réglages ou Modération à gauche de la photo, l'apparence passe à droite de la photo
   it("puts the appearance right of the photo when icons stand left of it", () => {
     expect(orderOf(render({ onOpenDeveloper: doNothing, onOpenSettings: doNothing }))).toEqual([

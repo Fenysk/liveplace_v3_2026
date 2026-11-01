@@ -19,7 +19,7 @@ const savedPlan = () => {
   return plan;
 };
 
-describe("a placement (Écart §7.2, JOURNAL 2026-10-06)", () => {
+describe("a placement (§7.2)", () => {
   // Quand une pose arrive, le snapshot attend cinq minutes après le dernier : perdre cinq minutes de poses est accepté
   it("waits five minutes after the last snapshot", () => {
     const plan = savedPlan();
@@ -193,7 +193,7 @@ describe("the oldest modification not saved yet (JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("a discarded canvas (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("a discarded canvas (§7.6)", () => {
   // Une archive supprimée n'est plus sauvegardée, ni par une activité, ni par un balayage, ni par une sauvegarde en cours
   it("is never due again once dropped, whatever the activity, the sweep or a save in flight", () => {
     const plan = savedPlan();

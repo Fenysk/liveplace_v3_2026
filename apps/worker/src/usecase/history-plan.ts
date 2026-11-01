@@ -1,4 +1,4 @@
-// Quand archiver l'historique de chaque canvas (Écart §7.2, JOURNAL 2026-10-08). Pur : l'heure vient toujours de l'appelant.
+// Quand archiver l'historique de chaque canvas (§7.1). Pur : l'heure vient toujours de l'appelant.
 
 export const HISTORY_INTERVAL_MS = 5 * 60_000; // le tour : tout ce qui n'est pas archivé part
 export const HISTORY_PENDING_MAX = 5_000; // des entrées non archivées qui font partir un chunk sans attendre le tour, et sa taille

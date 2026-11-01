@@ -1,4 +1,4 @@
-// Le cycle du worker (Écart §7.2, JOURNAL 2026-10-06) : écouter Redis, balayer, sauvegarder ce que le plan dit dû.
+// Le cycle du worker (§7.2) : écouter Redis, balayer, sauvegarder ce que le plan dit dû.
 
 import type { SnapshotSource, SnapshotStore, Unsubscribe } from "@liveplace/domain/ports";
 import type { CanvasSnapshot } from "@liveplace/domain/snapshot";
@@ -90,7 +90,7 @@ export function createSnapshotCycle({
       return canvases;
     },
 
-    // Le retard de la Sauvegarde (Écart §8.1, JOURNAL 2026-10-08) : l'âge de la plus ancienne modification pas encore
+    // Le retard de la Sauvegarde (§7.2) : l'âge de la plus ancienne modification pas encore
     // sauvegardée, 0 quand tout l'est.
     getDelayMs(): number {
       const oldest = plan.getOldestUnsavedAt();

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { snapshotTier } from "../convex/schema";
 import { isOutdated, SNAPSHOTS_KEPT } from "./snapshot-order";
 
-describe("isOutdated (Écart §8.1, JOURNAL 2026-10-06)", () => {
+describe("isOutdated (§8.1)", () => {
   const latest = { version: 100, takenAt: 5_000 };
 
   // Sans snapshot gardé, rien n'est dépassé

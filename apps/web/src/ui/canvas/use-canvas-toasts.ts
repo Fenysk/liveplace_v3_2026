@@ -1,6 +1,6 @@
 // Les toasts de la page (CDC 2026, Toasts) : la connexion perdue puis revenue, les pixels
 // d'un envoi que le serveur a refusés, gardés dans le brouillon, le streamer qui change de canvas
-// (Écart §15, JOURNAL 2026-10-06), et le brouillon effacé par une réduction qui rapproche les dessins (Écart §5.3, JOURNAL 2026-10-24).
+// (§17.1), et le brouillon effacé par une réduction qui rapproche les dessins (§5.8).
 
 import { useEffect } from "react";
 import type { CanvasStore } from "../../state/canvas-store";

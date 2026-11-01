@@ -1,4 +1,4 @@
-// Écart §14 (JOURNAL 2026-10-07) : la langue de la page, partagée par tous ceux qui l'affichent. Le serveur la rend
+// §9.9 : la langue de la page, partagée par tous ceux qui l'affichent. Le serveur la rend
 // d'après le cookie ou `Accept-Language` (`initial`) ; un choix écrit le cookie et change la page sans la recharger.
 // Hors d'un `LocaleProvider` (un test, un composant seul), la langue est le français.
 
@@ -60,7 +60,7 @@ export const LocaleProvider = ({ initial, children }: PropsWithChildren<{ initia
   return <LocaleContext.Provider value={state}>{children}</LocaleContext.Provider>;
 };
 
-// Une langue imposée à ce qui est dessous : la fenêtre Développeur reste en français (Écart §14).
+// Une langue imposée à ce qui est dessous : la fenêtre Développeur reste en français (§9.9).
 export const FixedLocale = ({ locale, children }: PropsWithChildren<{ locale: Locale }>) => {
   const state = useMemo(() => ({ locale, pick: doNothing }), [locale]);
   return <LocaleContext.Provider value={state}>{children}</LocaleContext.Provider>;

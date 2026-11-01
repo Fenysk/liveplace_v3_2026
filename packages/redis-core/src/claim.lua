@@ -5,7 +5,7 @@ local userId, requestId = ARGV[1], ARGV[2]
 local nowMs, growthFactor = tonumber(ARGV[3]), tonumber(ARGV[4])
 local gaugeTtlSeconds, reqTtlSeconds = ARGV[5], ARGV[6]
 
--- Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call(
   "HMGET",
   metaKey,

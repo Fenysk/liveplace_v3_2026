@@ -1,4 +1,4 @@
-// Là où une bulle d'aide vise (Écart §8.1, JOURNAL 2026-10-08) : un `<span>` autour de l'élément, car `Button` ne transmet pas de `ref`.
+// Là où une bulle d'aide vise (§9.11) : un `<span>` autour de l'élément, car `Button` ne transmet pas de `ref`.
 // Les refs vivent dans un contexte, que la page de jeu pose : ailleurs (/design, la connexion), l'élément reste seul, sans `<span>`.
 
 import { createContext, createRef, type ReactNode, type RefObject, useContext, useState } from "react";

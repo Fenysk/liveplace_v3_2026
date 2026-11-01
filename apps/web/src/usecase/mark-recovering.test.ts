@@ -25,7 +25,7 @@ const doubles = (options: { isLive?: boolean; hasSnapshot?: boolean; failsAt?: "
   return { marks, recovery, calls };
 };
 
-describe("markRecoveringIfLost (Écart §4.2, JOURNAL 2026-10-08)", () => {
+describe("markRecoveringIfLost (§7.4)", () => {
   // Un canvas qui vit : un `EXISTS` sur Redis, jamais Convex, jamais de marque
   it("asks Redis only, and marks nothing, for a canvas that lives", async () => {
     const { marks, recovery, calls } = doubles({ isLive: true });

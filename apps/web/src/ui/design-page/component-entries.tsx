@@ -110,7 +110,7 @@ const PROFILE_USERS = [
 ];
 const PROFILE_VARIANTS: readonly ProfileVariant[] = ["avatar", "name", "full"];
 
-// Écart §4 (JOURNAL 2026-10-07) : le bouton Twitch d'un compte en live, dans chacun de ses états.
+// §10.4 : le bouton Twitch d'un compte en live, dans chacun de ses états.
 const PROFILE_LIVE_STATES: readonly {
   name: string;
   detail: string;
@@ -389,7 +389,7 @@ const ActivityCardScene = ({
 
 const NO_ONE_HERE = "Personne sur cette fresque en ce moment.";
 
-// Écart §14 (JOURNAL 2026-10-07) : les exemples de /design gardent le français de la page.
+// §9.9 : les exemples de /design gardent le français de la page.
 const {
   themeLabel: THEME_LABEL,
   themePlaceholder: THEME_PLACEHOLDER,

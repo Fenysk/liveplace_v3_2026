@@ -1,4 +1,4 @@
-// L'usage du mois d'un déploiement Convex (Écart §2 et §9, JOURNAL 2026-10-07), par l'API de déploiement que la CLI appelle :
+// L'usage du mois d'un déploiement Convex (§16.3), par l'API de déploiement que la CLI appelle :
 // `GET /api/v1/get_current_usage`, `Authorization: Convex <clé>`. L'API est en bêta : une forme inconnue est un échec dit en
 // quelques mots, jamais un plantage. La clé et l'adresse ne sont ni gardées ni journalisées, pas même dans le message d'une erreur.
 // Le stock de fichiers (JOURNAL 2026-10-08) n'y figure pas : le compteur que tient Convex (`usage:files`, une fonction interne)

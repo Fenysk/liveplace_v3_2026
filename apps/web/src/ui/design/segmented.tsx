@@ -13,7 +13,7 @@ type SegmentedProps<Value extends string> = {
   options: readonly SegmentedOption<Value>[];
   value: Value | null; // `null` : aucune option n'est choisie
   onSelect: (value: Value) => void;
-  isDisabled?: boolean; // Écart §5.3 (JOURNAL 2026-10-29) : grisé, l'option choisie se lit encore, ni clic ni clavier
+  isDisabled?: boolean; // §5.8 : grisé, l'option choisie se lit encore, ni clic ni clavier
 };
 
 export const Segmented = <Value extends string>({

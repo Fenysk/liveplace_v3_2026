@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isCanvasArchived, isCanvasReopened } from "./canvas-status";
 
-describe("what a page reads from the status of its canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("what a page reads from the status of its canvas (§17.1)", () => {
   // La page du jeu suit le canvas actif dès que celui qu'elle montre est archivé, et seulement une fois connectée
   it("makes the game page follow the active canvas as soon as its canvas is archived, once connected only", () => {
     expect(isCanvasArchived({ status: "live", isArchived: true })).toBe(true);

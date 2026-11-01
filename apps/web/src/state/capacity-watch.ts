@@ -1,4 +1,4 @@
-// La section Capacité de la fenêtre Développeur (écart §4.2, JOURNAL 2026-10-07) : la capacité, que le gateway pousse toutes
+// La section Capacité de la fenêtre Développeur (§16.1) : la capacité, que le gateway pousse toutes
 // les 2 s tant qu'elle est ouverte, et l'historique d'une période, redemandé chaque minute. Le pendant de `activity-watch.ts`,
 // avec ses propres frames. Le web affiche, le gateway décide : pour tout autre compte, rien ne revient.
 

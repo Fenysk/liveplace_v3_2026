@@ -1,4 +1,4 @@
-// Le fichier d'un snapshot (Écart §7.2, JOURNAL 2026-10-06) : du JSON compressé en brotli, validé à la lecture.
+// Le fichier d'un snapshot (§7.2) : du JSON compressé en brotli, validé à la lecture.
 
 import { promisify } from "node:util";
 import { brotliCompress, brotliDecompress, constants } from "node:zlib";

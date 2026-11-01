@@ -5,7 +5,7 @@ import type { DurableStore, OwnedCanvas } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { buildWebManifest, webManifestResponse } from "./web-manifest";
 
-// Écart §9.1 (JOURNAL 2026-10-08) : le manifest d'application web d'un canvas.
+// §9.10 : le manifest d'application web d'un canvas.
 
 const WEB_ROOT = join(import.meta.dirname, "..", "..", "..");
 const owner: User = { userId: "1234", login: "fenysk", displayName: "Fenysk", avatarUrl: "" };
@@ -31,7 +31,7 @@ const getPngHeader = (name: string) => {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25] };
 };
 
-describe("le manifest d'application web d'un canvas (Écart §9.1, JOURNAL 2026-10-08)", () => {
+describe("le manifest d'application web d'un canvas (§9.10)", () => {
   // Quand on ajoute la page à l'écran d'accueil, l'icône rouvre CE canvas, en plein écran, et sans orientation imposée
   it("reopens the very canvas it was installed from, full screen, with no orientation", () => {
     const manifest = buildWebManifest(owner);

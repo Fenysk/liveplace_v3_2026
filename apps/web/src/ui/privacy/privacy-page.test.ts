@@ -14,7 +14,7 @@ const titleFor = async (locale: "fr" | "en") => {
   return head?.meta?.find((tag) => tag && "title" in tag)?.title;
 };
 
-describe("la page Confidentialité dans les deux langues (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la page Confidentialité dans les deux langues (§9.9)", () => {
   // Quand le serveur rend la page, le titre de l'onglet est écrit dans la langue que la racine a rendue
   it("writes the title of the tab in the language the root rendered", async () => {
     expect(await titleFor("fr")).toBe("Confidentialité · LivePlace");
@@ -48,7 +48,7 @@ describe("la page Confidentialité dans les deux langues (Écart §14, JOURNAL 2
 const inLocale = (locale: "fr" | "en"): string =>
   renderToStaticMarkup(createElement(LocaleProvider, { initial: locale }, createElement(PrivacyPage)));
 
-describe("la page Confidentialité ramène à l'accueil (Écart §9.1, JOURNAL 2026-10-31)", () => {
+describe("la page Confidentialité ramène à l'accueil (§9.10)", () => {
   // Quand le visiteur arrive sur la page, « LivePlace » est un lien vers l'accueil, avant le titre, dans les deux langues
   it("writes LivePlace first, as a link to the home page, in both languages", () => {
     for (const locale of ["fr", "en"] as const) {

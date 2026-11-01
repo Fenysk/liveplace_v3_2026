@@ -1,4 +1,4 @@
-// Écart §15 (JOURNAL 2026-10-06) : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas.
+// §17.2 : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas.
 // Jamais un pixel ni un script (§2) : des clés qu'on copie, qu'on vide, qu'on marque. Le web n'en importe que du
 // TypeScript, jamais un fichier `.lua` : rien ici ne les lit.
 
@@ -119,7 +119,7 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
       for (const key of ["bans", "bansTwitch", "mods", "modsTwitch", "modsLiveplace", "twitchUsers"] as const)
         await replaceKey(from[key], to[key]);
       await replaceFamily(fromCanvasId, toCanvasId, "ban:"); // la preuve de chaque banni
-      // Écart §15 (JOURNAL 2026-10-06) : les bannis de l'entrant ont changé, son classement les suit. Un canvas neuf n'a
+      // §17.2 : les bannis de l'entrant ont changé, son classement les suit. Un canvas neuf n'a
       // pas de classement : rien à faire. Le sortant et son classement ne bougent pas.
       await redis.eval(FOLLOW_BANS, 3, to.bans, to.scoreboard, to.scoreboardBanned);
       const values = await redis.hmget(from.meta, ...SHARED_META_FIELDS);

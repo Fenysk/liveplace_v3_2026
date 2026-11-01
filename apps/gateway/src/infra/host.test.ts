@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHostProbe, toCpuPercent } from "./host";
 
-// Écart §5.1 (JOURNAL 2026-10-07) : la machine et le process se lisent par `node:os`, `node:fs` et `performance`.
+// §16.3 : la machine et le process se lisent par `node:os`, `node:fs` et `performance`.
 describe("the processor of the machine (JOURNAL 2026-10-07)", () => {
   // Rend la part du temps de tous les cœurs passée à travailler, entre deux lectures
   it("gives the share of the time of all the cores spent working, between two readings", () => {

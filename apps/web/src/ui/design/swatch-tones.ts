@@ -1,4 +1,4 @@
-// Les teintes d'une pastille de choix (Écart §15, JOURNAL 2026-10-06) : chacune est la classe `lp-swatch--<teinte>` de
+// Les teintes d'une pastille de choix (§17.1) : chacune est la classe `lp-swatch--<teinte>` de
 // palette.css, jamais un `style`. La page d'archive est rendue par le serveur, et la CSP de production bloque l'attribut
 // `style` du HTML qu'il écrit : la pastille perdrait sa couleur.
 

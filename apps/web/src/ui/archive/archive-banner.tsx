@@ -1,4 +1,4 @@
-// Le bandeau d'une archive (Écart §15, JOURNAL 2026-10-06), en haut à gauche, à la place de la pill Canvas : à qui elle
+// Le bandeau d'une archive (§17.1), en haut à gauche, à la place de la pill Canvas : à qui elle
 // est (son avatar et son nom mènent à son canvas en cours), son titre et sa légende, puis Copier le lien et Télécharger
 // en PNG. Sur mobile, les actions n'ont que leur icône. L'affichage seul.
 

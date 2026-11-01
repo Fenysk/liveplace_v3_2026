@@ -7,7 +7,7 @@ import { createContext, useContext } from "react";
 
 export type ToastTone = "success" | "error";
 
-// Un bouton texte après la phrase (Écart §9.3, JOURNAL 2026-10-13) : « Rétablir » après « Brouillon vidé ».
+// Un bouton texte après la phrase (§9.6) : « Rétablir » après « Brouillon vidé ».
 export type ToastAction = { label: string; onPress: () => void };
 
 // `id` : deux fois la même phrase font deux toasts.

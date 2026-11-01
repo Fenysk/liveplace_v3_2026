@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { everyText, HELP_TEXTS } from "./help-texts";
 
-describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("les mots des bulles d'aide (§9.11)", () => {
   // Les textes validés par le propriétaire du produit, mot pour mot
   it("keeps the validated texts word for word", () => {
     expect(HELP_TEXTS.fr.trace).toBe("Active le tracé pour dessiner en glissant");
@@ -16,25 +16,25 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
     expect(HELP_TEXTS.fr.reward(undefined)).toBe("Une récompense t'attend");
   });
 
-  // La suite de la chaîne du streamer, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  // La suite de la chaîne du streamer, mot pour mot (§9.11)
   it("keeps the validated texts of the streamer's bubbles in the window word for word", () => {
     expect(HELP_TEXTS.fr.inviteLink).toBe("Partage aussi ce lien à tes viewers");
     expect(HELP_TEXTS.fr.theme).toBe("Donne un thème à ta fresque");
     expect(HELP_TEXTS.fr.twitchSync).toBe("Reprends tes modérateurs Twitch ici");
   });
 
-  // Les deux bulles de qui modère, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  // Les deux bulles de qui modère, mot pour mot (§9.11)
   it("keeps the validated texts of the moderation bubbles word for word", () => {
     expect(HELP_TEXTS.fr.moderatorWelcome).toBe("Tu modères cette fresque\u00a0: tout est ici");
     expect(HELP_TEXTS.fr.moderationActions).toBe("Efface ses dessins ou bannis ce viewer ici");
   });
 
-  // La bulle d'Espace, à la souris, mot pour mot (Écart §8.1, JOURNAL 2026-10-14)
+  // La bulle d'Espace, à la souris, mot pour mot (§9.11)
   it("keeps the validated text of the Space bubble word for word", () => {
     expect(HELP_TEXTS.fr.space).toBe("Maintiens Espace et glisse pour tracer");
   });
 
-  // Les trois conseils du Dessin, mot pour mot (Écart §8.1, JOURNAL 2026-10-12)
+  // Les trois conseils du Dessin, mot pour mot (§9.11)
   it("keeps the validated texts of the Draft tips word for word", () => {
     expect(HELP_TEXTS.fr.palette).toBe("Touche ta couleur pour ouvrir la palette");
     expect(HELP_TEXTS.fr).not.toHaveProperty("keysRecent");
@@ -91,7 +91,7 @@ describe("les mots des bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => 
   });
 });
 
-describe("the help bubbles in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the help bubbles in English (§9.9)", () => {
   // Chaque bulle a sa phrase anglaise, directe comme la française
   it("says every bubble in English", () => {
     expect(HELP_TEXTS.en.report).toBe("A drawing was reported");

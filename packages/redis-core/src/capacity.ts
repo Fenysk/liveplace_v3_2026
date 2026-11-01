@@ -1,4 +1,4 @@
-// La capacité dans Redis (écart §5.1 et §2, JOURNAL 2026-10-07) : des nombres sous `capacity:`, aucun nom hors celui d'un
+// La capacité dans Redis (§16.3) : des nombres sous `capacity:`, aucun nom hors celui d'un
 // déploiement Convex. Le gateway écrit chaque minute, élague, et lit ce que le web dépose ; le web dépose, sans script.
 
 import { readFileSync } from "node:fs";
@@ -247,7 +247,7 @@ export function createCapacityStore(redis: Redis, keys: CapacityKeys = buildCapa
       await pruneHash(redis, keys.guards, CAPACITY_MINUTES_RETENTION_MS, nowMs);
     },
 
-    // Un seul `HSET` pour toutes les minutes : une minute déjà écrite est remplacée, jamais doublée (Écart §4.3, JOURNAL 2026-10-09).
+    // Un seul `HSET` pour toutes les minutes : une minute déjà écrite est remplacée, jamais doublée (§16.3).
     async storeGuardMinutes(minutes) {
       if (minutes.length === 0) return;
       await redis.hset(

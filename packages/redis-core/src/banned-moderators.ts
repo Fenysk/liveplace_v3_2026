@@ -1,4 +1,4 @@
-// Écart §5.4 (JOURNAL 2026-10-08) : un modérateur nommé ici ne se bannit plus ; ceux que le bug avait laissés bannis perdent ce
+// §5.4 : un modérateur nommé ici ne se bannit plus ; ceux que le bug avait laissés bannis perdent ce
 // rôle, au démarrage du gateway. Idempotent : sans banni nommé ici, rien ne s'écrit.
 
 import type { Redis } from "ioredis";

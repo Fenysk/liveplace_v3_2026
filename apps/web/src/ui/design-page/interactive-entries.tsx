@@ -182,7 +182,7 @@ type SectionsWindowProps = {
   isLarge?: boolean;
 };
 
-// Un réglage enregistré en direct : son toast passe au-dessus de la fenêtre et de son voile (Écart §8.1, JOURNAL 2026-10-13).
+// Un réglage enregistré en direct : son toast passe au-dessus de la fenêtre et de son voile (§9.8).
 const SaveButton = () => {
   const toast = useToast();
   return <Button label="Enregistrer" onPress={() => toast("success", "Réglage enregistré")} />;

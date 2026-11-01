@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : archiver le canvas actif, et repartir sur un canvas vide.
+// §17.2 : archiver le canvas actif, et repartir sur un canvas vide.
 // L'ordre fait l'opération fiable : tant que Convex n'a pas tranché, tout se défait ; après, plus rien ne l'empêche.
 
 import { type CanvasMeta, DYNAMIC_BIRTH_CANVAS_SIZE, MAX_ARCHIVES, toTheme } from "@liveplace/domain";
@@ -16,7 +16,7 @@ import {
 export type ArchiveRequest = { canvasId: string; theme: string; progress: ProgressChoice };
 
 // Le canvas vide qui prend la place : la même taille, les mêmes jauges de départ et maximale, la même recharge. Son
-// thème ne se recopie pas : il part sans (Écart §8.1, JOURNAL 2026-10-07). Écart §5.3 (JOURNAL 2026-10-29) : archivé en taille dynamique, il
+// thème ne se recopie pas : il part sans (§17.1). §5.8 : archivé en taille dynamique, il
 // naît en taille dynamique et 10×10, comme un canvas de première connexion ; en taille fixe, il garde la taille du sortant.
 const toIncomingMeta = (meta: CanvasMeta): CanvasMeta => ({
   ownerId: meta.ownerId,

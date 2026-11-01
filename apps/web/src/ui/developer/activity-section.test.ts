@@ -49,7 +49,7 @@ const render = (view: ActivityWatchView): string =>
     }),
   );
 
-describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("the activity section (§16.1)", () => {
   // Montre, de haut en bas, les chiffres de l'instant, l'audience, les canvas, puis les courbes de la période
   it("shows, top to bottom, the numbers of the moment, the audience, the canvases, then the curves of the period", () => {
     const markup = render({
@@ -130,7 +130,7 @@ describe("the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
     expect(charts(render(ready("all", { activeAccounts: 4, activePlayers: 2, activeStreamers: 1 })))).toBe(9);
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : un seul état, « streamé » : une tuile sans « dont N en live », aucune pastille sur la ligne, une seule courbe de canvas
+  // §16.2 : un seul état, « streamé » : une tuile sans « dont N en live », aucune pastille sur la ligne, une seule courbe de canvas
   it("tells the streamed canvases alone, with no badge on the row, and draws no live curve", () => {
     const point = {
       at: lastMinute,

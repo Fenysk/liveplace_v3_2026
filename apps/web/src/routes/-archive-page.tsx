@@ -1,4 +1,4 @@
-// Ce que fait `/{login}/archives/{code}` avant de s'afficher (Écart §15, JOURNAL 2026-10-06) : le propriétaire
+// Ce que fait `/{login}/archives/{code}` avant de s'afficher (§17.1) : le propriétaire
 // par son pseudo, l'archive par son code. Sans session : tous ceux qui ont le lien la voient, et rien ne la liste.
 // Le tiret en tête du nom : le routeur ignore ce fichier, ce n'est pas une route.
 
@@ -15,7 +15,7 @@ const getArchivePage = createServerFn({ method: "GET" })
   .validator(ArchiveParamsSchema)
   .handler(async ({ data, context }) => {
     const page = await resolveArchive(context.deps.durable, data.login, data.code, context.deps.tracker);
-    // Écart §4.2 (JOURNAL 2026-10-08) : une archive que Redis a perdue se dit « en récupération » dès ce rendu.
+    // §7.4 : une archive que Redis a perdue se dit « en récupération » dès ce rendu.
     if (page?.status === "archived")
       await markRecoveringIfLost(
         { marks: context.deps.recoveryMarks, recovery: context.deps.recovery },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { followDelayMs } from "./follow-delay";
 
-describe("followDelayMs (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("followDelayMs (§17.1)", () => {
   // Relit tout de suite, puis de plus en plus lentement : Convex a peut-être encore l'ancien canvas actif
   it("rereads at once, then more and more slowly: Convex may still hold the old active canvas", () => {
     expect([0, 1, 2, 3].map(followDelayMs)).toEqual([0, 400, 800, 1600]);

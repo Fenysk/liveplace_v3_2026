@@ -1,4 +1,4 @@
-// Copier le lien d'une archive (Écart §15, JOURNAL 2026-10-06) : l'adresse entière, puis le toast « Lien
+// Copier le lien d'une archive (§17.1) : l'adresse entière, puis le toast « Lien
 // copié ». Le navigateur peut refuser le presse-papiers : le toast le dit, plutôt que de promettre une copie.
 
 import { useCallback } from "react";

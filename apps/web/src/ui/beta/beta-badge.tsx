@@ -1,4 +1,4 @@
-// Écart §11.1 (JOURNAL 2026-10-04) : le bandeau d'une bêta, la branche qui y tourne ; jamais en prod ni dans OBS.
+// §11.1 : le bandeau d'une bêta, la branche qui y tourne ; jamais en prod ni dans OBS.
 
 import { Badge } from "../design/badge";
 import { useTexts } from "../locale/use-locale";

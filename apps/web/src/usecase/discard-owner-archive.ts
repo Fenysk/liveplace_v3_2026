@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : supprimer une archive. C'est définitif : son lien cesse de répondre.
+// §17.2 : supprimer une archive. C'est définitif : son lien cesse de répondre.
 // Convex tranche d'abord (jamais le canvas actif, jamais celui d'un autre) ; Redis suit, et les pages le savent avant
 // que les clés partent.
 

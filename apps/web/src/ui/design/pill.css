@@ -133,7 +133,7 @@
   right: var(--space-4);
 }
 
-/* Haut centre (la pill Thème, Écart §8.1, JOURNAL 2026-10-07) : sur toute la largeur, moins de chaque côté ce que prend la
+/* Haut centre (la pill Thème, §9.7) : sur toute la largeur, moins de chaque côté ce que prend la
    plus large des pills Canvas et Compte (mesurées par pill.tsx ; avant cela, une largeur moyenne) et deux marges, pour
    rester centrée. Le thème se coupe à cette place plutôt que de passer dessous. */
 .lp-floating[data-dock="tc"] {
@@ -186,8 +186,8 @@
   animation: lp-toast-in var(--lp-dur-fade) var(--lp-ease);
 }
 
-/* Au PC, pendant un déplacement du viewport, toutes les pills s'effacent en fondu (CDC 2026). Sur mobile (Écart §8.1, JOURNAL
-   2026-10-08), seules celles du haut : voir plus bas. */
+/* Au PC, pendant un déplacement du viewport, toutes les pills s'effacent en fondu (CDC 2026). Sur mobile (§9.7),
+   seules celles du haut : voir plus bas. */
 @media not ((max-width: 640px) or (pointer: coarse)) {
   html[data-panning] .lp-floating {
     opacity: 0;
@@ -301,7 +301,7 @@
   place-items: center;
 }
 
-/* Écran étroit ou tactile (Écart §8.1, JOURNAL 2026-10-08). La rangée du haut mesure un contrôle et ses deux marges, à 44 px
+/* Écran étroit ou tactile (§9.7). La rangée du haut mesure un contrôle et ses deux marges, à 44 px
    ici comme dans tokens.css.
    La pill Canvas ne dépasse jamais la place que la pill Compte lui laisse (sa largeur est publiée, pill.tsx), avec un espace,
    et prend toute la rangée tant que celle-ci n'est pas là : l'invité n'a pas de pill Compte, un viewer l'attend du gateway.
@@ -365,8 +365,8 @@
   }
 
   /* Pendant un geste de vue (déplacer, pincer), le haut s'efface de même : les pills Canvas et Compte, puis la bande Thème,
-     et la bulle qui en vise une (bubble.tsx). Il revient au dernier doigt levé, sans délai, par le fondu des pills (Écart
-     §8.1, JOURNAL 2026-10-09). Le bas reste, c'est là qu'est le pouce. Rien ne bouge de place (ni `top`, ni `display`) : le
+     et la bulle qui en vise une (bubble.tsx). Il revient au dernier doigt levé, sans délai, par le fondu des pills (§9.11).
+     Le bas reste, c'est là qu'est le pouce. Rien ne bouge de place (ni `top`, ni `display`) : le
      cadrage du canvas (arrival-insets.ts) lit les pills là où elles sont en Vue. */
   html[data-panning] .lp-bubble:is([data-aimed-dock="tl"], [data-aimed-dock="tr"], [data-aimed-dock="tc"]),
   html[data-panning] .lp-floating:is([data-dock="tl"], [data-dock="tr"], [data-dock="tc"]) {

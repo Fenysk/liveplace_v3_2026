@@ -172,7 +172,7 @@ describe("wheelFactor (CDC 2026, molette vers le curseur)", () => {
   });
 });
 
-describe("isWheelNotch (Écart §9.3, JOURNAL 2026-10-09)", () => {
+describe("isWheelNotch (§9.3)", () => {
   // Un cran de souris (100 ou 120 px, ou des lignes sous Firefox) s'anime, dans un sens comme dans l'autre
   it("takes a mouse notch, in pixels or in lines, either way", () => {
     expect(isWheelNotch(100, 0, false)).toBe(true);

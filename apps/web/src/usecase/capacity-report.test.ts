@@ -67,7 +67,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// Écart §2 et §9 (JOURNAL 2026-10-07) : le web dépose son occupation et l'usage de Convex, par des minuteries de fond.
+// §16.3 : le web dépose son occupation et l'usage de Convex, par des minuteries de fond.
 describe("the capacity report of the web (JOURNAL 2026-10-07)", () => {
   // Dépose son occupation avec l'instant de sa mesure
   it("deposits its utilization with the instant of its measure", async () => {

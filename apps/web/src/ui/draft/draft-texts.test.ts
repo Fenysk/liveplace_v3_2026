@@ -15,7 +15,7 @@ const CODES = [
   "server_full",
 ] as const;
 
-describe("the tip of the gauge (JOURNAL 2026-09-30, Écart §14)", () => {
+describe("the tip of the gauge (JOURNAL 2026-09-30, §9.9)", () => {
   const full = { charges: 10, max: 10, claimable: 0 };
 
   // Jauge pleine : les pixels sur le maximum, et rien d'autre
@@ -64,7 +64,7 @@ describe("the tip of the gauge (JOURNAL 2026-09-30, Écart §14)", () => {
   });
 });
 
-describe("the tip of Attendre (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the tip of Attendre (§9.6)", () => {
   // Le bouton attend le prochain pixel : le mot « charge » ne se dit plus à l'écran
   it("says the next pixel, never a charge", () => {
     expect(fr.waitTip).toBe("Attendre le prochain pixel");
@@ -72,7 +72,7 @@ describe("the tip of Attendre (Écart §9.3, JOURNAL 2026-10-13)", () => {
   });
 });
 
-describe("the refusals of the gateway (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the refusals of the gateway (§9.9)", () => {
   // Le gateway n'envoie qu'un code : chacun a sa phrase, dans chaque langue, jamais le code lui-même
   it("gives every code its own sentence in each language, and never the code itself", () => {
     for (const code of CODES) {
@@ -85,7 +85,7 @@ describe("the refusals of the gateway (Écart §14, JOURNAL 2026-10-07)", () => 
   });
 });
 
-describe("the button that leaves the Draw mode (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the button that leaves the Draw mode (§9.6)", () => {
   // Il ferme le mode Dessin et garde le brouillon : sa bulle le dit, dans chaque langue
   it("tells that the draft is kept when the Draw mode closes", () => {
     expect(fr.closeTip).toBe("Fermer le mode Dessin\u00a0: le brouillon est gardé");

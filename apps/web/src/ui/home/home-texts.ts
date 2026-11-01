@@ -1,4 +1,4 @@
-// Les phrases de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : une phrase, le bouton, et le nom de la fresque de la démo pour les
+// Les phrases de l'accueil (§9.10) : une phrase, le bouton, et le nom de la fresque de la démo pour les
 // lecteurs d'écran. Le bouton d'envoi de la démo écrit « Dessiner · n » avec le mot du jeu (`enterLabel`), et le stream n'écrit rien.
 
 import { defineTexts } from "../locale/texts";

@@ -1,4 +1,4 @@
-// La page d'une archive, `/{login}/archives/{code}` (Écart §15, JOURNAL 2026-10-06) : le canvas figé, qu'on
+// La page d'une archive, `/{login}/archives/{code}` (§17.1) : le canvas figé, qu'on
 // regarde sans pouvoir y poser. Zoom, déplacement, inspection d'un pixel (son auteur, sa date), le lien à copier et le
 // dessin en PNG. Ni palette, ni brouillon, ni modération. Tous ceux qui ont le lien la voient, connectés ou non.
 
@@ -84,7 +84,7 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
   const [isChoosing, setIsChoosing] = useState(false);
   const [background, setBackground] = useState<PngBackground | null>(null);
   const { owner, createdAt, archivedAt, theme } = archive;
-  const ownerProfile = useOwnerProfile(stores?.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
+  const ownerProfile = useOwnerProfile(stores?.canvas, owner); // §10.4 : son live
 
   // Le dessin visible, case par case : le même que celui de la page, agrandi sans lissage, sur le fond choisi.
   const download = async (choice: PngBackground): Promise<void> => {
@@ -169,7 +169,7 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
     if (isReopened) void navigate({ to: "/$login", params: { login: owner.login } });
   }, [isReopened, navigate, owner.login]);
 
-  // Redis remet cette archive en place (Écart §4.2, JOURNAL 2026-10-08) : le même message, la page reprend seule.
+  // Redis remet cette archive en place (§7.4) : le même message, la page reprend seule.
   if (isRecovering) return <CanvasRecovering />;
   if (isMissing || isDiscarded)
     return <ArchiveNotFound login={owner.login} displayName={owner.displayName} />;

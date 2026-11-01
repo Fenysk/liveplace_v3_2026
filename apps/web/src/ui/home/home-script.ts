@@ -1,4 +1,4 @@
-// La démo qui joue seule (Écart §9.1, JOURNAL 2026-10-22) : un doigt choisit une couleur, touche des cases, puis le bouton, par lots.
+// La démo qui joue seule (§9.10) : un doigt choisit une couleur, touche des cases, puis le bouton, par lots.
 // De la logique pure : le doigt n'avance qu'au rythme que la jauge permet, jamais au-delà de ses charges.
 
 import { DEMO_COLOR, GRASS, SUN } from "./home-art";

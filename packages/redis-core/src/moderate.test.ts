@@ -508,7 +508,7 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
   });
 });
 
-describe("a moderator named here is never banned, and a banned one moderates nothing (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("a moderator named here is never banned, and a banned one moderates nothing (§5.4)", () => {
   const nameModerator = async (canvasId: string, userId: string, source: ModerationSource) => {
     const result = await core.setModerator(canvasId, { userId, source, isModerator: true });
     if (!result.ok) throw new Error(result.error);

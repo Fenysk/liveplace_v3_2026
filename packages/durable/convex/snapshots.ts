@@ -1,4 +1,4 @@
-// Les snapshots d'un canvas (§8.2, Écart §8.1 JOURNAL 2026-10-06) : un fichier par snapshot, une ligne d'index.
+// Les snapshots d'un canvas (§8.2, §8.1) : un fichier par snapshot, une ligne d'index.
 
 import { v } from "convex/values";
 import { requireServiceKey } from "../src/service-key";
@@ -267,7 +267,7 @@ export const getLatest = query({
   },
 });
 
-// Écart §7.2 (JOURNAL 2026-10-08) : ce scope garde-t-il une sauvegarde de ce canvas ? La connexion du streamer ne le recrée
+// §7.4 : ce scope garde-t-il une sauvegarde de ce canvas ? La connexion du streamer ne le recrée
 // pas vide si oui. Un seul index, `first()`.
 export const has = query({
   args: { serviceKey: v.string(), scope: v.string(), canvasId: v.string() },

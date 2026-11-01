@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Reveal } from "./reveal";
 
-// Un contrôle qui paraît en fondu, à sa place : rien ne bouge autour de lui (Écart §9.3, JOURNAL 2026-10-13).
+// Un contrôle qui paraît en fondu, à sa place : rien ne bouge autour de lui (§9.6).
 
 const css = readFileSync(join(import.meta.dirname, "reveal.css"), "utf8").replace(/\s+/g, " ");
 // `Reveal` n'a pas d'état : l'appeler rend directement ce qu'il rend.

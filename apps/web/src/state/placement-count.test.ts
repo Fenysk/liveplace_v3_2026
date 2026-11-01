@@ -22,7 +22,7 @@ const refuse = (): never => {
 
 const refusing = (): BubbleStorage => ({ getItem: refuse, setItem: refuse, removeItem: refuse });
 
-describe("les dessins posés sur l'appareil (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("les dessins posés sur l'appareil (§9.11)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   // Rien n'a été posé : zéro

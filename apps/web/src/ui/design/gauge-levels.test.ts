@@ -22,7 +22,7 @@ describe("gaugeLevels", () => {
   });
 });
 
-describe("timerText (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("timerText (§9.4)", () => {
   // Sous la minute, les secondes seules, sans unité : l'anneau n'a pas la place d'en écrire une
   it("writes the seconds alone under a minute", () => {
     expect(timerText(12)).toBe("12");

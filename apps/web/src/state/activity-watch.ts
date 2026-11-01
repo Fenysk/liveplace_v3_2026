@@ -1,4 +1,4 @@
-// La fenêtre Développeur (écart §4.2, JOURNAL 2026-10-06 et 2026-10-07) : les chiffres de l'instant, que le gateway
+// La fenêtre Développeur (§16.1) : les chiffres de l'instant, que le gateway
 // pousse toutes les 2 s tant qu'elle est ouverte, et l'historique d'une période, redemandé chaque minute. Une seule
 // écoute pour ses deux sections : Ce canvas et Tout LivePlace lisent la même vue.
 // Le web affiche, le gateway décide : pour tout autre compte, rien ne revient.

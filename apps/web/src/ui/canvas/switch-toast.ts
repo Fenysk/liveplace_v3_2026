@@ -1,4 +1,4 @@
-// Le toast des viewers quand le streamer change de canvas (Écart §15, JOURNAL 2026-10-06) : ils passent seuls sur le
+// Le toast des viewers quand le streamer change de canvas (§17.1) : ils passent seuls sur le
 // canvas actif, sans recharger, et un toast court le dit. Celui qui l'a demandé a son propre toast (« Fresque archivée »).
 
 import type { CanvasView } from "../../state/canvas-store";

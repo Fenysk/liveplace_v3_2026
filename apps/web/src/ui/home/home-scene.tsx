@@ -1,4 +1,4 @@
-// La scène de l'accueil (Écart §9.1, JOURNAL 2026-10-22) : un écran qui montre un faux stream, et devant lui un téléphone qui
+// La scène de l'accueil (§9.10) : un écran qui montre un faux stream, et devant lui un téléphone qui
 // montre la vraie interface mobile. Chaque pixel envoyé s'envole de sa case sur le téléphone à SA case sur le stream. La démo
 // joue seule jusqu'au premier geste du visiteur. Tout reste dans la page : aucune connexion, aucune requête.
 

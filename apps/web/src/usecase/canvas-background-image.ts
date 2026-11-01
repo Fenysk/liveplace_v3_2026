@@ -1,4 +1,4 @@
-// Écart §8.1 (JOURNAL 2026-10-10) : poser l'image du fond du canvas en cours, ou la retirer. Convex tranche : ce doit être l'actif
+// §9.5 : poser l'image du fond du canvas en cours, ou la retirer. Convex tranche : ce doit être l'actif
 // de ce propriétaire. Redis suit en best effort, journalisé : la copie du gateway, puis les frames qui l'apprennent aux pages.
 
 import { BACKGROUND_IMAGE_MAX_BYTES } from "@liveplace/domain";

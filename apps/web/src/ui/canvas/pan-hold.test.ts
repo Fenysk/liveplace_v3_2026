@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createGestureTracker, type PointerInput } from "./gestures";
 
-// Écart §8.1 (JOURNAL 2026-10-09) : sur mobile, le haut revient dès le dernier doigt levé. Plus de maintien (ce fichier en
+// §9.7 : sur mobile, le haut revient dès le dernier doigt levé. Plus de maintien (ce fichier en
 // portait les tests, d'où son nom) : la scène pose `data-panning` pendant un déplacement ou un pincement, le CSS le lit seul.
 
 const read = (...path: string[]) => readFileSync(join(import.meta.dirname, ...path), "utf8");
@@ -18,7 +18,7 @@ const finger = (pointerId: number, x: number, y: number): PointerInput => ({
   point: { x, y },
 });
 
-describe("le geste de vue, de la scène au CSS (Écart §8.1, JOURNAL 2026-10-09)", () => {
+describe("le geste de vue, de la scène au CSS (§9.7)", () => {
   // Le CSS lit l'attribut que la scène écrit, au PC comme sur mobile ; si l'un le renomme, le haut ne s'efface plus
   it("has the CSS read the very attribute the scene writes, on a PC and on mobile", () => {
     expect(scene).toContain('const PANNING_ATTRIBUTE = "data-panning";');

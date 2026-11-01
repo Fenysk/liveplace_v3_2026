@@ -1,4 +1,4 @@
-// Le mode Dessin, posé sur <html> (Écart §8.1, JOURNAL 2026-10-08) : sur mobile, le CSS efface les pills Canvas et Compte et
+// Le mode Dessin, posé sur <html> (§9.7) : sur mobile, le CSS efface les pills Canvas et Compte et
 // monte la bande Thème à leur place (pill.css). Un attribut, comme `data-panning` (canvas-scene.ts), plutôt qu'un état
 // passé à trois pills qui ne se connaissent pas.
 

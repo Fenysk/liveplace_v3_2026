@@ -1,4 +1,4 @@
-// L'exemple du geste de vue sur mobile (Écart §8.1, JOURNAL 2026-10-09) : le haut s'efface tant qu'on glisse sur le canvas et
+// L'exemple du geste de vue sur mobile (§9.7) : le haut s'efface tant qu'on glisse sur le canvas et
 // revient au doigt levé, sans délai. Comme le jeu (canvas-scene.ts), un attribut suit le geste et le CSS le lit, sur un faux canvas.
 
 import { type PointerEvent, type ReactNode, useRef, useState } from "react";

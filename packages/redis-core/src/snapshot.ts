@@ -1,4 +1,4 @@
-// Ce que le worker lit de Redis pour sauvegarder un canvas (Écart §7.2, JOURNAL 2026-10-06).
+// Ce que le worker lit de Redis pour sauvegarder un canvas (§7.2).
 
 import { CANVAS_HEIGHT, CANVAS_WIDTH, type CellKey, toCellKey } from "@liveplace/domain";
 import type { SnapshotSource } from "@liveplace/domain/ports";
@@ -260,7 +260,7 @@ async function* scanNames(redis: Redis, match: string): AsyncGenerator<string> {
 
 export function createSnapshotSource(redis: Redis, subscriber: Redis): SnapshotSource {
   return {
-    // Écart §7.1 (JOURNAL 2026-10-06) : deux balayages de Redis pour tous les canvas, jamais un par canvas : chacun
+    // §7.1 : deux balayages de Redis pour tous les canvas, jamais un par canvas : chacun
     // relirait tout l'espace de clés. Les canvas viennent de `meta` : l'un d'avant la progression n'a aucun joueur.
     async listCanvases() {
       const found = new Map<string, Set<string>>();

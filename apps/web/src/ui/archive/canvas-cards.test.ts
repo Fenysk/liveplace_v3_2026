@@ -37,7 +37,7 @@ const sectionHtml = (current: ListedCanvas, archives: ListedArchive[]): string =
     }),
   );
 
-describe("the rows of the Archives section (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the rows of the Archives section (§17.1)", () => {
   // Plus de cartes : ni leurs classes, ni un attribut `style` que la CSP de production bloquerait
   it("has no card, and no inline style", () => {
     const html = sectionHtml(active, [archiveOf(1, "Printemps"), archiveOf(2)]);

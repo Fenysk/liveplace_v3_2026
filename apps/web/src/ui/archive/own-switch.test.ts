@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createOwnSwitchTracker, OWN_SWITCH_WINDOW_MS } from "./own-switch";
 
-describe("createOwnSwitchTracker (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("createOwnSwitchTracker (§17.2)", () => {
   // N'a rien demandé au départ
   it("has asked for nothing at the start", () => {
     expect(createOwnSwitchTracker().isRecent(1_000_000)).toBe(false);

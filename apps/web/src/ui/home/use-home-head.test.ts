@@ -48,7 +48,7 @@ afterEach(() => {
   written.description = "";
 });
 
-describe("l'onglet de la page d'accueil suit la langue (Écart §14, JOURNAL 2026-10-22)", () => {
+describe("l'onglet de la page d'accueil suit la langue (§9.9)", () => {
   // Quand la page est dans une langue, le titre de l'onglet et la description sont écrits dans cette langue
   it("writes the title of the tab and the description in the language of the page", () => {
     stubDocument(true);

@@ -10,7 +10,7 @@ const TEXTS = defineTexts({
   }),
 });
 
-describe("les phrases d'un module (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("les phrases d'un module (§9.9)", () => {
   // Quand on lit une langue, le système doit rendre chaque phrase dans cette langue
   it("gives every sentence in the language that is read", () => {
     expect(TEXTS.fr.close).toBe("Fermer");

@@ -22,7 +22,7 @@ const drafting = (isTouchTracing: boolean): Extract<DraftPillState, { kind: "dra
   isPicking: false,
 });
 
-describe("ce que la pill Dessin dit aux bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("ce que la pill Dessin dit aux bulles d'aide (§9.11)", () => {
   // En Vue, elle dit sa jauge et le +1 qui attend
   it("tells the gauge and the reward waiting in View", () => {
     expect(toPillFacts({ kind: "view", gauge: gauge(0), canClaim: true })).toEqual({

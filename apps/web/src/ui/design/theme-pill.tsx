@@ -1,7 +1,7 @@
-// La pill Thème (Écart §8.1, JOURNAL 2026-10-07), en haut au centre : le thème du canvas, montré à tous dès qu'il est
+// La pill Thème (§9.7), en haut au centre : le thème du canvas, montré à tous dès qu'il est
 // rempli. Un petit texte discret au-dessus, le thème dessous, gros. Sur mobile, c'est une bande sous les pills du haut, sur
-// leur largeur : « Thème » devant le thème, qui tient sur deux lignes ; en Dessin, elle monte à leur place (Écart §8.1, JOURNAL
-// 2026-10-08, pill.css, theme-pill.css). Jamais cliquable.
+// leur largeur : « Thème » devant le thème, qui tient sur deux lignes ; en Dessin, elle monte à leur place (§9.7,
+// pill.css, theme-pill.css). Jamais cliquable.
 
 import { useTexts } from "../locale/use-locale";
 import { DESIGN_TEXTS } from "./design-texts";

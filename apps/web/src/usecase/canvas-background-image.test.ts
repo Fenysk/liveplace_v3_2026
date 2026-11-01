@@ -8,7 +8,7 @@ import {
   setCanvasBackgroundImage,
 } from "./canvas-background-image";
 
-// Écart §8.1 (JOURNAL 2026-10-10) : poser ou retirer l'image du fond du canvas en cours. Convex tranche, puis Redis suit : la
+// §9.5 : poser ou retirer l'image du fond du canvas en cours. Convex tranche, puis Redis suit : la
 // copie du gateway et les frames qui l'apprennent aux pages. Les doubles notent ce qu'on leur demande, dans l'ordre.
 
 const AT = 1_760_000_000_000;
@@ -73,7 +73,7 @@ describe("isWebp", () => {
   });
 });
 
-describe("setCanvasBackgroundImage (Écart §8.1, JOURNAL 2026-10-10)", () => {
+describe("setCanvasBackgroundImage (§9.5)", () => {
   // Quand le propriétaire envoie un WebP, le système doit le ranger dans Convex pour le canvas visé, puis copier l'instant que
   // Convex rend dans Redis
   it("stores a WebP in Convex for the canvas of the request, then copies the instant Convex gives into Redis", async () => {
@@ -159,7 +159,7 @@ describe("setCanvasBackgroundImage (Écart §8.1, JOURNAL 2026-10-10)", () => {
   });
 });
 
-describe("clearCanvasBackgroundImage (Écart §8.1, JOURNAL 2026-10-10)", () => {
+describe("clearCanvasBackgroundImage (§9.5)", () => {
   // Quand le propriétaire retire l'image, le système doit la retirer de Convex pour ce canvas, puis de Redis
   it("clears the image from Convex for the canvas of the request, then from Redis", async () => {
     const { deps, durableLog, redisLog } = setup();

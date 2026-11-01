@@ -1,4 +1,4 @@
-// Quel snapshot Convex garde, et lequel il refuse (Écart §8.1, JOURNAL 2026-10-06).
+// Quel snapshot Convex garde, et lequel il refuse (§8.1).
 
 export const SNAPSHOTS_KEPT = 2; // par canvas et par palier : le dernier, et celui d'avant s'il est illisible
 

@@ -1,5 +1,5 @@
-// Les phrases des canvas archivés (Écart §15, JOURNAL 2026-10-06) : les dates, le titre d'une ligne, le bandeau.
-// Écart §14 (JOURNAL 2026-10-07) : chacune en français et en anglais.
+// Les phrases des canvas archivés (§17.1) : les dates, le titre d'une ligne, le bandeau.
+// §9.9 : chacune en français et en anglais.
 
 import { MAX_ARCHIVES, type Timestamp } from "@liveplace/domain";
 import type { ProgressChoice } from "../../usecase/canvas-switch";
@@ -355,7 +355,7 @@ export const archiveCaption = (
   locale: Locale,
 ): string | null => (theme ? datesTitle(createdAt, archivedAt, locale) : null);
 
-// Écart §8.1 (JOURNAL 2026-10-07) : en archivant, le champ propose le thème du canvas actif, qu'une archive rouverte a
+// §17.1 : en archivant, le champ propose le thème du canvas actif, qu'une archive rouverte a
 // gardé ; vide, il l'effacerait. Rouvrir n'a pas de thème à donner.
 export const startingTheme = (request: ThemeRequest): string =>
   request.kind === "archive" ? (request.canvas.theme ?? "") : "";

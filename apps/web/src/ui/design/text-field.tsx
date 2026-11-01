@@ -1,4 +1,4 @@
-// Un champ de texte (Écart §15, JOURNAL 2026-10-06) : le thème facultatif d'un canvas. Son libellé est lié au champ, et
+// Un champ de texte (§17.1) : le thème facultatif d'un canvas. Son libellé est lié au champ, et
 // les raccourcis du jeu se taisent pendant qu'on y écrit (use-draft-keys.ts). Avec `onCommit`, il se valide en perdant
 // le focus, ou par Entrée : un réglage sans bouton Enregistrer. `isLoading` : sa valeur arrive, un squelette de champ prend
 // la place du champ, sous son libellé.

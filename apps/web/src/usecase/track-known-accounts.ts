@@ -1,4 +1,4 @@
-// Écart §4 (JOURNAL 2026-10-07) : au démarrage du web, tous les comptes connus sont suivis en arrière-plan : abonnés à Twitch
+// §10.4 : au démarrage du web, tous les comptes connus sont suivis en arrière-plan : abonnés à Twitch
 // et dotés de leur état de départ, sans attendre une connexion ou une visite.
 
 import type { AccountList } from "@liveplace/domain/ports";

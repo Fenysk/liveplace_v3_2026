@@ -1,4 +1,4 @@
-// L'image du fond, préparée dans la page avant l'envoi (Écart §9.1, JOURNAL 2026-10-10) : réduite pour que son grand côté fasse
+// L'image du fond, préparée dans la page avant l'envoi (§9.5) : réduite pour que son grand côté fasse
 // 2048 px au plus, encodée en WebP, et refusée au-delà de 2 Mo. Le web et Convex ne reçoivent que du WebP déjà borné.
 
 import { BACKGROUND_IMAGE_MAX_BYTES, BACKGROUND_IMAGE_MAX_SIDE } from "@liveplace/domain";

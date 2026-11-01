@@ -1,6 +1,6 @@
 // Le toast (CDC 2026, Toasts) : une pill courte, une icône et une phrase, 3 s, un seul à la fois,
-// succès ou erreur. Une action en bouton texte (Écart §9.3, JOURNAL 2026-10-13) le garde 5 s. Il monte du bas en fondu et y redescend.
-// Dans le jeu il est dans la couche supérieure du navigateur, au-dessus d'une fenêtre ouverte (Écart §8.1, JOURNAL 2026-10-13).
+// succès ou erreur. Une action en bouton texte (§9.6) le garde 5 s. Il monte du bas en fondu et y redescend.
+// Dans le jeu il est dans la couche supérieure du navigateur, au-dessus d'une fenêtre ouverte (§9.8).
 // `ToastProvider` le tient pour toute la page, `useToast` l'affiche. Il s'entend par les régions de `toast-announcement.tsx`,
 // pas par lui-même : l'image n'est pas lue.
 

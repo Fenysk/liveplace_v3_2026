@@ -1,4 +1,4 @@
-// Les mots des boutons de la pill Dessin selon le brouillon et la jauge (Écart §9.3, JOURNAL 2026-10-08).
+// Les mots des boutons de la pill Dessin selon le brouillon et la jauge (§9.6).
 
 import type { Locale } from "../locale/locale";
 import { DRAFT_TEXTS } from "./draft-texts";
@@ -9,7 +9,7 @@ const TICK_MS = 1000;
 
 const twoDigits = (count: number): string => String(count).padStart(2, "0");
 
-// Le format des durées de l'interface (Écart §9.3, JOURNAL 2026-10-13) : « 12 s », « 1 min 05 s », « 2 h 05 min ».
+// Le format des durées de l'interface (§9.4) : « 12 s », « 1 min 05 s », « 2 h 05 min ».
 export function formatWait(seconds: number): string {
   if (seconds < SECONDS_PER_MINUTE) return `${seconds} s`;
   if (seconds < SECONDS_PER_HOUR)
@@ -18,7 +18,7 @@ export function formatWait(seconds: number): string {
   return `${Math.floor(seconds / SECONDS_PER_HOUR)} h ${twoDigits(minutes)} min`;
 }
 
-// Dessiner, et la taille du brouillon gardé derrière, comme Valider (Écart §9.3, JOURNAL 2026-10-13) : « Dessiner · 12 ».
+// Dessiner, et la taille du brouillon gardé derrière, comme Valider (§9.6) : « Dessiner · 12 ».
 export const enterLabel = (draftSize: number, locale: Locale): string => {
   const { draw } = DRAFT_TEXTS[locale];
   return draftSize > 0 ? `${draw} · ${draftSize}` : draw;

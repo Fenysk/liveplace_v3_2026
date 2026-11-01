@@ -12,7 +12,7 @@ import { useMorph } from "./use-morph";
 export type PillDock = "tl" | "tc" | "tr" | "cl" | "cr" | "br" | "bc" | "toast";
 
 // `row` : une ligne. `stack` : des lignes empilées. `rail` : une colonne large d'un seul contrôle. `title` : des lignes de
-// texte que la pill coupe plutôt que d'élargir (la pill Thème, Écart §8.1, JOURNAL 2026-10-07).
+// texte que la pill coupe plutôt que d'élargir (la pill Thème, §9.7).
 export type PillLayout = "row" | "stack" | "rail" | "title";
 
 // Verrouillée pendant l'envoi, floutée pendant la connexion (CDC 2026, pill Dessin seulement).

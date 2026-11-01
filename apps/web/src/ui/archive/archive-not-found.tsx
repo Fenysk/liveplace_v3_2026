@@ -1,4 +1,4 @@
-// Une archive introuvable (Écart §15, JOURNAL 2026-10-06) : un lien que personne ne reconnaît, ou une
+// Une archive introuvable (§17.1) : un lien que personne ne reconnaît, ou une
 // archive que son streamer a supprimée. Le lien cesse de répondre, et la page le dit sans rien révéler d'autre.
 // `lp-game` : caché en vue OBS, aucun texte sur le stream.
 

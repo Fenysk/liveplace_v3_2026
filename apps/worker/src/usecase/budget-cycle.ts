@@ -1,4 +1,4 @@
-// Le budget de l'historique fin (Écart §8.1, JOURNAL 2026-10-08) : 700 Mo pour la prod, 50 Mo ailleurs. Au-delà, le plus ancien
+// Le budget de l'historique fin (§7.3) : 700 Mo pour la prod, 50 Mo ailleurs. Au-delà, le plus ancien
 // part le premier, canvas confondus, sans jamais descendre sous 7 jours d'historique. Le total vient d'un compteur de Convex ; le
 // curseur de chaque canvas avance avec chaque lot retiré, donc un worker arrêté au milieu reprend là où il en était.
 

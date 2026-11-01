@@ -1,5 +1,5 @@
-// La section Capacité branchée sur le store du canvas : le suivi s'ouvre avec la section et se ferme avec elle (écart §4.2,
-// JOURNAL 2026-10-07). Montée pour le seul développeur, à la place du suivi d'activité tant que Capacité est la section ouverte.
+// La section Capacité branchée sur le store du canvas : le suivi s'ouvre avec la section et se ferme avec elle (§16.1).
+// Montée pour le seul développeur, à la place du suivi d'activité tant que Capacité est la section ouverte.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";

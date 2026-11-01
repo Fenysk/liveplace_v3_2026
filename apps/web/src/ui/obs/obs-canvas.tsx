@@ -1,5 +1,5 @@
 // La surface de la vue OBS (CDC 2026, Vue OBS) : les pixels seuls, sur le fond de la fresque (transparent, noir ou blanc) et son image
-// (Écart §9.1, JOURNAL 2026-10-10). Le canvas remplit la source sans se déformer, centré : une case peut faire 4 px et sa voisine
+// (§9.5). Le canvas remplit la source sans se déformer, centré : une case peut faire 4 px et sa voisine
 // 5 px (JOURNAL 2026-09-25). Ni geste, ni curseur. Le dessin et ses animations sont dans obs-scene.ts.
 
 import { useEffect, useRef } from "react";

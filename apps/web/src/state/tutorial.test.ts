@@ -31,7 +31,7 @@ const veteran = () => {
   return { storage, seen, firstHint, placements };
 };
 
-describe("rejouer le tutoriel (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("rejouer le tutoriel (§9.11)", () => {
   // Les trois mémoires repartent de zéro d'un coup : chaque bulle, le conseil, les dessins posés
   it("forgets every seen bubble, the first-visit hint and the placements at once", () => {
     const { seen, firstHint, placements } = veteran();

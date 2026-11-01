@@ -1,4 +1,4 @@
-// Le développeur (écart §10.3, JOURNAL 2026-10-06 et 2026-10-07) : sa fenêtre et ses trois sections, dans chacun de leurs
+// Le développeur (§10.3) : sa fenêtre et ses trois sections, dans chacun de leurs
 // états. Les vrais composants du jeu, avec des chiffres d'exemple, aucune connexion.
 
 import type { ActivityPeriod } from "@liveplace/domain";

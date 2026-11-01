@@ -49,7 +49,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
     getActiveCanvasForOwner: (ownerId) =>
       convex.query(api.canvases.getActiveForOwner, { serviceKey, ownerId }),
 
-    // Écart §15 (JOURNAL 2026-10-06) : les archives. Un refus de Convex est une valeur `{ ok: false, error }`.
+    // §17.1 : les archives. Un refus de Convex est une valeur `{ ok: false, error }`.
     listCanvasesForOwner: (ownerId) => convex.query(api.canvases.listForOwner, { serviceKey, ownerId }),
     async archiveActiveCanvas({ incoming, theme, ...archiving }) {
       const result = await convex.mutation(api.canvases.archiveActive, {
@@ -76,7 +76,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
       });
       return result.ok ? { ok: true, value: undefined } : result;
     },
-    // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond part à l'adresse d'envoi de Convex, comme un snapshot, puis la mutation la
+    // §8.4 : l'image du fond part à l'adresse d'envoi de Convex, comme un snapshot, puis la mutation la
     // range sur le canvas actif ; un refus de Convex est une valeur, et le fichier part avec.
     async setActiveCanvasBackgroundImage(ownerId, canvasId, image) {
       const uploadUrl = await convex.mutation(api.snapshots.generateUploadUrl, { serviceKey });
@@ -111,7 +111,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
   };
 }
 
-// Les snapshots d'un seul `DURABLE_SCOPE` (Écart §8.1, JOURNAL 2026-10-06) : le scope entre dans chaque appel.
+// Les snapshots d'un seul `DURABLE_SCOPE` (§8.1) : le scope entre dans chaque appel.
 export function createSnapshotStore(url: string, serviceKey: string, scope: string): SnapshotStore {
   const convex = new ConvexHttpClient(url);
   return {
@@ -149,7 +149,7 @@ export function createSnapshotStore(url: string, serviceKey: string, scope: stri
   };
 }
 
-// L'historique d'un seul `DURABLE_SCOPE` (Écart §7.2, JOURNAL 2026-10-08) : le fichier part comme celui d'un snapshot.
+// L'historique d'un seul `DURABLE_SCOPE` (§7.1) : le fichier part comme celui d'un snapshot.
 export function createHistoryStore(url: string, serviceKey: string, scope: string): HistoryStore {
   const convex = new ConvexHttpClient(url);
   return {
@@ -172,7 +172,7 @@ export function createHistoryStore(url: string, serviceKey: string, scope: strin
   };
 }
 
-// Les paliers d'un seul `DURABLE_SCOPE` (Écart §7.3, JOURNAL 2026-10-08) : les lignes se nomment par palier et date, jamais par
+// Les paliers d'un seul `DURABLE_SCOPE` (§7.3) : les lignes se nomment par palier et date, jamais par
 // leur identifiant Convex.
 export function createRetentionStore(url: string, serviceKey: string, scope: string): RetentionStore {
   const convex = new ConvexHttpClient(url);
@@ -238,7 +238,7 @@ export function createRetentionStore(url: string, serviceKey: string, scope: str
   };
 }
 
-// Le budget de l'historique d'un seul `DURABLE_SCOPE` (Écart §8.1, JOURNAL 2026-10-08) : le total vient d'un compteur, une ligne.
+// Le budget de l'historique d'un seul `DURABLE_SCOPE` (§7.3) : le total vient d'un compteur, une ligne.
 export function createBudgetStore(url: string, serviceKey: string, scope: string): BudgetStore {
   const convex = new ConvexHttpClient(url);
   return {
@@ -259,7 +259,7 @@ export function createBudgetStore(url: string, serviceKey: string, scope: string
 
 const USERS_PER_QUERY = 200; // les noms d'un canvas par lots : une requête Convex lit un document par personne
 
-// Ce que la récupération lit de Convex pour un seul `DURABLE_SCOPE` (Écart §7.2, JOURNAL 2026-10-08) : seulement pour un canvas
+// Ce que la récupération lit de Convex pour un seul `DURABLE_SCOPE` (§7.4) : seulement pour un canvas
 // perdu, ou à la connexion de son streamer. Le fichier d'une sauvegarde ne se télécharge que si on le demande.
 export function createRecoveryStore(url: string, serviceKey: string, scope: string): RecoveryStore {
   const convex = new ConvexHttpClient(url);

@@ -13,7 +13,7 @@ import {
   toolCursorSvg,
 } from "./canvas-cursor";
 
-// Le curseur de la fresque à la souris (Écart §9.3, JOURNAL 2026-10-13) : il dit ce que fera le clic.
+// Le curseur de la fresque à la souris (§9.3) : il dit ce que fera le clic.
 
 // Les teintes de tokens.css que la scène donne : `--draft-outline-out` et `--draft-outline-in`.
 const SHADES = { ink: "#10121c", halo: "#ffffff" };
@@ -58,7 +58,7 @@ const SITUATIONS: readonly { name: string; situation: CursorSituation; kind: Cur
   },
 ];
 
-describe("cursorKind and canvasCursor, one per situation (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("cursorKind and canvasCursor, one per situation (§9.3)", () => {
   // Chaque situation du tableau a son curseur : croix, loupe, main fermée, croix, gomme, pipette, pinceau
   it("picks the cursor of each situation of the table", () => {
     for (const { name, situation, kind, css } of SITUATIONS) {
@@ -87,7 +87,7 @@ describe("cursorKind and canvasCursor, one per situation (Écart §9.3, JOURNAL 
   });
 });
 
-describe("the tool cursors (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("the tool cursors (§9.3)", () => {
   const TOOLS = ["eraser", "picker", "trace"] as const;
   const BUTTON_ICONS = { eraser: Eraser, picker: Pipette, trace: Brush };
 

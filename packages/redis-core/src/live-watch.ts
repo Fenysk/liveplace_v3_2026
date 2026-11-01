@@ -1,4 +1,4 @@
-// Le canal `live` de tous les canvas, vu du worker (Écart §7.2, JOURNAL 2026-10-06 et 2026-10-08).
+// Le canal `live` de tous les canvas, vu du worker (§7.2).
 
 import type { CanvasActivity, LiveMessage, Unsubscribe } from "@liveplace/domain/ports";
 import type { Redis } from "ioredis";

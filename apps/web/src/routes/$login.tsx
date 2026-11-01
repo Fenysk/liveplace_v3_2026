@@ -62,7 +62,7 @@ import { useScoreboardRows } from "../ui/scoreboard/use-scoreboard";
 import { useScoreboardCollapse } from "../ui/scoreboard/use-scoreboard-collapse";
 import { CanvasNotFound, noStoreHeaders, resolveGameCanvasPage } from "./-canvas-page";
 
-// `canvasId` : à quel canvas ces stores sont ouverts. La page en change quand le streamer archive (Écart §15, JOURNAL 2026-10-06).
+// `canvasId` : à quel canvas ces stores sont ouverts. La page en change quand le streamer archive (§17.1).
 type Stores = { canvasId: string; canvas: CanvasStore; draft: DraftStore };
 
 // Avant les stores (rendu serveur, puis le temps d'ouvrir le WebSocket), la pill Dessin est déjà là, en connexion.
@@ -103,25 +103,25 @@ const shownSection = ({ isOpen, sectionId }: WindowState): AccountSection | unde
 const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPillFold }: LivePillsProps) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
-  // Écart §15 (JOURNAL 2026-10-06) : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
+  // §17.1 : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
   const [switchTracker] = useState(createOwnSwitchTracker);
   const draft = useDraftPillProps(stores, login, signingIn);
   const bubbleTargets = useBubbleTargets();
   const [windowState, setWindowState] = useState<WindowState>({ isOpen: false, sectionId: "account" });
   const moderation = useModeration(stores.canvas);
-  // Écart §8.1 (JOURNAL 2026-10-08) : les bulles d'aide, une à la fois
+  // §9.11 : les bulles d'aide, une à la fois
   const help = useHelpBubbles(stores, draft.state, shownSection(windowState), moderation.controls);
-  useDraftingAttribute(stores.draft); // Écart §8.1 (JOURNAL 2026-10-08) : en Dessin sur mobile, seule la bande Thème reste en haut
+  useDraftingAttribute(stores.draft); // §9.7 : en Dessin sur mobile, seule la bande Thème reste en haut
   const reporting = useReport(stores.canvas);
   useCanvasToasts(stores, switchTracker, owner.displayName);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
-  const firstHint = useFirstHintProps(stores, help.isBusy); // Écart §8.1 (JOURNAL 2026-10-08) : le conseil de première visite
+  const firstHint = useFirstHintProps(stores, help.isBusy); // §9.11 : le conseil de première visite
   const banned = useBannedWindowProps(stores.canvas);
-  const developer = useDeveloperWindow(stores.canvas); // écart §10.3 (JOURNAL 2026-10-06) : le développeur seul
+  const developer = useDeveloperWindow(stores.canvas); // §10.3 : le développeur seul
   const scoreboard = useScoreboardRows(stores.canvas);
   const scoreboardCollapse = useScoreboardCollapse();
-  const ownerProfile = useOwnerProfile(stores.canvas, owner); // Écart §4 (JOURNAL 2026-10-07) : son live
-  const isSidePanel = useMediaQuery(SIDE_COLUMN_QUERY); // Écart §8.1 (JOURNAL 2026-10-08) : paysage sur un écran bas
+  const ownerProfile = useOwnerProfile(stores.canvas, owner); // §10.4 : son live
+  const isSidePanel = useMediaQuery(SIDE_COLUMN_QUERY); // §9.7 : paysage sur un écran bas
   const getRole = () => stores.canvas.getView().role;
   const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
   const isOwner = role === "owner";
@@ -146,7 +146,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
         onSignIn={signingIn.onSignIn}
       />
       {developer.onOpen && (
-        // Écart §14 (JOURNAL 2026-10-07) : la fenêtre Développeur reste en français, quelle que soit la langue de la page.
+        // §9.9 : la fenêtre Développeur reste en français, quelle que soit la langue de la page.
         <FixedLocale locale="fr">
           <DeveloperWindow
             isOpen={developer.isOpen}
@@ -238,7 +238,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
   );
 };
 
-// Écart §8.1 (JOURNAL 2026-10-07) : le thème du canvas, pour tous, dès le rendu serveur ; le gateway le suit ensuite en direct.
+// §8.1 : le thème du canvas, pour tous, dès le rendu serveur ; le gateway le suit ensuite en direct.
 const CanvasThemePill = ({
   canvas,
   loaded,
@@ -256,15 +256,15 @@ const GamePage = () => {
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
   const isCanvasRecovering = useIsCanvasRecovering(stores?.canvas);
-  // Écart §8.1 (JOURNAL 2026-10-08, 2026-10-09) : la pill Canvas se replie quand on déplace, zoome, recentre ou ouvre une case ; rien n'est retenu.
+  // §9.7 : la pill Canvas se replie quand on déplace, zoome, recentre ou ouvre une case ; rien n'est retenu.
   const [isCanvasPillFolded, setIsCanvasPillFolded] = useState(false);
   const foldCanvasPill = useCallback(() => setIsCanvasPillFolded(true), []);
-  // Écart §15 : la page qui suit le canvas actif garde l'ancienne fresque à l'écran jusqu'à l'arrivée de la nouvelle.
+  // §17.1 : la page qui suit le canvas actif garde l'ancienne fresque à l'écran jusqu'à l'arrivée de la nouvelle.
   const handoff = useRef(createHandoff());
   const unfoldCanvasPill = useCallback(() => setIsCanvasPillFolded(false), []);
-  // Écart §15 (JOURNAL 2026-10-06) : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
+  // §17.1 : le streamer archive, le loader rend le nouveau canvas actif, la page s'y rebranche.
   useFollowActiveCanvas(stores?.canvas);
-  useBarColor(); // Écart §9.1 (JOURNAL 2026-10-08) : les barres du navigateur ou du système prennent le fond du jeu
+  useBarColor(); // §9.10 : les barres du navigateur ou du système prennent le fond du jeu
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
   useEffect(() => {
@@ -279,7 +279,7 @@ const GamePage = () => {
     };
   }, [canvasId, openCanvas]);
 
-  // Redis remet ce canvas en place (Écart §4.2, JOURNAL 2026-10-08) : le message d'attente, pour tous. Puis, comme le canvas
+  // Redis remet ce canvas en place (§7.4) : le message d'attente, pour tous. Puis, comme le canvas
   // introuvable, la page se rétablit seule : les stores restent ouverts.
   if (isCanvasRecovering) return <CanvasRecovering />;
   // Le gateway ne connaît pas ce canvas : la page du canvas introuvable.
@@ -342,7 +342,7 @@ const CanvasPage = () => {
   );
 };
 
-// L'application web de ce canvas (Écart §9.1, JOURNAL 2026-10-08, sans la vue OBS forcée `$login_.obs`), puis la carte d'aperçu du lien.
+// L'application web de ce canvas (§9.10, sans la vue OBS forcée `$login_.obs`), puis la carte d'aperçu du lien.
 const canvasHead = (page: LinkPreviewPage, locale: Locale) => {
   const pwa = pwaHead(page.owner);
   return { ...pwa, meta: [...pwa.meta, ...linkPreviewMeta(page, locale)] };

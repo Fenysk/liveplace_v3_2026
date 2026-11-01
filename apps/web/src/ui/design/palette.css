@@ -52,7 +52,7 @@
     0 / 10px 10px;
 }
 
-/* Les teintes d'un choix de couleur (Écart §15, JOURNAL 2026-10-06) : une classe par teinte, jamais un `style`, que la CSP
+/* Les teintes d'un choix de couleur (§17.1) : une classe par teinte, jamais un `style`, que la CSP
    de production bloque dans le HTML du serveur. Le vrai noir et le vrai blanc du PNG viennent de tokens.css. */
 .lp-swatch--png-black {
   background: var(--png-black);
@@ -87,7 +87,7 @@
   border-radius: var(--radius-pill);
 }
 
-/* Un choix de couleur (Écart §15, JOURNAL 2026-10-06) : les pastilles de la palette en une rangée, sans nom dessous
+/* Un choix de couleur (§17.1) : les pastilles de la palette en une rangée, sans nom dessous
    (JOURNAL 2026-10-10). Posé après la variante au doigt : il en garde les pastilles rondes, et refait les colonnes. */
 .lp-palette--choice {
   grid-template-columns: none;

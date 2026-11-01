@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : la photo Twitch d'un streamer, récupérée par le serveur pour l'image d'aperçu de son lien.
+// §9.10 : la photo Twitch d'un streamer, récupérée par le serveur pour l'image d'aperçu de son lien.
 // Le CDN de Twitch seul, jamais de redirection, une petite image reconnue ; gardée en mémoire. Sans photo, la carte
 // montre l'initiale, comme le design system (Profils).
 

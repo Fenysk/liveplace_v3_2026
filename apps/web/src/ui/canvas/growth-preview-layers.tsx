@@ -1,4 +1,4 @@
-// Les couches de l'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29) : le damier, découpé à la fresque agrandie, et son contour en
+// Les couches de l'aperçu de la croissance (§9.3) : le damier, découpé à la fresque agrandie, et son contour en
 // pointillé, sous le canvas. La scène du jeu les pilote (canvas-scene.ts), `/design` aussi (growth-preview-demo.tsx) : `isContained` les
 // pose dans une boîte au lieu de l'écran. Aucune ne prend un clic.
 

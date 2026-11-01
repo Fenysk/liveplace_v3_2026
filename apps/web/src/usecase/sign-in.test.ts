@@ -100,7 +100,7 @@ describe("completeSignIn (§10.1)", () => {
     expect(createdCanvases).toEqual(["existing-canvas"]);
   });
 
-  // Écart §5.3 (JOURNAL 2026-10-29) : le canvas de la première connexion naît en taille dynamique et 10 × 10, pour Redis comme pour Convex
+  // §5.8 : le canvas de la première connexion naît en taille dynamique et 10 × 10, pour Redis comme pour Convex
   it("makes the canvas of a first sign-in dynamic and 10 × 10, for Redis and for Convex", async () => {
     const { deps, createdMetas, candidates } = doubles("random-candidate");
 
@@ -167,7 +167,7 @@ describe("completeSignIn (§10.1)", () => {
     expect(result).toEqual({ signedSession: "signed-session", login: user.login });
   });
 
-  // À chaque connexion, le live Twitch du compte est suivi (écart §4 et §10.1, JOURNAL 2026-10-07)
+  // À chaque connexion, le live Twitch du compte est suivi (§10.4)
   it("has the account's Twitch live tracked at each sign-in, new account or not", async () => {
     const first = doubles("random-candidate");
     const later = doubles("existing-canvas");
@@ -179,7 +179,7 @@ describe("completeSignIn (§10.1)", () => {
     expect(later.tracked).toEqual([user.userId]);
   });
 
-  // Garde l'e-mail pour Convex seulement : jamais dans le miroir Redis ni dans la session (écart §10.1, JOURNAL 2026-09-27)
+  // Garde l'e-mail pour Convex seulement : jamais dans le miroir Redis ni dans la session (§10.1)
   it("keeps the email for Convex only: never in the Redis mirror nor in the session", async () => {
     const { deps, upserts, mirrored, signed } = doubles("existing-canvas", {
       ...user,
@@ -218,7 +218,7 @@ describe("completeSignIn (§10.1)", () => {
   });
 
   // Compte un nouveau compte quand Convex garde le canvas candidat, avec sa provenance, et pas à une connexion suivante
-  // (écart §5.1, JOURNAL 2026-10-06)
+  // (§16.2)
   it("counts a signup when Convex keeps the candidate canvas, with its provenance, and not at a later sign-in", async () => {
     const first = doubles("random-candidate");
     const later = doubles("existing-canvas");

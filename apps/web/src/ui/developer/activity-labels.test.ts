@@ -37,7 +37,7 @@ import {
 
 const now = Date.UTC(2026, 9, 6, 12, 30); // 14 h 30 à Paris
 
-describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("the words of the activity section (§16.1)", () => {
   // Écrit les nombres au format français
   it("writes numbers the French way", () => {
     expect(formatCount(1234567)).toBe((1234567).toLocaleString("fr-FR"));
@@ -162,7 +162,7 @@ describe("the words of the activity section (écart §4.3, JOURNAL 2026-10-06)",
     expect(JSON.stringify(row)).not.toContain("OBS");
   });
 
-  // Écart §5.1 (JOURNAL 2026-10-08) : l'infobulle des courbes accorde les minutes streamées, « minute » au singulier jusqu'à 1
+  // §16.2 : l'infobulle des courbes accorde les minutes streamées, « minute » au singulier jusqu'à 1
   it("agrees the streamed minutes of the curves' tooltip, in the singular up to 1", () => {
     expect([streamedMinutesLabel(0), streamedMinutesLabel(1), streamedMinutesLabel(12)]).toEqual([
       "0 minute streamée",

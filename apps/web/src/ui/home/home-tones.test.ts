@@ -43,7 +43,7 @@ describe("the tones of the home page (CSP of production)", () => {
     expect(css).not.toMatch(/#9146ff|#772ce8|var\(--twitch/i);
   });
 
-  // Écart §9.1 (JOURNAL 2026-10-31) : la colonne de la phrase ne descend pas sous la largeur de son bouton, qui ne passe pas sous la scène
+  // §9.10 : la colonne de la phrase ne descend pas sous la largeur de son bouton, qui ne passe pas sous la scène
   it("keeps the sentence column at least as wide as its content, so the button never goes under the scene", () => {
     expect(css).toMatch(
       /@container lp-home \(min-width: 840px\)\s*\{\s*\.lp-home-layout\s*\{[^}]*grid-template-columns:\s*minmax\(min-content,\s*0\.3fr\)\s+minmax\(0,\s*0\.7fr\)/,

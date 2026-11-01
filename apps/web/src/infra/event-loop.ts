@@ -1,4 +1,4 @@
-// L'occupation de la boucle d'événements du web (Écart §9, JOURNAL 2026-10-07), par `performance.eventLoopUtilization`.
+// L'occupation de la boucle d'événements du web (§16.3), par `performance.eventLoopUtilization`.
 
 import { performance } from "node:perf_hooks";
 

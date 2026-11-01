@@ -24,9 +24,9 @@ export function createRedisHarness() {
   const runId = randomUUID();
   let canvasCount = 0;
   const uniqueCanvasId = () => `${runId}-${++canvasCount}`;
-  // L'activité n'a pas de canvas pour la séparer : un préfixe par appel (écart §5.1, JOURNAL 2026-10-06).
+  // L'activité n'a pas de canvas pour la séparer : un préfixe par appel (§16.2).
   const uniqueActivityKeys = () => buildActivityKeys(`activity:${uniqueCanvasId()}-`);
-  // La capacité non plus (écart §5.1, JOURNAL 2026-10-07).
+  // La capacité non plus (§16.3).
   const uniqueCapacityKeys = () => buildCapacityKeys(`capacity:${uniqueCanvasId()}-`);
 
   beforeAll(async () => {

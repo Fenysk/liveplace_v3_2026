@@ -27,7 +27,7 @@ export type ObsView = {
   palette: readonly string[];
   pixels: Uint8Array; // modifiés sur place : chaque changement publie une nouvelle vue
   background: ObsBackground; // JOURNAL 2026-09-29 : blanc, la vue OBS le peint sous ses pixels
-  backgroundImageAt?: Timestamp | undefined; // Écart §9.1 (JOURNAL 2026-10-10) : l'image du fond, absente quand il n'y en a pas
+  backgroundImageAt?: Timestamp | undefined; // §9.5 : l'image du fond, absente quand il n'y en a pas
   backgroundImageOpacity: number; // celle de cette image, en pourcents
 };
 

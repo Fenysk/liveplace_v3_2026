@@ -1,4 +1,4 @@
-// Les phrases de la pill Inspection (Écart §14, JOURNAL 2026-10-07) : l'auteur d'un pixel, sa date, signaler et modérer.
+// Les phrases de la pill Inspection (§9.9) : l'auteur d'un pixel, sa date, signaler et modérer.
 
 import { defineTexts, localized } from "../locale/texts";
 

@@ -114,7 +114,7 @@
 
 /* Le mot de devant d'un libellé (« Attendre » devant « 12 s ») cède quand la place manque. Mesuré sur la barre du bas d'un
    téléphone, le tube de la jauge au plus juste (la largeur de son nombre) : « Attendre 10 s », la plus longue qu'une recharge
-   de 10 s donne, tient dès 345 px ; sous 360 px, le mot s'efface (Écart §9.3, JOURNAL 2026-10-08 et 2026-10-13). */
+   de 10 s donne, tient dès 345 px ; sous 360 px, le mot s'efface (§9.6). */
 @media (max-width: 359px) {
   .lp-btn-lead {
     display: none;

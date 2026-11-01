@@ -1,4 +1,4 @@
-// Les curseurs de la fresque à la souris (Écart §9.3, JOURNAL 2026-10-13) : un par situation, les vrais, posés par le CSSOM
+// Les curseurs de la fresque à la souris (§9.3) : un par situation, les vrais, posés par le CSSOM
 // comme le fait la scène. Passer la souris sur la zone les montre ; l'image de l'outil est montrée en grand à côté.
 
 import { useEffect, useRef, useState } from "react";

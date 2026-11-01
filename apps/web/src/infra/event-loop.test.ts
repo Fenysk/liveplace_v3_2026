@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEventLoopMeter } from "./event-loop";
 
-// Écart §9 (JOURNAL 2026-10-07) : l'occupation du web, la part du temps où sa boucle d'événements travaille.
+// §16.3 : l'occupation du web, la part du temps où sa boucle d'événements travaille.
 describe("createEventLoopMeter (JOURNAL 2026-10-07)", () => {
   // Dit l'occupation depuis la lecture précédente, entre 0 et 100 % : un travail la monte, une pause la fait retomber
   it("tells how busy the loop has been since the previous reading, from 0 to 100 %: work raises it, a pause lowers it", async () => {

@@ -61,7 +61,7 @@ describe("les sections de la fenêtre (CDC 2026, Fenêtre)", () => {
     expect(sectionsOf(renderWindow(OWNER_TABS))).toEqual(["Fresque", "Vue OBS", "Modération", "Mon compte"]);
   });
 
-  // Le streamer a aussi Archives, juste après Canvas (Écart §15, JOURNAL 2026-10-06) ; lui seul
+  // Le streamer a aussi Archives, juste après Canvas (§17.1) ; lui seul
   it("lists Archives right after Canvas for the owner, and for the owner alone", () => {
     const withCanvases = { ...OWNER_TABS, canvasesTab: tab("contenu de la section Archives") };
 
@@ -130,8 +130,8 @@ describe("la section Mon compte (CDC 2026, Fenêtre)", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : « Revoir le tuto » remet le tutoriel à zéro sur l'appareil
-describe("« Revoir le tuto » dans Mon compte (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.8 : « Revoir le tuto » remet le tutoriel à zéro sur l'appareil
+describe("« Revoir le tuto » dans Mon compte (§9.8)", () => {
   // Un bouton avec son libellé, sa rangée « Tutoriel » et son icône, sous la langue
   it("holds a Revoir le tuto button, in its own Tutoriel row below the language, with an icon", () => {
     const markup = renderWindow();
@@ -192,8 +192,8 @@ describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)"
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-09 et 2026-10-12) : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à les ouvrir
-describe("les onglets Vue OBS et Modération, cibles d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09 et 2026-10-12)", () => {
+// §9.11 : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à les ouvrir
+describe("les onglets Vue OBS et Modération, cibles d'une bulle d'aide (§9.11)", () => {
   const refs = createBubbleTargets();
   const inGame = (props: Partial<WindowProps>): string =>
     renderToStaticMarkup(

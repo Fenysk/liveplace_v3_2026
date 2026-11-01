@@ -50,7 +50,7 @@ const setup = () => {
   return { watch, isWatchingSent, asked, timers, listening, answered };
 };
 
-describe("the developer's capacity section (écart §4.2, JOURNAL 2026-10-07)", () => {
+describe("the developer's capacity section (§16.1)", () => {
   // À l'ouverture, regarde la capacité et demande l'historique de 24 h, puis chaque minute jusqu'à la fermeture
   it("at opening, watches the capacity and asks the 24 h history, then every minute until closing", () => {
     const { watch, isWatchingSent, asked, timers } = setup();

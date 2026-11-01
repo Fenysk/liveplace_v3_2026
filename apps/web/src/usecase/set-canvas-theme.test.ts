@@ -3,7 +3,7 @@ import type { DurableStore } from "@liveplace/domain/ports";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setCanvasTheme, type ThemeDeps } from "./set-canvas-theme";
 
-// Écart §8.1 (JOURNAL 2026-10-07) : donner un thème au canvas en cours. Convex tranche, puis Redis suit : la copie du
+// §8.1 : donner un thème au canvas en cours. Convex tranche, puis Redis suit : la copie du
 // gateway, puis le `ctl` qui l'apprend aux pages. Les doubles notent ce qu'on leur demande, dans l'ordre.
 
 type Call = { ownerId: string; canvasId: string; theme: string | undefined };
@@ -30,7 +30,7 @@ const setup = (outcome: Outcome = "commits", failsAt?: "setTheme" | "publishThem
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("setCanvasTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("setCanvasTheme (§8.1)", () => {
   // Le thème est nettoyé comme celui d'une archive : espaces rognés, une seule espace, 40 caractères au plus
   it("cleans the theme like an archive's: trimmed, one space between words, 40 characters at most", async () => {
     const { deps, calls } = setup();

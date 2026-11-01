@@ -5,7 +5,7 @@ import { ZONE_ABOVE_ATTRIBUTE } from "../canvas/arrival-insets";
 import { DRAFTING_ATTRIBUTE } from "../draft/use-drafting-attribute";
 import { COMPACT_SCREEN_QUERY, SIDE_COLUMN_QUERY } from "./use-media-query";
 
-// Écart §8.1 et §9.3 (JOURNAL 2026-10-08) : un téléphone en paysage et les écrans à charnière. Le CSS est la source : ces
+// §9.7 : un téléphone en paysage et les écrans à charnière. Le CSS est la source : ces
 // garde-fous lisent ses règles, comme ceux du haut de l'écran sur mobile (mobile-header.test.ts).
 
 const read = (file: string) => readFileSync(join(import.meta.dirname, file), "utf8");
@@ -57,7 +57,7 @@ const large = queryBodyOf(landscapeCss, LARGE_MEDIA);
 const across = queryBodyOf(hingeCss, SEGMENTS_ACROSS);
 const stacked = queryBodyOf(hingeCss, SEGMENTS_STACKED);
 
-describe("la zone libre du canvas (Écart §9.3, JOURNAL 2026-10-08)", () => {
+describe("la zone libre du canvas (§9.7)", () => {
   // Sans propriété, la sonde couvre tout l'écran : le PC et les écrans sans disposition à part ne changent pas
   it("covers the whole screen when no layout says otherwise", () => {
     expect(zoneCss).toContain(".lp-canvas-zone { position: fixed; top: 0; left: var(--lp-zone-left, 0px);");
@@ -67,7 +67,7 @@ describe("la zone libre du canvas (Écart §9.3, JOURNAL 2026-10-08)", () => {
     expect(zoneCss).toContain("height: calc(var(--lp-zone-h, 100%) - var(--lp-zone-bottom, 0px));");
   });
 
-  // Écart §9.3 (JOURNAL 2026-10-09) : la sonde de la zone au-dessus de la colonne ne diffère de l'autre que par ses deux marges,
+  // §9.7 : la sonde de la zone au-dessus de la colonne ne diffère de l'autre que par ses deux marges,
   // et sans elles (une disposition qui n'en offre pas) elle est la même
   it("probes the zone above the column with its own right and bottom, the other zone's without them", () => {
     expect(zoneCss).toContain(
@@ -101,7 +101,7 @@ describe("la zone libre du canvas (Écart §9.3, JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("la barre du bas en colonne (Écart §8.1 et §9.3, JOURNAL 2026-10-08)", () => {
+describe("la barre du bas en colonne (§9.7)", () => {
   // La même requête dans le CSS et dans le code : la page rend le panneau là où le CSS fait la colonne
   it("writes the same three queries in the CSS and in the code", () => {
     expect(SIDE_COLUMN_QUERY.split(", ")).toHaveLength(3);
@@ -152,7 +152,7 @@ describe("la barre du bas en colonne (Écart §8.1 et §9.3, JOURNAL 2026-10-08)
   });
 
   // Recentrer se pose contre la colonne ; sans colonne (la page d'une archive), il garde sa place. Il glisse d'une zone à l'autre
-  // (Écart §9.3, JOURNAL 2026-10-09), avec la durée et la courbe des pills.
+  // (§9.7), avec la durée et la courbe des pills.
   it("puts Recentre against the column, only where there is a column, sliding between the zones", () => {
     expect(side).toContain(
       'html:has(.lp-floating[data-dock="bc"]) .lp-floating[data-dock="br"] { right: calc(var(--lp-land-right) + var(--lp-side-width) + var(--space-2)); bottom: var(--lp-land-bottom); transition: opacity var(--lp-dur-fade) ease, right var(--lp-dur) var(--lp-ease), bottom var(--lp-dur) var(--lp-ease); }',
@@ -182,7 +182,7 @@ describe("la barre du bas en colonne (Écart §8.1 et §9.3, JOURNAL 2026-10-08)
   });
 });
 
-describe("un téléphone en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08)", () => {
+describe("un téléphone en paysage (§9.7)", () => {
   // Les pills du haut restent dans les coins, la pill Thème entre les deux comme au PC : une seule rangée
   it("keeps the top pills in their corners and the Theme pill between them: a single row", () => {
     expect(landscape).toContain('html .lp-floating[data-dock="tl"] { --lp-canvas-room:');
@@ -219,7 +219,7 @@ describe("un téléphone en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08)"
   });
 });
 
-describe("un écran tactile large, pliable déplié ou tablette (Écart §8.1 et §9.3, JOURNAL 2026-10-08)", () => {
+describe("un écran tactile large, pliable déplié ou tablette (§9.7)", () => {
   // Il garde ses pills du haut et sa bande Thème : seule la barre du bas change. En Dessin, la bande s'arrête avant le panneau.
   it("keeps its top pills and its Theme band, the band stopping before the panel in Drafting", () => {
     expect(large).toContain(
@@ -239,7 +239,7 @@ describe("un écran tactile large, pliable déplié ou tablette (Écart §8.1 et
     expect(large).toContain("top var(--lp-dur) var(--lp-ease), left var(--lp-dur) var(--lp-ease);");
   });
 
-  // Écart §9.3 (JOURNAL 2026-10-09) : en Vue, la colonne offre au canvas une seconde zone, au-dessus d'elle, sur une colonne de
+  // §9.7 : en Vue, la colonne offre au canvas une seconde zone, au-dessus d'elle, sur une colonne de
   // hauteur fixe : celle de Vue, la jauge et Dessiner. La feuille Dessin, qui la grandit, ne déplace donc pas le canvas.
   it("offers the zone above the column, on its Vue height and not on the measured one the Drafting panel grows", () => {
     expect(large).toContain("--lp-zone-above-right: env(safe-area-inset-right, 0px);");
@@ -266,7 +266,7 @@ describe("un écran tactile large, pliable déplié ou tablette (Écart §8.1 et
   });
 });
 
-describe("deux écrans côte à côte (Écart §8.1 et §9.3, JOURNAL 2026-10-08)", () => {
+describe("deux écrans côte à côte (§9.7)", () => {
   // Le canvas, ses pills et Recentrer dans le premier écran ; rien ne passe sur la charnière
   it("keeps the canvas, its pills and Recentre inside the first screen", () => {
     expect(across).toContain("--lp-zone-w: env(viewport-segment-width 0 0);");
@@ -294,7 +294,7 @@ describe("deux écrans côte à côte (Écart §8.1 et §9.3, JOURNAL 2026-10-08
   });
 });
 
-describe("deux écrans l'un sur l'autre, ou un pliable à moitié plié (Écart §8.1 et §9.3, JOURNAL 2026-10-08)", () => {
+describe("deux écrans l'un sur l'autre, ou un pliable à moitié plié (§9.7)", () => {
   // Sans segment (Galaxy Z Flip en Flex mode), la charnière est au milieu ; avec, elle est où elle dit
   it("puts the hinge in the middle without a segment, where the segments say it with them", () => {
     expect(stacked).toContain("--lp-zone-h: 50dvh; --lp-seg2-top: 50dvh;");

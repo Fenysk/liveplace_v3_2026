@@ -48,7 +48,7 @@ export function canModerate(role: Role): boolean {
   return role === "owner" || role === "moderator";
 }
 
-// Écart §10.3 (JOURNAL 2026-10-06) : le développeur, `fenysk`, voit le suivi d'activité. Jamais un rôle de canvas.
+// §10.3 : le développeur, `fenysk`, voit le suivi d'activité. Jamais un rôle de canvas.
 export const DEVELOPER_USER_ID = "68710381";
 
 // Le web montre le bouton, le gateway décide d'envoyer : la même règle des deux côtés.
@@ -56,11 +56,11 @@ export function isDeveloper(userId: string | undefined): boolean {
   return userId === DEVELOPER_USER_ID;
 }
 
-// Écart §4.2 (JOURNAL 2026-10-06) : 24 h (un point par minute), 30 jours (un par heure), ou tout (un par jour).
+// §16.1 : 24 h (un point par minute), 30 jours (un par heure), ou tout (un par jour).
 export const ACTIVITY_PERIODS = ["day", "month", "all"] as const;
 export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];
 
-// Écart §4.2 (JOURNAL 2026-10-14) : le détail des courbes d'un jour passé, selon ce que la rétention en garde.
+// §16.1 : le détail des courbes d'un jour passé, selon ce que la rétention en garde.
 export const ACTIVITY_DAY_GRAINS = ["minute", "hour", "none"] as const;
 export type ActivityDayGrain = (typeof ACTIVITY_DAY_GRAINS)[number];
 
@@ -102,15 +102,15 @@ function size(width: number, height: number): CanvasSize {
   return { width, height };
 }
 
-// CDC 2026 §1 : la taille fixe par défaut est le petit carré, 50×50. Écart §5.3 (JOURNAL 2026-10-29) : un canvas n'y naît plus (il naît
+// CDC 2026 §1 : la taille fixe par défaut est le petit carré, 50×50. §5.8 : un canvas n'y naît plus (il naît
 // dynamique, `DYNAMIC_BIRTH_CANVAS_SIZE`), mais y revient quand le streamer retire la taille dynamique.
 export const FIXED_DEFAULT_CANVAS_SIZE: CanvasSize = size(50, 50);
 
-// Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique garde 3 cases vides entre ses pixels posés et chaque bord, de 10 à 256 par axe.
+// §5.8 : la taille dynamique garde 3 cases vides entre ses pixels posés et chaque bord, de 10 à 256 par axe.
 export const DYNAMIC_SIZE_MARGIN = 3;
 export const DYNAMIC_SIZE_MIN = 10;
 
-// Écart §5.3 (JOURNAL 2026-10-29) : un canvas neuf naît en taille dynamique, au plus petit : 10×10.
+// §5.8 : un canvas neuf naît en taille dynamique, au plus petit : 10×10.
 export const DYNAMIC_BIRTH_CANVAS_SIZE: CanvasSize = size(DYNAMIC_SIZE_MIN, DYNAMIC_SIZE_MIN);
 
 // Le repère d'une page : la somme des décalages (vers la droite et vers le bas) qu'une taille dynamique a imposés à ses cases.
@@ -157,29 +157,29 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     height: number;
     obsDelayMs: number;
     obsBackground: ObsBackground;
-    // Écart §8.1 (JOURNAL 2026-10-10) : la copie du gateway ; Convex fait foi. L'instant où l'image du fond a été posée, absent : pas d'image.
+    // §8.4 : la copie du gateway ; Convex fait foi. L'instant où l'image du fond a été posée, absent : pas d'image.
     backgroundImageAt?: Timestamp;
-    // Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de cette image, un cran de `BACKGROUND_IMAGE_OPACITY_STEPS`. Absente : 40 %.
+    // §9.5 : l'opacité de cette image, un cran de `BACKGROUND_IMAGE_OPACITY_STEPS`. Absente : 40 %.
     backgroundImageOpacity?: number;
-    // Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus aucune écriture ; `successorId` est le canvas qui l'a remplacée.
+    // §17.1 : une archive ne reçoit plus aucune écriture ; `successorId` est le canvas qui l'a remplacée.
     archivedAt?: Timestamp;
     successorId?: string;
-    // Écart §8.1 (JOURNAL 2026-10-07) : la copie du gateway ; Convex fait foi. Absent : pas de thème.
+    // §8.1 : la copie du gateway ; Convex fait foi. Absent : pas de thème.
     theme?: string;
-    // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Absent : jamais.
+    // §5.8 : la version du dernier rapprochement qui a déplacé des pixels. Absent : jamais.
     movedAtVersion?: number;
-    // Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique est activée ; et le repère de la fresque, absent : jamais décalée.
+    // §5.8 : la taille dynamique est activée ; et le repère de la fresque, absent : jamais décalée.
     isDynamicSize?: boolean;
     origin?: CanvasOrigin;
   };
 
-// Écart §15 (JOURNAL 2026-10-06) : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.
+// §17.1 : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.
 export const CANVAS_STATUSES = ["archived", "active", "discarded"] as const;
 export type CanvasStatus = (typeof CANVAS_STATUSES)[number];
 
-// Écart §15 (JOURNAL 2026-10-06) : un canvas actif, et au plus cinq archives.
+// §17.1 : un canvas actif, et au plus cinq archives.
 export const MAX_ARCHIVES = 5;
-// Écart §8.1 (JOURNAL 2026-10-07) : le thème d'un canvas, un texte libre et facultatif.
+// §8.1 : le thème d'un canvas, un texte libre et facultatif.
 export const THEME_MAX_LENGTH = 40;
 
 // base58, sans les caractères qu'on confond (0, O, I, l) : le code d'une archive dans son lien.
@@ -217,19 +217,19 @@ export function toTheme(raw: string): string | undefined {
   return theme === "" ? undefined : theme;
 }
 
-// CDC 2026 §1 et Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, en jeu et dans la vue OBS : transparent, noir ou blanc.
+// CDC 2026 §1 et §9.5 : le fond de la fresque, en jeu et dans la vue OBS : transparent, noir ou blanc.
 // Le nom `obsBackground` est resté celui d'avant. Transparent par défaut, et sur un canvas d'avant. L'image du streamer n'en est
 // pas un choix : elle se pose par-dessus n'importe lequel.
 export const OBS_BACKGROUNDS = ["transparent", "black", "white"] as const;
 export type ObsBackground = (typeof OBS_BACKGROUNDS)[number];
 export const OBS_BACKGROUND: ObsBackground = "transparent";
 
-// Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond arrive réduite et encodée en WebP par la page ; le web et le gateway la
+// §9.5 : l'image du fond arrive réduite et encodée en WebP par la page ; le web et le gateway la
 // refusent au-delà de ces bornes, la page les respecte avant d'envoyer.
 export const BACKGROUND_IMAGE_MAX_SIDE = 2048;
 export const BACKGROUND_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
-// Écart §9.1 (JOURNAL 2026-10-10) : l'opacité de l'image par-dessus le fond, en pourcents, de 10 en 10. 40 par défaut, et sur un
+// §9.5 : l'opacité de l'image par-dessus le fond, en pourcents, de 10 en 10. 40 par défaut, et sur un
 // canvas d'avant.
 export const BACKGROUND_IMAGE_OPACITY_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 export const BACKGROUND_IMAGE_OPACITY = 40;
@@ -297,7 +297,7 @@ export function toParisDay(nowMs: Timestamp): string {
 export const MINUTE_MS = 60_000;
 export const HOUR_MS = 3_600_000;
 
-// Le début des trois points d'activité d'un instant : sa minute, son heure, son jour de Paris (écart §5.1, JOURNAL 2026-10-06).
+// Le début des trois points d'activité d'un instant : sa minute, son heure, son jour de Paris (§16.2).
 export type ActivityPointStarts = { minute: Timestamp; hour: Timestamp; day: Timestamp };
 
 // Minuit à Paris tombe à 22 h UTC la veille en été, à 23 h en hiver, jamais dans le trou d'un changement d'heure.
@@ -321,7 +321,7 @@ export function toActivityPointStarts(nowMs: Timestamp): ActivityPointStarts {
   return { minute: toMinuteStart(nowMs), hour: toHourStart(nowMs), day: toParisDayStart(nowMs) };
 }
 
-// Écart §5.1 (JOURNAL 2026-10-08) : une coupure de moins de 5 minutes, côté OBS ou côté Twitch, se comble dans l'historique.
+// §16.2 : une coupure de moins de 5 minutes, côté OBS ou côté Twitch, se comble dans l'historique.
 export const STREAM_GRACE_MS = 5 * MINUTE_MS;
 
 // Les minutes entières strictement entre la fin d'une coupure et sa reprise : celles de la fin et de la reprise sont déjà
@@ -388,7 +388,7 @@ export function defaultCanvasMeta(ownerId: string): CanvasMeta {
   };
 }
 
-// Écart §5.3 (JOURNAL 2026-10-29) : le canvas de la première connexion d'un streamer, en taille dynamique et 10×10. Les canvas d'avant
+// §5.8 : le canvas de la première connexion d'un streamer, en taille dynamique et 10×10. Les canvas d'avant
 // gardent leur réglage : sans le champ, la taille dynamique est retirée.
 export function birthCanvasMeta(ownerId: string): CanvasMeta {
   return { ...defaultCanvasMeta(ownerId), ...DYNAMIC_BIRTH_CANVAS_SIZE, isDynamicSize: true };

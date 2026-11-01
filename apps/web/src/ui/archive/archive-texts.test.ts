@@ -23,7 +23,7 @@ const en = ARCHIVE_TEXTS.en;
 // Midi à Paris : loin des minuits, quel que soit l'heure d'été.
 const at = (year: number, month: number, day: number): number => Date.UTC(year, month - 1, day, 10);
 
-describe("datesLabel (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("datesLabel (§17.1)", () => {
   // Du jour de création au jour d'archivage, dans le même mois
   it("goes from the creation day to the archive day, within one month", () => {
     expect(datesLabel(at(2026, 10, 12), at(2026, 10, 18), "fr")).toBe("du 12 au 18 octobre 2026");
@@ -64,7 +64,7 @@ describe("datesLabel (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("canvasTitle (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("canvasTitle (§17.1)", () => {
   // Le thème d'abord ; sans thème, ses dates, avec une majuscule
   it("is the theme first, and without one the dates, capitalised", () => {
     const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
@@ -77,7 +77,7 @@ describe("canvasTitle (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("currentCanvasTitle and currentCanvasCaption (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("currentCanvasTitle and currentCanvasCaption (§17.1)", () => {
   const createdAt = at(2026, 10, 4);
 
   // Sans thème : les dates en titre, « Depuis le … », et aucune légende
@@ -94,7 +94,7 @@ describe("currentCanvasTitle and currentCanvasCaption (Écart §15, JOURNAL 2026
   });
 });
 
-describe("archiveCaption (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("archiveCaption (§17.1)", () => {
   const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
 
   // Sans thème, les dates sont déjà le titre : pas de légende ; avec un thème, la légende dit les dates
@@ -104,7 +104,7 @@ describe("archiveCaption (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the labels of the Archives section (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the labels of the Archives section (§17.1)", () => {
   // Le libellé du canvas en cours, et son bouton : un mot, l'icône dit le reste
   it("labels the current canvas, and its button in one word", () => {
     expect(fr.currentCanvasLabel).toBe("Fresque en cours");
@@ -120,7 +120,7 @@ describe("the labels of the Archives section (Écart §15, JOURNAL 2026-10-06)",
   });
 });
 
-describe("the theme of the current canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("the theme of the current canvas (§17.1)", () => {
   // Le champ de l'onglet Canvas, sa légende, et ce que dit le toast quand l'enregistrement a réussi
   it("labels the field of the Canvas section, captions it, and confirms the saving", () => {
     expect(fr.themeLabel).toBe("Thème");
@@ -140,7 +140,7 @@ describe("the theme of the current canvas (Écart §8.1, JOURNAL 2026-10-07)", (
   });
 });
 
-describe("archivesCounter and the empty list (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("archivesCounter and the empty list (§17.1)", () => {
   // « Archives · 1 sur 5 », « Archives · 3 sur 5 » : le libellé de la liste, zéro compris
   it("labels the list with how many archives there are against the maximum, zero included", () => {
     expect(fr.archivesCounter({ count: 0, max: 5 })).toBe("Archives · 0 sur 5");
@@ -159,7 +159,7 @@ describe("archivesCounter and the empty list (Écart §15, JOURNAL 2026-10-06)",
   });
 });
 
-describe("startingTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("startingTheme (§17.1)", () => {
   // Archiver propose le thème du canvas actif, que rouvrir une archive lui a laissé : valider tel quel le garde
   it("offers the theme of the active canvas when archiving, so confirming as it is keeps the theme", () => {
     expect(startingTheme({ kind: "archive", canvas: { theme: "Printemps" } })).toBe("Printemps");
@@ -172,7 +172,7 @@ describe("startingTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the sentences of the confirmation windows (§17.1)", () => {
   // Archiver : une phrase, sans aucune dimension
   it("tells what archiving does in one sentence, without a size", () => {
     expect(fr.archiveSentence).toBe(
@@ -207,7 +207,7 @@ describe("the sentences of the confirmation windows (Écart §15, JOURNAL 2026-1
   });
 });
 
-describe("progressOptions (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("progressOptions (§17.1)", () => {
   // Le choix parle des jauges des viewers, jamais de progression, pour les deux fenêtres
   it("speaks of the gauges of the viewers, never of progression, in both windows", () => {
     expect(fr.progressLabel).toBe("Les jauges des viewers");
@@ -236,7 +236,7 @@ describe("progressOptions (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("reportsSentence (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("reportsSentence (§17.1)", () => {
   // Dit combien de signalements attendent, et qu'ils seront classés sans suite ; aucun, la ligne n'existe pas
   it("says how many reports wait and that they will be settled without follow-up, and nothing for none", () => {
     expect(reportsSentence(0, "fr")).toBeNull();
@@ -253,7 +253,7 @@ describe("reportsSentence (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("datesTitle and switchFailure (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("datesTitle and switchFailure (§17.1)", () => {
   // Les dates en tête de phrase : une majuscule, rien d'autre ne change
   it("writes the dates at the head of a sentence: a capital, nothing else changes", () => {
     expect(datesTitle(at(2026, 10, 12), at(2026, 10, 18), "fr")).toBe("Du 12 au 18 octobre 2026");
@@ -303,7 +303,7 @@ describe("datesTitle and switchFailure (Écart §15, JOURNAL 2026-10-06)", () =>
   });
 });
 
-describe("shouldReloadAfter (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("shouldReloadAfter (§17.1)", () => {
   // Recharge la liste quand la page n'est plus à jour, ou quand le serveur a pu finir sans qu'elle le sache
   it("reloads the list when the page is stale or the server may have finished without it knowing", () => {
     for (const reason of ["not_active", "not_archive", "network"] as const)
@@ -317,7 +317,7 @@ describe("shouldReloadAfter (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("bannerTitle and bannerCaption (§17.1)", () => {
   const dates = { createdAt: at(2026, 10, 12), archivedAt: at(2026, 10, 18) };
 
   // Sans thème : « Archive de {nom affiché} », et la légende, ce sont ses dates
@@ -356,7 +356,7 @@ describe("bannerTitle and bannerCaption (Écart §15, JOURNAL 2026-10-06)", () =
   });
 });
 
-describe("ownerToast (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("ownerToast (§17.1)", () => {
   // Le streamer qui archive sait où sont ses viewers ; rouvrir et supprimer gardent leurs mots
   it("tells the streamer who archived where the viewers are, and keeps the words of reopening and discarding", () => {
     expect(fr.ownerToast.archive).toBe("Fresque archivée\u00a0: tes viewers sont sur la nouvelle.");
@@ -366,14 +366,14 @@ describe("ownerToast (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("archiveHref (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("archiveHref (§17.1)", () => {
   // Le lien d'une archive est `/{login}/archives/{code}`, sans jamais le canvasId
   it("makes the link of an archive /{login}/archives/{code}, never with the canvasId", () => {
     expect(archiveHref("kalyss", "3mAqXz9RbK")).toBe("/kalyss/archives/3mAqXz9RbK");
   });
 });
 
-describe("the button of a missing archive (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the button of a missing archive (§17.1)", () => {
   // Le nom affiché, pas le pseudo ; sans nom affiché (le pseudo n'existe pas), le pseudo
   it("says the display name, not the login, and the login when the login does not exist at all", () => {
     expect(DESIGN_TEXTS.fr.viewCanvasOf("Kalyss")).toBe("Voir la fresque de Kalyss");
@@ -382,7 +382,7 @@ describe("the button of a missing archive (Écart §15, JOURNAL 2026-10-06)", ()
   });
 });
 
-describe("missingDisplayName (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("missingDisplayName (§17.1)", () => {
   // Lit le nom affiché que le loader a joint à l'introuvable, et rien d'autre : `data` n'est connu que comme `unknown`
   it("reads the display name the loader attached to the not-found, and nothing else", () => {
     expect(missingDisplayName({ displayName: "Kalyss" })).toBe("Kalyss");

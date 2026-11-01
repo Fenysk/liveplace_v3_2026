@@ -1,4 +1,4 @@
-// La synchro Twitch jamais faite (Écart §8.1, JOURNAL 2026-10-12) : le gateway ne la dit qu'avec la liste des modérateurs, que seule
+// La synchro Twitch jamais faite (§9.11) : le gateway ne la dit qu'avec la liste des modérateurs, que seule
 // la section Modération demande. La page la demande une fois à chaque ouverture de la fenêtre, quand `isAsked` (le streamer, la bulle
 // pas encore vue) ; sans réponse, ou après un échec, il n'y a rien à dire.
 

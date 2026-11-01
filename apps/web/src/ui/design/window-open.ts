@@ -15,7 +15,7 @@ const subscribe = (listener: () => void): (() => void) => {
 
 const getServerSnapshot = (): number => 0;
 
-// Combien de fenêtres sont ouvertes : une petite fenêtre s'ouvre parfois par-dessus la grande (Écart §8.1, JOURNAL 2026-10-09,
+// Combien de fenêtres sont ouvertes : une petite fenêtre s'ouvre parfois par-dessus la grande (§9.11,
 // la bulle de la grande se tait alors).
 export const useOpenWindowCount = (): number =>
   useSyncExternalStore(subscribe, countOpenWindows, getServerSnapshot);

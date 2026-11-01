@@ -1,4 +1,4 @@
-// Réduire une fresque rapproche ses dessins avant de couper : Écart §5.3 (JOURNAL 2026-10-24). Pur, une seule implémentation :
+// Réduire une fresque rapproche ses dessins avant de couper : §5.8. Pur, une seule implémentation :
 // redis-core applique le plan, le web l'aperçoit. Une case vide est un `colorIndex` 0 dans `state`.
 
 import type { CanvasSize } from "./index";

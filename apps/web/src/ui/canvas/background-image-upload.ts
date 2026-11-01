@@ -1,4 +1,4 @@
-// La page poste l'image du fond au web (Écart §9.1, JOURNAL 2026-10-10) : `POST /{login}/background?canvas=<id>`, le cookie de session
+// La page poste l'image du fond au web (§9.5) : `POST /{login}/background?canvas=<id>`, le cookie de session
 // part avec. Jamais à Convex : la CSP `default-src 'self'` ne l'ouvre pas.
 
 import type { Result } from "@liveplace/shared";

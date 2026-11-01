@@ -1,4 +1,4 @@
-// Écart §14 (JOURNAL 2026-10-07) : la langue de l'interface, `fr` ou `en`, retenue dans le cookie `lp_locale`.
+// §9.9 : la langue de l'interface, `fr` ou `en`, retenue dans le cookie `lp_locale`.
 
 import { cookieValue } from "@liveplace/shared";
 
@@ -48,7 +48,7 @@ const isRefused = (header: string, locale: Locale): boolean =>
     return localeOfTag(tag) === locale && weightOf(parameters) === 0;
   });
 
-// Écart §14 (JOURNAL 2026-10-28) : sans langue connue, une langue demandée que le site n'a pas (es, de, ja…) vaut l'anglais, sauf
+// §9.9 : sans langue connue, une langue demandée que le site n'a pas (es, de, ja…) vaut l'anglais, sauf
 // refusé (`en;q=0`). Aucune langue demandée vaut l'anglais sur l'accueil, que lit un robot d'aperçu, et le français ailleurs.
 const fallbackLocale = (header: string | undefined, isHome: boolean): Locale => {
   if (!header?.trim()) return isHome ? "en" : DEFAULT_LOCALE;

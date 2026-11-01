@@ -38,7 +38,7 @@ const loadedFiles = (entry: string): Map<string, string> => {
 const FILES = loadedFiles(HOME_PAGE);
 const nameOf = (file: string): string => relative(WEB_SOURCE, file).replaceAll("\\", "/");
 
-describe("the home page stays in the browser (Écart §9.1, JOURNAL 2026-10-22)", () => {
+describe("the home page stays in the browser (§9.10)", () => {
   // Le parcours des imports voit bien la page : ses composants et ceux du design system qu'elle réutilise
   it("follows the imports of the page through its own components and the design system", () => {
     const names = [...FILES.keys()].map(nameOf);

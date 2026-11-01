@@ -1,4 +1,4 @@
-// Le libellé d'un bouton qui change (Écart §9.3, JOURNAL 2026-10-08) : sa largeur glisse de l'ancienne à la nouvelle, et
+// Le libellé d'un bouton qui change (§9.6) : sa largeur glisse de l'ancienne à la nouvelle, et
 // son contenu passe en fondu quand ses mots changent, pas quand ses chiffres seuls changent (un compte à rebours ne clignote pas).
 // Les durées viennent de tokens.css : coupées, rien ne bouge.
 

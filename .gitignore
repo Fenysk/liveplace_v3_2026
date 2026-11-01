@@ -13,7 +13,7 @@ coverage/
 .env.*
 !.env.example
 
-# Écart §11.7 (JOURNAL 2026-10-05) : un worktree par chantier, créé par `tools/worktree.sh` seulement.
+# §11.8 : un worktree par chantier, créé par `tools/worktree.sh` seulement.
 .claude/worktrees/
 
 *.log

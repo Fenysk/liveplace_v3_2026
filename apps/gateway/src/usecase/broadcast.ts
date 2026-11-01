@@ -16,7 +16,7 @@ import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => void;
 // JOURNAL 2026-10-06 : le classement, au plus une fois par fenêtre ; la frame est celle de cette page.
 export type ScoreboardControl = { t: "scoreboard"; frame: ScoreboardFrame };
-// Écart §4 (JOURNAL 2026-10-07) : le live d'un compte a changé ; chaque page décide s'il la regarde. Absent : plus en live.
+// §10.4 : le live d'un compte a changé ; chaque page décide s'il la regarde. Absent : plus en live.
 export type TwitchLiveControl = { t: "twitchLive"; userId: string; twitchLive?: TwitchLive };
 // Un message de contrôle de moderate.lua (§5.4), le classement ou un live : ni tick ni conflation, il n'a aucune case.
 export type ControlMessage = LiveControl | ScoreboardControl | TwitchLiveControl;
@@ -35,13 +35,13 @@ export interface Broadcast {
   // JOURNAL 2026-10-06 : une fenêtre du classement. Ne relit que les canvas où une pose, un ban ou un déban a eu lieu.
   tickScoreboard(): Promise<void>;
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
-  // Écart §4 (JOURNAL 2026-10-07) : un message de contrôle à toutes les pages jointes, tous canvas confondus.
+  // §10.4 : un message de contrôle à toutes les pages jointes, tous canvas confondus.
   announce(control: ControlMessage): void;
-  // Écart §5.1 (JOURNAL 2026-10-07) : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
+  // §16.3 : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
   countConnections(): { total: number; largestCanvas: number };
 }
 
-// Écart §5.1 et §6 (JOURNAL 2026-10-07) : la capacité mesure, à l'envoi de chaque frame, le retard de chaque pose qu'elle porte :
+// §16.3 : la capacité mesure, à l'envoi de chaque frame, le retard de chaque pose qu'elle porte :
 // sans l'attente voulue du tick. `tickMs` : l'intervalle du tick, celui de la minuterie qui l'appelle.
 export type DelayRecorder = { now(): Timestamp; record(delayMs: number): void; tickMs: number };
 

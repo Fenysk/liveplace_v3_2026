@@ -1,4 +1,4 @@
-// Le contenu de la page `/auth/expired` (Écart §14, JOURNAL 2026-10-13) : le retour de Twitch ne venait pas de ce navigateur,
+// Le contenu de la page `/auth/expired` (§9.9) : le retour de Twitch ne venait pas de ce navigateur,
 // ou trop tard. Il le dit, et offre Se connecter au même endroit.
 
 import { DESIGN_TEXTS } from "../design/design-texts";

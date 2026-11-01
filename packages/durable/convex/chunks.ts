@@ -1,4 +1,4 @@
-// L'historique d'un canvas : un fichier par chunk, une ligne d'index (§8.2, Écart §7.2, JOURNAL 2026-10-08). L'envoi du
+// L'historique d'un canvas : un fichier par chunk, une ligne d'index (§8.2, §7.1). L'envoi du
 // fichier passe par `snapshots.generateUploadUrl`, comme celui d'un snapshot.
 
 import { v } from "convex/values";

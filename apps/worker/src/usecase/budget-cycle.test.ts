@@ -84,7 +84,7 @@ function setup(scope: string, initial: ChunkSize[]) {
   return { ...convex, cycle, clock, logs };
 }
 
-describe("the history budget cycle (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("the history budget cycle (§7.3)", () => {
   // Sous le budget, rien n'est lu au-delà du total, rien ne part
   it("purges nothing under the budget", async () => {
     const { cycle, calls, total } = setup("poste-2", chunks("a", 40, LONG_AGO));

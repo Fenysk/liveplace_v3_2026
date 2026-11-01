@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : la géométrie de l'image d'aperçu « F · Ambiance » choisie par Alexis. Le canvas net à
+// §9.10 : la géométrie de l'image d'aperçu « F · Ambiance » choisie par Alexis. Le canvas net à
 // gauche, le panneau à sa droite, et les tailles de texte qui suivent la largeur du panneau.
 
 import { PREVIEW_IMAGE_HEIGHT, PREVIEW_IMAGE_WIDTH } from "./link-preview";

@@ -8,7 +8,7 @@ import {
   toBackdrop,
 } from "./canvas-background";
 
-// Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, peint sous les pixels, le même pinceau en jeu et dans la vue OBS.
+// §9.5 : le fond de la fresque, peint sous les pixels, le même pinceau en jeu et dans la vue OBS.
 
 const PROPERTIES: Record<string, string> = { "--obs-black": "#000000", "--obs-white": "#ffffff" };
 const getProperty = (property: string): string => PROPERTIES[property] ?? "";

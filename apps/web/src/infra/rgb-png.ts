@@ -1,4 +1,4 @@
-// Écart §9.1 (JOURNAL 2026-10-10) : un PNG en couleurs vraies (rouge, vert, bleu sur 8 bits) écrit à la main, pour le fond
+// §9.10 : un PNG en couleurs vraies (rouge, vert, bleu sur 8 bits) écrit à la main, pour le fond
 // flou de l'image d'aperçu. Chaque ligne est filtrée « Sub » : un fond lisse se compresse bien mieux que brut.
 
 import { deflateSync } from "node:zlib";

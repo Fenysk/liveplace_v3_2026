@@ -1,4 +1,4 @@
--- Remettre un canvas perdu (Écart §7.2, JOURNAL 2026-10-08). Ordre des KEYS et ARGV : recovery.ts. Les gros morceaux (piles
+-- Remettre un canvas perdu (§7.4). Ordre des KEYS et ARGV : recovery.ts. Les gros morceaux (piles
 -- `hist:`, `cells:`, miroirs `user:`) sont déjà posés par le worker : ici le reste, d'un seul bloc, et `ready` en dernier.
 
 local versionKey, metaKey, stateKey = KEYS[1], KEYS[2], KEYS[3]

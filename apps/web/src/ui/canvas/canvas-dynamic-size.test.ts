@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CanvasSettings, type DynamicSizeField } from "./canvas-settings";
 import { toCanvasSize, toSizeChoice } from "./canvas-size";
 
-// Écart §5.3 (JOURNAL 2026-10-28) : la taille dynamique dans la section Canvas. Activée, le choix de taille reste visible mais grisé
+// §5.8 : la taille dynamique dans la section Canvas. Activée, le choix de taille reste visible mais grisé
 // (JOURNAL 2026-10-29) ; une taille qui n'est dans aucun format est dite telle qu'elle est, sans format présenté comme choisi.
 
 const doNothing = (): void => undefined;
@@ -39,7 +39,7 @@ const sectionHtml = (
 
 const checkboxOf = (html: string) => html.match(/<input type="checkbox"[^>]*>/)?.[0] ?? "";
 
-describe("toSizeChoice (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("toSizeChoice (§5.8)", () => {
   // Une taille d'un format se retrouve, celle d'avant les formats garde le grand carré ; une autre n'est nulle part
   it("finds the format of a format size, and none for any other size", () => {
     expect(toSizeChoice({ width: 128, height: 72 })).toEqual({ format: "16:9", sizeIndex: 1 });
@@ -50,7 +50,7 @@ describe("toSizeChoice (Écart §5.3, JOURNAL 2026-10-28)", () => {
   });
 });
 
-describe("the dynamic size in the Canvas section (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("the dynamic size in the Canvas section (§5.8)", () => {
   // Désactivée, la case est décochée, les formats reviennent avec Changer la taille
   it("shows an unchecked box and the format choice while it is off", () => {
     const html = sectionHtml({}, { width: 50, height: 50 });

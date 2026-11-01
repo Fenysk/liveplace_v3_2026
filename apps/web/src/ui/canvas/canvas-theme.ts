@@ -1,4 +1,4 @@
-// Le thème du canvas en cours : enregistré quand le champ perd le focus, et montré à tous (Écart §8.1, JOURNAL 2026-10-07).
+// Le thème du canvas en cours : enregistré quand le champ perd le focus, et montré à tous (§8.1).
 
 import { toTheme } from "@liveplace/domain";
 

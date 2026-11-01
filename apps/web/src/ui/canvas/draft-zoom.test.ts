@@ -84,7 +84,7 @@ const LANDSCAPE_INSETS = { top: 44, right: 375, bottom: 21, left: 47 };
 const DRAFT_INSETS = { top: 96, right: 0, bottom: 220, left: 0 };
 const PHONE_VIEW_INSETS = { top: 130, right: 0, bottom: 60, left: 0 };
 const LANDSCAPE_VIEW_INSETS = { top: 68, right: 375, bottom: 21, left: 47 };
-// Un écran tactile large en portrait (Écart §9.3, JOURNAL 2026-10-09) : en Vue le canvas arrive au-dessus de la colonne, dans toute
+// Un écran tactile large en portrait (§9.7) : en Vue le canvas arrive au-dessus de la colonne, dans toute
 // la largeur ; en Dessin le panneau de 320 px prend la droite (336 px avec ses marges).
 const DUO = { width: 626, height: 890 };
 const ABOVE_COLUMN_INSETS = { top: 164, right: 0, bottom: 128, left: 0 };
@@ -115,7 +115,7 @@ const draftSquare = (x: number, y: number, size: number) => [
   { x: x + size - 1, y: y + size - 1 },
 ];
 
-describe("COMFORTABLE_CELL, Écart §9.3 (JOURNAL 2026-10-08)", () => {
+describe("COMFORTABLE_CELL, §9.3", () => {
   // Le doigt est plus grossier que la souris : seuil et cible y sont plus grands, et la cible dépasse toujours le seuil
   it("asks a finger for bigger cells than a mouse, and aims past its own threshold", () => {
     expect(COMFORTABLE_CELL.coarse.min).toBeGreaterThan(COMFORTABLE_CELL.fine.min);
@@ -124,7 +124,7 @@ describe("COMFORTABLE_CELL, Écart §9.3 (JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("comfortableCell, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("comfortableCell, §9.3", () => {
   // Une zone libre haute ou large garde la cible du pointeur : le PC et une tablette ne changent pas
   it("keeps the pointer's own target on a roomy free area", () => {
     expect(comfortableCell("fine", LAPTOP_AREA)).toBe(COMFORTABLE_CELL.fine.target);
@@ -163,7 +163,7 @@ describe("comfortableCell, Écart §9.3 (JOURNAL 2026-10-09)", () => {
   });
 });
 
-describe("isCellTooSmall, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("isCellTooSmall, §9.3", () => {
   // Une même vue est assez grande pour la souris et trop petite pour le doigt
   it("judges one view by the pointer: enough for a mouse, too small for a finger", () => {
     const view = withScale(
@@ -323,7 +323,7 @@ const fakeLayer: FakeLayer = {
 };
 const LAYER = fakeLayer as HTMLElement;
 
-// L'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29) : ses pièces notent ce que la scène leur écrit.
+// L'aperçu de la croissance (§9.3) : ses pièces notent ce que la scène leur écrit.
 const preview = { isShown: false, clip: "", outline: {} as Record<string, string> };
 const PREVIEW = {
   root: {
@@ -442,8 +442,8 @@ type Options = {
   isReducedMotion?: boolean;
   isLoaded?: boolean;
   handoff?: Handoff;
-  background?: BackgroundParams; // le fond de la fresque que le welcome annonce (Écart §9.1, JOURNAL 2026-10-10)
-  isDynamicSize?: boolean; // la taille dynamique, que le welcome annonce (Écart §5.3, JOURNAL 2026-10-28)
+  background?: BackgroundParams; // le fond de la fresque que le welcome annonce (§9.5)
+  isDynamicSize?: boolean; // la taille dynamique, que le welcome annonce (§5.8)
 };
 
 // La vraie scène, sur de vrais stores : le joueur est connecté, la page arrive à son cadrage, `draft` est son brouillon gardé.
@@ -585,7 +585,7 @@ const openScene = (
   };
 };
 
-describe("la scène du canvas à l'entrée en Dessin, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("la scène du canvas à l'entrée en Dessin, §9.3", () => {
   beforeEach(startBrowser);
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -829,7 +829,7 @@ describe("la scène du canvas à l'entrée en Dessin, Écart §9.3 (JOURNAL 2026
   });
 });
 
-describe("le toucher d'une case trop petite, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("le toucher d'une case trop petite, §9.3", () => {
   const tapped = { x: 131, y: 311 };
 
   beforeEach(startBrowser);
@@ -1946,7 +1946,7 @@ describe("les cases des autres joueurs, en fondu décalé", () => {
   });
 });
 
-describe("draft-zoom, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("draft-zoom, §9.3", () => {
   // Plus de zoom d'entrée en Dessin dans le module : ne restent les tailles de confort, le zoom du toucher et l'animation
   it("keeps no entry zoom: only the comfort sizes, the tap zoom and the animation", async () => {
     const names = Object.keys(await import("./draft-zoom")).sort();
@@ -1963,7 +1963,7 @@ describe("draft-zoom, Écart §9.3 (JOURNAL 2026-10-09)", () => {
   });
 });
 
-describe("zoomFrame, Écart §9.3 (JOURNAL 2026-10-08)", () => {
+describe("zoomFrame, §9.3", () => {
   const from = PHONE_ARRIVAL;
   const pivot = centerOf(PHONE_AREA);
   const to = tapZoomTarget(from, pivot, "coarse", PHONE_AREA, PHONE_LIMITS) ?? from;
@@ -2022,7 +2022,7 @@ describe("zoomFrame, Écart §9.3 (JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("tapZoomTarget, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("tapZoomTarget, §9.3", () => {
   const tapped = { x: 120, y: 300 };
 
   // Un toucher sur une case trop petite : la vue vise la taille confortable de la zone libre, au lieu d'inspecter
@@ -2088,7 +2088,7 @@ describe("tapZoomTarget, Écart §9.3 (JOURNAL 2026-10-09)", () => {
   });
 });
 
-describe("freeArea, Écart §9.3 (JOURNAL 2026-10-09)", () => {
+describe("freeArea, §9.7", () => {
   // Sans marges, tout l'écran ; avec elles, l'espace libre entre la bande du haut, la feuille du bas et les côtés
   it("is the whole screen without insets, and the space left by the insets with them", () => {
     expect(freeArea(PHONE, NO_INSETS)).toEqual({ left: 0, top: 0, right: 375, bottom: 812 });
@@ -2115,7 +2115,7 @@ class FakeImage {
   }
 }
 
-describe("la scène du canvas et le fond de la fresque, Écart §9.1 (JOURNAL 2026-10-10)", () => {
+describe("la scène du canvas et le fond de la fresque, §9.5", () => {
   beforeEach(() => {
     startBrowser();
     FakeImage.made = [];
@@ -2217,8 +2217,8 @@ describe("la scène du canvas et le fond de la fresque, Écart §9.1 (JOURNAL 20
   });
 });
 
-// Le curseur que la scène pose sur le canvas, Écart §9.3 (JOURNAL 2026-10-13) : il dit ce que fera le clic, à la souris.
-describe("le curseur de la scène, Écart §9.3 (JOURNAL 2026-10-13)", () => {
+// Le curseur que la scène pose sur le canvas, §9.3 : il dit ce que fera le clic, à la souris.
+describe("le curseur de la scène, §9.3", () => {
   beforeEach(startBrowser);
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -2337,7 +2337,7 @@ describe("le curseur de la scène, Écart §9.3 (JOURNAL 2026-10-13)", () => {
   });
 });
 
-describe("l'aperçu de la croissance dans la scène, Écart §9.3 (JOURNAL 2026-10-29)", () => {
+describe("l'aperçu de la croissance dans la scène, §9.3", () => {
   const SMALL = { width: 10, height: 10 };
   beforeEach(startBrowser);
   afterEach(() => {

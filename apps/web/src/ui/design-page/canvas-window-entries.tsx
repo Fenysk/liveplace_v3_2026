@@ -1,4 +1,4 @@
-// Les réglages du streamer : les sections Canvas (avec le fond de la fresque, Écart §9.1 JOURNAL 2026-10-10) et Vue OBS de la
+// Les réglages du streamer : les sections Canvas (avec le fond de la fresque, §9.5) et Vue OBS de la
 // fenêtre, et les confirmations de la taille et de la jauge maximale. Les vrais composants du jeu, avec des props d'exemple.
 
 import {
@@ -35,7 +35,7 @@ import sampleBackgroundUrl from "./sample-background.svg?url";
 
 const LOCKED_MS = 1500; // la démonstration du verrou : l'action, puis la fermeture
 
-// Écart §5.3 (JOURNAL 2026-10-24) : la fresque d'exemple de la confirmation de taille, 256 × 256 : le petit dessin, et une ligne de
+// §5.8 : la fresque d'exemple de la confirmation de taille, 256 × 256 : le petit dessin, et une ligne de
 // 90 pixels qu'aucune petite taille ne tient. L'aperçu est le vrai plan : les dessins se rapprochent, la ligne se coupe.
 const RESIZE_SAMPLE = (() => {
   const state = new Uint8Array(SAMPLE_CANVAS.width * SAMPLE_CANVAS.height);
@@ -161,8 +161,8 @@ const ThemeScene = ({ initial, status, isSaving }: ThemeSceneProps) => {
 };
 
 // Le thème du canvas, puis la taille dynamique, le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui
-// sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256). Écart §5.3 (JOURNAL 2026-10-28) : une taille dans aucun
-// format n'en présente aucun comme choisi. Écart §5.3 (JOURNAL 2026-10-29) : la taille dynamique activée grise le choix de taille, qui
+// sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256). §5.8 : une taille dans aucun
+// format n'en présente aucun comme choisi. §5.8 : la taille dynamique activée grise le choix de taille, qui
 // montre encore le format de la taille d'aujourd'hui ; la décocher ramène la fresque à 50 × 50, par la confirmation d'un format plus petit
 // si des dessins sortiraient du cadre (`hasOutside`), sinon d'un coup ; le format Petit carré est alors choisi.
 type CanvasSettingsSceneProps = {

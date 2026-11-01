@@ -1,4 +1,4 @@
-// Les mots de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07) : des nombres au format français,
+// Les mots de la fenêtre Développeur (§16.1) : des nombres au format français,
 // des textes courts.
 
 import {
@@ -51,7 +51,7 @@ export const streamedCanvasesLabel = (streamed: number): string =>
 
 export const placedPixelsLabel = (pixels: number): string => counted(pixels, "pixel posé", "pixels posés");
 
-// Écart §5.1 (JOURNAL 2026-10-08) : les minutes streamées sont celles d'un canvas.
+// §16.2 : les minutes streamées sont celles d'un canvas.
 export const streamedMinutesLabel = (minutes: number): string =>
   counted(minutes, "minute streamée", "minutes streamées");
 

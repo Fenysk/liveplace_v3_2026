@@ -1,4 +1,4 @@
-// La page d'accueil `/` (Écart §9.1, JOURNAL 2026-10-22) : « LivePlace » en haut à gauche et les réglages (langue, apparence) en haut
+// La page d'accueil `/` (§9.10) : « LivePlace » en haut à gauche et les réglages (langue, apparence) en haut
 // à droite, puis à gauche une phrase et « Lancer ma fresque avec Twitch », à droite la scène. Sur un écran étroit, la phrase et le
 // bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le
 // stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).

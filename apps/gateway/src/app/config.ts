@@ -8,8 +8,8 @@ const GatewayEnvSchema = z.object({
   SESSION_SECRET: z.string().min(32), // §10.2 : 32 octets minimum
   BROADCAST_HZ: z.coerce.number().int().positive().default(10), // D-13, JOURNAL 2026-09-15
   PUBLIC_URL: z.url(), // §11.5
-  GATEWAY_PORT: z.coerce.number().int().positive().default(8080), // §11.1 ; Écart §11.7 (JOURNAL 2026-10-05) : une place de dev le change
-  BETA_LABEL: z.string().optional(), // Écart §10.3 (JOURNAL 2026-10-06) : vide en production, le compose la passe toujours
+  GATEWAY_PORT: z.coerce.number().int().positive().default(8080), // §11.1 ; §11.8 : une place de dev le change
+  BETA_LABEL: z.string().optional(), // §10.3 : vide en production, le compose la passe toujours
 });
 
 export type GatewayConfig = {
@@ -18,7 +18,7 @@ export type GatewayConfig = {
   broadcastHz: number;
   publicOrigin: string; // la seule origine d'où une page ouvre le WebSocket (JOURNAL 2026-09-29)
   port: number;
-  isProduction: boolean; // Écart §10.3 (JOURNAL 2026-10-06) : là seulement, les onglets du développeur ne comptent pas
+  isProduction: boolean; // §10.3 : là seulement, les onglets du développeur ne comptent pas
 };
 
 export function parseGatewayConfig(env: unknown): GatewayConfig {

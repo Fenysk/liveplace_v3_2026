@@ -84,7 +84,7 @@ const clearUser = (target: string): Moderation => ({
   slice: "first",
 });
 
-describe("la taille dynamique : grandir avec la pose (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("la taille dynamique : grandir avec la pose (§5.8)", () => {
   // Un pixel posé à 1 colonne du bord droit agrandit la fresque de ce côté, juste assez pour retrouver 3 colonnes vides
   it("a pixel placed at x = 18 of a 20×20 canvas widens it to 22, leaving columns 19, 20 and 21 empty", async () => {
     const { canvasId, keys } = await dynamicCanvas(20, 20);
@@ -248,7 +248,7 @@ describe("la taille dynamique : grandir avec la pose (Écart §5.3, JOURNAL 2026
   });
 });
 
-describe("la taille dynamique : une pose contre un décalage (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("la taille dynamique : une pose contre un décalage (§5.8)", () => {
   // Une page qui n'a pas reçu le décalage envoie ses cases dans l'ancien repère : elles tombent sur la case visée
   it("a pose sent from the origin before a shift lands on the cell it aimed at", async () => {
     const { canvasId } = await dynamicCanvas(20, 20);
@@ -308,7 +308,7 @@ describe("la taille dynamique : une pose contre un décalage (Écart §5.3, JOUR
   });
 });
 
-describe("la taille dynamique : la modération (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("la taille dynamique : la modération (§5.8)", () => {
   // Un pixel remis sur une case vide trop près du bord agrandit la fresque, et l'événement parle du nouveau cadre
   it("a pixel the moderation brings back near an edge grows the canvas first, and the event speaks of the new frame", async () => {
     const { canvasId, keys } = await harness.readyCanvas(meta(50, 50));
@@ -375,7 +375,7 @@ describe("la taille dynamique : la modération (Écart §5.3, JOURNAL 2026-10-28
   });
 });
 
-describe("setDynamicSize : l'activation resserre la fresque (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("setDynamicSize : l'activation resserre la fresque (§5.8)", () => {
   // Un décalage de signes contraires (à droite, vers le haut) : chaque pile trouve sa case libre
   it("moves a block right and up at once, every pile finding its cell free", async () => {
     const { canvasId, keys } = await harness.readyCanvas(meta(50, 50));
@@ -475,7 +475,7 @@ describe("setDynamicSize : l'activation resserre la fresque (Écart §5.3, JOURN
     expect(await redis.get(keys.version)).toBe(before);
   });
 
-  // Retirer le réglage ramène la fresque à 50 × 50 (Écart §5.3, JOURNAL 2026-10-29), et prévient les pages une fois ; le redire ne change rien
+  // Retirer le réglage ramène la fresque à 50 × 50 (§5.8), et prévient les pages une fois ; le redire ne change rien
   it("removing the setting brings the canvas back to 50×50 and tells the pages once", async () => {
     const { canvasId } = await harness.readyCanvas(meta(50, 50));
     await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: true });
@@ -538,7 +538,7 @@ describe("setDynamicSize : l'activation resserre la fresque (Écart §5.3, JOURN
   });
 });
 
-describe("setDynamicSize : retirer le réglage ramène la fresque à 50 × 50 (Écart §5.3, JOURNAL 2026-10-29)", () => {
+describe("setDynamicSize : retirer le réglage ramène la fresque à 50 × 50 (§5.8)", () => {
   const line = (x0: number, x1: number, y: number): Pixel[] =>
     Array.from({ length: x1 - x0 + 1 }, (_, index) => ({ x: x0 + index, y, colorIndex: 5 }));
 
@@ -673,7 +673,7 @@ describe("setDynamicSize : retirer le réglage ramène la fresque à 50 × 50 (�
   });
 });
 
-describe("planGrowth du domaine : la même règle que reframe.lua (Écart §9.3, JOURNAL 2026-10-29)", () => {
+describe("planGrowth du domaine : la même règle que reframe.lua (§9.3)", () => {
   // Ce que la page montre avant la pose est ce que le script fait : la taille et le décalage de la fresque après une vraie pose
   const cases: { name: string; width: number; height: number; cells: { x: number; y: number }[] }[] = [
     { name: "a cell on the right margin", width: 20, height: 20, cells: [{ x: 18, y: 5 }] },

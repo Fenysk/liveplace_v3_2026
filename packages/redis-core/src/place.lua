@@ -1,5 +1,5 @@
 -- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua, la jauge de gauge.lua,
--- `planGrowth` et `reframe` de reframe.lua (Écart §5.3, JOURNAL 2026-10-28).
+-- `planGrowth` et `reframe` de reframe.lua (§5.8).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, gaugeKey, reqKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -15,7 +15,7 @@ local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), ton
 -- §5.1 : le classement, et l'encodage de son score (keys.ts).
 local scoreboardKey = KEYS[13]
 local scoreTieSpan, scoreMaxPixels, transparentColorIndex = tonumber(ARGV[17]), tonumber(ARGV[18]), tonumber(ARGV[19])
--- Écart §5.3 (JOURNAL 2026-10-28) : l'origine des pixels de la page, ce que reframe.lua décale, et les bornes d'une taille dynamique.
+-- §5.8 : l'origine des pixels de la page, ce que reframe.lua décale, et les bornes d'une taille dynamique.
 local frameOriginX, frameOriginY = tonumber(ARGV[20]), tonumber(ARGV[21])
 local clearingPrefix, banPrefix, recentlyClearedPrefix = ARGV[22], ARGV[23], ARGV[24]
 local growthLimits = { margin = tonumber(ARGV[25]), maxWidth = tonumber(ARGV[26]), maxHeight = tonumber(ARGV[27]) }
@@ -27,7 +27,7 @@ local function encodeAck(ack)
   return (string.gsub(cjson.encode(ack), '"rejected":{}', '"rejected":[]'))
 end
 
--- 0. Canvas prêt. §5.5 : le script ne se fie pas au seul gateway. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- 0. Canvas prêt. §5.5 : le script ne se fie pas au seul gateway. §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call(
   "HMGET",
   metaKey,
@@ -95,7 +95,7 @@ end
 
 local version
 if #accepted > 0 then
-  -- 5b. Écart §5.3 (JOURNAL 2026-10-28) : une taille dynamique garde ses marges. Un pixel posé trop près d'un bord agrandit la
+  -- 5b. §5.8 : une taille dynamique garde ses marges. Un pixel posé trop près d'un bord agrandit la
   -- fresque, avant la pose : les cases du lot, les piles et l'événement parlent déjà du nouveau cadre.
   if meta[9] == "1" then
     local added = {}

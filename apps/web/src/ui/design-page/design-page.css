@@ -538,7 +538,7 @@
 }
 
 /* Le geste de vue sur mobile : le haut s'efface en fondu tant qu'on glisse, puis ne prend plus ni touchers ni lecteurs d'écran,
-   et revient au doigt levé (Écart §8.1, JOURNAL 2026-10-09) ; il garde sa place, comme les pills du jeu (pill.css). Un faux
+   et revient au doigt levé (§9.7) ; il garde sa place, comme les pills du jeu (pill.css). Un faux
    canvas dessous. */
 .design-pan-demo {
   width: 359px;

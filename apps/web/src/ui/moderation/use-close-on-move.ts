@@ -1,6 +1,6 @@
-// Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case. Une demande ouverte (signaler, retirer) visait un x, y d'avant,
+// §5.8 : des pixels ont changé de case. Une demande ouverte (signaler, retirer) visait un x, y d'avant,
 // et l'aperçu de sa fenêtre montre des positions fausses : elle se ferme, aucune action ne part avec une case périmée.
-// Écart §5.3 (JOURNAL 2026-10-28) : un décalage de la fresque aussi (`toMoveKey`).
+// §5.8 : un décalage de la fresque aussi (`toMoveKey`).
 
 import { useEffect, useRef } from "react";
 

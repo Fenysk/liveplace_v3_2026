@@ -1,4 +1,4 @@
-// Redis a perdu ce canvas et le remet en place (`canvas_recovering`, Écart §4.2, JOURNAL 2026-10-08) : la page dit son attente à
+// Redis a perdu ce canvas et le remet en place (`canvas_recovering`, §7.4) : la page dit son attente à
 // la place du canvas, pour tous, et reprend d'elle-même quand un `welcome` arrive : le store oublie alors l'erreur.
 // `lp-game` : caché en vue OBS, aucun texte sur le stream.
 

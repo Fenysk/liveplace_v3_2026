@@ -38,7 +38,7 @@ const ban = async (canvasId: string, target: string) => {
   if (!result.ok) throw new Error(result.error);
 };
 
-describe("the stream entry of a placement (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("the stream entry of a placement (§7.1)", () => {
   // Quand une pose est acceptée, son entrée porte la `placementId` dans un champ `p`, après l'événement `e`
   it("carries the placementId in a field p, after the event in e", async () => {
     const { canvasId, keys } = await readyCanvas();

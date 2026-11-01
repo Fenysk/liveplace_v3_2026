@@ -1,4 +1,4 @@
-// Les phrases du design system (Écart §14, JOURNAL 2026-10-07) : celles que ses composants écrivent eux-mêmes, et les
+// Les phrases du design system (§9.9) : celles que ses composants écrivent eux-mêmes, et les
 // mots que les fenêtres du jeu se partagent (Annuler, Fermer, Chargement…).
 
 import type { ObsBackground } from "@liveplace/domain";
@@ -57,7 +57,7 @@ export const DESIGN_TEXTS = defineTexts({
   copyAction: { fr: "Copier", en: "Copy" },
   copied: { fr: "Copié", en: "Copied" },
 
-  // Le +1 dit son effet par le chiffre : la jauge actuelle + 1 (Écart §9.3, JOURNAL 2026-10-13).
+  // Le +1 dit son effet par le chiffre : la jauge actuelle + 1 (§9.4).
   claimGauge: localized({
     fr: (gaugeMax: number) => `Réclamer : ta jauge passe à ${gaugeMax + 1} pixels`,
     en: (gaugeMax) => `Claim: your gauge goes up to ${gaugeMax + 1} pixels`,

@@ -4,7 +4,7 @@ import type { ConvexDeployment } from "@liveplace/domain/ports";
 import { parseEnv } from "@liveplace/shared";
 import { z } from "zod";
 
-// Écart §2 et §9 (JOURNAL 2026-10-07) : un déploiement Convex dont le web lit l'usage, nommé par le premier mot de son hôte.
+// §16.3 : un déploiement Convex dont le web lit l'usage, nommé par le premier mot de son hôte.
 // Jamais une URL qui n'est pas en https : la clé voyage dans un en-tête.
 const toConvexDeployment = (url: string, key: string): ConvexDeployment | null => {
   try {
@@ -38,14 +38,14 @@ const WebEnvSchema = z.object({
   CONVEX_SERVICE_KEY: z.string().min(1),
   REDIS_URL: z.string().min(1),
   TWITCH_EVENTSUB_SECRET: z.string().min(10).max(100), // JOURNAL 2026-09-27 : les bornes de Twitch
-  BETA_LABEL: z.string().optional(), // Écart §11.1 (JOURNAL 2026-10-04) : vide en production, le compose la passe toujours
-  // Écart §7.2 (JOURNAL 2026-10-08) : le nom de l'environnement de sauvegarde, celui du worker. Absente, vide ou `off` : la
+  BETA_LABEL: z.string().optional(), // §11.1 : vide en production, le compose la passe toujours
+  // §7.5 : le nom de l'environnement de sauvegarde, celui du worker. Absente, vide ou `off` : la
   // connexion crée le canvas comme avant, sans demander à Convex s'il en garde une sauvegarde.
   DURABLE_SCOPE: z
     .string()
     .regex(/^([a-z][a-z0-9-]{0,31})?$/)
     .optional(),
-  // Écart §2 et §9 (JOURNAL 2026-10-07) : facultative ; sans elle, Convex est « non configuré ».
+  // §16.3 : facultative ; sans elle, Convex est « non configuré ».
   CONVEX_USAGE_DEPLOYMENTS: z
     .string()
     .optional()

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createGrowthPreview, type GrowthPreviewInput, previewGrowth } from "./growth-preview";
 import { GrowthPreview } from "./growth-preview-layers";
 
-// Écart §9.3 (JOURNAL 2026-10-29) : l'aperçu de la croissance. Ce qui le nourrit (la règle du serveur), et ce qu'il écrit dans ses couches.
+// §9.3 : l'aperçu de la croissance. Ce qui le nourrit (la règle du serveur), et ce qu'il écrit dans ses couches.
 
 const input = (overrides: Partial<GrowthPreviewInput> = {}): GrowthPreviewInput => ({
   isDynamicSize: true,
@@ -18,7 +18,7 @@ const input = (overrides: Partial<GrowthPreviewInput> = {}): GrowthPreviewInput 
   ...overrides,
 });
 
-describe("previewGrowth (Écart §9.3, JOURNAL 2026-10-29)", () => {
+describe("previewGrowth (§9.3)", () => {
   // Rien au repos : ni viseur, ni brouillon
   it("shows nothing at rest", () => {
     expect(previewGrowth(input())).toBeNull();
@@ -105,7 +105,7 @@ const fakeLayers = () => {
   };
 };
 
-describe("createGrowthPreview (Écart §9.3, JOURNAL 2026-10-29)", () => {
+describe("createGrowthPreview (§9.3)", () => {
   const screen = { width: 400, height: 300 };
   const box = { left: 100, top: 50, width: 200, height: 160 };
 
@@ -166,7 +166,7 @@ describe("createGrowthPreview (Écart §9.3, JOURNAL 2026-10-29)", () => {
   });
 });
 
-describe("les couches de l'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29)", () => {
+describe("les couches de l'aperçu de la croissance (§9.3)", () => {
   const css = readFileSync(new URL("../design/canvas.css", import.meta.url), "utf8");
   const rule = (selector: string): string => {
     const found = css.match(new RegExp(`${selector.replaceAll(".", "\\.")}\\s*\\{([^}]*)\\}`));

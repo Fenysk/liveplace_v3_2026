@@ -1,4 +1,4 @@
-// Un seul worker, et sa santé (§7.5, Écart §11.5 JOURNAL 2026-10-06) : un bail dans Redis, et un battement.
+// Un seul worker, et sa santé (§7.5) : un bail dans Redis, et un battement.
 
 import type { Redis } from "ioredis";
 

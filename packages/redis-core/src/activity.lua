@@ -1,4 +1,4 @@
--- Une minute de l'activité, reportée d'un coup sur ses trois niveaux (écart §5.1, JOURNAL 2026-10-06, 2026-10-07 et 2026-10-08) : le
+-- Une minute de l'activité, reportée d'un coup sur ses trois niveaux (§16.2) : le
 -- pic des personnes et des canvas streamés, la somme des pixels, des visites, des visites au téléphone et du temps passé. Le
 -- septième champ, `live`, porte l'état streamé : un pic pour tout LivePlace, qui l'écrit aussi dans le deuxième, une somme de
 -- minutes streamées pour un canvas. Les nouveaux comptes et les distincts ont leur propre champ, écrit par le web et par le

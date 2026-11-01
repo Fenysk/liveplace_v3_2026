@@ -1,4 +1,4 @@
-// L'aperçu de la croissance (Écart §9.3, JOURNAL 2026-10-29), tel que le jeu le montre : les vraies couches (`GrowthPreview`) et la vraie
+// L'aperçu de la croissance (§9.3), tel que le jeu le montre : les vraies couches (`GrowthPreview`) et la vraie
 // règle (`previewGrowth`, `createGrowthPreview`), sur une fresque de 10 × 10 dans une boîte au lieu de l'écran. Passer la souris sur la
 // fresque la fait viser une case, comme en Dessin ; une case de la marge montre ce qui s'ajoute, une case du milieu ne montre rien.
 

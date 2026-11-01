@@ -1,4 +1,4 @@
-// Ce que montre la section « Archives », tiré des fonctions serveur du streamer (Écart §15, JOURNAL 2026-10-06) :
+// Ce que montre la section « Archives », tiré des fonctions serveur du streamer (§17.1) :
 // la liste, la demande de confirmation en cours, et l'action qu'elle déclenche. Montée à l'ouverture de la section, et
 // de nouveau quand le canvas actif change (la clé du parent).
 

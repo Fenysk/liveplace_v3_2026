@@ -47,8 +47,8 @@ describe("le champ Thème des réglages de la fresque", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : le champ du thème est la cible de la bulle qui invite le streamer à en donner un
-describe("le champ Thème, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : le champ du thème est la cible de la bulle qui invite le streamer à en donner un
+describe("le champ Thème, cible d'une bulle d'aide (§9.11)", () => {
   const inGame = (status: ThemeField["status"]): string =>
     renderToStaticMarkup(
       createElement(

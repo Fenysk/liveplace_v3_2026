@@ -1,5 +1,5 @@
 // L'état de la démo de l'accueil, côté React : les transitions de `home-demo.ts` appliquées à l'instant du geste.
-// Rien ne part au réseau : tout reste dans cette page (Écart §9.1, JOURNAL 2026-10-22).
+// Rien ne part au réseau : tout reste dans cette page (§9.10).
 
 import { useMemo, useRef, useState } from "react";
 import {

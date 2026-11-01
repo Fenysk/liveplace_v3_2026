@@ -80,7 +80,7 @@ describe("connectionToast (CDC 2026, Toasts)", () => {
   });
 });
 
-describe("the connection toast on a real store (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the connection toast on a real store (§17.1)", () => {
   // Une coupure vraie se dit, puis la reprise aussi : la page se reconnecte d'elle-même
   it("still says a real drop, then the return, as the page reconnects by itself", () => {
     const { toasts, dropSocket, open, receive } = setup();

@@ -17,7 +17,7 @@ const stateWith = (
   return state;
 };
 
-describe("planDynamicSize : le resserrement à l'activation (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("planDynamicSize : le resserrement à l'activation (§5.8)", () => {
   it("shrinks a 4×4 drawing in the middle of a 50×50 canvas to 10×10", () => {
     const from = size(50, 50);
     const plan = planDynamicSize(stateWith(from, 20, 23, 30, 33), from);
@@ -70,7 +70,7 @@ describe("planDynamicSize : le resserrement à l'activation (Écart §5.3, JOURN
   });
 });
 
-describe("planGrowth : de combien la fresque grandit à une pose (Écart §9.3, JOURNAL 2026-10-29)", () => {
+describe("planGrowth : de combien la fresque grandit à une pose (§9.3)", () => {
   const grows = (cells: { x: number; y: number }[], width: number, height: number) =>
     planGrowth(cells, size(width, height));
 

@@ -1,4 +1,4 @@
-// Écart §8.1 (JOURNAL 2026-10-08) : ce que Convex garde d'un canvas supprimé part avec lui, en tâche de fond.
+// §7.6 : ce que Convex garde d'un canvas supprimé part avec lui, en tâche de fond.
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";

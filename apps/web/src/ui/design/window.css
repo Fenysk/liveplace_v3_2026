@@ -125,7 +125,7 @@
   gap: var(--space-2);
 }
 
-/* Le titre d'un bloc de la section, au-dessus de son contenu (la section Activité, écart §4.3, JOURNAL 2026-10-06) */
+/* Le titre d'un bloc de la section, au-dessus de son contenu (la section Activité, §16.1) */
 .lp-window-subhead {
   margin: 0;
 }
@@ -168,7 +168,7 @@
   }
 }
 
-/* Une action qui a échoué sur une ligne (Écart §8.1, JOURNAL 2026-10-13) : la ligne garde sa place, et le message avec
+/* Une action qui a échoué sur une ligne (§9.8) : la ligne garde sa place, et le message avec
    Réessayer passent dessous, sur toute sa largeur. Sans échec, l'alerte vide ne prend aucune place. */
 .lp-window-row--failed {
   flex-wrap: wrap;

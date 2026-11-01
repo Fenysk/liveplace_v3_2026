@@ -1,4 +1,4 @@
-// La couleur des barres du navigateur ou du système (Écart §9.1, JOURNAL 2026-10-08) : le fond du jeu, clair ou sombre.
+// La couleur des barres du navigateur ou du système (§9.10) : le fond du jeu, clair ou sombre.
 // Une balise posée ici et non dans le `head` du routeur : il ne garde qu'une balise par nom, et le choix de l'apparence
 // (le sien ou celui du système) ne se lit que dans le navigateur.
 

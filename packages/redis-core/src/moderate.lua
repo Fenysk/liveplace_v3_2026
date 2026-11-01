@@ -1,5 +1,5 @@
 -- Modération d'un canvas (§5.4) : clearUser, clearPlacement, approvePlacement, ban, unban. Ordre des KEYS et ARGV :
--- client.ts. `openPile` et `parseEntry` viennent de pile.lua, `planGrowth` et `reframe` de reframe.lua (Écart §5.3, JOURNAL 2026-10-28).
+-- client.ts. `openPile` et `parseEntry` viennent de pile.lua, `planGrowth` et `reframe` de reframe.lua (§5.8).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, modsKey, clearedKey, clearingKey, targetCellsKey, banKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8], KEYS[9], KEYS[10]
@@ -11,7 +11,7 @@ local clearedPlacementsKey, clearedRangesKey, offStreamKey, reportedKey, approve
 local recentlyClearedKey = KEYS[17]
 -- §5.1 : le classement, d'où un banni sort, et où son score l'attend.
 local scoreboardKey, scoreboardBannedKey = KEYS[18], KEYS[19]
--- Écart §5.4 (JOURNAL 2026-10-08) : les modérateurs nommés ici, que personne ne bannit.
+-- §5.4 : les modérateurs nommés ici, que personne ne bannit.
 local modsLiveplaceKey = KEYS[20]
 local histPrefix, cellsPrefix, liveChannel, by, action, target, slice =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6], ARGV[7]
@@ -21,12 +21,12 @@ local source = ARGV[12]
 -- §5.4 : la pose visée et la plage d'heures qui l'étend, vides sinon.
 local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(ARGV[15])
 local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
--- Écart §5.3 (JOURNAL 2026-10-28) : ce que reframe.lua décale, et les bornes d'une taille dynamique.
+-- §5.8 : ce que reframe.lua décale, et les bornes d'une taille dynamique.
 local banPrefix, recentlyClearedPrefix = ARGV[19], ARGV[20]
 local growthLimits = { margin = tonumber(ARGV[21]), maxWidth = tonumber(ARGV[22]), maxHeight = tonumber(ARGV[23]) }
 local placement = target .. ":" .. placementId
 
--- 0. Canvas prêt. §5.5, comme place.lua. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- 0. Canvas prêt. §5.5, comme place.lua. §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height", "archivedAt", "dynamicSize", "originX", "originY")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
@@ -40,7 +40,7 @@ local width, ownerId, height = tonumber(meta[2]), meta[3], tonumber(meta[4])
 if (by ~= ownerId and redis.call("SISMEMBER", modsKey, by) == 0) or target == ownerId then
   return { "forbidden" }
 end
--- Écart §5.4 (JOURNAL 2026-10-08) : un banni ne modère plus, ni ne se débannit ; un modérateur nommé ici ne se bannit pas.
+-- §5.4 : un banni ne modère plus, ni ne se débannit ; un modérateur nommé ici ne se bannit pas.
 if by ~= ownerId and redis.call("SISMEMBER", bansKey, by) == 1 then
   return { "forbidden" }
 end
@@ -286,7 +286,7 @@ if slice == "first" then
     cells[#cells + 1] = cell
   end
 end
--- Écart §5.3 (JOURNAL 2026-10-28) : un pixel remis sur une case vide peut rapprocher un dessin du bord d'une taille dynamique. La fresque
+-- §5.8 : un pixel remis sur une case vide peut rapprocher un dessin du bord d'une taille dynamique. La fresque
 -- grandit avant que l'événement parte : ses cases parlent déjà du nouveau cadre.
 if meta[6] == "1" then
   local added = {}

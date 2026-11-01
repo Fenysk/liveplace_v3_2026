@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHART_HEIGHT, chartMax, chartScale, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
 
-describe("the scale of the curves (écart §4.3, JOURNAL 2026-10-06)", () => {
+describe("the scale of the curves (§16.1)", () => {
   // Monte jusqu'à la plus grande valeur, et jamais sous 1 : une courbe à zéro reste au sol
   it("rises up to the largest value, and never below 1: a curve at zero stays on the ground", () => {
     expect(chartMax([3, null, 12, 7])).toBe(12);

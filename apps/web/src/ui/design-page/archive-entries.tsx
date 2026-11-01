@@ -1,4 +1,4 @@
-// Plusieurs canvas (Écart §15, JOURNAL 2026-10-06) : le bandeau d'une archive, la section Archives de la fenêtre et ses
+// Plusieurs canvas (§17.1) : le bandeau d'une archive, la section Archives de la fenêtre et ses
 // confirmations, dans chacun de leurs états. Les vrais composants.
 
 import { HOUR_MS, MAX_ARCHIVES } from "@liveplace/domain";

@@ -19,10 +19,10 @@ export type SignInDeps = {
     "upsertUserFromTwitch" | "getUserByLogin" | "ensureCanvasForOwner" | "getActiveCanvasForOwner"
   >;
   redis: SignInWrites;
-  // Écart §7.2 (JOURNAL 2026-10-08) : absent sans `DURABLE_SCOPE`, la connexion crée le canvas comme avant.
+  // §7.4 : absent sans `DURABLE_SCOPE`, la connexion crée le canvas comme avant.
   recovery?: Pick<RecoveryStore, "hasSnapshot"> | undefined;
   signer: SessionSigner;
-  tracker: Pick<TwitchLiveTracker, "track">; // Écart §4 et §10.1 (JOURNAL 2026-10-07) : jamais bloquant, ni en échec
+  tracker: Pick<TwitchLiveTracker, "track">; // §10.4 : jamais bloquant, ni en échec
   randomCanvasId: () => string;
   now: () => Timestamp;
 };
@@ -67,7 +67,7 @@ export async function signInTwitchUser(
   const { email, ...user } = signedIn;
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);
-  // Écart §5.3 (JOURNAL 2026-10-29) : un canvas neuf naît en taille dynamique, 10×10 ; Convex garde cette taille de naissance, Redis fait foi ensuite.
+  // §5.8 : un canvas neuf naît en taille dynamique, 10×10 ; Convex garde cette taille de naissance, Redis fait foi ensuite.
   const meta = birthCanvasMeta(user.userId);
   const candidateCanvasId = deps.randomCanvasId();
   // Le candidat n'est retenu qu'à la première connexion : seul le `canvasId` rendu fait foi (D-14).
@@ -80,7 +80,7 @@ export async function signInTwitchUser(
   // Un canvas dont ce scope garde une sauvegarde ne naît jamais vide : Redis l'a perdu, le worker le remet en place. Une
   // Convex muette fait échouer la connexion : mieux vaut qu'elle recommence qu'un canvas vide que la récupération ne remplace plus.
   if (!(await deps.recovery?.hasSnapshot(canvasId))) await deps.redis.createCanvas(canvasId, meta);
-  // Écart §5.1 (JOURNAL 2026-10-06) : le candidat retenu, c'est un nouveau compte.
+  // §16.2 : le candidat retenu, c'est un nouveau compte.
   if (canvasId === candidateCanvasId) {
     const discoveredViaCanvasId = await getDiscoveredViaCanvasId(deps.durable, discoveredViaUserId);
     await deps.redis.storeSignup({

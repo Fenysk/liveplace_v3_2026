@@ -1,4 +1,4 @@
--- Changer la taille d'un canvas (JOURNAL 2026-09-29), en rapprochant les dessins avant de couper (Écart §5.3, JOURNAL 2026-10-24).
+-- Changer la taille d'un canvas (JOURNAL 2026-09-29), en rapprochant les dessins avant de couper (§5.8).
 -- Le plan vient de `planResize` (domain) ; ici il s'applique d'un coup, si la version lue pour le calculer n'a pas bougé.
 -- Ordre des KEYS et ARGV : client.ts. `parseEntry` vient de pile.lua, `openMoves` de pile-moves.lua, `applyResizePlan` de resize-plan.lua.
 
@@ -8,7 +8,7 @@ local width, height, cellStride = tonumber(ARGV[4]), tonumber(ARGV[5]), tonumber
 local cellsPrefix, clearingPrefix = ARGV[7], ARGV[8]
 local expectedVersion, planJson = tonumber(ARGV[9]), ARGV[10]
 
--- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Écart §15 (JOURNAL 2026-10-06) : une archive ne reçoit plus rien.
+-- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. §17.1 : une archive ne reçoit plus rien.
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
@@ -16,7 +16,7 @@ end
 if meta[5] then
   return { "canvas_archived" }
 end
--- Écart §5.3 (JOURNAL 2026-10-28) : une taille dynamique se règle seule, jamais par un format.
+-- §5.8 : une taille dynamique se règle seule, jamais par un format.
 if by ~= meta[2] or meta[6] == "1" then
   return { "forbidden" }
 end

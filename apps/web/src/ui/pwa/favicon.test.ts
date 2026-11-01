@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Route as RootRoute } from "../../routes/__root";
 
-// Écart §9.1 (JOURNAL 2026-10-08) : la pastille « LP » est l'icône de l'application et le favicon de toutes les pages.
+// §9.10 : la pastille « LP » est l'icône de l'application et le favicon de toutes les pages.
 
 const PUBLIC_DIR = join(import.meta.dirname, "..", "..", "..", "public");
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 
 const getPublicFile = (name: string) => readFileSync(join(PUBLIC_DIR, name));
 
-describe("le favicon (Écart §9.1, JOURNAL 2026-10-08)", () => {
+describe("le favicon (§9.10)", () => {
   // Quand une page se charge, l'onglet montre la même icône que l'application, sans que le navigateur cherche /favicon.ico
   it("links the same icon on every page, from the root", async () => {
     const head = await RootRoute.options.head?.({} as never);

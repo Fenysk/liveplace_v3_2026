@@ -1,4 +1,4 @@
-// Un choix exclusif, une option par ligne, avec sa phrase d'aide (Écart §15, JOURNAL 2026-10-06) : les jauges des
+// Un choix exclusif, une option par ligne, avec sa phrase d'aide (§17.1) : les jauges des
 // viewers quand le canvas change. Aucune option n'est présélectionnée : `value` à `null`, rien n'est coché.
 // De vrais boutons radio sous les lignes : le clavier (flèches, Tab) et les lecteurs d'écran les connaissent déjà.
 

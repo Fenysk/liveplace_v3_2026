@@ -1,4 +1,4 @@
-// Ce que le worker lit du flux d'un canvas pour en archiver l'historique (Écart §7.2, JOURNAL 2026-10-08).
+// Ce que le worker lit du flux d'un canvas pour en archiver l'historique (§7.1).
 
 import type { ChunkEntry, Recovered } from "@liveplace/domain/chunk";
 import type { HistorySource } from "@liveplace/domain/ports";

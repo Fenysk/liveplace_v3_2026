@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Toast, toastDurationMs } from "./toast";
 
-// Le toast et son bouton d'action (Écart §9.3, JOURNAL 2026-10-13).
+// Le toast et son bouton d'action (§9.6).
 
 const noop = (): void => undefined;
 const render = (action?: { label: string; onPress: () => void }): string =>
@@ -36,7 +36,7 @@ describe("le toast qui porte une action", () => {
   });
 });
 
-describe("le toast au-dessus d'une fenêtre (Écart §8.1, JOURNAL 2026-10-13)", () => {
+describe("le toast au-dessus d'une fenêtre (§9.8)", () => {
   const css = readFileSync(join(import.meta.dirname, "toast.css"), "utf8").replace(/\s+/g, " ");
   const message = { id: 1, tone: "success", text: "Thème enregistré" } as const;
   const docked = renderToStaticMarkup(createElement(Toast, { message }));

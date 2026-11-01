@@ -10,7 +10,7 @@ import { MODERATION_TEXTS } from "./moderation-texts";
 
 const MINUTE = 60_000;
 
-// A2 : un curseur à crans, qui étend la plage avant et après à la fois. Écart §14 (JOURNAL 2026-10-13) : « 5 min avant et après
+// A2 : un curseur à crans, qui étend la plage avant et après à la fois. §9.9 : « 5 min avant et après
 // ce dessin », jamais « ± 5 min ». Le cran 0 porte le libellé de ce qu'il vise.
 const SPANS = [
   { value: MINUTE, duration: "1 min" },

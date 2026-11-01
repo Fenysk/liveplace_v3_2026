@@ -26,7 +26,7 @@ const keysOf = async (canvasId: string): Promise<string[]> => {
   return found.sort();
 };
 
-describe("preparing and readying a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("preparing and readying a canvas (§17.2)", () => {
   // Prépare un canvas que personne ne sert encore : `meta` sans `ready`, `state` vide, version 0 ; `ready` le sert
   it("prepares a canvas nobody serves yet: meta without ready, empty state, version 0, then ready serves it", async () => {
     const canvasId = uniqueCanvasId();
@@ -48,7 +48,7 @@ describe("preparing and readying a canvas (Écart §15, JOURNAL 2026-10-06)", ()
   });
 });
 
-describe("the dynamic size at birth (Écart §5.3, JOURNAL 2026-10-29)", () => {
+describe("the dynamic size at birth (§5.8)", () => {
   const birth = birthCanvasMeta("owner-1");
 
   // Naît en taille dynamique et 10 × 10 : le réglage s'écrit sous son nom dans Redis, jamais sous celui du domaine
@@ -91,7 +91,7 @@ describe("the dynamic size at birth (Écart §5.3, JOURNAL 2026-10-29)", () => {
   });
 });
 
-describe("marking a canvas archived or active (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("marking a canvas archived or active (§17.2)", () => {
   // Marque l'archive de ses deux champs, retire le successeur seul, puis rend le canvas actif en retirant les deux
   it("marks the archive with its two fields, removes the successor alone, then gives the canvas back by removing both", async () => {
     const canvasId = uniqueCanvasId();
@@ -111,7 +111,7 @@ describe("marking a canvas archived or active (Écart §15, JOURNAL 2026-10-06)"
   });
 });
 
-describe("copying what is common to the owner (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("copying what is common to the owner (§17.2)", () => {
   const seedShared = async (canvasId: string, user: string, more: Record<string, string | number> = {}) => {
     const keys = buildCanvasKeys(canvasId);
     await redis
@@ -216,7 +216,7 @@ describe("copying what is common to the owner (Écart §15, JOURNAL 2026-10-06)"
   });
 });
 
-describe("copying the progress (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("copying the progress (§17.2)", () => {
   // Efface la progression de l'entrant puis recopie celle du sortant, jour compris, sans jamais copier la jauge
   it("erases the incoming progress then copies the outgoing one, day included, never the gauge", async () => {
     const [outgoing, incoming] = [uniqueCanvasId(), uniqueCanvasId()];
@@ -262,7 +262,7 @@ describe("copying the progress (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("settling the reports (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("settling the reports (§17.2)", () => {
   // Vide les signalements et les poses cachées du stream, et laisse les poses rétablies, les bannis et le reste
   it("empties the reports and the poses hidden from the stream, and leaves approved poses, bans and the rest", async () => {
     const canvasId = uniqueCanvasId();
@@ -287,7 +287,7 @@ describe("settling the reports (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("publishing the status (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("publishing the status (§17.2)", () => {
   // Publie le statut sur le canal `live` du canvas, tel que le gateway le relit
   it("publishes the status on the live channel of the canvas, as the gateway reads it", async () => {
     const canvasId = uniqueCanvasId();
@@ -310,7 +310,7 @@ describe("publishing the status (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the theme of a canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("the theme of a canvas (§17.1)", () => {
   const listen = async (canvasId: string) => {
     const subscriber = redis.duplicate();
     const received: string[] = [];
@@ -376,7 +376,7 @@ describe("the theme of a canvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("the background image of a canvas (Écart §8.1, JOURNAL 2026-10-10)", () => {
+describe("the background image of a canvas (§17.1)", () => {
   const listen = async (canvasId: string) => {
     const subscriber = redis.duplicate();
     const received: string[] = [];
@@ -479,7 +479,7 @@ describe("the background image of a canvas (Écart §8.1, JOURNAL 2026-10-10)", 
   });
 });
 
-describe("discarding a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("discarding a canvas (§17.2)", () => {
   // Efface toutes les clés du canvas, le classement et ses scores à l'écart compris, et pas celles d'un canvas dont
   // l'identifiant commence pareil
   it("erases every key of the canvas, scoreboard included, and not those of a canvas whose id starts the same", async () => {
@@ -531,7 +531,7 @@ describe("discarding a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the image of a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the image of a canvas (§17.2)", () => {
   // Rend la taille et un octet par case, et rien pour un canvas absent
   it("gives the size and one byte per cell, and nothing for a missing canvas", async () => {
     const canvasId = uniqueCanvasId();
@@ -549,7 +549,7 @@ describe("the image of a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the lock of an owner (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("the lock of an owner (§17.2)", () => {
   // Un seul preneur à la fois, qui seul le rend ; il expire de lui-même
   it("has a single holder at a time, who alone gives it back, and expires by itself", async () => {
     const ownerId = `${runId}-owner-1`;

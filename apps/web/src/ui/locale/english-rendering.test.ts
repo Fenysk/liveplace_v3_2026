@@ -1,4 +1,4 @@
-// L'interface en anglais (Écart §14, JOURNAL 2026-10-07) : chaque surface rendue sous un `LocaleProvider` anglais dit ses
+// L'interface en anglais (§9.9) : chaque surface rendue sous un `LocaleProvider` anglais dit ses
 // mots en anglais, et ne garde aucun mot français.
 
 import { PALETTE } from "@liveplace/domain";
@@ -72,7 +72,7 @@ const accountPill = (props: Partial<Parameters<typeof AccountPill>[0]> = {}): st
     }),
   );
 
-describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the account in English (§9.9)", () => {
   // La pill Compte : ses titres, le point des signalements dit en anglais, et pas de bouton de langue (elle est dans Mon compte)
   it("says the account pill in English, with the pending reports", () => {
     const markup = accountPill({ onOpenSettings: doNothing, pendingReports: 2 });
@@ -149,7 +149,7 @@ describe("the account in English (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the Draw pill in English (§9.9)", () => {
   // Les états de connexion : l'invitation, le ban, la coupure
   it("says the connection, the ban and the invitation in English", () => {
     expect(draftPill({ kind: "connecting" })).toContain("Connecting");
@@ -214,7 +214,7 @@ describe("the Draw pill in English (Écart §14, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the windows of the game in English (§9.9)", () => {
   const canvas = { width: 8, height: 8, palette: PALETTE };
 
   // La confirmation d'une modération : titre, conséquence, boutons
@@ -374,7 +374,7 @@ describe("the windows of the game in English (Écart §14, JOURNAL 2026-10-07)",
   });
 });
 
-describe("the canvas settings and the archives in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the canvas settings and the archives in English (§9.9)", () => {
   const current = { width: 32, height: 32 };
 
   // Le thème, la taille, le format et la confirmation
@@ -418,7 +418,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(section).toContain("Dynamic size");
     expect(section).toContain("keeps 3 empty cells around its drawings");
     for (const label of ["Small", "Medium", "Large", "Change size"]) expect(section).toContain(label);
-    // Le fond de la fresque, avec son image (Écart §9.1, JOURNAL 2026-10-10)
+    // Le fond de la fresque, avec son image (§9.5)
     for (const label of [
       "Canvas background",
       "Canvas image",
@@ -433,7 +433,7 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(resize).toContain("it comes back when the canvas grows");
   });
 
-  // La pill Pratique : Écart §8.1 (JOURNAL 2026-10-13), plus de pourcentage
+  // La pill Pratique : §9.7, plus de pourcentage
   it("says the tips of the zoom pill in English, and shows no percent", () => {
     const markup = inEnglish(
       createElement(ViewportPill, {
@@ -545,14 +545,14 @@ describe("the canvas settings and the archives in English (Écart §14, JOURNAL 
     expect(markup).toContain("In OBS Studio or Streamlabs: Sources, +, Browser.");
     expect(markup).toContain(">Delay</label>");
     expect(markup).toContain(">None</span>");
-    // Le fond n'est plus ici : il se règle dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10)
+    // Le fond n'est plus ici : il se règle dans la section Fresque (§9.5)
     expect(markup).not.toContain("OBS view background");
     expect(markup).not.toContain('aria-label="Transparent"');
     expect(markup).not.toContain('aria-label="Black"');
   });
 });
 
-describe("what arrived with the mobile interface, in English (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("what arrived with the mobile interface, in English (§9.9)", () => {
   const owner: ProfileUser = { displayName: "Kalyss", login: "kalyss" };
 
   // La pill Canvas repliée sur mobile : le bouton qui la déplie, et le live dans son nom
@@ -576,7 +576,7 @@ describe("what arrived with the mobile interface, in English (Écart §14, JOURN
     expect(markup).toContain('aria-label="2 of 3"');
   });
 
-  // À la souris (Écart §8.1, JOURNAL 2026-10-12) : les mêmes deux gestes, à la molette et au clic
+  // À la souris (§9.11) : les mêmes deux gestes, à la molette et au clic
   it("says the first-visit hint with a mouse in English", () => {
     const markup = inEnglish(
       createElement(FirstHint, { doneCount: 1, isVisible: true, isDocked: false, isTouchScreen: false }),

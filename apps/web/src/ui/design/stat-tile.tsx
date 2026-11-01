@@ -1,4 +1,4 @@
-// Un chiffre de l'instant sous son libellé, avec une précision facultative (la section Activité, écart §4.3, JOURNAL 2026-10-06).
+// Un chiffre de l'instant sous son libellé, avec une précision facultative (la section Activité, §16.1).
 
 import type { ReactNode } from "react";
 import { RollingNumber } from "./rolling-number";

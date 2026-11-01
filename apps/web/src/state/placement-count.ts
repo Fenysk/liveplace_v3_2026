@@ -1,4 +1,4 @@
-// Les dessins posés sur cet appareil (Écart §8.1, JOURNAL 2026-10-12), retenus dans son navigateur : ils disent quand proposer la
+// Les dessins posés sur cet appareil (§9.11), retenus dans son navigateur : ils disent quand proposer la
 // palette, Ctrl+Z et la pipette. Compté par appareil, plafonné à ce qui sert ; le stockage est injecté.
 
 import type { BubbleStorage } from "./seen-bubbles";

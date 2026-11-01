@@ -1,4 +1,4 @@
--- Collé devant place.lua, moderate.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (Écart §5.3, JOURNAL 2026-10-28) :
+-- Collé devant place.lua, moderate.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (§5.8) :
 -- la taille dynamique. `planGrowth` dit de combien une fresque grandit pour retrouver ses marges, `reframe` l'agrandit ou la resserre
 -- et décale tout ce qui porte une coordonnée.
 

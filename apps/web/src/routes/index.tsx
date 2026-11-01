@@ -1,4 +1,4 @@
-// `/` : la page d'accueil, une démo jouable qui reste dans le navigateur (Écart §9.1, JOURNAL 2026-10-22).
+// `/` : la page d'accueil, une démo jouable qui reste dans le navigateur (§9.1).
 
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";

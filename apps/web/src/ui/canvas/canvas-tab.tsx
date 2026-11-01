@@ -1,5 +1,5 @@
-// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le thème du canvas, son fond (Écart §9.1, JOURNAL 2026-10-10), la taille
-// dynamique (Écart §5.3, JOURNAL 2026-10-28) ou la taille choisie, sa confirmation, puis la demande au gateway. La nouvelle taille arrive
+// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le thème du canvas, son fond (§9.5), la taille
+// dynamique (§5.8) ou la taille choisie, sa confirmation, puis la demande au gateway. La nouvelle taille arrive
 // d'elle-même, par un `welcome` et un snapshot, à toutes les pages. Retirer la taille dynamique ramène la fresque à la taille fixe par défaut
 // (JOURNAL 2026-10-29) : avec des dessins qui sortiraient du cadre, c'est la confirmation d'un format plus petit ; sans, rien à confirmer.
 

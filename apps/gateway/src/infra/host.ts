@@ -1,4 +1,4 @@
-// La machine et le process, lus sans rien installer (écart §5.1, JOURNAL 2026-10-07) : `node:os` et `node:fs` donnent les
+// La machine et le process, lus sans rien installer (§16.3) : `node:os` et `node:fs` donnent les
 // chiffres de l'hôte, même depuis un conteneur, et sous Windows en local ; `performance`, l'occupation de la boucle d'événements.
 
 import { statfs } from "node:fs/promises";

@@ -1,4 +1,4 @@
-// Ce que le tutoriel retient sur l'appareil, côté navigateur (Écart §8.1, JOURNAL 2026-10-12) : les dessins posés, que la page
+// Ce que le tutoriel retient sur l'appareil, côté navigateur (§9.11) : les dessins posés, que la page
 // compte, et de quoi tout rejouer. Les bulles vues vivent dans `ui/design/use-seen-bubble.ts`, le conseil de première visite
 // dans `ui/hint/use-first-hint.ts`.
 

@@ -143,7 +143,7 @@ const setup = async (
   };
 };
 
-describe("the history cycle (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("the history cycle (§7.1)", () => {
   // Quand le tour de cinq minutes vient, un seul chunk range tout ce qui suit le curseur, poses et modération, avec leurs poses
   it("stores one chunk per turn with every entry after the cursor, and the placement ids", async () => {
     const { cycle, chunks, advance } = await setup({

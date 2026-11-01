@@ -1,8 +1,8 @@
 // La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas) ou
 // Modération (qui modère sans être le streamer), l'apparence, puis sa photo (Mon compte) ou Se connecter. Avec
-// Développeur, Réglages ou Modération, l'apparence passe à droite de la photo (Écart §14, JOURNAL 2026-10-07). La langue
-// se choisit dans Mon compte, pas ici. Sur son canvas, c'est la seule pill du streamer. Sur mobile (Écart §8.1,
-// JOURNAL 2026-10-08), ni l'apparence (elle est dans Mon compte) ni Se connecter (la barre du bas le dit) : l'invité
+// Développeur, Réglages ou Modération, l'apparence passe à droite de la photo (§9.9). La langue
+// se choisit dans Mon compte, pas ici. Sur son canvas, c'est la seule pill du streamer. Sur mobile (§9.7),
+// ni l'apparence (elle est dans Mon compte) ni Se connecter (la barre du bas le dit) : l'invité
 // n'a plus de pill, sauf sans barre du bas (une archive).
 
 import { Activity, Settings, Shield } from "lucide-react";
@@ -33,7 +33,7 @@ export type AccountPillProps = {
   onOpenAccount: () => void; // la fenêtre, ouverte sur Mon compte, ou sur Modération si des signalements attendent (sauf au modérateur)
   onOpenSettings?: (() => void) | undefined; // la fenêtre, sur Canvas ; absent : pas le streamer sur son canvas
   onOpenModeration?: (() => void) | undefined; // la fenêtre, sur Modération ; absent : pas modérateur sans être le streamer
-  onOpenDeveloper?: (() => void) | undefined; // écart §10.3 (JOURNAL 2026-10-06) : la fenêtre Développeur, pour lui seul
+  onOpenDeveloper?: (() => void) | undefined; // §10.3 : la fenêtre Développeur, pour lui seul
   pendingReports?: number; // pour qui modère : un point tant qu'il y en a, sur Modération s'il l'a, sinon sur sa photo (JOURNAL 2026-09-28)
   onSignIn?: () => void; // la page part chez Twitch
   isCompact?: boolean;
@@ -136,7 +136,7 @@ export const AccountPill = ({
   const appearance = !isCompact && <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />;
   const hasLeftIcons = Boolean(onOpenDeveloper || onOpenSettings || onOpenModeration);
   // Le point suit le bouton qui mène aux signalements : Modération pour le modérateur, sinon la photo (une seule pastille).
-  // La bulle d'aide des signalements vise le même bouton (Écart §8.1, JOURNAL 2026-10-08).
+  // La bulle d'aide des signalements vise le même bouton (§9.11).
   const hasModeration = Boolean(onOpenModeration);
   const { showsSignIn, hasNothingToShow } = visibilityOf(identity, isCompact, hasBottomBar);
   return (

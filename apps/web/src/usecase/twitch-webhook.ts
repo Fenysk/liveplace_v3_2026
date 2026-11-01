@@ -18,7 +18,7 @@ export type TwitchWebhookDeps = {
   now: () => Timestamp;
   durable: Pick<DurableStore, "getActiveCanvasForOwner">;
   twitchWrites: TwitchWrites;
-  tracker: Pick<TwitchLiveTracker, "apply">; // Écart §4 (JOURNAL 2026-10-07)
+  tracker: Pick<TwitchLiveTracker, "apply">; // §10.4
 };
 
 // `204` dès que c'est noté : Twitch réessaie, puis coupe l'abonnement, si la réponse tarde.
@@ -26,7 +26,7 @@ export type TwitchWebhookAnswer = { status: 200; challenge: string } | { status:
 
 type ChannelEvent = Exclude<TwitchWebhookEvent, { kind: "verification" | "ignored" } | TwitchLiveEvent>;
 
-// Écart §4 (JOURNAL 2026-10-07) : le live n'a pas de canvas ici, et sa révocation n'est pas celle de la modération.
+// §10.4 : le live n'a pas de canvas ici, et sa révocation n'est pas celle de la modération.
 const isLiveEvent = (event: TwitchWebhookEvent): event is TwitchLiveEvent =>
   event.kind === "online" ||
   event.kind === "offline" ||
@@ -68,7 +68,7 @@ const applyEvent = async (deps: TwitchWebhookDeps, event: AppliedEvent): Promise
   else if (event.kind !== "ignored") await applyChannelEvent(deps, event);
 };
 
-// Écart §5.1 (JOURNAL 2026-10-08) : Twitch livre « au moins une fois ». Un identifiant déjà reçu ne rejoue rien ; si
+// §10.1 : Twitch livre « au moins une fois ». Un identifiant déjà reçu ne rejoue rien ; si
 // l'action échoue, il est rendu, pour que la redélivrance de Twitch passe.
 const applyOnce = async (deps: TwitchWebhookDeps, messageId: string, event: AppliedEvent): Promise<void> => {
   if (!(await deps.twitchWrites.reserveTwitchMessage(messageId))) return;

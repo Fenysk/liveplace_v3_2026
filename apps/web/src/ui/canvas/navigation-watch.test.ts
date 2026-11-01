@@ -16,7 +16,7 @@ const setup = () => {
   return { onNavigate, navigation: createNavigationWatch(onNavigate) };
 };
 
-describe("ce que l'utilisateur fait de la vue (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("ce que l'utilisateur fait de la vue (§9.7)", () => {
   // Un glissement trop court n'est pas un déplacement : un doigt qui dérive ne remplit pas un point
   it("does not count a drag shorter than the minimum as a move", () => {
     const { navigation, onNavigate } = setup();

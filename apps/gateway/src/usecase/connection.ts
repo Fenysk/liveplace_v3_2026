@@ -86,7 +86,7 @@ type ListCapacityHistoryFrame = Extract<ClientFrame, { t: "listCapacityHistory" 
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
 // attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), le statut du
-// canvas (Écart §15, JOURNAL 2026-10-06), ou le live du streamer ou de cette personne (Écart §4, JOURNAL 2026-10-07).
+// canvas (§17.1), ou le live du streamer ou de cette personne (§10.4).
 type ControlFrame = Extract<
   ServerFrame,
   {
@@ -107,7 +107,7 @@ type ControlFrame = Extract<
   }
 >;
 
-// Écart §4 (JOURNAL 2026-10-07) : le live du streamer du canvas et celui de la personne connectée.
+// §10.4 : le live du streamer du canvas et celui de la personne connectée.
 type TwitchLives = { owner: TwitchLive | null; you: TwitchLive | null };
 
 // L'arrivée d'une page : un resync depuis `lastVersion`, ou un snapshot (et son `recent` en vue OBS).
@@ -119,7 +119,7 @@ type Arrival = { version: number; coveredVersion: number } & (
 
 // `ready` garde la taille du canvas (une case hors bornes n'a pas de cellKey à elle) et le rôle, qui décide (§10.3).
 // §10.3 : le rôle se relit en direct, d'où `ownerId`.
-// Écart §15 (JOURNAL 2026-10-06) : `isArchived`, plus aucune écriture ; la connexion reste ouverte, pour qu'on y regarde.
+// §17.1 : `isArchived`, plus aucune écriture ; la connexion reste ouverte, pour qu'on y regarde.
 type ReadyState = {
   status: "ready";
   canvasId: string;
@@ -129,7 +129,7 @@ type ReadyState = {
   height: number;
   role: Role;
   isArchived: boolean;
-  // Écart §5.3 (JOURNAL 2026-10-28) : la dernière version que l'arrivée de la page a déjà couverte. Une case plus ancienne, qui
+  // §5.8 : la dernière version que l'arrivée de la page a déjà couverte. Une case plus ancienne, qui
   // attendait encore dans le tampon du tick, parle peut-être d'un cadre d'avant un agrandissement : elle n'est plus envoyée.
   coveredVersion: number;
 };
@@ -141,7 +141,7 @@ type State =
       status: "joining";
       canvasId: string;
       mode: HelloFrame["mode"];
-      ownerId: string; // le live d'un compte ne regarde que lui et ses pages (Écart §4, JOURNAL 2026-10-07)
+      ownerId: string; // le live d'un compte ne regarde que lui et ses pages (§10.4)
       role: Role;
       pendingFrames: CellsFrame[];
       pendingControls: ControlFrame[];
@@ -155,8 +155,8 @@ export type ConnectionDeps = {
   // actions Twitch (`twitch-commands.ts`).
   core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe" | "copyTwitchUsers">;
   broadcast: Broadcast;
-  activity: Omit<Activity, "tick" | "start">; // écart §4.3 (JOURNAL 2026-10-06) : le gateway décide, et ne dit rien aux autres
-  // écart §4.3 (JOURNAL 2026-10-07) : de même ; Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : il compte aussi les poses refusées
+  activity: Omit<Activity, "tick" | "start">; // §16.1 : le gateway décide, et ne dit rien aux autres
+  // §16.1 : de même ; §16.3 : il compte aussi les poses refusées
   capacity: Pick<Capacity, "watch" | "listHistory" | "countRefusedPlacement">;
   now: () => Timestamp;
 };
@@ -212,8 +212,8 @@ const buildWelcome = (
     ownerId: meta.ownerId,
     ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
     ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
-    ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // Écart §5.3 (JOURNAL 2026-10-24)
-    ...(meta.isDynamicSize ? { isDynamicSize: true } : {}), // Écart §5.3 (JOURNAL 2026-10-28)
+    ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // §5.8
+    ...(meta.isDynamicSize ? { isDynamicSize: true } : {}), // §5.8
     ...(meta.origin ? { origin: meta.origin } : {}),
   },
   params: {
@@ -223,11 +223,11 @@ const buildWelcome = (
     refillCharges: meta.refillCharges,
     obsDelayMs: meta.obsDelayMs,
     obsBackground: meta.obsBackground,
-    ...(meta.backgroundImageAt === undefined ? {} : { backgroundImageAt: meta.backgroundImageAt }), // Écart §8.1 (JOURNAL 2026-10-10)
+    ...(meta.backgroundImageAt === undefined ? {} : { backgroundImageAt: meta.backgroundImageAt }), // §8.4
     ...(meta.backgroundImageOpacity === undefined
       ? {}
       : { backgroundImageOpacity: meta.backgroundImageOpacity }),
-    ...(meta.theme === undefined ? {} : { theme: meta.theme }), // Écart §8.1 (JOURNAL 2026-10-07)
+    ...(meta.theme === undefined ? {} : { theme: meta.theme }), // §8.1
   },
   palette: [...PALETTE],
   version,
@@ -238,7 +238,7 @@ const buildWelcome = (
 // La page à qui un message de contrôle s'adresse : son rôle, son mode, et le streamer du canvas.
 type Page = { role: Role; mode: HelloFrame["mode"]; ownerId: string };
 
-// Écart §4 (JOURNAL 2026-10-07) : le live du streamer de la page ou de cette personne, jamais en vue OBS, qui n'a pas de profil.
+// §10.4 : le live du streamer de la page ou de cette personne, jamais en vue OBS, qui n'a pas de profil.
 const twitchLiveFrameOf = (
   { userId, twitchLive }: TwitchLiveControl,
   session: Session | null,
@@ -255,7 +255,7 @@ type BackgroundImageControl = Extract<Control, { t: "backgroundImage" | "backgro
 const isBackgroundImageControl = (control: Control): control is BackgroundImageControl =>
   control.t === "backgroundImage" || control.t === "backgroundImageOpacity";
 
-// Écart §4.3 (JOURNAL 2026-10-10) : l'image du fond et son opacité, les mêmes pour toutes les pages, telles que le web les a publiées.
+// §4.3 : l'image du fond et son opacité, les mêmes pour toutes les pages, telles que le web les a publiées.
 const backgroundImageFrameOf = (control: BackgroundImageControl): ControlFrame =>
   control.t === "backgroundImage"
     ? { t: "backgroundImage", ...(control.at ? { at: control.at } : {}) }
@@ -283,7 +283,7 @@ const toStreamState = (state: Uint8Array, cells: OffStreamCell[], width: number)
   return shown;
 };
 
-// `device` : lu au `User-Agent` du handshake, pour le suivi d'activité (écart §4.3, JOURNAL 2026-10-06).
+// `device` : lu au `User-Agent` du handshake, pour le suivi d'activité (§16.1).
 export function createConnection(
   deps: ConnectionDeps,
   socket: ClientSocket,
@@ -335,7 +335,7 @@ export function createConnection(
     if (control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
   };
 
-  // Écart §10.3 (JOURNAL 2026-10-08) : un banni ne modère plus, son déban lui rend son rôle ; la frame `banned` part ensuite.
+  // §10.3 : un banni ne modère plus, son déban lui rend son rôle ; la frame `banned` part ensuite.
   const rereadRoleOnBan = (control: Exclude<ControlMessage, ScoreboardControl>): void => {
     if (control.t === "banned" || control.t === "unbanned") onRoleControl(control.userId);
   };
@@ -353,7 +353,7 @@ export function createConnection(
     if (frame) deliverControl(frame);
   };
 
-  // Écart §15 (JOURNAL 2026-10-06) : le statut du canvas dit aussi si la connexion accepte encore des écritures.
+  // §17.1 : le statut du canvas dit aussi si la connexion accepte encore des écritures.
   const deliverControl = (frame: ControlFrame): void => {
     if (state.status === "joining") state.pendingControls.push(frame);
     else if (state.status === "ready") {
@@ -384,7 +384,7 @@ export function createConnection(
     socket.close(CLOSE_POLICY);
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-08) : Redis a perdu ce canvas et le remet en place (`meta.ready` à 0), ou il n'existe pas.
+  // §7.4 : Redis a perdu ce canvas et le remet en place (`meta.ready` à 0), ou il n'existe pas.
   // La page reprend seule dans le premier cas : sa reconnexion trouve le canvas prêt.
   const refuseMissing = async (canvasId: string): Promise<void> =>
     refuse((await deps.core.isRecovering(canvasId)) ? "canvas_recovering" : "canvas_not_found");
@@ -481,7 +481,7 @@ export function createConnection(
     await arrive(frame, meta, role, gauge, scoreboard);
   };
 
-  // Écart §4 (JOURNAL 2026-10-07) : le live du streamer et celui de la personne connectée, lus une fois joint : un live annoncé
+  // §10.4 : le live du streamer et celui de la personne connectée, lus une fois joint : un live annoncé
   // pendant la lecture est gardé, puis envoyé après le welcome. Aucun profil en vue OBS, aucune lecture.
   const getTwitchLives = async (mode: HelloFrame["mode"], ownerId: string): Promise<TwitchLives> => {
     if (mode === "obs") return { owner: null, you: null };
@@ -494,7 +494,7 @@ export function createConnection(
   };
 
   // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live.
-  // Écart §15 (JOURNAL 2026-10-06) : une archive n'en a pas à dire, personne n'y pose.
+  // §17.1 : une archive n'en a pas à dire, personne n'y pose.
   const getArrivalParts = (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
     const isArchived = meta.archivedAt !== undefined;
     return Promise.all([
@@ -556,15 +556,14 @@ export function createConnection(
     else void rearrive().catch((error: unknown) => console.error("nouvelle taille non reprise", error));
   };
 
-  // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas, ni une archive (Écart §15, JOURNAL 2026-10-06) : personne n'y pose.
+  // §5.6 : la jauge dès l'arrivée. Un invité n'en a pas, ni une archive (§17.1) : personne n'y pose.
   const getGaugeFor = async (canvasId: string, meta: CanvasMeta): Promise<AckFrame["gauge"] | null> =>
     session && meta.archivedAt === undefined
       ? deps.core.getGauge(canvasId, session.userId, deps.now())
       : null;
 
   // JOURNAL 2026-10-06 : le classement à l'arrivée, lu avant de s'abonner comme la jauge, donc plus ancien que tout ce
-  // qui tombe ensuite. Rien en vue OBS, rien non plus sans pose : une page qui se coupe efface le sien. Écart §15
-  // (JOURNAL 2026-10-06) : ni sur une archive, qui n'en montre pas et n'a rien à lire.
+  // qui tombe ensuite. Rien en vue OBS, rien non plus sans pose : une page qui se coupe efface le sien. §17.1 : ni sur une archive, qui n'en montre pas et n'a rien à lire.
   const getScoreboardFrame = async ({ canvasId, mode }: HelloFrame, meta: CanvasMeta) => {
     if (mode === "obs" || meta.archivedAt !== undefined) return null;
     const [top, ranks] = await Promise.all([
@@ -586,7 +585,7 @@ export function createConnection(
     await joinCanvas(frame, meta, roleFor(session, meta, isModerator), gauge, scoreboard);
   };
 
-  // Écart §15 (JOURNAL 2026-10-06) : une archive refuse sans fermer la connexion. Un script qui la refuse apprend aussi
+  // §17.1 : une archive refuse sans fermer la connexion. Un script qui la refuse apprend aussi
   // à la connexion qu'elle en est une : le gateway n'a pas encore reçu le statut.
   const refuseArchived = (requestId: string): void => {
     if (state.status === "ready") state = { ...state, isArchived: true };
@@ -607,7 +606,7 @@ export function createConnection(
       requestId: frame.requestId,
       placementId: frame.placementId,
       nowMs: deps.now(),
-      origin: frame.origin, // Écart §5.3 (JOURNAL 2026-10-28) : le script traduit les pixels vers le repère d'aujourd'hui
+      origin: frame.origin, // §5.8 : le script traduit les pixels vers le repère d'aujourd'hui
       pixels: frame.pixels,
     });
     if (!result.ok)
@@ -638,10 +637,10 @@ export function createConnection(
   };
 
   // Ce que ce rôle voit de l'auteur : sans identifiant hors modération. JOURNAL 2026-09-27 : qui modère apprend en plus s'il
-  // est modérateur, le streamer pour le nommer ou le retirer. Écart §4.3 (JOURNAL 2026-10-08) : tout modérateur, pour
+  // est modérateur, le streamer pour le nommer ou le retirer. §4.3 : tout modérateur, pour
   // que Bannir se cache sur un modérateur nommé ici.
   const entryFor = async (inspected: InspectEntry, ready: ReadyState): Promise<InspectEntry> => {
-    // Écart §15 (JOURNAL 2026-10-06) : sur une archive, ni identifiant, ni signalement, ni origine : personne n'y modère.
+    // §17.1 : sur une archive, ni identifiant, ni signalement, ni origine : personne n'y modère.
     if (ready.isArchived) return withoutUserId(inspected);
     const found = session ? { ...inspected, canReport: await canReport(inspected, ready) } : inspected;
     if (!canModerate(ready.role)) return withoutUserId(found);
@@ -659,7 +658,7 @@ export function createConnection(
     socket.sendFrame({ t: "inspected", requestId, x, y, ...(entry ? { entry } : {}) });
   };
 
-  // Écart §4 (JOURNAL 2026-10-07) : l'auteur est-il en live ? Une lecture Redis, au débit déjà plafonné de l'inspection.
+  // §10.4 : l'auteur est-il en live ? Une lecture Redis, au débit déjà plafonné de l'inspection.
   const withTwitchLive = async (inspected: InspectEntry): Promise<InspectEntry> => {
     const twitchLive = inspected.userId ? await deps.core.getTwitchLive(inspected.userId) : null;
     return twitchLive ? { ...inspected, twitchLive } : inspected;
@@ -752,7 +751,7 @@ export function createConnection(
     socket.sendFrame({ t: "authorPixels", requestId, pixels });
   };
 
-  // La réponse à une requête de taille. Écart §5.3 (JOURNAL 2026-10-24) : `busy`, des poses ont couru pendant chaque essai, rien n'a
+  // La réponse à une requête de taille. §5.8 : `busy`, des poses ont couru pendant chaque essai, rien n'a
   // bougé ; il suffit de réessayer.
   const answerSizeRequest = (
     result: Awaited<ReturnType<CanvasCore["resizeCanvas"]>> | null,
@@ -773,7 +772,7 @@ export function createConnection(
       requestId,
     );
 
-  // Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul, comme la taille, et la même réponse.
+  // §5.8 : le streamer seul, comme la taille, et la même réponse.
   const setDynamicSize = async ({ requestId, isDynamicSize }: SetDynamicSizeFrame, ready: ReadyState) =>
     answerSizeRequest(
       ready.role === "owner" && session
@@ -802,7 +801,7 @@ export function createConnection(
     await deps.core.setObsBackground(ready.canvasId, obsBackground);
   };
 
-  // Écart §9.1 (JOURNAL 2026-10-10) : le streamer seul, comme le fond. Le schéma n'a laissé passer qu'un cran.
+  // §9.5 : le streamer seul, comme le fond. Le schéma n'a laissé passer qu'un cran.
   const setBackgroundImageOpacity = async (
     { requestId, backgroundImageOpacity }: SetBackgroundImageOpacityFrame,
     ready: ReadyState,
@@ -820,7 +819,7 @@ export function createConnection(
     await deps.core.setGaugeLimits(ready.canvasId, { gaugeMaxStart, gaugeMaxCeiling });
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul ; pour les autres, rien, pas même un refus. L'historique du canvas
+  // §16.1 : le développeur seul ; pour les autres, rien, pas même un refus. L'historique du canvas
   // est celui de cette socket (JOURNAL 2026-10-07).
   const listActivityHistory = async (
     { requestId, period }: ListActivityHistoryFrame,
@@ -830,7 +829,7 @@ export function createConnection(
     if (history) socket.sendFrame({ t: "activityHistory", requestId, ...history });
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-14) : de même pour un jour passé. Un jour futur est refusé pour cette requête seule.
+  // §16.1 : de même pour un jour passé. Un jour futur est refusé pour cette requête seule.
   const listActivityDay = async (
     { requestId, dayAt }: ListActivityDayFrame,
     ready: ReadyState,
@@ -841,7 +840,7 @@ export function createConnection(
     socket.sendFrame({ t: "activityDay", requestId, ...result.value });
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, qui n'a rien de propre au canvas de la socket.
+  // §16.1 : de même pour la capacité, qui n'a rien de propre au canvas de la socket.
   const listCapacityHistory = async ({ requestId, period }: ListCapacityHistoryFrame): Promise<void> => {
     const history = await deps.capacity.listHistory(session, period);
     if (history) socket.sendFrame({ t: "capacityHistory", requestId, ...history });
@@ -849,8 +848,8 @@ export function createConnection(
 
   // Un `switch` exhaustif : le compilateur signale toute frame du protocole laissée sans route.
   const route = async (frame: Exclude<ClientFrame, HelloFrame>, ready: ReadyState): Promise<void> => {
-    // Écart §15 (JOURNAL 2026-10-06) : une archive se regarde (`inspect`) et se tient en vie (`ping`) ; le reste est refusé,
-    // sauf le suivi d'activité et de capacité (écart §4.2), qui ne touchent pas au canvas.
+    // §17.1 : une archive se regarde (`inspect`) et se tient en vie (`ping`) ; le reste est refusé,
+    // sauf le suivi d'activité et de capacité (§16.1), qui ne touchent pas au canvas.
     if (
       ready.isArchived &&
       frame.t !== "inspect" &&

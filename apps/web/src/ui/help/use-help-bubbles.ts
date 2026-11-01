@@ -1,4 +1,4 @@
-// Ce que montrent les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08) : quelle bulle, à cet instant, et quand elle se clôt.
+// Ce que montrent les bulles d'aide (§9.11) : quelle bulle, à cet instant, et quand elle se clôt.
 // Les stores et la pill Dessin disent ce que l'écran demande (`HelpFacts`) ; l'état pur choisit une seule bulle, la plus
 // prioritaire ; `state/shown-bubble.ts` lui laisse le temps de paraître, et la précédente de s'effacer avant elle.
 
@@ -60,8 +60,8 @@ const bubbleClock: ShownBubbleClock = {
 
 const getNoBubble = (): HelpBubble | undefined => undefined;
 
-// La bulle voulue attend que celle qui était là ait fini son fondu : jamais deux à l'écran. Une bulle close qui reste (Écart §8.1,
-// JOURNAL 2026-10-12) garde sa place le temps d'être lue ; `canLinger` le dit pour la bulle montrée.
+// La bulle voulue attend que celle qui était là ait fini son fondu : jamais deux à l'écran. Une bulle close qui reste (§9.11)
+// garde sa place le temps d'être lue ; `canLinger` le dit pour la bulle montrée.
 const useShownBubble = (
   wanted: HelpBubble | undefined,
   canLinger: (shown: HelpBubble) => boolean,
@@ -130,7 +130,7 @@ export type HelpBubblesView = {
 };
 
 // `windowSection` : la section de la fenêtre du compte ouverte, absente si elle est fermée. Ouverte, elle a ses propres bulles.
-// `moderation` : absent, pas le droit de modérer ; l'inspection d'une pose a alors la sienne (Écart §8.1, JOURNAL 2026-10-12).
+// `moderation` : absent, pas le droit de modérer ; l'inspection d'une pose a alors la sienne (§9.11).
 export function useHelpBubbles(
   { canvas, draft }: HelpStores,
   pillState: DraftPillState,
@@ -143,7 +143,7 @@ export function useHelpBubbles(
   const placements = useSyncExternalStore(placementCount.subscribe, placementCount.getCount, getNoPlacement);
   const isTouchScreen = useMediaQuery(TOUCH_SCREEN_QUERY);
   // Le bouton de la couleur actuelle n'existe que dans la feuille Dessin repliée : ni au grand écran, ni dans le panneau du paysage
-  // (Écart §8.1, JOURNAL 2026-10-12).
+  // (§9.11).
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const isSidePanel = useMediaQuery(SIDE_COLUMN_QUERY);
   const hasColorButton = isCompact && !isSidePanel;

@@ -1,4 +1,4 @@
-// Les ressources de la section Capacité (Écart §4.3, JOURNAL 2026-10-07), en lignes simples comme celles des autres sections
+// Les ressources de la section Capacité (§16.3), en lignes simples comme celles des autres sections
 // de la fenêtre (le motif de `WindowRow`), rangées par maillon : le nom et une légende à gauche, la valeur et son plafond, une
 // fine barre du taux, puis le taux en couleur. Sans nouvelles ou non mesurée, la ligne le dit à la place de la valeur. Sans
 // plafond (les protections du gateway, JOURNAL 2026-10-09), des nombres par période, sans barre ni taux.

@@ -1,4 +1,4 @@
-/* La vignette de l'image du fond (Écart §9.1, JOURNAL 2026-10-10) : l'image par-dessus le fond choisi, à l'opacité du curseur.
+/* La vignette de l'image du fond (§9.5) : l'image par-dessus le fond choisi, à l'opacité du curseur.
    Le fond est celui du jeu : le damier du transparent, le vrai noir et le vrai blanc de tokens.css. L'opacité vient de
    `data-opacity`, un cran par règle : la CSP de production bloque l'attribut `style` du HTML du serveur. */
 .lp-bg-preview {

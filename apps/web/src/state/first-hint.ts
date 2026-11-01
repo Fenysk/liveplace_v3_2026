@@ -1,4 +1,4 @@
-// Le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08) : les gestes que l'appareil a déjà faits, retenus dans son navigateur.
+// Le conseil de première visite (§9.11) : les gestes que l'appareil a déjà faits, retenus dans son navigateur.
 // Trois gestes distincts ; le troisième ferme le conseil pour de bon. Au doigt comme à la souris (JOURNAL 2026-10-12) : seul son
 // texte change. Sans stockage lisible, il ne s'ouvre jamais.
 

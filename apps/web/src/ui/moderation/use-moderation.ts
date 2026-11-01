@@ -25,7 +25,7 @@ import { useCloseOnMove } from "./use-close-on-move";
 type ModeratorKind = "clear" | "ban" | "banAfterClear";
 export type ModeratorRequest = { kind: ModeratorKind; author: ModerationTarget };
 
-// Un retrait fait, la fenêtre propose de bannir (JOURNAL 2026-09-29) ; `null` : rien après. Écart §5.4 (JOURNAL 2026-10-08) :
+// Un retrait fait, la fenêtre propose de bannir (JOURNAL 2026-09-29) ; `null` : rien après. §5.4 :
 // pas pour un modérateur nommé ici, le retrait suffit.
 export const askBanAfterClear = ({ kind, author }: ModeratorRequest): ModeratorRequest | null =>
   kind === "clear" && canBan(author) ? { kind: "banAfterClear", author } : null;
@@ -66,7 +66,7 @@ export function useModeration(canvas: CanvasStore): {
     list(canvas.listPixels(author.userId), () => setStatus("failed"));
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-24) : des pixels ont changé de case, l'aperçu de la fenêtre est faux ; une action qui part est laissée.
+  // §5.8 : des pixels ont changé de case, l'aperçu de la fenêtre est faux ; une action qui part est laissée.
   useCloseOnMove(toMoveKey(view), request !== null && status !== "running", () => show(null));
 
   // Pas d'étape « après » un ban : la fenêtre et l'inspection se ferment, les pixels partent par le flux.

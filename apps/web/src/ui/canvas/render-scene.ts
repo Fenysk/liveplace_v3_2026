@@ -3,7 +3,7 @@
 // qui se posent, la case visée, le viseur de la case inspectée, puis la fresque que la page vient de quitter, qui s'efface.
 // Le vide et le damier ne sont pas ici : ce sont deux couches CSS sous le canvas (`.lp-void`, `.lp-checker`), qui ne suivent
 // pas le viewport. Le canvas reste transparent autour de l'image, et sous ses pixels transparents, sauf quand la fresque a un
-// fond noir, blanc ou image : il le peint lui-même, sous les pixels, et le damier se retire (Écart §9.1, JOURNAL 2026-10-10).
+// fond noir, blanc ou image : il le peint lui-même, sous les pixels, et le damier se retire (§9.5).
 // Tout ici est en pixels physiques : les pixels CSS du viewport sont multipliés par `pixelRatio`.
 
 import { type CellKey, TRANSPARENT_COLOR_INDEX, toCellKey } from "@liveplace/domain";
@@ -51,7 +51,7 @@ export type Scene = {
   viewport: Viewport;
   canvas: Size;
   image: CanvasImageSource;
-  backdrop: Backdrop; // Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque, sous les pixels ; le damier cède quand il peint
+  backdrop: Backdrop; // §9.5 : le fond de la fresque, sous les pixels ; le damier cède quand il peint
   reveal: Reveal | null;
   ghost: Ghost | null;
   shades: SceneShades;

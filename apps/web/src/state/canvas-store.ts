@@ -55,7 +55,7 @@ export type CanvasStoreOptions = {
   mode: CanvasMode;
   now: () => Timestamp; // l'âge d'un lot au moment de le renvoyer
   reload: () => void; // §4.5 : une reprise refusée pour la version du protocole
-  // Écart §4.2 (JOURNAL 2026-10-09) : le web dit si rien ne ramènera un canvas que le gateway ne trouve pas. Absent, le
+  // §9.1 : le web dit si rien ne ramènera un canvas que le gateway ne trouve pas. Absent, le
   // store croit le gateway ; sinon la page attend cette réponse avant de dire « introuvable » (vue OBS exceptée).
   isMissingConfirmed?: (canvasId: string) => Promise<boolean>;
 };
@@ -76,7 +76,7 @@ export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
 // Les modérateurs, et l'état de la synchro Twitch quand elle a été faite (JOURNAL 2026-09-27).
 export type ModeratorList = { users: Moderator[]; twitchSync?: TwitchSync };
 export type StaleList = Extract<ServerFrame, { t: "staleList" }>["list"];
-// Écart §4.3 (JOURNAL 2026-10-06) : le top du classement et la place de cette page.
+// §5.9 : le top du classement et la place de cette page.
 export type Scoreboard = Omit<Extract<ServerFrame, { t: "scoreboard" }>, "t">;
 
 // Une requête de modération ou de lecture (JOURNAL 2026-09-25), réglée par la réponse de son `requestId`.
@@ -98,7 +98,7 @@ export type CanvasView = {
   role?: Role;
   ownerId?: string; // le streamer : jamais modéré sur son canvas (JOURNAL 2026-09-25)
   isBanned: boolean; // lecture seule (§10.2), mis par `banned`, retiré par `unbanned`
-  // Écart §15 (JOURNAL 2026-10-06) : le canvas est une archive, lecture seule pour tous. Le `welcome` le dit, la frame
+  // §17.1 : le canvas est une archive, lecture seule pour tous. Le `welcome` le dit, la frame
   // `canvasStatus` le change, et une écriture refusée par `canvas_archived` l'apprend. `isDiscarded` : il a été supprimé.
   isArchived: boolean;
   isDiscarded: boolean;
@@ -106,13 +106,13 @@ export type CanvasView = {
   login?: string; // absent pour un invité
   displayName?: string; // absent pour un invité
   avatarUrl?: string; // absente pour un invité, ou d'une session d'avant la photo (JOURNAL 2026-09-24)
-  // Écart §4 (JOURNAL 2026-10-07) : le live du streamer, et celui de la personne connectée. Absent : hors live.
+  // §10.4 : le live du streamer, et celui de la personne connectée. Absent : hors live.
   ownerTwitchLive?: TwitchLive | undefined;
   twitchLive?: TwitchLive | undefined;
-  // Écart §5.3 (JOURNAL 2026-10-24) : la version du dernier rapprochement qui a déplacé des pixels. Elle change : tout x, y
+  // §5.8 : la version du dernier rapprochement qui a déplacé des pixels. Elle change : tout x, y
   // d'avant (brouillon, inspection, lot en vol, cible de signalement) est périmé. Absent : aucun n'en a déplacé.
   movedAtVersion?: number | undefined;
-  // Écart §5.3 (JOURNAL 2026-10-28) : la taille est dynamique, et le repère de la fresque : la somme des décalages vers la droite et
+  // §5.8 : la taille est dynamique, et le repère de la fresque : la somme des décalages vers la droite et
   // le bas qu'elle a subis. Quand il change, tout x, y d'avant se décale d'autant (brouillon, vue, inspection, lot en vol).
   isDynamicSize: boolean;
   origin: CanvasOrigin;
@@ -150,7 +150,7 @@ export type CanvasStore = {
   setModerator(userId: string, isModerator: boolean): Promise<RequestResult<ModeratorList>>; // le streamer seul
   setObsDelay(obsDelayMs: number): void; // confirmé par la frame `obsDelay`, qui met à jour `params`
   setObsBackground(obsBackground: ObsBackground): void; // confirmé par la frame `obsBackground` (JOURNAL 2026-09-29)
-  setBackgroundImageOpacity(backgroundImageOpacity: number): void; // confirmé par la frame du même nom (Écart §9.1, JOURNAL 2026-10-10)
+  setBackgroundImageOpacity(backgroundImageOpacity: number): void; // confirmé par la frame du même nom (§9.5)
   // JOURNAL 2026-09-30 : la jauge arrive par l'`ack` ; les bornes, le streamer seul, par la frame `gaugeLimits`.
   claimGauge(): void;
   setGaugeLimits(limits: GaugeLimits): void;
@@ -158,7 +158,7 @@ export type CanvasStore = {
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
   // Le streamer seul ; la nouvelle taille arrive par un `welcome` et un snapshot (JOURNAL 2026-09-29).
   resizeCanvas(width: number, height: number): Promise<RequestResult<true>>;
-  // Écart §5.3 (JOURNAL 2026-10-28) : de même, activée ou retirée ; le `welcome` qui suit porte le réglage.
+  // §5.8 : de même, activée ou retirée ; le `welcome` qui suit porte le réglage.
   setDynamicSize(isDynamicSize: boolean): Promise<RequestResult<true>>;
   // Les pixels de l'auteur de cette pose, pour choisir la plage à signaler (JOURNAL 2026-09-29).
   listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
@@ -166,20 +166,20 @@ export type CanvasStore = {
   listenArrivals(listener: (arrival: Arrival) => void): () => void;
   // JOURNAL 2026-10-06 : une liste de l'onglet Modération a bougé ailleurs, et à chaque reprise de la socket.
   listenStaleLists(listener: (list: StaleList) => void): () => void;
-  // Écart §4.2 (JOURNAL 2026-10-06) : le développeur seul, le gateway décide. Redit à chaque reprise de la socket.
+  // §16.1 : le développeur seul, le gateway décide. Redit à chaque reprise de la socket.
   watchActivity(isWatching: boolean): void;
   listActivityHistory(period: ActivityPeriod): Promise<RequestResult<ActivityHistory>>;
-  // Écart §4.2 (JOURNAL 2026-10-14) : un jour passé, `dayAt` étant le début de son jour de Paris, lu une fois.
+  // §16.1 : un jour passé, `dayAt` étant le début de son jour de Paris, lu une fois.
   listActivityDay(dayAt: Timestamp): Promise<RequestResult<ActivityDay>>;
   listenActivity(listener: (frame: ActivityFrame) => void): () => void;
-  // Écart §4.2 (JOURNAL 2026-10-07) : de même pour la capacité, avec ses propres frames.
+  // §16.1 : de même pour la capacité, avec ses propres frames.
   watchCapacity(isWatching: boolean): void;
   listCapacityHistory(period: ActivityPeriod): Promise<RequestResult<CapacityHistory>>;
   listenCapacity(listener: (frame: CapacityFrame) => void): () => void;
   close(): void;
 };
 
-// Écart §5.3 (JOURNAL 2026-10-28) : change quand des pixels changent de case, par un rapprochement ou par un décalage de la fresque.
+// §5.8 : change quand des pixels changent de case, par un rapprochement ou par un décalage de la fresque.
 export const toMoveKey = ({
   movedAtVersion,
   origin,
@@ -233,11 +233,11 @@ const toModeratorList = (reply: ReplyFrame): ModeratorList | undefined =>
     ? { users: reply.users, ...(reply.twitchSync ? { twitchSync: reply.twitchSync } : {}) }
     : undefined;
 
-// Écart §15 (JOURNAL 2026-10-06) : ce que dit la frame `canvasStatus` du canvas ouvert.
+// §17.1 : ce que dit la frame `canvasStatus` du canvas ouvert.
 const toStatusView = (status: CanvasStatus): Partial<CanvasView> =>
   status === "discarded" ? { isDiscarded: true } : { isArchived: status === "archived", isDiscarded: false };
 
-// Écart §4 (JOURNAL 2026-10-07) : le gateway n'envoie que le live du streamer et celui de cette personne ; la frame sans live l'efface.
+// §10.4 : le gateway n'envoie que le live du streamer et celui de cette personne ; la frame sans live l'efface.
 const toTwitchLiveView = (
   { ownerId, userId }: Pick<CanvasView, "ownerId" | "userId">,
   frame: Extract<ServerFrame, { t: "twitchLive" }>,
@@ -283,7 +283,7 @@ export function createCanvasStore(
   const capacityListeners = new Set<(frame: CapacityFrame) => void>();
   let isWatchingCapacity = false;
   let hasWelcomed = false; // une reprise porte `lastVersion` (§4.5)
-  // Écart §15 (JOURNAL 2026-10-06) : fermé par la page qui change de canvas, le socket qui tombe ensuite
+  // §17.1 : fermé par la page qui change de canvas, le socket qui tombe ensuite
   // n'est pas une coupure : rien ne reprendra, et rien ne l'annonce.
   let isClosedByPage = false;
   let heldRecent: CellsFrame | null = null; // le `recent` du `welcome`, rendu avec le snapshot qui le suit
@@ -451,7 +451,7 @@ export function createCanvasStore(
     };
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-24) : le welcome dit que des pixels ont changé de case depuis le dernier. Un lot en vol ne se
+  // §5.8 : le welcome dit que des pixels ont changé de case depuis le dernier. Un lot en vol ne se
   // rejoue jamais à ses anciennes positions, l'inspection (case et réponse attendue) est périmée ; le snapshot qui suit remet l'image.
   const dropOnMove = (frame: WelcomeFrame): Partial<CanvasView> => {
     if ((frame.canvas.movedAtVersion ?? 0) === (view.movedAtVersion ?? 0)) return {};
@@ -460,7 +460,7 @@ export function createCanvasStore(
     return { inspection: null };
   };
 
-  // Écart §5.3 (JOURNAL 2026-10-28) : la taille ou le repère change. Un lot en vol garde sa frame, que le serveur traduit de son origine ;
+  // §5.8 : la taille ou le repère change. Un lot en vol garde sa frame, que le serveur traduit de son origine ;
   // ses `offsets` parlent de l'ancien tableau, et rien d'avant ne se restaure plus.
   const forgetPendingOffsets = (): void => {
     for (const batch of pending.values()) {
@@ -502,14 +502,14 @@ export function createCanvasStore(
       // Pendant la coupure, rien n'a dit ce qui a bougé.
       emitStale("bans");
       emitStale("moderators");
-      // La nouvelle connexion ne sait pas que le développeur regarde (écart §4.2, JOURNAL 2026-10-06).
+      // La nouvelle connexion ne sait pas que le développeur regarde (§16.1).
       if (isWatchingActivity) transport.send({ t: "watchActivity", isWatching: true });
       if (isWatchingCapacity) transport.send({ t: "watchCapacity", isWatching: true });
     }
     hasWelcomed = true;
   };
 
-  // Écart §4.2 (JOURNAL 2026-10-09) : le gateway ne trouve pas un canvas que Convex connaît, souvent parce que Redis vient de
+  // §9.1 : le gateway ne trouve pas un canvas que Convex connaît, souvent parce que Redis vient de
   // le perdre et que personne ne l'a encore marqué. La page ne dit rien tant que le web n'a pas répondu, puis « introuvable »
   // seulement si rien ne le ramènera ; une panne du web, ou un canvas qui vit, est une attente.
   const askIfMissing = (ask: (canvasId: string) => Promise<boolean>): void => {
@@ -544,7 +544,7 @@ export function createCanvasStore(
     publish({ status: "closed" });
   };
 
-  // Écart §15 (JOURNAL 2026-10-06) : une écriture refusée parce que le canvas est archivé vaut pour tout ce qui attend.
+  // §17.1 : une écriture refusée parce que le canvas est archivé vaut pour tout ce qui attend.
   // Pas de `lastError` : ce n'est pas un refus à montrer, la page va suivre le canvas actif.
   const archive = (): void => {
     settleAllPending({ ok: false, error: "canvas_archived" });
@@ -582,14 +582,14 @@ export function createCanvasStore(
     if (view.params) publish({ params: { ...view.params, ...change } });
   };
 
-  // Écart §8.1 (JOURNAL 2026-10-07) : sans `theme`, le canvas n'en a plus ; le reste de `params` ne bouge pas.
+  // §8.1 : sans `theme`, le canvas n'en a plus ; le reste de `params` ne bouge pas.
   const takeTheme = ({ theme }: Extract<ServerFrame, { t: "theme" }>): void => {
     if (!view.params) return;
     const { theme: previous, ...rest } = view.params;
     publish({ params: theme === undefined ? rest : { ...rest, theme } });
   };
 
-  // Écart §8.1 (JOURNAL 2026-10-10) : sans `at`, le canvas n'a plus d'image de fond ; le reste de `params` ne bouge pas.
+  // §9.5 : sans `at`, le canvas n'a plus d'image de fond ; le reste de `params` ne bouge pas.
   const takeBackgroundImage = ({ at }: Extract<ServerFrame, { t: "backgroundImage" }>): void => {
     if (!view.params) return;
     const { backgroundImageAt: previous, ...rest } = view.params;
@@ -706,7 +706,7 @@ export function createCanvasStore(
     // Les lots attendent la reprise (JOURNAL 2026-09-25) ; les modérations et les lectures échouent.
     onClose: () => {
       failAllRequests("closed");
-      // Écart §15 (JOURNAL 2026-10-06) : fermé par la page, le store n'annonce rien : ni reprise, ni classement effacé.
+      // §17.1 : fermé par la page, le store n'annonce rien : ni reprise, ni classement effacé.
       if (isClosedByPage) return;
       if (view.status !== "closed") publish({ status: "reconnecting" });
       // Après une coupure, rien n'est sûr : la page efface son classement, et le gateway lui renvoie le sien.

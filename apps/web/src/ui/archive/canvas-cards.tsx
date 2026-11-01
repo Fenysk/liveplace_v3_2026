@@ -1,4 +1,4 @@
-// Les lignes de la section « Archives » de la fenêtre (Écart §15, JOURNAL 2026-10-06) : le canvas en cours en haut,
+// Les lignes de la section « Archives » de la fenêtre (§17.1) : le canvas en cours en haut,
 // puis les archives de la plus récente à la plus ancienne. L'affichage seul, nourri par `ArchivesTab`.
 
 import { MAX_ARCHIVES, PALETTE } from "@liveplace/domain";

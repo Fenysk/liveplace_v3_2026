@@ -7,7 +7,7 @@ import { BubbleTarget, BubbleTargetsContext, createBubbleTargets } from "./bubbl
 const content = { children: createElement("em", null, "Valider") };
 const refs = createBubbleTargets();
 
-describe("la cible d'une bulle (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("la cible d'une bulle (§9.11)", () => {
   // Hors de la page de jeu (/design, la connexion), l'élément reste seul : aucun `<span>` de plus
   it("leaves the element alone outside the game page", () => {
     expect(renderToStaticMarkup(createElement(BubbleTarget, { name: "submit", ...content }))).toBe(

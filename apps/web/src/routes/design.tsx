@@ -13,7 +13,7 @@ export const Route = createFileRoute("/design")({
     meta: [{ title: "Design system · LivePlace" }, { name: "robots", content: "noindex" }],
     links: [
       { rel: "stylesheet", href: designPageCss },
-      // L'entrée Accueil montre la vraie page : ses classes (Écart §9.1, JOURNAL 2026-10-22).
+      // L'entrée Accueil montre la vraie page : ses classes (§9.1).
       { rel: "stylesheet", href: homeCss },
     ],
   }),

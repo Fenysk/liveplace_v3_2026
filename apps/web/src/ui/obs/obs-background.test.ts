@@ -35,7 +35,7 @@ describe("the fill of the OBS view (CDC 2026 §1)", () => {
   });
 });
 
-// Le fond se règle dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10) : son toast est dans les phrases de la fresque
+// Le fond se règle dans la section Fresque (§9.5) : son toast est dans les phrases de la fresque
 describe("the toast of the saved background (CDC 2026, Toasts)", () => {
   // Dit le fond enregistré par son nom, en minuscules après les deux-points
   it("says the saved background by its name", () => {

@@ -1,4 +1,4 @@
-// Le brouillon (CDC 2026, écart §9.3, JOURNAL 2026-09-24) : les cases choisies, pas encore posées, et ses règles.
+// Le brouillon (CDC 2026, §9.3) : les cases choisies, pas encore posées, et ses règles.
 // Pur : ni navigateur, ni réseau. Un brouillon ne se modifie jamais, chaque règle en rend un nouveau.
 
 import {
@@ -75,7 +75,7 @@ export function fitDraft(draft: Draft, { width, height }: CanvasSize): Draft {
   return inside.length === draft.size ? draft : new Map(inside);
 }
 
-// Écart §5.3 (JOURNAL 2026-10-28) : la fresque a été décalée de `shift` cases, et ses cases avec elle ; l'ordre d'envoi reste. Une case
+// §5.8 : la fresque a été décalée de `shift` cases, et ses cases avec elle ; l'ordre d'envoi reste. Une case
 // qui passerait avant l'origine est sortie du cadre (un resserrement a coupé son bord).
 export function shiftDraft(draft: Draft, shift: CanvasOrigin): Draft {
   if (shift.x === 0 && shift.y === 0) return draft;

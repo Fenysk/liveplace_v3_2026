@@ -15,7 +15,7 @@ const image: SnapshotImage = {
 
 const compressed = (value: unknown) => new Uint8Array(brotliCompressSync(Buffer.from(JSON.stringify(value))));
 
-describe("the state-only file format (Écart §7.3, JOURNAL 2026-10-08)", () => {
+describe("the state-only file format (§7.3)", () => {
   // Un dessin encodé puis décodé redevient exactement lui-même
   it("gives back exactly the drawing after a round trip", async () => {
     expect(await decodeImage(await encodeImage(image))).toEqual({ ok: true, value: image });

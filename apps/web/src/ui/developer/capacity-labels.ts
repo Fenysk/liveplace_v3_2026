@@ -1,4 +1,4 @@
-// Les mots de la section Capacité de la fenêtre Développeur (écart §4.3, JOURNAL 2026-10-07) : chaque valeur dans son unité,
+// Les mots de la section Capacité de la fenêtre Développeur (§16.3) : chaque valeur dans son unité,
 // des nombres au format français, des textes courts. Le gateway dit les nombres ; ici, ce que le développeur lit.
 
 import {
@@ -183,7 +183,7 @@ export type CapacityLinkView = {
   rows: CapacityRowView[];
 };
 
-// Les protections du gateway (Écart §4.3 et §5.1, JOURNAL 2026-10-09) : sans plafond, deux nombres par période, dans l'ordre de la légende.
+// Les protections du gateway (§16.3) : sans plafond, deux nombres par période, dans l'ordre de la légende.
 const toGuardsText = ({ refusedPlacements, closedConnections }: GuardCount): string =>
   `${formatCount(refusedPlacements)} · ${formatCount(closedConnections)}`;
 

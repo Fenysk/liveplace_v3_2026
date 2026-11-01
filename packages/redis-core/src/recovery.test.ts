@@ -121,7 +121,7 @@ const populate = async () => {
   return { canvasId, keys };
 };
 
-describe("restore: a lost canvas comes back as it was saved (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("restore: a lost canvas comes back as it was saved (§7.4)", () => {
   // Tout ce que la sauvegarde porte revient champ par champ : le dessin, la modération, le classement, les progressions, `meta`
   it("brings back everything the snapshot holds, field by field", async () => {
     const { canvasId } = await populate();
@@ -406,7 +406,7 @@ describe("restore: a lost canvas comes back as it was saved (Écart §7.2, JOURN
     expect(back.cells[0]?.[0]).toBe(toCellKey(0, 0));
   });
 
-  // Écart §5.3 (JOURNAL 2026-10-24) : la sauvegarde lit les piles là où un rapprochement les a mises, la récupération les y remet
+  // §5.8 : la sauvegarde lit les piles là où un rapprochement les a mises, la récupération les y remet
   it("brings back the pixels where a shrink moved them, and nothing where they were", async () => {
     const { canvasId, keys } = await readyCanvas();
     await placeAs(canvasId, A, "pleft00001", [{ x: 5, y: 5 }]);

@@ -28,7 +28,7 @@ afterEach(() => {
   hasRun = false;
 });
 
-describe("la langue de la page suit le cookie (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("la langue de la page suit le cookie (§9.9)", () => {
   // Quand le retour arrière reprend un HTML rendu en français alors que le cookie dit l'anglais, la page passe à l'anglais
   it("switches to the language of the cookie when the page was rendered in another one", () => {
     expect(openPage("fr", "lp_locale=en")).toBe("<span>en</span>");

@@ -39,7 +39,7 @@ describe("resolveCanvas (§9.1, D-14)", () => {
   });
 
   // Rend le thème du canvas actif avec la page, dans le même appel que le canvas, et sans thème la clé est absente
-  // (Écart §8.1, JOURNAL 2026-10-07)
+  // (§9.1)
   it("gives the theme of the active canvas with the page, and leaves the key out without one", async () => {
     expect(await resolveCanvas(durableWith({ ...canvas, theme: "Halloween" }), "fenysk")).toEqual({
       canvasId: canvas.canvasId,
@@ -62,7 +62,7 @@ describe("resolveCanvas (§9.1, D-14)", () => {
   });
 });
 
-describe("resolveCanvas, le live du propriétaire (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("resolveCanvas, le live du propriétaire (§10.4)", () => {
   const trackerOf = (twitchLive?: { category: string }) => {
     const asked: string[] = [];
     return {

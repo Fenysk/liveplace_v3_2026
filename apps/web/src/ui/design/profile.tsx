@@ -13,7 +13,7 @@ import { DESIGN_TEXTS } from "./design-texts";
 import { TwitchGlyph, TwitchLiveGlyph } from "./twitch";
 import { SmallWindow } from "./window";
 
-// `twitchLive` (Écart §4, JOURNAL 2026-10-07) : la personne est en live ; le bouton de sa chaîne le dit. Absent : hors live.
+// `twitchLive` (§10.4) : la personne est en live ; le bouton de sa chaîne le dit. Absent : hors live.
 export type ProfileUser = {
   displayName: string;
   login: string;
@@ -104,7 +104,7 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
           {inner}
         </button>
       )}
-      {/* Écart §4 (JOURNAL 2026-10-07) : en live, le bouton teinté paraît même sans logo (mobile) ; seule une personne avec compte l'est */}
+      {/* §10.4 : en live, le bouton teinté paraît même sans logo (mobile) ; seule une personne avec compte l'est */}
       {user.twitchLive && hasAccount ? (
         <TwitchLiveLink user={user} twitchLive={user.twitchLive} />
       ) : (
@@ -134,7 +134,7 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
 
 // Dans la pill Compte, sa propre photo n'est pas un profil : c'est le bouton Mon compte.
 // `hasDot` : quelque chose l'attend, un signalement pour qui modère (JOURNAL 2026-09-28) ; `title` le dit.
-// `isLive` (Écart §8.1, JOURNAL 2026-10-08) : la pill Canvas repliée, où la photo déplie le profil ; en live, le rond
+// `isLive` (§9.7) : la pill Canvas repliée, où la photo déplie le profil ; en live, le rond
 // violet de Twitch remplace le rouge. `isExpanded` dit si le bouton déplie ce qu'il commande.
 type AvatarButtonProps = {
   user: AvatarProps;

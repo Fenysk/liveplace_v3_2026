@@ -179,7 +179,7 @@ describe("createObsStore (§9.5, JOURNAL 2026-09-25)", () => {
     expect(store.getView().background).toBe("black");
   });
 
-  // Prend l'image du fond posée, changée ou retirée à chaud, sans toucher au fond, sans rechargement (Écart §9.1, JOURNAL 2026-10-10)
+  // Prend l'image du fond posée, changée ou retirée à chaud, sans toucher au fond, sans rechargement (§9.5)
   it("takes a background image set, changed or cleared live, leaving the background alone, without a reload", () => {
     const { store, arrive, setBackground, setBackgroundImage } = setup();
     arrive({ kind: "snapshot", pixels: new Uint8Array(16), recent: null });

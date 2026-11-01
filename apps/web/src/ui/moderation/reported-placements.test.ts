@@ -34,7 +34,7 @@ const render = (...reports: PendingReport[]) =>
     }),
   );
 
-describe("Bannir in the reported placements (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("Bannir in the reported placements (§5.4)", () => {
   // Un signalement offre Effacer, Bannir et Rétablir pour un joueur, et pour un modérateur venu de Twitch seul
   it("offers Effacer, Bannir and Rétablir on a player, and on a moderator who comes from Twitch only", () => {
     const player = render(report());

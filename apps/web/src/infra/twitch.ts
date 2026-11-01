@@ -157,7 +157,7 @@ export function createTwitchAuth({ clientId, clientSecret, redirectUri }: Twitch
 
 const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // la règle de Twitch contre le rejeu
 
-// Écart §4 (JOURNAL 2026-10-07) : les types qui disent le live d'une chaîne, et la version de chacun.
+// §10.4 : les types qui disent le live d'une chaîne, et la version de chacun.
 const LIVE_SUBSCRIPTIONS = [
   { type: "stream.online", version: "1" },
   { type: "stream.offline", version: "1" },
@@ -198,7 +198,7 @@ const toUser = (event: z.infer<typeof ChannelUserEventSchema>) => ({
 const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
   const { subscription, event } = NotificationSchema.parse(body);
   switch (subscription.type) {
-    // Écart §4 (JOURNAL 2026-10-07) : seul un `type: live` allume le statut, jamais une rediffusion.
+    // §10.4 : seul un `type: live` allume le statut, jamais une rediffusion.
     case "stream.online": {
       const online = StreamEventSchema.parse(event);
       return online.type === "live"
@@ -233,7 +233,7 @@ const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
   }
 };
 
-// Écart §4 (JOURNAL 2026-10-07) : un abonnement de live retiré n'est jamais la synchro de modération révoquée.
+// §10.4 : un abonnement de live retiré n'est jamais la synchro de modération révoquée.
 const toRevocationEvent = (body: unknown): TwitchWebhookEvent => {
   const { subscription } = RevocationSchema.parse(body);
   return {
@@ -270,7 +270,7 @@ const MODERATION_TYPES = [
 const MODERATION_SUBSCRIPTIONS = MODERATION_TYPES.map((type) => ({ type, version: "1" }));
 // Un abonnement dans un autre état (révoqué, échoué) ne livre plus rien : on en recrée un.
 const ACTIVE_STATUSES = new Set(["enabled", "webhook_callback_verification_pending"]);
-// Écart §4 (JOURNAL 2026-10-07) : aucun appel à Twitch ne pend, sous le délai de 10 s qu'il laisse à un webhook.
+// §10.4 : aucun appel à Twitch ne pend, sous le délai de 10 s qu'il laisse à un webhook.
 const TWITCH_TIMEOUT_MS = 4000;
 
 const AppGrantSchema = z.object({ access_token: z.string().min(1) });
@@ -342,7 +342,7 @@ export function createTwitchEventSub({
   const skipReason = (): string | null => {
     // Twitch ne livre qu'à une adresse publique en https : sur le poste de développement, rien à prendre.
     if (!callbackUrl.startsWith("https://")) return "l'adresse de retour n'est pas publique";
-    // Écart §10.1 (JOURNAL 2026-10-05) : Twitch ne garde qu'un abonnement par type et par chaîne ; une bêta le volerait à la prod.
+    // §10.1 : Twitch ne garde qu'un abonnement par type et par chaîne ; une bêta le volerait à la prod.
     return isBeta ? "emplacement de bêta" : null;
   };
 
@@ -409,7 +409,7 @@ export function createTwitchEventSub({
       await createMissing(broadcasterId, found, MODERATION_SUBSCRIPTIONS);
     },
 
-    // Écart §4 (JOURNAL 2026-10-07) : le live de la chaîne, avec les mêmes règles que la modération.
+    // §10.4 : le live de la chaîne, avec les mêmes règles que la modération.
     async subscribeToLive(broadcasterId) {
       const found = await listWhenAllowed(broadcasterId);
       if (found) await createMissing(broadcasterId, found, LIVE_SUBSCRIPTIONS);
@@ -417,7 +417,7 @@ export function createTwitchEventSub({
   };
 }
 
-// --- Le live d'une chaîne maintenant (Écart §4, JOURNAL 2026-10-07) : le filet des abonnements, avec le jeton de l'application ---
+// --- Le live d'une chaîne maintenant (§10.4) : le filet des abonnements, avec le jeton de l'application ---
 
 const STREAMS_URL = "https://api.twitch.tv/helix/streams";
 const CHANNELS_URL = "https://api.twitch.tv/helix/channels";

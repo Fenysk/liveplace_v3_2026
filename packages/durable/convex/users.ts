@@ -63,7 +63,7 @@ export const getByLogin = query({
   },
 });
 
-// Écart §7.2 (JOURNAL 2026-10-08) : le miroir `user:<id>` de ces personnes, perdu avec Redis. Jamais l'e-mail. Une lecture par
+// §7.4 : le miroir `user:<id>` de ces personnes, perdu avec Redis. Jamais l'e-mail. Une lecture par
 // identifiant dans une seule requête : la récupération en demande par lots, et seulement pour un canvas à remettre.
 export const listByUserIds = query({
   args: { serviceKey: v.string(), userIds: v.array(v.string()) },

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDraftPan } from "./draft-pan";
 
-describe("le glissement en Dessin (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("le glissement en Dessin (§9.11)", () => {
   // Un doigt qui glisse en Dessin, Tracé éteint, déplace la vue au lieu de dessiner : c'est retenu
   it("remembers a finger that moved the view in Draft with Trace off", () => {
     const pan = createDraftPan();

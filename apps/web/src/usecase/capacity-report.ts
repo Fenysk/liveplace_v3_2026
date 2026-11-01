@@ -1,4 +1,4 @@
-// Ce que le web dépose pour la capacité (Écart §2 et §9, JOURNAL 2026-10-07) : son occupation toutes les 10 s, l'usage de
+// Ce que le web dépose pour la capacité (§16.3) : son occupation toutes les 10 s, l'usage de
 // chaque déploiement Convex toutes les 15 minutes, et une fois au démarrage. Le gateway ne parle jamais à Convex (§2) :
 // il lit ce dépôt dans Redis. Une minuterie ne plante jamais le serveur : un échec se journalise et la suivante passe.
 

@@ -1,4 +1,4 @@
-// Le manifest d'application web d'un canvas (Écart §9.1, JOURNAL 2026-10-08) : « Ajouter à l'écran d'accueil » le rouvre.
+// Le manifest d'application web d'un canvas (§9.10) : « Ajouter à l'écran d'accueil » le rouvre.
 
 import type { DurableStore } from "@liveplace/domain/ports";
 import { type CanvasOwner, resolveCanvas } from "../../usecase/resolve-canvas";

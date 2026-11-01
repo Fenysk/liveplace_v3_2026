@@ -1,4 +1,4 @@
-// `/{login}/manifest.webmanifest` : le manifest d'application web du canvas (Écart §9.1, JOURNAL 2026-10-08).
+// `/{login}/manifest.webmanifest` : le manifest d'application web du canvas (§9.10).
 
 import { createFileRoute } from "@tanstack/react-router";
 import { webManifestResponse } from "../ui/pwa/web-manifest";

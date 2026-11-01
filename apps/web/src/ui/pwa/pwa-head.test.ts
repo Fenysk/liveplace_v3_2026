@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { Route as GameRoute } from "../../routes/$login";
 import { Route as ObsRoute } from "../../routes/$login_.obs";
 
-// Écart §9.1 (JOURNAL 2026-10-08) : les balises qui rendent la page du jeu installable.
+// §9.10 : les balises qui rendent la page du jeu installable.
 
 const owner = { login: "fenysk", displayName: "Fenysk" };
 const gameHead = async (loaderData: unknown) =>
   await GameRoute.options.head?.({ loaderData, matches: [] } as never);
 
-describe("la page du jeu, installable (Écart §9.1, JOURNAL 2026-10-08)", () => {
+describe("la page du jeu, installable (§9.10)", () => {
   // Quand la page d'un canvas se charge, le navigateur trouve le manifest de CE canvas et l'icône d'Apple
   it("links the manifest of its own canvas and the Apple touch icon", async () => {
     const head = await gameHead({ canvasId: "opaque-canvas", owner });

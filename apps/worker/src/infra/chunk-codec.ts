@@ -1,4 +1,4 @@
-// Le `payload` d'un chunk (Écart §7.2, JOURNAL 2026-10-08) : du JSON compressé en brotli, validé à la lecture.
+// Le `payload` d'un chunk (§7.1) : du JSON compressé en brotli, validé à la lecture.
 
 import { promisify } from "node:util";
 import { brotliCompress, brotliDecompress, constants } from "node:zlib";

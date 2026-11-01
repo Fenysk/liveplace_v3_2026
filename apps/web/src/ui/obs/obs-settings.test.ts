@@ -16,10 +16,10 @@ const settingsHtml = (): string =>
     }),
   );
 
-// Écart §9.1 (JOURNAL 2026-10-10) : le fond de la fresque se règle dans la section Fresque, avec un choix de plus, l'image. Ces cas,
+// §9.5 : le fond de la fresque se règle dans la section Fresque, avec un choix de plus, l'image. Ces cas,
 // qui disaient où il se choisissait dans « Vue OBS », disent maintenant qu'il n'y est plus ; son comportement est prouvé par la
 // section Fresque (canvas-background-settings.test.ts).
-describe("the OBS section of the settings no longer holds the background (Écart §9.1, JOURNAL 2026-10-10)", () => {
+describe("the OBS section of the settings no longer holds the background (§9.5)", () => {
   // Plus de clavier de couleurs, ni de titre « Fond de la vue OBS », ni d'interrupteur
   it("has no color keyboard under « Fond de la vue OBS » any more, and no switch", () => {
     const html = settingsHtml();
@@ -84,8 +84,8 @@ describe("the OBS section of the settings no longer holds the background (Écart
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-09) : le champ qui copie l'adresse est la cible de la dernière bulle de la chaîne OBS
-describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2026-10-09)", () => {
+// §9.11 : le champ qui copie l'adresse est la cible de la dernière bulle de la chaîne OBS
+describe("l'adresse à copier, cible d'une bulle d'aide (§9.11)", () => {
   const refs = createBubbleTargets();
   const props = {
     address: "liveplace.test/kalyss",
@@ -110,8 +110,8 @@ describe("l'adresse à copier, cible d'une bulle d'aide (Écart §8.1, JOURNAL 2
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : le lien de la fresque sert à OBS et aux viewers, c'est la même page : un seul bouton
-describe("le lien de Vue OBS, à coller dans OBS et à partager (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.8 : le lien de la fresque sert à OBS et aux viewers, c'est la même page : un seul bouton
+describe("le lien de Vue OBS, à coller dans OBS et à partager (§9.8)", () => {
   // Un libellé qui dit les deux usages, puis un seul champ à copier, qui lit l'adresse sans protocole
   it("shows one label saying both uses, then one copy field with the address without protocol", () => {
     const html = settingsHtml();

@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : archiver, rouvrir, supprimer et lister n'ont qu'un propriétaire : celui du cookie.
+// §17.2 : archiver, rouvrir, supprimer et lister n'ont qu'un propriétaire : celui du cookie.
 // Jamais un paramètre envoyé par le client ; sans session, rien ne se fait.
 
 import type { Session } from "@liveplace/domain";

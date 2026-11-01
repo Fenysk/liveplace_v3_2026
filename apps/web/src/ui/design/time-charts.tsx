@@ -1,4 +1,4 @@
-// Des courbes empilées sur un même axe du temps (écart §4.3, JOURNAL 2026-10-06) : une par chiffre, chacune sa propre
+// Des courbes empilées sur un même axe du temps (§16.1) : une par chiffre, chacune sa propre
 // échelle, jamais deux axes sur une courbe. Survoler ou toucher un instant pose un repère vertical sur toutes, et une
 // infobulle dit l'instant et chaque valeur. Un créneau sans point laisse un trou.
 
@@ -7,7 +7,7 @@ import { classNames } from "./class-names";
 import { CHART_HEIGHT, chartMax, chartScale, nearestSlot, stepSlot, toChartPaths } from "./time-chart-scale";
 
 // Un créneau de l'axe du temps : son instant en toutes lettres, et une valeur par courbe. `null` : aucun point ; une valeur
-// `null` : ce point n'a rien mesuré pour cette courbe, qui y fait un trou (Écart §4.3, JOURNAL 2026-10-07).
+// `null` : ce point n'a rien mesuré pour cette courbe, qui y fait un trou (§16.1).
 export type ChartSlot = { title: string; values: readonly (number | null)[] } | null;
 
 // Une courbe : son titre, et sa valeur telle que l'infobulle la dit, accordée (« 2 personnes connectées »).

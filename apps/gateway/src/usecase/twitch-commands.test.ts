@@ -42,7 +42,7 @@ const bannedOf = (userId: string, isFromTwitch: boolean): BannedUser => ({
   hasAccount: true,
 });
 
-// `unbannable` : ceux que le script refuse de bannir (les modérateurs nommés ici, Écart §5.4, JOURNAL 2026-10-08).
+// `unbannable` : ceux que le script refuse de bannir (les modérateurs nommés ici, §5.4).
 type Current = { moderators?: Moderator[]; bans?: BannedUser[]; unbannable?: string[] };
 
 // Un noyau qui note ce qu'on lui demande. `slices` : ce que rend chaque appel à `moderate`, dans l'ordre.
@@ -113,7 +113,7 @@ describe("applyTwitchCommand (JOURNAL 2026-09-27)", () => {
     ]);
   });
 
-  // Un ban Twitch que le noyau refuse (un modérateur nommé ici) est ignoré : aucun retrait ne le suit (Écart §5.4, JOURNAL 2026-10-08)
+  // Un ban Twitch que le noyau refuse (un modérateur nommé ici) est ignoré : aucun retrait ne le suit (§5.4)
   it("ignores a Twitch ban that the core refuses, a moderator named here: no clear follows", async () => {
     const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
 
@@ -196,7 +196,7 @@ describe("a full Twitch list (JOURNAL 2026-09-27)", () => {
   });
 });
 
-describe("a Twitch live told to the pages (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("a Twitch live told to the pages (§10.4)", () => {
   // Annonce le live d'un compte à toutes les pages jointes, avec sa catégorie, sans toucher à aucun canvas
   it("announces the live of an account to the joined pages, with its category, touching no canvas", async () => {
     const { deps, announced, moderations } = setup();
@@ -278,7 +278,7 @@ describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
     logged.mockRestore();
   });
 
-  // Acquitte un ban que le noyau refuse sans le retenter ni le journaliser comme une panne (Écart §5.4, JOURNAL 2026-10-08)
+  // Acquitte un ban que le noyau refuse sans le retenter ni le journaliser comme une panne (§5.4)
   it("acknowledges a ban the core refuses, without retrying it nor logging it as a failure", async () => {
     const { deps, moderations } = setup([], { unbannable: ["mod-here"] });
     const acknowledged: string[] = [];
@@ -310,8 +310,8 @@ describe("consumeTwitchCommands (JOURNAL 2026-09-27)", () => {
   });
 });
 
-// Écart §15 (JOURNAL 2026-10-06) : une action visait le canvas actif d'hier ; elle suit `successorId` jusqu'à celui d'aujourd'hui.
-describe("following the successor of an archived canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+// §17.1 : une action visait le canvas actif d'hier ; elle suit `successorId` jusqu'à celui d'aujourd'hui.
+describe("following the successor of an archived canvas (§17.1)", () => {
   const ready = (canvasId: string): CanvasMeta => ({ ...meta, ownerId: `owner-of-${canvasId}` });
   const archived = (successorId?: string): CanvasMeta => ({
     ...meta,
@@ -535,8 +535,8 @@ describe("following the successor of an archived canvas (Écart §15, JOURNAL 20
   });
 });
 
-// Écart §4.2 (JOURNAL 2026-10-08) : le canvas est perdu et Redis le remet en place ; une action Twitch ne s'oublie pas.
-describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+// §7.4 : le canvas est perdu et Redis le remet en place ; une action Twitch ne s'oublie pas.
+describe("a canvas being recovered (§7.4)", () => {
   const ban: TwitchCommand = { kind: "ban", canvasId, userId: "troll" };
 
   // Un noyau dont le canvas manque `missingFor` lectures, en récupération pendant ce temps, puis prêt

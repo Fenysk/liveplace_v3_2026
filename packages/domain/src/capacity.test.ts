@@ -42,7 +42,7 @@ const withoutNews = (id: CapacityResourceId): CapacityResource => {
   return { link, id, unit, state: "withoutNews" };
 };
 
-// Écart §5.1 et §6 (JOURNAL 2026-10-07) : les plafonds fixes de la capacité, dans domain.
+// §16.3 : les plafonds fixes de la capacité, dans domain.
 describe("the fixed ceilings (JOURNAL 2026-10-07)", () => {
   // Fixe le débit sortant à 200 Mbit/s, le retard de diffusion à 100 ms, et les connexions à 1 000 et 1 750
   it("fixes the outbound rate at 200 Mbit/s, the broadcast lateness at 100 ms, and the connections at 1,000 and 1,750", () => {
@@ -417,7 +417,7 @@ describe("the saturation: the highest ratio and the resource that carries it (JO
   });
 });
 
-// Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : les protections du gateway, des comptes par minute, sans plafond.
+// §16.3 : les protections du gateway, des comptes par minute, sans plafond.
 describe("the totals of the guards (JOURNAL 2026-10-09)", () => {
   const guard = (agoMinutes: number, refusedPlacements: number, closedConnections: number): GuardMinute => ({
     at: now - agoMinutes * MINUTE_MS,

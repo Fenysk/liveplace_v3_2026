@@ -10,7 +10,7 @@ import { DRAFT_TEXTS } from "./draft-texts";
 // Le bouton rend comme avant, et se souvient des propriétés de chaque rendu : de quoi en presser un sans navigateur.
 vi.mock("../design/button", { spy: true });
 
-// La pill Dessin ne bouge pas sous le pointeur (Écart §9.3, JOURNAL 2026-10-13) : ses boutons sont les mêmes brouillon vide ou non.
+// La pill Dessin ne bouge pas sous le pointeur (§9.6) : ses boutons sont les mêmes brouillon vide ou non.
 
 const noop = (): void => undefined;
 const ACTIONS: DraftPillActions = {

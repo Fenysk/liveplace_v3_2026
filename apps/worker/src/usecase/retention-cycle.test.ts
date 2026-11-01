@@ -177,7 +177,7 @@ function setup(initial: Record<string, TierRow[]>) {
   return { ...convex, cycle, clock, logs, images };
 }
 
-describe("the retention cycle (Écart §7.3, JOURNAL 2026-10-08)", () => {
+describe("the retention cycle (§7.3)", () => {
   // Un working de l'heure en cours entre dans l'horaire, avec le fichier de sa source : aucun octet ne bouge
   it("promotes a working save to the hourly tier and shares its file", async () => {
     const taken = NOW - 10 * 60_000;

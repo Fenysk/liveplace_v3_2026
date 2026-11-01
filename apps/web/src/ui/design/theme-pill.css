@@ -1,4 +1,4 @@
-/* La pill Thème (Écart §8.1, JOURNAL 2026-10-07) : un petit texte discret, le thème dessous, gros, au centre. Le thème
+/* La pill Thème (§9.7) : un petit texte discret, le thème dessous, gros, au centre. Le thème
    se coupe par « … » plutôt que d'élargir la pill (pill.css : `.lp-pill--title`). */
 
 .lp-theme {
@@ -26,8 +26,8 @@
 }
 
 /* Écran étroit ou tactile : la bande (pill.css). « Thème » en petit juste devant le premier mot du thème, dans le même
-   flux de texte, l'ensemble centré, à la taille « title » et sur deux lignes au plus, coupé par « … » au-delà (Écart §8.1,
-   JOURNAL 2026-10-08). Le `line-clamp` tient au seul bloc que contient la boîte : un petit texte et un thème frères dans
+   flux de texte, l'ensemble centré, à la taille « title » et sur deux lignes au plus, coupé par « … » au-delà (§9.7).
+   Le `line-clamp` tient au seul bloc que contient la boîte : un petit texte et un thème frères dans
    elle seraient deux lignes de la boîte, pas un flux. */
 @media (max-width: 640px), (pointer: coarse) {
   .lp-theme {

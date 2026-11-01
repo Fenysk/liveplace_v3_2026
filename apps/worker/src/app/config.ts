@@ -3,7 +3,7 @@
 import { parseEnv } from "@liveplace/shared";
 import { z } from "zod";
 
-// Écart §11.5 (JOURNAL 2026-10-06) : aucun défaut. `off`, écrit exprès, est le seul moyen de ne rien sauvegarder.
+// §11.5 : aucun défaut. `off`, écrit exprès, est le seul moyen de ne rien sauvegarder.
 const WorkerEnvSchema = z.object({
   REDIS_URL: z.string().min(1),
   CONVEX_URL: z.url(),

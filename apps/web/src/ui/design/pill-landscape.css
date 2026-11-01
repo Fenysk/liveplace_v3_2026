@@ -1,4 +1,4 @@
-/* Les écrans tactiles larges, et les téléphones en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08). Chargé après pill.css :
+/* Les écrans tactiles larges, et les téléphones en paysage (§9.7). Chargé après pill.css :
    chaque règle y garde la même forme que la sienne, préfixée de `html` pour passer devant. */
 
 /* Une encoche ou une Dynamic Island sur le côté (iPhone Duo, iPhone en paysage) : les pills du haut et des côtés s'en écartent.
@@ -257,7 +257,7 @@
 /* Un écran tactile large : la bande Thème, montée en Dessin à la place des pills du haut, s'arrête avant le panneau. Sur le plus
    étroit (iPhone Duo en portrait), le toast se pose au centre de ce que la colonne laisse au canvas. */
 @media (pointer: coarse) and (min-width: 560px) and (min-height: 560px) {
-  /* En Vue, la colonne laisse aussi au canvas la zone au-dessus d'elle (Écart §9.3, JOURNAL 2026-10-09), sur une colonne de hauteur
+  /* En Vue, la colonne laisse aussi au canvas la zone au-dessus d'elle (§9.7), sur une colonne de hauteur
      fixe (la jauge, Dessiner, leurs marges et un espace) : la feuille Dessin, qui la grandit, ne déplace pas le canvas. Le cadrage
      prend la plus grande des deux zones (arrival-insets.ts) et le dit par `data-zone-above`. */
   :root {

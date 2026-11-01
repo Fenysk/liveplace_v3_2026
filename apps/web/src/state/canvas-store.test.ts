@@ -128,7 +128,7 @@ describe("a canvas the gateway does not know (§4.2)", () => {
   });
 });
 
-describe("a canvas being recovered (Écart §4.2, JOURNAL 2026-10-08)", () => {
+describe("a canvas being recovered (§7.4)", () => {
   // Le canvas revient : le welcome démentit canvas_recovering, la page reprend d'elle-même
   it("forgets canvas_recovering when a welcome comes, and goes on reconnecting until then", () => {
     const { store, receive, close, open } = setup({ isWelcomed: false });
@@ -172,7 +172,7 @@ const webConfirmation = () => {
   return { asked, isMissingConfirmed, pending };
 };
 
-describe("a canvas the gateway cannot find, which the web confirms (Écart §4.2, JOURNAL 2026-10-09)", () => {
+describe("a canvas the gateway cannot find, which the web confirms (§9.1)", () => {
   // Tant que le web n'a pas répondu, la page ne dit ni « introuvable » ni rien d'autre : elle ne ment pas
   it("says neither missing nor recovering while the web has not answered, and asks about this canvas", () => {
     const web = webConfirmation();
@@ -331,7 +331,7 @@ describe("the gauge (§9.4)", () => {
     expect(store.getView()).toMatchObject({ login: "user1", displayName: "User 1" });
   });
 
-  // Garde la photo Twitch de la personne connectée, quand le gateway l'envoie (écart §4.3, JOURNAL 2026-09-24)
+  // Garde la photo Twitch de la personne connectée, quand le gateway l'envoie (§4.3)
   it("keeps the signed-in Twitch photo when the gateway sends it", () => {
     const { store, receive } = setup();
     const avatarUrl = "https://static-cdn.jtvnw.net/jtv_user_pictures/fenysk-profile_image-300x300.png";
@@ -846,7 +846,7 @@ describe("inspect (CDC 2026, la pill Inspection)", () => {
     expect(store.getView().inspection).toBeNull();
   });
 
-  // Garde l'inspection d'avant quand le gateway refuse la nouvelle, sans erreur ni lot échoué (écart §4.3, JOURNAL 2026-09-27)
+  // Garde l'inspection d'avant quand le gateway refuse la nouvelle, sans erreur ni lot échoué (§4.3)
   it("keeps the previous inspection when the gateway refuses the new one, with no error and no failed batch", async () => {
     const { store, sent, receive, pixelAt } = setup();
     store.inspect(1, 2);
@@ -1184,7 +1184,7 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
   });
 
   // Prend l'instant de l'image du fond du welcome, puis celui d'une frame qui la change, puis plus aucun quand la frame n'en
-  // porte pas, sans toucher au reste des params (Écart §8.1, JOURNAL 2026-10-10)
+  // porte pas, sans toucher au reste des params (§8.1)
   it("takes the instant of the background image of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {
     const { store, receive } = setup({ isWelcomed: false });
     const plain = { ...welcome, params: { ...welcome.params } };
@@ -1218,7 +1218,7 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
   });
 
   // Prend le thème du welcome, puis celui d'une frame qui le change, puis plus aucun quand la frame n'en porte pas, sans
-  // toucher au reste des params (Écart §8.1, JOURNAL 2026-10-07)
+  // toucher au reste des params (§8.1)
   it("takes the theme of the welcome, then a changed one, then none when the frame carries none, leaving the other params alone", () => {
     const { store, receive } = setup({ isWelcomed: false });
     const withoutTheme = { ...welcome, params: { ...welcome.params } };
@@ -1362,7 +1362,7 @@ describe("reports and hidden placements (JOURNAL 2026-09-28)", () => {
   });
 });
 
-describe("an archive, and the status of a canvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("an archive, and the status of a canvas (§17.1)", () => {
   const archivedWelcome: ServerFrame = {
     ...welcome,
     canvas: { canvasId: "canvas-1", width, height: 4, ownerId: "owner-1", archivedAt: now - 1000 },
@@ -1450,7 +1450,7 @@ describe("an archive, and the status of a canvas (Écart §15, JOURNAL 2026-10-0
   });
 });
 
-describe("a store the page closes (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("a store the page closes (§17.1)", () => {
   // La page change de canvas : elle ferme son store, et le socket qui tombe ensuite n'est pas une coupure, rien ne reprendra
   it("announces no reconnection when the socket drops after close(), as nothing will reconnect", () => {
     const { store, close: dropSocket, transportState } = setup();
@@ -1477,7 +1477,7 @@ describe("a store the page closes (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () => {
+describe("the activity of the developer (§16.1)", () => {
   const noAudience = {
     visits: 0,
     phoneVisits: 0,
@@ -1638,7 +1638,7 @@ describe("the activity of the developer (écart §4.2, JOURNAL 2026-10-06)", () 
   });
 });
 
-describe("the capacity of the developer (écart §4.2, JOURNAL 2026-10-07)", () => {
+describe("the capacity of the developer (§16.1)", () => {
   const capacity: ServerFrame = {
     t: "capacity",
     saturation: { percent: 62.1, resource: "redisMemory", isIncomplete: false },
@@ -1735,7 +1735,7 @@ describe("the scoreboard in the canvas view (JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("the Twitch live in the canvas view (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the Twitch live in the canvas view (§10.4)", () => {
   const art = { category: "Art" };
   const chatting = { category: "Just Chatting" };
   const welcomeWith = (
@@ -1856,7 +1856,7 @@ describe("the Twitch live in the canvas view (Écart §4, JOURNAL 2026-10-07)", 
   });
 });
 
-describe("pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("pixels moved by a resize (§5.8)", () => {
   const welcomeMoved = (movedAtVersion?: number): Extract<ServerFrame, { t: "welcome" }> => {
     if (welcome.t !== "welcome") throw new Error("le welcome de départ n'en est pas un");
     return {
@@ -1950,7 +1950,7 @@ describe("pixels moved by a resize (Écart §5.3, JOURNAL 2026-10-24)", () => {
   });
 });
 
-describe("a dynamic size, and the shifts it brings (Écart §5.3, JOURNAL 2026-10-28)", () => {
+describe("a dynamic size, and the shifts it brings (§5.8)", () => {
   const welcomeShifted = (
     origin: { x: number; y: number } | undefined,
     size = { width, height: 4 },

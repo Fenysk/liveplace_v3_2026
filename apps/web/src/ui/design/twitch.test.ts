@@ -11,7 +11,7 @@ const render = (element: ReturnType<typeof createElement>, locale: Locale = "fr"
 // Le texte que lit un outil d'accessibilité dans le lien : tout ce qui n'est pas une balise
 const textOf = (html: string): string => html.replace(/<[^>]*>/g, "").trim();
 
-describe("Se connecter, son nom accessible (Écart §9.1, JOURNAL 2026-10-31)", () => {
+describe("Se connecter, son nom accessible (§9.12)", () => {
   // Quand le bouton a un libellé, son nom accessible est ce libellé seul : un `title` différent le contredirait (WCAG 2.5.3)
   it("names a button with a label by that label alone, with no title", () => {
     for (const locale of ["fr", "en"] as const) {
@@ -42,7 +42,7 @@ describe("Se connecter, son nom accessible (Écart §9.1, JOURNAL 2026-10-31)", 
   });
 });
 
-describe("la ligne sous Se connecter (Écart §9.1, JOURNAL 2026-10-31)", () => {
+describe("la ligne sous Se connecter (§9.10)", () => {
   // Le lien de la politique s'ouvre dans l'onglet de la page : le visiteur y revient par l'accueil
   it("opens the privacy policy in the same tab", () => {
     for (const locale of ["fr", "en"] as const) {

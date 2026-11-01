@@ -1,4 +1,4 @@
-// Où poser une bulle qui vise un élément (Écart §8.1, JOURNAL 2026-10-08) : au-dessus de lui, centrée sur lui, gardée dans l'écran.
+// Où poser une bulle qui vise un élément (§9.11) : au-dessus de lui, centrée sur lui, gardée dans l'écran.
 // La hauteur de la bulle comprend la place de sa flèche. Sans DOM : bubble.tsx mesure, et applique le résultat.
 
 export type TargetRect = { left: number; top: number; width: number; height: number };
@@ -23,7 +23,7 @@ export function positionBubble(
   return { left, top, arrowX: targetCenter - left };
 }
 
-// Écart §8.1 (JOURNAL 2026-10-08) : une bulle d'aide vise un bouton d'une pill, sans la couvrir. Elle se pose contre la pill
+// §9.11 : une bulle d'aide vise un bouton d'une pill, sans la couvrir. Elle se pose contre la pill
 // (`anchor`) qui le porte, du côté où elle tient dans l'écran : au-dessus d'abord, puis dessous (les pills du haut), puis à
 // gauche, puis à droite (une barre du bas en colonne). La flèche vise le centre de la cible, même dans une pill plus haute.
 export type BubbleSide = "above" | "below" | "left" | "right";
@@ -60,7 +60,7 @@ const roomAround = (
 });
 
 // `pill` : la surface de la bulle, sans sa flèche ; `arrowSpace` : ce que la flèche prend, du côté de la cible ; `sides` : les
-// seuls côtés essayés, dans l'ordre (Écart §8.1, JOURNAL 2026-10-09 : une rangée d'onglets se vise de dessous, une colonne de côté).
+// seuls côtés essayés, dans l'ordre (§9.11 : une rangée d'onglets se vise de dessous, une colonne de côté).
 export function placeBubble(
   target: TargetRect,
   anchor: TargetRect,
@@ -97,7 +97,7 @@ export function placeBubble(
   return { side, left: above.left, top, arrow: above.arrowX };
 }
 
-// Écart §8.1 (JOURNAL 2026-10-12) : aucun côté ne tient à la largeur du texte (un téléphone couché étroit, un pliable) : au lieu
+// §9.11 : aucun côté ne tient à la largeur du texte (un téléphone couché étroit, un pliable) : au lieu
 // de couvrir la pill, la bulle se resserre à la place que laisse un côté, et son texte passe à la ligne. `undefined` : un côté tient
 // (les côtés essayés, comme pour `placeBubble`), ou la place est trop étroite pour y lire.
 export const MIN_SQUEEZED_WIDTH = 200;
@@ -116,7 +116,7 @@ export function squeezedWidth(
   return widest >= MIN_SQUEEZED_WIDTH ? widest : undefined;
 }
 
-// Écart §8.1 (JOURNAL 2026-10-09) : dans une fenêtre dont le corps défile, la cible peut passer sous un bord. Elle reste à la vue
+// §9.11 : dans une fenêtre dont le corps défile, la cible peut passer sous un bord. Elle reste à la vue
 // tant que son centre est dans chaque cadre qui la rogne (le corps, la rangée d'onglets, la fenêtre) ; sinon la bulle s'efface.
 export function isInsideClips(target: TargetRect, clips: readonly TargetRect[]): boolean {
   const x = target.left + target.width / 2;

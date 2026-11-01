@@ -4,7 +4,7 @@ import { shouldAnnounceSwitch, switchToast } from "./switch-toast";
 const live = { status: "live", isArchived: false } as const;
 const archived = { status: "live", isArchived: true } as const;
 
-describe("shouldAnnounceSwitch (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("shouldAnnounceSwitch (§17.1)", () => {
   // Annonce le changement que la page a vu arriver, à ses viewers
   it("announces the change the page saw coming, to its viewers", () => {
     expect(shouldAnnounceSwitch(live, archived, false)).toBe(true);
@@ -24,7 +24,7 @@ describe("shouldAnnounceSwitch (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("switchToast (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("switchToast (§17.1)", () => {
   const context = { ownerName: "Kalyss", draftSize: 0, hasAskedHere: false };
 
   // Le streamer a changé de canvas : vrai pour un archivage comme pour une réouverture, donc sans « le nouveau »

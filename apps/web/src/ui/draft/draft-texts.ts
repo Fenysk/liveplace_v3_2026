@@ -1,4 +1,4 @@
-// Les phrases de la pill Dessin (Écart §14, JOURNAL 2026-10-07) : ses boutons, ses états, et ce que la jauge dit.
+// Les phrases de la pill Dessin (§9.9) : ses boutons, ses états, et ce que la jauge dit.
 
 import type { CanvasView } from "../../state/canvas-store";
 import { defineTexts, localized } from "../locale/texts";
@@ -26,11 +26,11 @@ export const DRAFT_TEXTS = defineTexts({
   },
   confirm: { fr: "Valider", en: "Confirm" },
   confirmTip: { fr: "Poser le brouillon", en: "Place the draft" },
-  // Plus aucun pixel et rien à poser : le bouton compte jusqu'au prochain (Écart §9.3, JOURNAL 2026-10-08).
+  // Plus aucun pixel et rien à poser : le bouton compte jusqu'au prochain (§9.6).
   waitLead: { fr: "Attendre ", en: "Wait " },
   waitTip: { fr: "Attendre le prochain pixel", en: "Wait for the next pixel" },
   clearDraftTip: { fr: "Vider le brouillon", en: "Clear the draft" },
-  // Le toast de Vider : le brouillon revient d'un bouton, tant que rien n'a été dessiné depuis (Écart §9.3, JOURNAL 2026-10-13).
+  // Le toast de Vider : le brouillon revient d'un bouton, tant que rien n'a été dessiné depuis (§9.6).
   draftCleared: { fr: "Brouillon vidé", en: "Draft cleared" },
   restoreDraft: { fr: "Rétablir", en: "Restore" },
   traceTip: {
@@ -111,7 +111,7 @@ export const DRAFT_TEXTS = defineTexts({
   }),
 
   // Le client prédit, le serveur tranche : l'infobulle de la jauge, dite d'un trait (§9.4).
-  // JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà. Écart §9.3 (JOURNAL 2026-10-13) : en pixels, durées en « 12 s ».
+  // JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà. §9.4 : en pixels, durées en « 12 s ».
   gaugeLabel: localized({
     fr: ({ charges, max, afterPlacement, nextRefill, claimable }: GaugeSentence) => {
       const placed = afterPlacement === undefined ? "" : `, ${afterPlacement} après ce dessin`;

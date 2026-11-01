@@ -2,7 +2,7 @@ import { THEME_MAX_LENGTH } from "@liveplace/domain";
 import { describe, expect, it } from "vitest";
 import { toShownTheme, toThemeToSave } from "./canvas-theme";
 
-describe("toThemeToSave (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("toThemeToSave (§8.1)", () => {
   // Rien à enregistrer tant que le thème nettoyé est celui qui l'est déjà : pas d'appel au serveur
   it("has nothing to save while the cleaned theme is the saved one", () => {
     expect(toThemeToSave("Printemps", "Printemps")).toBeNull();
@@ -30,7 +30,7 @@ describe("toThemeToSave (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("toShownTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("toShownTheme (§8.1)", () => {
   // Tant que le gateway n'a pas répondu, la page montre le thème de Convex qu'elle a reçu avec elle
   it("shows the theme the page was rendered with until the gateway has answered", () => {
     expect(toShownTheme(undefined, "Halloween")).toBe("Halloween");

@@ -4,7 +4,7 @@ import { fillImage, toColorTable } from "./canvas-image";
 // Relit une couleur de l'image comme le fait le navigateur : quatre octets R, G, B, A.
 const bytesOf = (target: Uint32Array, offset: number) => [...new Uint8Array(target.buffer, offset * 4, 4)];
 
-describe("canvas image (Écart §9.3)", () => {
+describe("canvas image (§9.3)", () => {
   const colorTable = toColorTable(["#00000000", "#ec273f", "#36c5f480"]);
 
   // Chaque couleur arrive dans l'image dans l'ordre R, G, B, A

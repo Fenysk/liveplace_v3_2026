@@ -1,4 +1,4 @@
-// Le vocabulaire de l'interface (Écart §14, JOURNAL 2026-10-13) : jamais « pose », « joueur », « utilisateur » ni « charge » à
+// Le vocabulaire de l'interface (§9.9) : jamais « pose », « joueur », « utilisateur » ni « charge » à
 // l'écran, jamais « ± ». En anglais, « drawing » et « viewer », jamais « placement » ni « player ».
 // `draft-texts.ts` manque : son refus « on n'y pose plus » (fresque archivée) attend sa reformulation.
 
@@ -40,7 +40,7 @@ const BANNED = {
 const textOf = (value: unknown): string =>
   JSON.stringify(value, (_key, part: unknown) => (typeof part === "function" ? part.toString() : part));
 
-describe("the words of the interface (Écart §14, JOURNAL 2026-10-13)", () => {
+describe("the words of the interface (§9.9)", () => {
   for (const locale of ["fr", "en"] as const) {
     // Aucun mot écarté dans les phrases des modules qui parlent de dessins, de viewers et de pixels
     it(`has no banned word in the ${locale} sentences of the game`, () => {

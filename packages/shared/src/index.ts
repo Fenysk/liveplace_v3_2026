@@ -22,7 +22,7 @@ export function cookieValue(header: string | undefined, name: string): string | 
     ?.slice(name.length + 1);
 }
 
-// Des octets en texte, pour traverser un JSON : l'image d'une miniature (Écart §15, JOURNAL 2026-10-06).
+// Des octets en texte, pour traverser un JSON : l'image d'une miniature (§17.1).
 const BASE64_CHUNK = 8192; // `String.fromCharCode(...tout)` ferait déborder la pile sur un grand canvas
 
 export function toBase64(bytes: Uint8Array): string {

@@ -1,5 +1,5 @@
-// Les phrases de la vue OBS (Écart §14, JOURNAL 2026-10-07) : la surface qu'OBS affiche, et la section de la fenêtre.
-// Le fond est parti dans la section Fresque (Écart §9.1, JOURNAL 2026-10-10).
+// Les phrases de la vue OBS (§9.9) : la surface qu'OBS affiche, et la section de la fenêtre.
+// Le fond est parti dans la section Fresque (§9.5).
 
 import { defineTexts, localized } from "../locale/texts";
 
@@ -14,7 +14,7 @@ export const OBS_TEXTS = defineTexts({
     en: (delay) => `Delay saved: ${delay}`,
   }),
 
-  // Le même bouton pour OBS et pour les viewers : l'adresse de la fresque est la même page (Écart §8.1, JOURNAL 2026-10-12).
+  // Le même bouton pour OBS et pour les viewers : l'adresse de la fresque est la même page (§9.8).
   address: {
     fr: "Ton lien : à coller dans OBS, à partager à tes viewers",
     en: "Your link: paste it into OBS, share it with your viewers",

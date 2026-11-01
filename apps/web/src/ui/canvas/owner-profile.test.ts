@@ -11,7 +11,7 @@ const rendered: ProfileUser = {
   twitchLive: art,
 };
 
-describe("the owner's profile, with its live (Écart §4, JOURNAL 2026-10-07)", () => {
+describe("the owner's profile, with its live (§10.4)", () => {
   // Avant le welcome, le live lu par le serveur au rendu fait foi
   it("keeps the live the server read when rendering, until the welcome", () => {
     expect(toOwnerProfile(rendered, {})).toEqual(rendered);

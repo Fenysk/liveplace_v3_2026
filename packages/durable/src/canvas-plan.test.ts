@@ -48,7 +48,7 @@ const archiving = {
   maxArchives: MAX_ARCHIVES,
 };
 
-describe("planArchive (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("planArchive (§17.1)", () => {
   // Archive l'actif avec sa date, son code et son thème, et insère le nouveau canvas actif, né à cet instant, sans thème
   it("archives the active canvas with its date, code and theme, and inserts the new one, born at that instant, with no theme", () => {
     const plan = planArchive([active], { ...archiving, theme: "Printemps" });
@@ -152,7 +152,7 @@ describe("planArchive (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("planReopen (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("planReopen (§17.1)", () => {
   const reopening = {
     ownerId,
     outgoingId: active.canvasId,
@@ -214,7 +214,7 @@ describe("planReopen (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("planDiscard (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("planDiscard (§17.1)", () => {
   // Supprime une archive de ce propriétaire
   it("deletes an archive of this owner", () => {
     expect(planDiscard([active, ...archives(2)], ownerId, "canvas-archive-2")).toEqual({
@@ -233,7 +233,7 @@ describe("planDiscard (Écart §15, JOURNAL 2026-10-06)", () => {
   });
 });
 
-describe("planSetTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("planSetTheme (§8.1)", () => {
   // Pose le thème sur le canvas actif de ce propriétaire, rien d'autre
   it("sets the theme on the active canvas of this owner, and writes nothing else", () => {
     expect(planSetTheme([active, ...archives(2)], ownerId, active.canvasId, "Printemps")).toEqual({
@@ -290,7 +290,7 @@ describe("planSetTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("planNameToTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("planNameToTheme (§8.1)", () => {
   // Ce que les documents deviennent une fois les écritures appliquées, comme `db.patch`
   const applied = (canvases: readonly StoredCanvas[]): StoredCanvas[] => {
     const plan = planNameToTheme(canvases);
@@ -356,7 +356,7 @@ describe("planNameToTheme (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("toActiveCanvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
+describe("toActiveCanvas (§8.1)", () => {
   // Donne le canvas actif de la page avec son thème s'il en a un, sans champ vide ni champ interne
   it("gives the canvas of the page with its theme when it has one, with no empty or internal field", () => {
     expect(toActiveCanvas({ ...active, theme: "Printemps", linkCode: "kept123456" })).toEqual({
@@ -374,7 +374,7 @@ describe("toActiveCanvas (Écart §8.1, JOURNAL 2026-10-07)", () => {
   });
 });
 
-describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)", () => {
+describe("toOwnerCanvases and pickLinkedCanvas (§17.1)", () => {
   // Sépare l'actif des archives, sans champ vide ni champ interne
   it("splits the active canvas from the archives, with no empty or internal field", () => {
     const listed = toOwnerCanvases([archiveOf(1, { theme: "Hiver" }), active, archiveOf(2)]);
@@ -455,7 +455,7 @@ describe("toOwnerCanvases and pickLinkedCanvas (Écart §15, JOURNAL 2026-10-06)
   });
 });
 
-describe("planBackgroundImage and pickBackgroundImage (Écart §8.1, JOURNAL 2026-10-10)", () => {
+describe("planBackgroundImage and pickBackgroundImage (§8.4)", () => {
   const image = { storageId: "storage-1", at: 1_760_000_000_000, size: 120_000 };
 
   // Le canvas actif de ce propriétaire peut porter une image : le plan rend celle qu'elle remplace, pour que son fichier parte

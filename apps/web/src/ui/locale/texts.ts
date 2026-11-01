@@ -1,4 +1,4 @@
-// Écart §14 (JOURNAL 2026-10-07) : les phrases d'un module, chacune avec sa version dans chaque langue côte à côte.
+// §9.9 : les phrases d'un module, chacune avec sa version dans chaque langue côte à côte.
 // Une phrase sans une langue de `LOCALES` ne compile pas ; ajouter une langue, c'est ajouter sa clé à chaque phrase.
 
 import { LOCALES, type Locale } from "./locale";

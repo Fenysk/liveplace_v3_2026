@@ -1,4 +1,4 @@
-/* Un choix exclusif, une option par ligne (Écart §15, JOURNAL 2026-10-06) : la ligne choisie prend le fond des pills */
+/* Un choix exclusif, une option par ligne (§17.1) : la ligne choisie prend le fond des pills */
 
 .lp-choices {
   display: grid;

@@ -34,7 +34,7 @@ const snapshot: CanvasSnapshot = {
 
 const compressed = (value: unknown) => new Uint8Array(brotliCompressSync(Buffer.from(JSON.stringify(value))));
 
-describe("the snapshot file format (Écart §7.2, JOURNAL 2026-10-06)", () => {
+describe("the snapshot file format (§7.2)", () => {
   // Un snapshot encodé puis décodé redevient exactement lui-même
   it("gives back exactly the snapshot after a round trip", async () => {
     const decoded = await decodeSnapshot(await encodeSnapshot(snapshot));

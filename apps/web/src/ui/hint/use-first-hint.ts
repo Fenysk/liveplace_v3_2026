@@ -1,4 +1,4 @@
-// Ce que montre le conseil de première visite (Écart §8.1, JOURNAL 2026-10-08) : l'état des gestes, retenu par appareil,
+// Ce que montre le conseil de première visite (§9.11) : l'état des gestes, retenu par appareil,
 // et ce que la page en cache. Un déplacement ou un zoom arrive de la scène du canvas (`recordFirstHintStep`) ;
 // une inspection se lit ici, dans le store du canvas.
 
@@ -20,7 +20,7 @@ export const restartFirstHint: () => void = firstHint.restart; // rejouer le tut
 const getServerView = (): FirstHintView => ({ status: "off" });
 
 // Vrai une fois le battement écoulé, pour de bon ; coupé avant (Dessin, inspection), il repart de zéro au retour
-// (Écart §8.1, JOURNAL 2026-10-09).
+// (§9.11).
 const useHintSettled = (isBeating: boolean): boolean => {
   const [isSettled, setIsSettled] = useState(false);
   useEffect(() => {

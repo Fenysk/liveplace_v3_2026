@@ -1,4 +1,4 @@
-// Écart §10.3 (JOURNAL 2026-10-06) : `/{login}/archives/{code}` → propriétaire par le pseudo, archive par le code. Sans
+// §17.2 : `/{login}/archives/{code}` → propriétaire par le pseudo, archive par le code. Sans
 // session : tous ceux qui ont le lien la voient, connectés ou non, et sans lien on ne la trouve pas.
 
 import { isLinkCode, type Timestamp } from "@liveplace/domain";

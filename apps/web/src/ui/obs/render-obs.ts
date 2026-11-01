@@ -29,7 +29,7 @@ export function renderObs(context: CanvasRenderingContext2D, scene: ObsFrame): v
   const { surface, frame, canvas } = scene;
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, surface.width, surface.height);
-  // CDC 2026 §1, Écart §9.1 (JOURNAL 2026-10-10) : le fond noir ou blanc, puis l'image par-dessus à son opacité, sous les pixels,
+  // CDC 2026 §1, §9.5 : le fond noir ou blanc, puis l'image par-dessus à son opacité, sous les pixels,
   // dans le cadre du canvas seulement. Sans fond, l'image se pose sur la transparence : OBS montre sa source à travers.
   renderBackdrop(context, frame, scene.backdrop);
   context.imageSmoothingEnabled = false;

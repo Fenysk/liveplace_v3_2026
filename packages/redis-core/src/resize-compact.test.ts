@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildCanvasKeys } from "./keys";
 import { createRedisHarness } from "./test-harness";
 
-// Écart §5.3 (JOURNAL 2026-10-24) : réduire une fresque rapproche ses dessins avant de couper. Les cas de `planResize` sont dans
+// §5.8 : réduire une fresque rapproche ses dessins avant de couper. Les cas de `planResize` sont dans
 // le domain ; ici, ce que Redis en fait : les piles, les ensembles `cells:` et `clearing:`, `state`, `meta`.
 const harness = createRedisHarness();
 const { redis, core } = harness;
@@ -104,7 +104,7 @@ const expectConsistent = async (canvasId: string, authors: readonly string[]) =>
   }
 };
 
-describe("resizeCanvas brings drawings closer (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("resizeCanvas brings drawings closer (§5.8)", () => {
   // La pile, l'auteur et la couleur suivent le pixel ; l'ancienne case n'a plus rien
   it("moves the pile, the author and the color along with the pixel", async () => {
     const { canvasId, keys } = await readyCanvas();
@@ -311,7 +311,7 @@ describe("resizeCanvas brings drawings closer (Écart §5.3, JOURNAL 2026-10-24)
   });
 });
 
-describe("resizeCanvas under concurrent placements (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("resizeCanvas under concurrent placements (§5.8)", () => {
   // Une pose qui passe entre la lecture et l'application fait refuser le plan : le client relit et recommence
   it("tries again when a placement ran between the read and the apply", async () => {
     const { canvasId } = await readyCanvas();
@@ -374,7 +374,7 @@ const seeded = (seed: number) => () => {
   return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
 };
 
-describe("resizeCanvas keeps Redis consistent (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("resizeCanvas keeps Redis consistent (§5.8)", () => {
   // Des poses qui se recouvrent, des gommes, puis des réductions et des agrandissements en série
   it("keeps `state`, the piles and the author sets consistent through shrinks and growths", async () => {
     const { canvasId } = await readyCanvas({ width: 40, height: 40 });
@@ -409,7 +409,7 @@ describe("resizeCanvas keeps Redis consistent (Écart §5.3, JOURNAL 2026-10-24)
   }, 60_000);
 });
 
-describe("resizeCanvas speed (Écart §5.3, JOURNAL 2026-10-24)", () => {
+describe("resizeCanvas speed (§5.8)", () => {
   // Une fresque 256×256 pleine, dont toutes les cases ont une pile : rien ne bouge, tout se coupe
   it("cuts a full 256×256 canvas fast", async () => {
     const { canvasId } = await readyCanvas({ width: 256, height: 256 });

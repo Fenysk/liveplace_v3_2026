@@ -1,4 +1,4 @@
-// L'axe du temps de l'historique (écart §4.3, JOURNAL 2026-10-06 et 2026-10-07) : des créneaux réguliers, du plus ancien
+// L'axe du temps de l'historique (§16.1) : des créneaux réguliers, du plus ancien
 // au plus récent, comme le gateway écrit ses points. Pour tout LivePlace, un point absent laisse son créneau vide : la
 // courbe y fait un trou. Pour un canvas, il vaut zéro : le gateway n'écrit un point que s'il s'y passe quelque chose.
 

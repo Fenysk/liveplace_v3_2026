@@ -1,5 +1,5 @@
 // La jauge (CDC 2026) : un anneau-minuteur du prochain pixel, puis un tube où les pixels sont un fluide, le nombre dedans
-// (Écart §9.3, JOURNAL 2026-10-13). Aucune boucle à nous : l'anneau est une animation du navigateur, le niveau une transition
+// (§9.4). Aucune boucle à nous : l'anneau est une animation du navigateur, le niveau une transition
 // CSS (JOURNAL 2026-09-24). Pas d'ondulation au repos : la seule boucle de l'interface est celle de « Reconnexion… » (design system).
 
 import { useEffect, useRef, useState } from "react";

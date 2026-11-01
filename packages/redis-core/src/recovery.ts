@@ -1,4 +1,4 @@
-// Remettre un canvas perdu dans Redis (Écart §7.2, JOURNAL 2026-10-08). Le worker lit la sauvegarde ; ici, les écritures :
+// Remettre un canvas perdu dans Redis (§7.4). Le worker lit la sauvegarde ; ici, les écritures :
 // le début (`ready` à 0), les gros morceaux en pipeline, puis `restore.lua` qui finit et pose `ready` en dernier.
 
 import { readFileSync } from "node:fs";
@@ -183,7 +183,7 @@ export function createRecoveryTarget(redis: Redis): RecoveryTarget {
   };
 }
 
-// Écart §4.2 (JOURNAL 2026-10-08) : ce que le web écrit au rendu d'une page, avant que le worker ait vu la perte.
+// §7.4 : ce que le web écrit au rendu d'une page, avant que le worker ait vu la perte.
 export function createRecoveryMarks(redis: Redis): RecoveryMarks {
   return {
     async isCanvasLive(canvasId) {

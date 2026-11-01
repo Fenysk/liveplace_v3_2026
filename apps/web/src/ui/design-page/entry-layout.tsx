@@ -122,7 +122,7 @@ export const InPhone = ({
   </div>
 );
 
-// Un téléphone en paysage (Écart §8.1 et §9.3, JOURNAL 2026-10-08) : la colonne du bas, ou le panneau Dessin sur toute la hauteur.
+// Un téléphone en paysage (§9.7) : la colonne du bas, ou le panneau Dessin sur toute la hauteur.
 export const InLandscape = ({ isPanel = false, children }: { isPanel?: boolean; children: ReactNode }) => (
   <div className={isPanel ? "design-in-landscape design-in-landscape--panel" : "design-in-landscape"}>
     {children}
@@ -140,12 +140,12 @@ export const InHinge = ({ isStacked = false, canvas, controls }: InHingeProps) =
   </div>
 );
 
-// La place entre les pills Canvas et Compte, en haut de l'écran d'un PC (la pill Thème, Écart §8.1, JOURNAL 2026-10-07).
+// La place entre les pills Canvas et Compte, en haut de l'écran d'un PC (la pill Thème, §9.7).
 export const InTopRoom = ({ children }: { children: ReactNode }) => (
   <div className="design-in-top-room">{children}</div>
 );
 
-// Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous (Écart §8.1, JOURNAL 2026-10-08), et
+// Le haut d'un téléphone : la rangée des pills Canvas et Compte, la bande Thème dessous (§9.7), et
 // le toast qui se pose sous elle. `isNarrow` : un petit téléphone, où la pill Canvas manque de place.
 export const InPhoneTop = ({ isNarrow = false, children }: { isNarrow?: boolean; children: ReactNode }) => (
   <div className={isNarrow ? "design-in-phone-top design-in-phone-top--narrow" : "design-in-phone-top"}>

@@ -10,7 +10,7 @@ describe("toIdentity (pill Compte, fenêtre Mon compte)", () => {
     expect(toIdentity({ role: "guest" })).toEqual({ kind: "guest" });
   });
 
-  // Écart §4 (JOURNAL 2026-10-07) : son profil porte son live Twitch quand le gateway le dit, la fenêtre Mon compte aussi
+  // §10.4 : son profil porte son live Twitch quand le gateway le dit, la fenêtre Mon compte aussi
   it("carries the person's Twitch live in the profile when the gateway says it", () => {
     const live = toIdentity({ ...signedIn, twitchLive: { category: "Art" } });
     const notLive = toIdentity(signedIn);

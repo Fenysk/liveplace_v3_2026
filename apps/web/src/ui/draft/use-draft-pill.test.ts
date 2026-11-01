@@ -11,7 +11,7 @@ import type { ShowToast } from "../design/toast";
 import { DRAFT_TEXTS } from "./draft-texts";
 import { discardWithRestore, useDraftPillProps } from "./use-draft-pill";
 
-// Vider se rattrape : un toast « Brouillon vidé » porte le bouton Rétablir (Écart §9.3, JOURNAL 2026-10-13).
+// Vider se rattrape : un toast « Brouillon vidé » porte le bouton Rétablir (§9.6).
 
 const CLEARED: Draft = new Map([[toCellKey(1, 1), { x: 1, y: 1, colorIndex: 4 }]]);
 

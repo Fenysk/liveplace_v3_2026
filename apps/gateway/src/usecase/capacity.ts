@@ -1,8 +1,8 @@
-// La capacité vue du gateway (écart §4.3 et §5.1, JOURNAL 2026-10-07) : toutes les 10 s, chaque ressource mesurée (Redis, la
+// La capacité vue du gateway (§16.3) : toutes les 10 s, chaque ressource mesurée (Redis, la
 // machine, lui-même, ce que le web dépose), son pic des 5 dernières minutes face à son plafond, et la saturation qui en
 // sort. Chaque minute, les pics partent sous `capacity:`. La frame part toutes les 2 s au développeur qui regarde, sans
-// rien lire : tout vient de la mémoire. Rien par pose, au-delà d'un compteur. Ce que bloquent les protections (Écart §4.3
-// et §5.1, JOURNAL 2026-10-09) se compte à part, sans plafond : la frame le porte, la saturation l'ignore.
+// rien lire : tout vient de la mémoire. Rien par pose, au-delà d'un compteur. Ce que bloquent les protections (§16.3)
+// se compte à part, sans plafond : la frame le porte, la saturation l'ignore.
 
 import {
   type ActivityPeriod,
@@ -60,7 +60,7 @@ export type CapacityDeps = {
 
 export interface Capacity {
   countBytes(bytes: number): void; // à chaque envoi de frame ou de snapshot : rien de lourd
-  // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : ce que bloquent les protections, un compteur de plus chacun, jamais une écriture.
+  // §16.3 : ce que bloquent les protections, un compteur de plus chacun, jamais une écriture.
   countRefusedPlacement(): void; // une pose refusée pour le débit
   countClosedConnection(): void; // une connexion fermée en 1013
   // Ignoré hors du développeur. Cesser de regarder ne demande aucun droit : la fermeture d'une page y passe aussi.
@@ -190,7 +190,7 @@ export function createCapacity(deps: CapacityDeps): Capacity {
     lastSnapshotAt = measure.at;
   };
 
-  // Le quota d'un mois est atteint quand l'usage, pas sa projection, le dépasse (écart §2 et §9, JOURNAL 2026-10-07).
+  // Le quota d'un mois est atteint quand l'usage, pas sa projection, le dépasse (§16.3).
   const sampleConvex = async (at: Timestamp): Promise<void> => {
     convex = await deps.store.getConvexDeposit();
     if (convex?.status !== "configured") return;

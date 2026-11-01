@@ -16,9 +16,9 @@ import { OBS_VIEW_SCRIPT } from "../ui/obs/obs-view";
 
 export type RouterContext = { openCanvas: CanvasOpener };
 
-// Écart §11.1 (JOURNAL 2026-10-04) : l'étiquette d'un emplacement de bêta, `null` en production.
-// Écart §14 (JOURNAL 2026-10-07) : et la langue de la page, d'après le cookie, sinon `Accept-Language`.
-// Écart §14 (JOURNAL 2026-10-28) : sans l'un ni l'autre, l'accueil `/` parle anglais.
+// §11.1 : l'étiquette d'un emplacement de bêta, `null` en production.
+// §9.9 : et la langue de la page, d'après le cookie, sinon `Accept-Language`.
+// §9.9 : sans l'un ni l'autre, l'accueil `/` parle anglais.
 const getRootPage = createServerFn({ method: "GET" }).handler(({ context }) => ({
   betaLabel: context.deps.betaLabel,
   locale: resolveLocale({
@@ -72,7 +72,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     links: [
       { rel: "stylesheet", href: designSystemCss },
       { rel: "stylesheet", href: betaBadgeCss },
-      // Écart §9.1 (JOURNAL 2026-10-08) : la même icône que l'application, dans l'onglet de toutes les pages.
+      // §9.10 : la même icône que l'application, dans l'onglet de toutes les pages.
       { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32 48x48" },
       { rel: "icon", type: "image/png", href: "/icon-192.png", sizes: "192x192" },
     ],

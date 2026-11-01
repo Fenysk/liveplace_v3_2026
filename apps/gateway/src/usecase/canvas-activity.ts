@@ -177,7 +177,7 @@ export function createCanvasCounts() {
       if (device === "phone") counts.phoneVisits += 1;
     },
 
-    // Une lecture de cette minute l'a vu streamé (Écart §5.1, JOURNAL 2026-10-08) : sa minute vaut 1, et s'écrit.
+    // Une lecture de cette minute l'a vu streamé (§16.2) : sa minute vaut 1, et s'écrit.
     markStreamed(canvasId: string): void {
       getMinute(canvasId).streamedMinutes = 1;
     },

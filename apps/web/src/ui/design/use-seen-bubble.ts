@@ -1,4 +1,4 @@
-// Une bulle ne s'affiche qu'une fois (Écart §8.1, JOURNAL 2026-10-08) : sa clé est retenue dans le navigateur de l'appareil.
+// Une bulle ne s'affiche qu'une fois (§9.11) : sa clé est retenue dans le navigateur de l'appareil.
 // Le serveur ne connaît pas le stockage : il rend « déjà vue », et React relit à l'hydratation.
 
 import { useSyncExternalStore } from "react";
@@ -19,7 +19,7 @@ export function useSeenBubble(key: string) {
 
 const KEY_SEPARATOR = "|";
 
-// Plusieurs bulles d'un coup (Écart §8.1, JOURNAL 2026-10-08) : la lecture se rend en une chaîne, un instantané que React compare.
+// Plusieurs bulles d'un coup (§9.11) : la lecture se rend en une chaîne, un instantané que React compare.
 export function useSeenBubbles<Key extends string>(keys: readonly Key[]): (key: Key) => boolean {
   const seen = useSyncExternalStore(
     seenBubbles.subscribe,

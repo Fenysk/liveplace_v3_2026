@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listChunkGaps, listGaps, type Recovered } from "./chunk";
 
-describe("listGaps (Écart §7.2, JOURNAL 2026-10-08)", () => {
+describe("listGaps (§7.1)", () => {
   // Quand chaque version après le curseur a son entrée, rien n'est noté
   it("notes nothing when every version has its entry", () => {
     expect(listGaps(10, [11, 12, 13], null)).toEqual({});
@@ -43,8 +43,8 @@ describe("listGaps (Écart §7.2, JOURNAL 2026-10-08)", () => {
   });
 });
 
-// Écart §7.2 (JOURNAL 2026-10-08, amendé) : une récupération saute de version, et les versions perdues avant elle se notent.
-describe("listChunkGaps (Écart §7.2, JOURNAL 2026-10-08)", () => {
+// §7.1 : une récupération saute de version, et les versions perdues avant elle se notent.
+describe("listChunkGaps (§7.1)", () => {
   const recovered = (snapshotVersion: number): Recovered => ({
     at: 1_700_000_000_000,
     version: 1_000_275,

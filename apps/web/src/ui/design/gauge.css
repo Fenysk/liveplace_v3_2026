@@ -1,5 +1,5 @@
-/* Un anneau-minuteur du prochain pixel, puis un tube où les pixels sont un fluide, le nombre « 8/20 » dedans (Écart §9.3,
-   JOURNAL 2026-10-13). Deux fluides : les pixels qu'on a devant, ceux que réserve le brouillon derrière, plus clairs : on les
+/* Un anneau-minuteur du prochain pixel, puis un tube où les pixels sont un fluide, le nombre « 8/20 » dedans (§9.4).
+   Deux fluides : les pixels qu'on a devant, ceux que réserve le brouillon derrière, plus clairs : on les
    distingue par la luminosité, pas seulement par la teinte. */
 
 .lp-gauge {
@@ -76,7 +76,7 @@
 }
 
 /* Le tube porte le fluide et le nombre. Le fluide le remplit ; le nombre, en trois couches de même texte superposées dans une
-   seule case, donne au tube sa largeur minimale : de quoi lire « 150/150 », jamais moins (Écart §9.3, JOURNAL 2026-10-13). */
+   seule case, donne au tube sa largeur minimale : de quoi lire « 150/150 », jamais moins (§9.4). */
 .lp-gauge-tube {
   position: relative;
   display: grid;
@@ -151,7 +151,7 @@
 }
 
 /* Le tube prend la place restante (barre du bas, sur mobile). Il cède avant que Valider, quand il compte ou attend
-   (Écart §9.3, JOURNAL 2026-10-08), ne le recouvre, mais pas sous son nombre. */
+   (§9.4), ne le recouvre, mais pas sous son nombre. */
 .lp-gauge--fill {
   flex: 1;
 }

@@ -19,7 +19,7 @@ const messageOf = (run: () => unknown): string => {
   throw new Error("aucune erreur levée");
 };
 
-describe("parseWorkerConfig (§11.5, Écart §11.5 JOURNAL 2026-10-06)", () => {
+describe("parseWorkerConfig (§11.5)", () => {
   // Nomme la variable obligatoire absente
   it("names the missing required variable", () => {
     const { REDIS_URL: _redisUrl, ...withoutRedis } = env;

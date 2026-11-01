@@ -43,7 +43,7 @@ const drafting: HelpFacts = { ...resting, pill: "draft" };
 const wishedIn = (facts: HelpFacts): HelpBubble[] => HELP_BUBBLES.filter((bubble) => isWished(bubble, facts));
 const neverSeen = () => false;
 
-describe("les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
+describe("les bulles d'aide (§9.11)", () => {
   // Au repos, un viewer qui regarde n'a besoin d'aucun conseil
   it("wishes nothing for a viewer who is just looking", () => {
     expect(wishedIn(resting)).toEqual([]);
@@ -171,8 +171,8 @@ describe("les bulles d'aide (Écart §8.1, JOURNAL 2026-10-08)", () => {
   });
 });
 
-// Le streamer, une fois par appareil : Réglages, puis l'onglet Vue OBS, puis l'adresse à copier (Écart §8.1, JOURNAL 2026-10-09)
-describe("la chaîne des bulles OBS (Écart §8.1, JOURNAL 2026-10-09)", () => {
+// Le streamer, une fois par appareil : Réglages, puis l'onglet Vue OBS, puis l'adresse à copier (§9.11)
+describe("la chaîne des bulles OBS (§9.11)", () => {
   const owner: HelpFacts = { ...resting, role: "owner" };
   const inWindow = (windowSection: string, facts: HelpFacts = owner): HelpFacts => ({
     ...facts,
@@ -296,9 +296,9 @@ describe("la chaîne des bulles OBS (Écart §8.1, JOURNAL 2026-10-09)", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : quatre bulles de tutoriel restent après l'action qui les ferme, tant que leur cible est à l'écran ;
+// §9.11 : quatre bulles de tutoriel restent après l'action qui les ferme, tant que leur cible est à l'écran ;
 // les autres partent aussitôt. Le temps qu'elles restent est une seule constante, celle du conseil de première visite.
-describe("les bulles qui restent après l'action qui les ferme (Écart §8.1, JOURNAL 2026-10-12)", () => {
+describe("les bulles qui restent après l'action qui les ferme (§9.11)", () => {
   const alwaysSeen = () => true;
 
   // Deux secondes, comme le dernier point du conseil de première visite
@@ -362,8 +362,8 @@ describe("les bulles qui restent après l'action qui les ferme (Écart §8.1, JO
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : trois conseils du Dessin qui viennent avec les dessins posés sur l'appareil
-describe("les conseils du Dessin après des dessins posés (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : trois conseils du Dessin qui viennent avec les dessins posés sur l'appareil
+describe("les conseils du Dessin après des dessins posés (§9.11)", () => {
   const touching: HelpFacts = { ...drafting, hasColorButton: true, draftSize: 1 };
   const clicking: HelpFacts = { ...drafting, isTouchScreen: false, draftSize: 1 };
   const placed = (facts: HelpFacts, placementCount: number): HelpFacts => ({ ...facts, placementCount });
@@ -474,8 +474,8 @@ describe("les conseils du Dessin après des dessins posés (Écart §8.1, JOURNA
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-14) : à la souris, glisser en Dessin déplace la vue ; la bulle dit une fois de tenir Espace pour tracer
-describe("la bulle d'Espace, à la souris (Écart §8.1, JOURNAL 2026-10-14)", () => {
+// §9.11 : à la souris, glisser en Dessin déplace la vue ; la bulle dit une fois de tenir Espace pour tracer
+describe("la bulle d'Espace, à la souris (§9.11)", () => {
   const moved: HelpFacts = { ...drafting, isTouchScreen: false, hasPannedInDraft: true, draftSize: 1 };
   const alwaysSeen = () => true;
 
@@ -538,8 +538,8 @@ describe("la bulle d'Espace, à la souris (Écart §8.1, JOURNAL 2026-10-14)", (
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : qui modère trouve sa pill Modération, puis les actions de l'inspection
-describe("les bulles de qui modère (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : qui modère trouve sa pill Modération, puis les actions de l'inspection
+describe("les bulles de qui modère (§9.11)", () => {
   const moderator: HelpFacts = { ...resting, role: "moderator" };
   const owner: HelpFacts = { ...resting, role: "owner" };
   // La pill Inspection montre une case posée par un autre compte, avec ses actions de modération.
@@ -653,8 +653,8 @@ describe("les bulles de qui modère (Écart §8.1, JOURNAL 2026-10-12)", () => {
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : la chaîne du streamer continue après l'adresse, dans la fenêtre
-describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Twitch (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : la chaîne du streamer continue après l'adresse, dans la fenêtre
+describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Twitch (§9.11)", () => {
   const owner: HelpFacts = { ...resting, role: "owner" };
   // Ce que la fenêtre voudrait : les bulles de l'écran voudraient aussi (Réglages), mais ne se montrent pas pendant qu'elle est ouverte.
   const windowWished = (facts: HelpFacts): HelpBubble[] => wishedIn(facts).filter(isInWindow);
@@ -773,8 +773,8 @@ describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Tw
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : la synchro Twitch jamais faite se lit dans la réponse de la liste des modérateurs
-describe("lire la synchro Twitch jamais faite (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : la synchro Twitch jamais faite se lit dans la réponse de la liste des modérateurs
+describe("lire la synchro Twitch jamais faite (§9.11)", () => {
   // Une liste qui ne porte aucune synchro : jamais faite
   it("is never done when the list of moderators carries no sync", () => {
     expect(isTwitchSyncNever({ ok: true, value: { users: [] } })).toBe(true);
@@ -797,8 +797,8 @@ describe("lire la synchro Twitch jamais faite (Écart §8.1, JOURNAL 2026-10-12)
   });
 });
 
-// Écart §8.1 (JOURNAL 2026-10-12) : un seul bouton dans Vue OBS, qui porte la bulle de l'adresse puis celle du partage
-describe("copier le bouton de Vue OBS (Écart §8.1, JOURNAL 2026-10-12)", () => {
+// §9.11 : un seul bouton dans Vue OBS, qui porte la bulle de l'adresse puis celle du partage
+describe("copier le bouton de Vue OBS (§9.11)", () => {
   // Rien n'est vu : la première copie finit la chaîne OBS, pas encore le partage, qui n'a pas eu son tour
   it("ends the OBS chain on the first copy, not yet the link to share", () => {
     expect(bubblesEndedByCopy(neverSeen)).toEqual(OBS_CHAIN);

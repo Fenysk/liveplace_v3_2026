@@ -11,7 +11,7 @@ export const SAMPLE_OWNER: ProfileUser = {
   login: "kalyss",
   avatarUrl: sampleAvatarUrl,
 };
-// Écart §4 (JOURNAL 2026-10-07) : en live, dans une catégorie longue.
+// §10.4 : en live, dans une catégorie longue.
 export const SAMPLE_LIVE_OWNER: ProfileUser = {
   ...SAMPLE_OWNER,
   twitchLive: { category: "Red Dead Redemption 2" },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ACCOUNT_TEXTS } from "./account-texts";
 
-describe("the account sentences in both languages (Écart §14, JOURNAL 2026-10-07)", () => {
+describe("the account sentences in both languages (§9.9)", () => {
   // Le point des signalements dans le titre de la photo ou de Modération : le nombre déjà accordé, puis « en attente »
   it("says the pending reports in the title of the photo and of Moderation", () => {
     expect(ACCOUNT_TEXTS.fr.withPending("Mon compte", "2 signalements")).toBe(

@@ -7,7 +7,7 @@ const noop = (): void => undefined;
 const render = (props: { label: string; reservedLabel?: string; labelLead?: string }): string =>
   renderToStaticMarkup(createElement(Button, { onPress: noop, ...props }));
 
-describe("le bouton qui garde la largeur de son plus long libellé (Écart §9.3, JOURNAL 2026-10-13)", () => {
+describe("le bouton qui garde la largeur de son plus long libellé (§9.6)", () => {
   // Le libellé plus court ne rétrécit pas le bouton : le plus long se réserve, invisible, à côté de lui
   it("reserves the widest label next to the shown one, without saying it twice", () => {
     const markup = render({ label: "Valider · 3", reservedLabel: "Valider · 99" });

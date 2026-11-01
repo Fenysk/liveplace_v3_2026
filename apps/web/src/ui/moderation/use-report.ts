@@ -51,7 +51,7 @@ export function useReport(canvas: CanvasStore): {
     setTarget(null);
     drop();
   };
-  // Écart §5.3 (JOURNAL 2026-10-24) : un signalement qui part (`running`) est laissé, la case visée est celle que le serveur relit.
+  // §5.8 : un signalement qui part (`running`) est laissé, la case visée est celle que le serveur relit.
   useCloseOnMove(toMoveKey(view), target !== null && status !== "running", close);
 
   // Cette pose seule, ou ses voisines : la plage de l'aperçu, calculée sur les mêmes pixels.

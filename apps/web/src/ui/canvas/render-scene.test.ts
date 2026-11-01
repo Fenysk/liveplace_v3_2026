@@ -434,7 +434,7 @@ describe("une case posée par un autre joueur, en fondu", () => {
   });
 });
 
-describe("les effets sur une fresque à fond noir, blanc ou image (Écart §9.1, JOURNAL 2026-10-10)", () => {
+describe("les effets sur une fresque à fond noir, blanc ou image (§9.5)", () => {
   const BLACK = { fill: "black", image: null } as const;
   const arriving = [{ ...CELL, base: [{ colorIndex: 1, alpha: 1 }], colorIndex: 2, progress: 0.5 }];
 

@@ -20,7 +20,7 @@ import type { ChunkSize, TierRow } from "./retention";
 import type { CanvasSnapshot, SnapshotTier } from "./snapshot";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
-// Écart §5.3 (JOURNAL 2026-10-28) : `origin`, le repère des pixels ; le script les traduit vers celui de la fresque. Absent : le même.
+// §5.8 : `origin`, le repère des pixels ; le script les traduit vers celui de la fresque. Absent : le même.
 export type Placement = {
   userId: string;
   requestId: string;
@@ -90,7 +90,7 @@ export type ModeratorRole = { userId: string; source: ModerationSource; isModera
 // Le nom Twitch de quelqu'un qui n'a pas (encore) de compte LivePlace.
 export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
 
-// Écart §4 et §10.1 (JOURNAL 2026-10-07) : le live Twitch en cours d'un compte, avec sa catégorie (vide : sans catégorie).
+// §10.4 : le live Twitch en cours d'un compte, avec sa catégorie (vide : sans catégorie).
 // Absent : hors live.
 export type TwitchLive = NonNullable<Extract<ServerFrame, { t: "twitchLive" }>["twitchLive"]>;
 
@@ -105,7 +105,7 @@ export type CanvasTwitchCommand =
   | { kind: "moderators"; canvasId: string; userIds: string[] }
   | { kind: "bans"; canvasId: string; userIds: string[] };
 
-// Écart §4 (JOURNAL 2026-10-07) : le live d'un compte a changé ; le gateway le dit à ses pages. Sans canvas : il vaut
+// §10.4 : le live d'un compte a changé ; le gateway le dit à ses pages. Sans canvas : il vaut
 // pour toutes les pages du streamer et pour les connexions de ce compte.
 export type TwitchLiveCommand = { kind: "twitchLive"; userId: string; twitchLive?: TwitchLive };
 
@@ -119,7 +119,7 @@ export interface TwitchWrites {
   setTwitchUsers(canvasId: string, users: readonly TwitchUser[]): Promise<void>;
   queueTwitchCommands(commands: readonly TwitchCommand[]): Promise<void>;
   setTwitchSync(canvasId: string, sync: TwitchSync): Promise<void>; // dans `meta`
-  // Écart §5.1 (JOURNAL 2026-10-08) : Twitch livre « au moins une fois ». `false` : ce message a déjà été reçu ; `release`
+  // §10.1 : Twitch livre « au moins une fois ». `false` : ce message a déjà été reçu ; `release`
   // rend l'identifiant quand l'action a échoué, pour que la redélivrance de Twitch passe.
   reserveTwitchMessage(messageId: string): Promise<boolean>;
   releaseTwitchMessage(messageId: string): Promise<void>;
@@ -131,12 +131,12 @@ export interface TwitchCommandQueue {
   ackTwitchCommand(id: string): Promise<void>;
 }
 
-// Écart §4 (JOURNAL 2026-10-07) : les comptes que LivePlace connaît (le miroir `user:`), que le web suit tous à son démarrage.
+// §10.4 : les comptes que LivePlace connaît (le miroir `user:`), que le web suit tous à son démarrage.
 export interface AccountList {
   listAccountIds(): Promise<string[]>;
 }
 
-// Écart §4 (JOURNAL 2026-10-07) : l'état de live de chaque compte, écrit par le web ; le gateway le lit par `getTwitchLive`.
+// §10.4 : l'état de live de chaque compte, écrit par le web ; le gateway le lit par `getTwitchLive`.
 export interface TwitchLiveStore {
   getTwitchLiveState(userId: string): Promise<TwitchLiveState | null>; // `null` : aucun état connu
   setTwitchLiveState(userId: string, state: TwitchLiveState): Promise<void>;
@@ -161,15 +161,15 @@ export type LiveControl =
   | ({ t: "gaugeLimits" } & GaugeLimits) // chaque page reçoit sa jauge recalculée (JOURNAL 2026-09-30)
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   | { t: "resize" } // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
-  | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (Écart §15, JOURNAL 2026-10-06)
-  | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (Écart §4.3, JOURNAL 2026-10-10)
-  | { t: "backgroundImage"; at?: Timestamp } // publié par le web : l'image du fond a changé, sans `at` il n'y en a plus (Écart §4.3, JOURNAL 2026-10-10)
-  | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (Écart §4.3, JOURNAL 2026-10-07)
+  | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (§17.1)
+  | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (§4.3)
+  | { t: "backgroundImage"; at?: Timestamp } // publié par le web : l'image du fond a changé, sans `at` il n'y en a plus (§4.3)
+  | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (§4.3)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
 export type Unsubscribe = () => Promise<void>;
 
-// Écart §15 (JOURNAL 2026-10-06) : pourquoi un script ne sert pas un canvas. Absent ou pas prêt ; ou archivé, et il
+// §17.1 : pourquoi un script ne sert pas un canvas. Absent ou pas prêt ; ou archivé, et il
 // ne reçoit plus aucune écriture : le gateway le dit à la page par l'erreur `canvas_archived`.
 export type CanvasRefusal = "canvas_not_found" | "canvas_archived";
 
@@ -181,8 +181,8 @@ export interface CanvasCore {
     user: Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>,
   ): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
-  isModerator(canvasId: string, userId: string): Promise<boolean>; // Écart §10.3 (JOURNAL 2026-10-08) : `false` pour un banni
-  // Écart §4.2 (JOURNAL 2026-10-08) : `meta.ready` à 0, le canvas est remis en place. Absent, ou sans `ready` (le canvas neuf
+  isModerator(canvasId: string, userId: string): Promise<boolean>; // §10.3 : `false` pour un banni
+  // §7.4 : `meta.ready` à 0, le canvas est remis en place. Absent, ou sans `ready` (le canvas neuf
   // d'un archivage), il ne l'est pas : `getCanvas` rend `null` dans les trois cas, seul celui-ci se dit `canvas_recovering`.
   isRecovering(canvasId: string): Promise<boolean>;
   getSnapshot(canvasId: string): Promise<Snapshot>; // État et version lus ensemble (§6.1).
@@ -217,13 +217,13 @@ export interface CanvasCore {
   listScoreboard(canvasId: string): Promise<ScoreboardEntry[]>;
   listScoreboardRanks(canvasId: string, userIds: readonly string[]): Promise<Map<string, ScoreboardRank>>;
   listOffStreamCells(canvasId: string): Promise<OffStreamCell[]>; // le snapshot d'une vue OBS qui arrive (§9.5)
-  // §5.3 : le streamer seul. Publie le `ctl` `resize`. Écart §5.3 (JOURNAL 2026-10-24) : `busy`, des poses ont couru pendant
+  // §5.3 : le streamer seul. Publie le `ctl` `resize`. §5.8 : `busy`, des poses ont couru pendant
   // chaque essai du plan, qui n'a pas pu s'appliquer ; rien n'a bougé.
   resizeCanvas(
     canvasId: string,
     resize: CanvasSize & { by: string },
   ): Promise<Result<void, CanvasRefusal | "forbidden" | "busy">>;
-  // Écart §5.3 (JOURNAL 2026-10-28) : le streamer seul. Activée, la fresque se resserre sur ses dessins ; publie le `ctl` `resize`
+  // §5.8 : le streamer seul. Activée, la fresque se resserre sur ses dessins ; publie le `ctl` `resize`
   // quand quelque chose a changé. `forbidden` aussi pour `resizeCanvas` tant que le réglage est actif.
   setDynamicSize(
     canvasId: string,
@@ -236,27 +236,27 @@ export interface CanvasCore {
   // CDC 2026 §1 : `meta` et le `ctl` ensemble, sans version.
   setObsDelay(canvasId: string, obsDelayMs: number): Promise<void>;
   setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
-  setBackgroundImageOpacity(canvasId: string, backgroundImageOpacity: number): Promise<void>; // Écart §9.1 (JOURNAL 2026-10-10), de même
+  setBackgroundImageOpacity(canvasId: string, backgroundImageOpacity: number): Promise<void>; // §9.5, de même
   setGaugeLimits(canvasId: string, limits: GaugeLimits): Promise<void>; // JOURNAL 2026-09-30, comme le délai
   // §5.1 : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
   setModerator(canvasId: string, change: ModeratorRole): Promise<Result<void, CanvasRefusal | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
   getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
-  getTwitchLive(userId: string): Promise<TwitchLive | null>; // Écart §4 (JOURNAL 2026-10-07) ; `null` : hors live, ou inconnu
+  getTwitchLive(userId: string): Promise<TwitchLive | null>; // §10.4 ; `null` : hors live, ou inconnu
   // Une seule lecture pour tous ces comptes (l'activité du développeur) : seuls ceux en live ont une entrée.
   listTwitchLives(userIds: readonly string[]): Promise<Map<string, TwitchLive>>;
-  // Écart §15 (JOURNAL 2026-10-06) : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.
+  // §17.1 : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.
   copyTwitchUsers(fromCanvasId: string, toCanvasId: string, userIds: readonly string[]): Promise<void>;
-  // `null` : pas modérateur. Pour la pill Inspection de qui modère (JOURNAL 2026-09-27, Écart §4.3 JOURNAL 2026-10-08).
+  // `null` : pas modérateur. Pour la pill Inspection de qui modère (JOURNAL 2026-09-27, §4.3).
   getModeratorOrigin(canvasId: string, userId: string): Promise<ModeratorOrigin | null>;
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 
 // Ce que le web écrit dans Redis à la connexion (§2) : jamais un pixel, donc jamais de script. Un nouveau compte
-// compte aussi dans l'activité (écart §5.1, JOURNAL 2026-10-06).
+// compte aussi dans l'activité (§16.2).
 export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser"> & SignupWrites;
 
-// Écart §4.3 (JOURNAL 2026-10-06) : le suivi d'activité, tel que le gateway l'envoie au développeur.
+// §16.1 : le suivi d'activité, tel que le gateway l'envoie au développeur.
 export type ActivityFrame = Extract<ServerFrame, { t: "activity" }>;
 export type ActivityCanvas = ActivityFrame["canvases"][number];
 export type ActivityUser = ActivityCanvas["owner"];
@@ -316,7 +316,7 @@ export type ActivityMinute = Omit<
 // Les pixels d'une minute passée, canvas par canvas : la température survit à un redémarrage.
 export type CanvasPixelsMinute = Pick<ActivityMinute, "at" | "pixelsByCanvas">;
 
-// Écart §5.1 (JOURNAL 2026-10-08) : les minutes d'une coupure de moins de `STREAM_GRACE_MS` (`toGapMinutes`), à compter
+// §16.2 : les minutes d'une coupure de moins de `STREAM_GRACE_MS` (`toGapMinutes`), à compter
 // comme streamées pour ce canvas : sa vue OBS, ou son live, est revenu.
 export type ActivityGap = { canvasId: string; minutes: readonly Timestamp[] };
 
@@ -331,7 +331,7 @@ export type Signup = {
 // Les nouveaux comptes d'un jour de Paris : tous, et ceux venus de la page de chaque streamer.
 export type DaySignups = { total: number; byDiscoveredViaUserId: ReadonlyMap<string, number> };
 
-// Écart §5.1 (JOURNAL 2026-10-06) : des nombres sous `activity:`, jamais un nom. Le gateway écrit chaque minute, élague,
+// §16.2 : des nombres sous `activity:`, jamais un nom. Le gateway écrit chaque minute, élague,
 // et lit ce que le développeur regarde.
 export interface ActivityStore {
   storeActivityMinute(minute: ActivityMinute): Promise<void>;
@@ -367,7 +367,7 @@ export interface ActivityStore {
   listCanvasDay(canvasId: string, dayAt: Timestamp, nowMs: Timestamp): Promise<CanvasDayRead>;
   // Les canvas qui ont un point ce jour-là, par un balayage des clés `activity:cv:*:day` : aucun index.
   listDayCanvases(dayAt: Timestamp): Promise<DayCanvasPoint[]>;
-  // Écart §5.1 (JOURNAL 2026-10-08) : compte un canvas comme streamé dans les minutes d'une coupure, pour lui seul et pour tout
+  // §16.2 : compte un canvas comme streamé dans les minutes d'une coupure, pour lui seul et pour tout
   // LivePlace là où la minute existe. Atomique, et sans effet pour une minute déjà comptée : on le rejoue sans dégât.
   storeActivityGap(gap: ActivityGap): Promise<void>;
   // Par canvas, l'heure où il a été vu streamé pour la dernière fois.
@@ -381,7 +381,7 @@ export interface SignupWrites {
   storeSignup(signup: Signup): Promise<void>;
 }
 
-// Écart §4.3 (JOURNAL 2026-10-07) : la capacité, telle que le gateway l'envoie au développeur.
+// §4.3 : la capacité, telle que le gateway l'envoie au développeur.
 export type CapacityFrame = Extract<ServerFrame, { t: "capacity" }>;
 export type CapacityHistoryFrame = Extract<ServerFrame, { t: "capacityHistory" }>;
 export type CapacityPoint = CapacityHistoryFrame["points"][number];
@@ -396,7 +396,7 @@ export type RedisUsage = {
   outOfMemoryRefusals: number;
 };
 
-// Ce que le web dépose pour le gateway (Écart §2 et §9, JOURNAL 2026-10-07) : son occupation, en pourcentage, à l'instant
+// Ce que le web dépose pour le gateway (§16.3) : son occupation, en pourcentage, à l'instant
 // de sa mesure ; et l'usage du mois d'un déploiement Convex, à l'instant de sa lecture (appels, Go, Go-heures).
 export type WebMeasure = { at: Timestamp; utilization: number };
 export type ConvexUsage = {
@@ -405,13 +405,13 @@ export type ConvexUsage = {
   databaseIoGb: number;
   egressGb: number;
   computeGbHours: number;
-  filesBytes?: number; // Écart §8.1 (JOURNAL 2026-10-08) : le stock de fichiers, absent quand le déploiement ne l'a pas dit
+  filesBytes?: number; // §16.3 : le stock de fichiers, absent quand le déploiement ne l'a pas dit
 };
 
-// Ce que le worker dépose pour la capacité (Écart §8.1, JOURNAL 2026-10-08) : le retard de la sauvegarde, à l'instant de sa mesure.
+// Ce que le worker dépose pour la capacité (§16.3) : le retard de la sauvegarde, à l'instant de sa mesure.
 export type SnapshotMeasure = { at: Timestamp; delayMs: number };
 
-// Un déploiement dont le web lit l'usage (Écart §2 et §9, JOURNAL 2026-10-07) : son nom, l'URL de son API et la clé de
+// Un déploiement dont le web lit l'usage (§16.3) : son nom, l'URL de son API et la clé de
 // déploiement qui l'ouvre. La clé ne sort jamais de l'adaptateur : ni dans un journal, ni dans Redis, ni dans une frame.
 export type ConvexDeployment = { name: string; url: string; key: string };
 
@@ -434,7 +434,7 @@ export type ConvexDeposit =
 // Les pics d'une minute : la saturation, la ressource qui la portait, et le plus haut taux de chaque maillon mesuré.
 export type CapacityMinute = { at: Timestamp } & Pick<Saturation, "percent" | "resource" | "linkRatios">;
 
-// Écart §5.1 (JOURNAL 2026-10-07) : des nombres sous `capacity:`. Le gateway lit ce que le web dépose, écrit chaque minute et élague.
+// §16.3 : des nombres sous `capacity:`. Le gateway lit ce que le web dépose, écrit chaque minute et élague.
 export interface CapacityStore {
   getRedisUsage(): Promise<RedisUsage>;
   getWebMeasure(): Promise<WebMeasure | null>; // `null` : le web n'a rien déposé
@@ -446,7 +446,7 @@ export interface CapacityStore {
   storeCapacityMinute(minute: CapacityMinute): Promise<void>;
   pruneCapacity(nowMs: Timestamp): Promise<void>; // les minutes de plus de 7 jours, les heures de plus de 366
   listCapacityHistory(period: ActivityPeriod, nowMs: Timestamp): Promise<CapacityPoint[]>; // un point absent le reste
-  // Écart §4.3 et §5.1 (JOURNAL 2026-10-09) : les minutes où une protection a joué. `HSET` : la même minute réécrite se remplace.
+  // §16.3 : les minutes où une protection a joué. `HSET` : la même minute réécrite se remplace.
   storeGuardMinutes(minutes: readonly GuardMinute[]): Promise<void>;
   listGuardMinutes(nowMs: Timestamp): Promise<GuardMinute[]>; // les dernières 24 h, au démarrage ; une minute sans protection est absente
 }
@@ -456,7 +456,7 @@ export interface CapacityWrites {
   storeWebUtilization(measure: WebMeasure): Promise<void>;
   storeConvexUsage(deployment: string, usage: ConvexUsage): Promise<void>; // `deployment` : son nom, jamais une clé
   // Un déploiement configuré que le web n'a pas pu lire : déposé « vieux de toujours » (instant 0), sans écraser une lecture
-  // déjà là. Le gateway le voit, et ne somme pas les seuls autres (Écart §8.1, JOURNAL 2026-10-08).
+  // déjà là. Le gateway le voit, et ne somme pas les seuls autres (§16.3).
   storeConvexUnread(deployment: string): Promise<void>;
   storeConvexUnconfigured(): Promise<void>;
 }
@@ -482,7 +482,7 @@ export type OwnerLock = { ownerId: string; holderId: string };
 // L'image d'un canvas, pour sa miniature et l'aperçu de son lien : un octet par case, l'index de palette.
 export type CanvasImage = { width: number; height: number; state: Uint8Array };
 
-// Écart §15 (JOURNAL 2026-10-06) : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas. Jamais un
+// §17.1 : ce que le web écrit dans Redis pour archiver, rouvrir et supprimer un canvas. Jamais un
 // pixel, donc jamais de script (§2). L'ordre des appels est celui de l'usecase : il fait l'opération fiable.
 export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
   // Un seul changement à la fois par propriétaire (double clic, deux onglets). `null` : un autre est en cours.
@@ -504,11 +504,11 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
   // Classés sans suite : `reported`, `reports:*` et `offstream` vidés ; `approved` reste.
   settleReports(canvasId: string): Promise<void>;
   publishStatus(canvasId: string, status: CanvasStatus): Promise<void>;
-  // Écart §8.1 (JOURNAL 2026-10-07) : la copie du thème dans `meta` (sans `theme`, plus de thème), jamais publiée ; puis
+  // §8.1 : la copie du thème dans `meta` (sans `theme`, plus de thème), jamais publiée ; puis
   // le `ctl` `theme`, pour les pages d'un canvas qui reste là. Archiver ou rouvrir n'écrit que la copie : ses pages changent de canvas.
   setTheme(canvasId: string, theme: string | undefined): Promise<void>;
   publishTheme(canvasId: string, theme: string | undefined): Promise<void>;
-  // Écart §8.1 (JOURNAL 2026-10-10) : la copie de l'image du fond dans `meta`, puis le `ctl` `backgroundImage` pour les pages du
+  // §8.4 : la copie de l'image du fond dans `meta`, puis le `ctl` `backgroundImage` pour les pages du
   // canvas. Le fond et l'opacité ne bougent pas : l'image se pose par-dessus n'importe quel fond.
   setBackgroundImage(canvasId: string, at: Timestamp): Promise<void>;
   clearBackgroundImage(canvasId: string): Promise<void>;
@@ -519,8 +519,8 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
 
-// Écart §15 (JOURNAL 2026-10-06) : le canvas actif d'un propriétaire. Son code ne vient que d'une archive rouverte ; son
-// thème (Écart §8.1, JOURNAL 2026-10-07) est celui que le streamer lui a donné, ou qu'une archive rouverte a gardé.
+// §17.1 : le canvas actif d'un propriétaire. Son code ne vient que d'une archive rouverte ; son
+// thème (§8.1) est celui que le streamer lui a donné, ou qu'une archive rouverte a gardé.
 export type ActiveCanvas = OwnedCanvas & { createdAt: Timestamp; theme?: string; linkCode?: string };
 
 // Une archive : son lien est `/{login}/archives/{linkCode}`, et rien d'autre ne la désigne aux yeux d'un public.
@@ -568,9 +568,9 @@ export interface DurableStore {
   getUserByLogin(login: string): Promise<User | null>;
   // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
   ensureCanvasForOwner(ownerId: string, candidate: OwnedCanvas): Promise<string>;
-  // Écart §8.1 (JOURNAL 2026-10-07) : avec son thème, que `/{login}` rend dans la page sans appel de plus.
+  // §8.1 : avec son thème, que `/{login}` rend dans la page sans appel de plus.
   getActiveCanvasForOwner(ownerId: string): Promise<(OwnedCanvas & { theme?: string }) | null>;
-  // Écart §15 (JOURNAL 2026-10-06) : le canvas actif et les archives de ce propriétaire.
+  // §17.1 : le canvas actif et les archives de ce propriétaire.
   listCanvasesForOwner(ownerId: string): Promise<OwnerCanvases>;
   // Une transaction. Refus : `not_active`, le sortant n'est pas l'actif de ce propriétaire ; `archives_full`, il a déjà
   // MAX_ARCHIVES archives.
@@ -584,7 +584,7 @@ export interface DurableStore {
     canvasId: string,
     theme?: string,
   ): Promise<Result<void, "not_active">>;
-  // Écart §8.1 (JOURNAL 2026-10-10) : l'image du fond du canvas actif seulement (`not_active` sinon), remplaçant la précédente, dont le
+  // §8.4 : l'image du fond du canvas actif seulement (`not_active` sinon), remplaçant la précédente, dont le
   // fichier part. `at` : l'instant où Convex l'a rangée, qui date aussi son adresse.
   setActiveCanvasBackgroundImage(
     ownerId: string,
@@ -601,7 +601,7 @@ export interface DurableStore {
 }
 
 // Ce qui s'est passé sur un canvas, vu du worker : une pose seule (elle attend le tour de cinq minutes), ou tout le
-// reste (modération, réglage, taille : le snapshot suit en moins de 2 s). Écart §7.2 (JOURNAL 2026-10-06). `status` : le
+// reste (modération, réglage, taille : le snapshot suit en moins de 2 s). §7.6. `status` : le
 // `canvasStatus` publié par le web, `version` la version de l'événement (JOURNAL 2026-10-08).
 export type CanvasActivity = {
   canvasId: string;
@@ -628,7 +628,7 @@ export interface SnapshotSource {
   watch(onActivity: (activity: CanvasActivity) => void): Promise<Unsubscribe>;
 }
 
-// Ce que le worker lit du flux d'un canvas pour en archiver l'historique (Écart §7.2, JOURNAL 2026-10-08).
+// Ce que le worker lit du flux d'un canvas pour en archiver l'historique (§7.1).
 export type HistoryRead = {
   entries: ChunkEntry[]; // dans l'ordre des versions
   resizedAtVersion: number | null; // la version sans événement de la dernière taille, `null` : jamais redimensionné
@@ -653,7 +653,7 @@ export interface HistoryStore {
   storeChunk(file: ChunkFile): Promise<"stored" | "overlap">;
 }
 
-// Un snapshot rangé dans Convex : ses octets compressés, et ce que l'index en dit (Écart §8.1, JOURNAL 2026-10-06).
+// Un snapshot rangé dans Convex : ses octets compressés, et ce que l'index en dit (§8.1).
 export type SnapshotFile = {
   canvasId: string;
   tier: SnapshotTier;
@@ -671,7 +671,7 @@ export interface SnapshotStore {
   getLatestSnapshot(canvasId: string, tier: SnapshotTier): Promise<SnapshotFile | null>;
 }
 
-// Écart §7.3 (JOURNAL 2026-10-08) : la rétention des sauvegardes d'un seul environnement. Une ligne se nomme par son palier
+// §7.3 : la rétention des sauvegardes d'un seul environnement. Une ligne se nomme par son palier
 // et sa date ; une promotion lui ajoute une ligne qui partage le fichier de sa source.
 export type PromotedTier = Exclude<SnapshotTier, "working">;
 export type CanvasTiers = { canvasId: string; rows: TierRow[] };
@@ -697,7 +697,7 @@ export interface RetentionStore {
   discard(canvasId: string, row: TierRow): Promise<void>;
 }
 
-// Écart §8.1 (JOURNAL 2026-10-08) : le budget de l'historique d'un seul environnement, lu sur les compteurs de Convex.
+// §7.3 : le budget de l'historique d'un seul environnement, lu sur les compteurs de Convex.
 export interface BudgetStore {
   ensureUsage(): Promise<{ isRecounted: boolean }>; // les compteurs d'un déploiement d'avant la rétention se font une fois
   getHistoryBytes(): Promise<number>; // le total des chunks de ce scope
@@ -722,7 +722,7 @@ export type Restoration = {
   at: Timestamp;
 };
 
-// Ce que le worker écrit dans Redis pour remettre un canvas perdu (Écart §7.2, JOURNAL 2026-10-08).
+// Ce que le worker écrit dans Redis pour remettre un canvas perdu (§7.4).
 export interface RecoveryTarget {
   // Ceux de ces canvas qui n'ont plus de `version` : perdus. Un pipeline Redis, jamais Convex.
   listLostCanvases(canvasIds: readonly string[]): Promise<string[]>;
@@ -779,7 +779,7 @@ export type TwitchWebhookMessage = {
   body: string;
 };
 
-// Écart §4 et §10.1 (JOURNAL 2026-10-07) : ce que Twitch dit du live d'une chaîne. `online` : seulement un live, jamais une
+// §10.4 : ce que Twitch dit du live d'une chaîne. `online` : seulement un live, jamais une
 // rediffusion. `liveRevoked` : un abonnement de live retiré, qui ne touche pas à la synchro de modération.
 export type TwitchLiveEvent =
   | { kind: "online" | "offline" | "liveRevoked"; broadcasterId: string }
@@ -803,10 +803,10 @@ export interface TwitchWebhook {
 // §10.1 : les abonnements EventSub d'une chaîne, pris avec le jeton de l'application.
 export interface TwitchEventSub {
   subscribeToModeration(broadcasterId: string): Promise<void>;
-  subscribeToLive(broadcasterId: string): Promise<void>; // Écart §4 (JOURNAL 2026-10-07)
+  subscribeToLive(broadcasterId: string): Promise<void>; // §10.4
 }
 
-// Écart §4 (JOURNAL 2026-10-07) : ce que Twitch dit d'une chaîne maintenant, avec le jeton de l'application.
+// §10.4 : ce que Twitch dit d'une chaîne maintenant, avec le jeton de l'application.
 export interface TwitchLiveSource {
   getLive(userId: string): Promise<TwitchLive | null>; // `helix/streams` : `null` hors live
   getCategory(userId: string): Promise<string>; // `helix/channels` : la catégorie de la chaîne, vide si elle n'en a pas

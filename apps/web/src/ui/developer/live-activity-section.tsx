@@ -1,5 +1,5 @@
 // La fenêtre Développeur branchée sur le store du canvas : le suivi s'ouvre avec la fenêtre et se ferme avec elle, une seule
-// écoute pour ses deux sections (écart §4.2, JOURNAL 2026-10-06 et 2026-10-07). Montée pour le seul développeur.
+// écoute pour ses deux sections (§16.1). Montée pour le seul développeur.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { type ActivityClock, type ActivityWatch, createActivityWatch } from "../../state/activity-watch";

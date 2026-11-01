@@ -1,4 +1,4 @@
-// Les réglages d'un visiteur sur l'accueil (Écart §14, JOURNAL 2026-10-22) : la langue et l'apparence, en haut à droite. Les deux
+// Les réglages d'un visiteur sur l'accueil (§9.9) : la langue et l'apparence, en haut à droite. Les deux
 // choix de langue ne tiennent pas à côté du mot-symbole sur un téléphone : la langue y est un bouton (« FR ») qui passe à la suivante.
 // Le serveur écrit les deux formes, home.css montre celle qui tient ; l'apparence est celle de la pill Compte.
 

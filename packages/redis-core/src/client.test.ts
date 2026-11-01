@@ -515,7 +515,7 @@ describe("getCanvas (§6.1)", () => {
     expect(await core.getCanvas(canvasId)).toEqual(meta);
   });
 
-  // Rend la date d'archivage et le successeur d'une archive, qui reste prête et se sert (Écart §15, JOURNAL 2026-10-06)
+  // Rend la date d'archivage et le successeur d'une archive, qui reste prête et se sert (§17.1)
   it("gives the archive date and the successor of an archive, which stays ready and served", async () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
@@ -557,7 +557,7 @@ describe("isModerator (§6.1)", () => {
     expect(await core.isModerator(canvasId, "moderator-1")).toBe(true);
   });
 
-  // Ne voit plus un modérateur banni, même resté dans mods, et le revoit une fois débanni (Écart §10.3, JOURNAL 2026-10-08)
+  // Ne voit plus un modérateur banni, même resté dans mods, et le revoit une fois débanni (§10.3)
   it("does not see a banned moderator, still in mods, and sees him again once unbanned", async () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
@@ -907,7 +907,7 @@ describe("setObsDelay (JOURNAL 2026-09-25)", () => {
     expect((await core.getCanvas(canvasId))?.obsBackground).toBe("transparent");
   });
 
-  // L'image du fond se relit, avec son instant quand meta en a un ; sans instant, la clé est absente (Écart §8.1, JOURNAL 2026-10-10)
+  // L'image du fond se relit, avec son instant quand meta en a un ; sans instant, la clé est absente (§8.4)
   it("reads the image of the background, with its instant when meta has one, and none without it", async () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);

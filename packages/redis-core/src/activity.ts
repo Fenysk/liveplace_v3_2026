@@ -1,4 +1,4 @@
-// L'activité dans Redis (écart §5.1, JOURNAL 2026-10-06, 2026-10-07 et 2026-10-08) : des nombres sous `activity:`, aucun nom ni
+// L'activité dans Redis (§16.2) : des nombres sous `activity:`, aucun nom ni
 // identifiant dans l'historique ; les distincts d'un jour, dans des HyperLogLog. Le gateway écrit chaque minute et élague ;
 // le web compte un nouveau compte, sans script. Chaque canvas a ses propres points, sous `activity:cv:<canvasId>:`.
 
@@ -61,7 +61,7 @@ const toFields = (stored: string) => {
   return { people, pixels, visits, phoneVisits, visitMinutes, live };
 };
 
-// Écart §5.1 (JOURNAL 2026-10-08) : `live` dit l'état streamé (vue OBS ouverte et streamer en live), 0 pour un point d'avant lui.
+// §16.2 : `live` dit l'état streamé (vue OBS ouverte et streamer en live), 0 pour un point d'avant lui.
 const toPoint = (at: Timestamp, stored: string, signups: string | null | undefined): ActivityPoint => {
   const { live, ...counts } = toFields(stored);
   return { at, ...counts, streamed: live, signups: Number(signups ?? 0) };

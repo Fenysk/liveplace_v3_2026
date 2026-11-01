@@ -1,7 +1,7 @@
 // La page d'une source OBS (§9.1, §9.5) : le store du canvas en mode `obs`, l'image du stream, la surface. Rien
 // d'autre : pendant une coupure, la dernière image reste, et la reprise se fait en silence (JOURNAL 2026-09-25).
 // Quand le streamer archive, la source suit seule le nouveau canvas actif, sans rien changer dans OBS
-// (Écart §15, JOURNAL 2026-10-06).
+// (§17.1).
 
 import { useEffect, useState } from "react";
 import type { CanvasOpener, CanvasStore } from "../../state/canvas-store";

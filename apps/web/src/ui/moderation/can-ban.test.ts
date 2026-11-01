@@ -14,7 +14,7 @@ const author = (moderatorOrigin?: ModerationTarget["moderatorOrigin"]): Moderati
   ...(moderatorOrigin ? { moderatorOrigin } : {}),
 });
 
-describe("canBan (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("canBan (§5.4)", () => {
   // Un modérateur nommé ici ne se bannit pas, même s'il l'est aussi sur Twitch ; celui de Twitch seul et un simple joueur, si
   it("refuses a moderator named here, even when Twitch names him too, and allows a Twitch-only moderator and a player", () => {
     expect(canBan(author(namedHere))).toBe(false);
@@ -24,7 +24,7 @@ describe("canBan (Écart §5.4, JOURNAL 2026-10-08)", () => {
   });
 });
 
-describe("the ban offered after a clear (Écart §5.4, JOURNAL 2026-10-08)", () => {
+describe("the ban offered after a clear (§5.4)", () => {
   // Un retrait fait propose de bannir son auteur, sauf un modérateur nommé ici : le retrait suffit
   it("is offered to the author of a clear, except a moderator named here", () => {
     expect(askBanAfterClear({ kind: "clear", author: author() })).toEqual({
