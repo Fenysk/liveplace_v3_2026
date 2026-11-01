@@ -20,6 +20,7 @@ type PaletteProps = {
   onDone?: () => void; // un clic, Entrée, Espace ou Échap : la feuille mobile se replie
   isTouch?: boolean; // pastilles rondes de la taille d'un contrôle, six par rangée
   hasEraser?: boolean; // sur mobile, la gomme est dans la rangée d'outils
+  isFill?: boolean; // les 15 colonnes prennent toute la largeur de la palette, les pastilles restent carrées
 };
 
 // Les `colorIndex` des cases, dans l'ordre où la grille les montre : la gomme, puis la palette sans son transparent.
@@ -50,6 +51,7 @@ export const Palette = ({
   onDone,
   isTouch = false,
   hasEraser = true,
+  isFill = false,
 }: PaletteProps) => {
   const t = useTexts(DESIGN_TEXTS);
   const cells = swatchColorIndexes(palette, hasEraser);
@@ -88,7 +90,7 @@ export const Palette = ({
 
   return (
     <div
-      className={classNames("lp-palette", isTouch && "lp-palette--touch")}
+      className={classNames("lp-palette", isTouch && "lp-palette--touch", isFill && "lp-palette--fill")}
       role="radiogroup"
       aria-label={t.allColors}
       data-palette=""

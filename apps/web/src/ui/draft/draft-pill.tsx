@@ -319,7 +319,7 @@ const draftContent = (
     <DraftSheet state={state} actions={actions} isPanel={isSidePanel} />
   ) : (
     <>
-      <Palette palette={state.palette} colorIndex={state.colorIndex} onPick={actions.onPickColor} />
+      <Palette palette={state.palette} colorIndex={state.colorIndex} onPick={actions.onPickColor} isFill />
       <div className="lp-row">
         <PillGauge gauge={state.gauge} />
         <span className="lp-spacer" />

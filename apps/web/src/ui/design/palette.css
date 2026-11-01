@@ -7,6 +7,17 @@
   padding: var(--space-1);
 }
 
+/* La pill Dessin : la rangée d'outils est plus large que 15 pastilles. Le gap ne change pas : les pastilles grandissent, pas les écarts */
+.lp-palette--fill {
+  grid-template-columns: repeat(15, minmax(var(--lp-swatch-size), 1fr));
+}
+
+.lp-palette--fill .lp-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
 .lp-swatch {
   width: var(--lp-swatch-size, 28px);
   height: var(--lp-swatch-size, 28px);
