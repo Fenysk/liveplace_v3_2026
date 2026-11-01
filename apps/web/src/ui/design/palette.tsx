@@ -20,7 +20,7 @@ type PaletteProps = {
   onDone?: () => void; // un clic, Entrée, Espace ou Échap : la feuille mobile se replie
   isTouch?: boolean; // pastilles rondes de la taille d'un contrôle, six par rangée
   hasEraser?: boolean; // sur mobile, la gomme est dans la rangée d'outils
-  isFill?: boolean; // les 15 colonnes prennent toute la largeur de la palette, les pastilles restent carrées
+  isFill?: boolean; // 18 colonnes qui prennent toute la largeur de la palette, les pastilles restent carrées
 };
 
 // Les `colorIndex` des cases, dans l'ordre où la grille les montre : la gomme, puis la palette sans son transparent.
@@ -57,7 +57,7 @@ export const Palette = ({
   const cells = swatchColorIndexes(palette, hasEraser);
   // Le seul arrêt de Tab : la couleur actuelle, ou la première case quand elle n'est pas dans la grille.
   const tabStop = cells.includes(colorIndex) ? colorIndex : cells[0];
-  const columns = isTouch ? SWATCH_COLUMNS.touch : SWATCH_COLUMNS.pointer;
+  const columns = isTouch ? SWATCH_COLUMNS.touch : isFill ? SWATCH_COLUMNS.fill : SWATCH_COLUMNS.pointer;
 
   // Choisir une couleur, ou seulement refermer : sans couleur.
   const finish = (cell?: number) => {

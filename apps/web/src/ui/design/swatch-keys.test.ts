@@ -9,7 +9,7 @@ const press = (key: string, code = key, hasModifier = false): SwatchPress => ({ 
 const COUNT = 43;
 const COLUMNS = SWATCH_COLUMNS.pointer;
 
-const moveTo = (key: string, index: number, count = COUNT, columns = COLUMNS) =>
+const moveTo = (key: string, index: number, count = COUNT, columns: number = COLUMNS) =>
   swatchKey(press(key), index, count, columns);
 
 describe("swatchKey (JOURNAL 2026-10-09, la palette au clavier)", () => {
@@ -53,6 +53,18 @@ describe("swatchKey (JOURNAL 2026-10-09, la palette au clavier)", () => {
   it("follows the six columns of the touch grid", () => {
     expect(swatchKey(press("ArrowDown"), 2, 42, SWATCH_COLUMNS.touch)).toEqual({ kind: "move", index: 8 });
     expect(swatchKey(press("ArrowUp"), 2, 42, SWATCH_COLUMNS.touch)).toEqual({ kind: "move", index: 38 });
+  });
+
+  // Dans la pill Dessin, dix-huit colonnes (18, 18, 7) : la même règle
+  it("follows the eighteen columns of the Draw pill grid", () => {
+    const columns = SWATCH_COLUMNS.fill;
+
+    expect(moveTo("ArrowDown", 4, COUNT, columns)).toEqual({ kind: "move", index: 22 });
+    expect(moveTo("ArrowDown", 40, COUNT, columns)).toEqual({ kind: "move", index: 4 });
+    expect(moveTo("ArrowUp", 4, COUNT, columns)).toEqual({ kind: "move", index: 40 });
+    // Colonne 7 : 7, 25, et pas de 43. La dernière rangée n'a que 7 cases.
+    expect(moveTo("ArrowUp", 7, COUNT, columns)).toEqual({ kind: "move", index: 25 });
+    expect(moveTo("ArrowDown", 25, COUNT, columns)).toEqual({ kind: "move", index: 7 });
   });
 
   // Début et Fin vont à la première et à la dernière case
@@ -120,5 +132,8 @@ describe("les colonnes de la grille", () => {
 
     expect(css).toContain(`grid-template-columns: repeat(${SWATCH_COLUMNS.pointer}, var(--lp-swatch-size))`);
     expect(css).toContain(`grid-template-columns: repeat(${SWATCH_COLUMNS.touch}, var(--control-size))`);
+    expect(css).toContain(
+      `grid-template-columns: repeat(${SWATCH_COLUMNS.fill}, minmax(var(--lp-swatch-size), 1fr))`,
+    );
   });
 });

@@ -6,8 +6,8 @@ export type SwatchPress = { key: string; code: string; hasModifier: boolean };
 // `move` mène le focus et choisit la couleur ; `choose` et `leave` rendent le focus au canvas, `choose` après avoir choisi.
 export type SwatchKeyResult = { kind: "move"; index: number } | { kind: "choose" } | { kind: "leave" };
 
-// Les colonnes de la grille, comme palette.css les pose : à la souris, et au doigt.
-export const SWATCH_COLUMNS = { pointer: 15, touch: 6 } as const;
+// Les colonnes de la grille, comme palette.css les pose : à la souris, dans la pill Dessin, et au doigt.
+export const SWATCH_COLUMNS = { pointer: 15, fill: 18, touch: 6 } as const;
 
 // Le Dessin reconnaît la palette à ce marqueur (use-draft-keys.ts) pour lui laisser ses touches.
 export const PALETTE_SELECTOR = "[data-palette]";
