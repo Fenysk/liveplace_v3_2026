@@ -16,6 +16,7 @@ export type BackgroundImagesDeps = {
 export type BackgroundImages = {
   // `null` : le login est inconnu, ou son canvas actif n'a plus d'image de cet instant.
   get(login: string, at: Timestamp): Promise<Uint8Array | null>;
+  forget(login: string): void; // CDC §8 : le streamer est supprimé, aucune de ses images ne se sert plus de la mémoire
 };
 
 type Image = Promise<Uint8Array | null>;
@@ -41,6 +42,11 @@ export function createBackgroundImages({ durable, now }: BackgroundImagesDeps): 
       };
       image.then((bytes) => bytes ?? forget(), forget);
       return image;
+    },
+
+    forget(login) {
+      const prefix = `${login.toLowerCase()}:`;
+      cached.deleteWhere((key) => key.startsWith(prefix));
     },
   };
 }

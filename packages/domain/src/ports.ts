@@ -5,6 +5,7 @@ import type { Result } from "@liveplace/shared";
 import type { CapacityResourceId, GuardMinute, Saturation } from "./capacity";
 import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
+  AccountDeletionTrigger,
   ActivityPeriod,
   CanvasMeta,
   CanvasOrigin,
@@ -134,12 +135,16 @@ export interface TwitchCommandQueue {
 // §10.4 : les comptes que LivePlace connaît (le miroir `user:`), que le web suit tous à son démarrage.
 export interface AccountList {
   listAccountIds(): Promise<string[]>;
+  // CDC §8 : un compte en cours d'effacement, ou effacé et pas revenu. Ce qui le suit (live, abonnements) ne doit rien écrire de plus.
+  isDeletedAccount(userId: string): Promise<boolean>;
 }
 
 // §10.4 : l'état de live de chaque compte, écrit par le web ; le gateway le lit par `getTwitchLive`.
 export interface TwitchLiveStore {
   getTwitchLiveState(userId: string): Promise<TwitchLiveState | null>; // `null` : aucun état connu
-  setTwitchLiveState(userId: string, state: TwitchLiveState): Promise<void>;
+  // Avec `announce`, l'action qui le dit au gateway part dans le même bloc. Faux : le compte est supprimé ou en cours de l'être
+  // (CDC §8), ni l'état ni l'action n'est écrit.
+  setTwitchLiveState(userId: string, state: TwitchLiveState, announce?: TwitchLiveCommand): Promise<boolean>;
 }
 
 // §4.3 : une ligne du classement d'un canvas, et la place d'un joueur dans ce classement (JOURNAL 2026-10-06).
@@ -160,6 +165,7 @@ export type LiveControl =
   | { t: "obsBackground"; obsBackground: ObsBackground } // JOURNAL 2026-09-29
   | ({ t: "gaugeLimits" } & GaugeLimits) // chaque page reçoit sa jauge recalculée (JOURNAL 2026-09-30)
   | { t: "reports"; count: number } // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
+  | { t: "tracesPurged" } // les traces d'un compte supprimé sont parties : classement et listes de qui modère à relire (JOURNAL 2026-11-01)
   | { t: "resize" } // la taille du canvas a changé : chaque page reprend un snapshot (JOURNAL 2026-09-29)
   | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (§17.1)
   | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (§4.3)
@@ -516,6 +522,55 @@ export interface ArchiveWrites extends Pick<CanvasCore, "getCanvas"> {
   getCanvasImage(canvasId: string): Promise<CanvasImage | null>;
 }
 
+// Un effacement de compte en cours (CDC §8, Supprimer son compte) : le seul endroit où l'identifiant reste stocké, le temps
+// de l'effacement. `canvasIds` : ses fresques, actives et archives, que Convex oublie avant que Redis les ait vidées.
+export type PendingDeletion = {
+  userId: string;
+  runId: string; // tiré au hasard : la preuve s'y rattache sans nommer le compte
+  trigger: AccountDeletionTrigger;
+  startedAt: Timestamp;
+  canvasIds: readonly string[];
+};
+
+// L'empreinte de la session d'un compte supprimé (HMAC de son identifiant, jamais l'identifiant) et l'instant de la suppression.
+export type DeletedAccountMark = { fingerprint: string; deletedAt: Timestamp };
+
+// Ce que Redis garde d'un compte qu'on supprime (JOURNAL 2026-11-01). Chaque étape est idempotente : la relancer sur un
+// compte à moitié effacé finit le travail, et c'est ainsi qu'un effacement interrompu reprend.
+export interface AccountPurge {
+  getPending(userId: string): Promise<PendingDeletion | null>;
+  listPending(): Promise<PendingDeletion[]>;
+  // Marque l'effacement en cours, garde l'empreinte de la session et ferme les connexions du compte. Sans effet pour un
+  // effacement déjà marqué : il garde son `runId` et son heure.
+  begin(deletion: PendingDeletion): Promise<void>;
+  // Ses fresques : le statut `discarded` pour les pages ouvertes, puis toutes leurs clés, ses statistiques et son verrou.
+  purgeOwnedCanvases(ownerId: string, canvasIds: readonly string[]): Promise<void>;
+  // Ses traces sur toutes les autres fresques ; rend combien de fresques en portaient.
+  purgeTraces(userId: string): Promise<number>;
+  // `user:<userId>`, son live, ses actions Twitch en attente, et son origine dans les nouveaux comptes.
+  purgeAccountKeys(userId: string): Promise<void>;
+  // Plus rien ne nomme le compte : l'effacement n'est plus en cours. L'ancien contenu sort ensuite de l'AOF.
+  finish(userId: string): Promise<void>;
+  // `BGREWRITEAOF` après une suppression, repris au démarrage si le serveur s'est arrêté avant. Vrai : rien ne reste à
+  // réécrire. Faux : une réécriture déjà en cours a commencé avant nos dernières écritures, il faudra la refaire.
+  rewriteAppendOnlyFile(): Promise<boolean>;
+  // Les empreintes de session gardées dans Convex ont-elles été remises dans Redis ? Non après une perte totale (JOURNAL 2026-11-02).
+  areMarksRestored(): Promise<boolean>;
+  // Remet les empreintes avec le temps qui leur reste (`nowMs` moins l'instant de la suppression), sans toucher à celles qui y sont.
+  restoreMarks(marks: readonly DeletedAccountMark[], nowMs: Timestamp): Promise<void>;
+  // L'empreinte de la session d'un compte, de quoi la garder dans Convex : jamais plus que cela ne quitte le web.
+  getFingerprint(userId: string): string;
+}
+
+// Les comptes supprimés vus des sessions : un jeton signé avant la suppression vaut un invité.
+export interface DeletedAccounts {
+  // `issuedAt` : l'instant d'émission du jeton, en secondes (`iat`).
+  isSessionRevoked(userId: string, issuedAt: number): Promise<boolean>;
+}
+
+// Le gateway apprend qu'un compte est supprimé : il ferme ses connexions et oublie ce qu'il savait de lui.
+export type DeletedAccountListener = (userId: string) => void;
+
 // Un canvas vu de son propriétaire (§8.1) : `canvasId` est opaque (D-14).
 export type OwnedCanvas = { canvasId: string; width: number; height: number };
 
@@ -561,9 +616,22 @@ export type ReopenInput = {
 // L'e-mail ne va qu'à Convex : ni dans la session, ni dans le miroir `user:`.
 export type SignedInUser = User & { email?: string };
 
+// CDC §8 : ce que Convex rend du compte qu'il vient de supprimer, de quoi oublier les caches du web. Jamais l'e-mail.
+export type DeletedProfile = { login: string; avatarUrl: string };
+
+// La preuve d'un effacement (RGPD art. 5.2), écrite avec la ligne du compte : sans nom, sans e-mail, sans identifiant.
+// `runId` la nomme, tiré au hasard au début de l'effacement ; `ownedCanvases`, les fresques parties avec lui.
+export type AccountDeletionProof = {
+  runId: string;
+  deletedAt: Timestamp;
+  trigger: AccountDeletionTrigger;
+  ownedCanvases: number;
+};
+
 // Le stockage durable (§8.2) : des fonctions Convex, toutes gardées par la clé du service.
 export interface DurableStore {
-  // §8.1 : `discoveredViaUserId` ne s'écrit qu'à la création du compte.
+  // §8.1 : `discoveredViaUserId` ne s'écrit qu'à la création du compte. Sans `email`, celui qu'on gardait part : un jeton qui n'a
+  // plus le droit de le lire (réduction de portée) ne le garde pas (contrat Twitch VI.F).
   upsertUserFromTwitch(user: SignedInUser, discoveredViaUserId?: string): Promise<void>;
   getUserByLogin(login: string): Promise<User | null>;
   // Rend le canvas actif s'il existe, sinon crée le candidat : seul le `canvasId` rendu fait foi.
@@ -598,6 +666,20 @@ export interface DurableStore {
   discardArchive(ownerId: string, canvasId: string): Promise<Result<void, "not_archive">>;
   // `null` : aucun canvas de ce propriétaire n'a ce code. Rendu sans session : le lien suffit à voir une archive.
   getArchiveByLinkCode(ownerId: string, linkCode: string): Promise<LinkedCanvas | null>;
+  // CDC §8, Supprimer son compte. Toutes les fresques du propriétaire, l'active comprise (`discardArchive` la refuse) :
+  // leurs sauvegardes et leurs fichiers partent en tâche de fond. Rend leurs identifiants, aucun si elles sont déjà parties.
+  discardOwnedCanvases(ownerId: string): Promise<string[]>;
+  // La ligne du compte, e-mail compris, avec la preuve de son effacement dans la même transaction. `null` : la ligne était déjà partie.
+  deleteUser(userId: string, proof: AccountDeletionProof): Promise<DeletedProfile | null>;
+  // Les comptes venus de sa page ne le nomment plus (`discoveredViaUserId`).
+  detachDiscoveredAccounts(userId: string): Promise<void>;
+  // Les sauvegardes du worker : la demande est gardée dans Convex, le worker réécrit les fichiers qui nomment le compte (JOURNAL
+  // 2026-11-02). À poser APRÈS la purge de Redis. Sans effet pour un compte déjà demandé.
+  requestErasure(userId: string): Promise<void>;
+  // Les empreintes de session des comptes supprimés, gardées 31 jours : Redis peut les perdre, Convex non. Idempotent.
+  keepDeletedAccount(mark: DeletedAccountMark): Promise<void>;
+  // Les empreintes d'au plus 31 jours (`since` : l'instant le plus ancien gardé) ; celles d'avant sont retirées de Convex.
+  syncDeletedAccounts(since: Timestamp): Promise<DeletedAccountMark[]>;
 }
 
 // Ce qui s'est passé sur un canvas, vu du worker : une pose seule (elle attend le tour de cinq minutes), ou tout le
@@ -661,6 +743,8 @@ export type SnapshotFile = {
   takenAt: Timestamp;
   schemaVersion: number;
   bytes: Uint8Array;
+  // Les comptes que le fichier nomme (`createAccountsFilter`), pour qu'une suppression ne lise que les fichiers qui le peuvent.
+  accountsFilter?: string;
 };
 
 // Le stockage des snapshots d'un seul environnement (`DURABLE_SCOPE`) : un autre scope n'y est jamais visible.
@@ -711,6 +795,48 @@ export interface BudgetStore {
   ): Promise<{ removed: number; bytes: number; isDone: boolean }>;
 }
 
+// Le ménage des fichiers qu'aucune ligne ne désigne (JOURNAL 2026-11-02), pour tout le déploiement.
+export interface OrphanStore {
+  // Les fichiers à partir de la borne `after`, `maxFiles` au plus, du plus ancien au plus récent : ceux de moins de `graceMs` restent,
+  // les autres partent si aucune ligne ne les désigne. `next` : la borne du prochain appel ; `isDone` : plus rien d'assez vieux à voir.
+  purgeOrphans(
+    after: number,
+    graceMs: number,
+    maxFiles: number,
+  ): Promise<{ next: number; deleted: number; isDone: boolean }>;
+}
+
+// Un fichier de Convex qui peut nommer un compte : un snapshot complet ou un chunk. Un fichier que plusieurs lignes partagent
+// (une promotion) ne figure qu'une fois.
+export type StoredFileKind = "snapshot" | "chunk";
+export type StoredFile = { storageId: string; size: number; accountsFilter?: string };
+
+// Le travail du worker pour un compte supprimé (JOURNAL 2026-11-02), tous scopes confondus : le déploiement ne doit plus rien
+// garder qui nomme le compte.
+export interface ErasureStore {
+  // Les comptes dont les fichiers restent à réécrire : leur identifiant est ici, le temps du travail.
+  listPendingErasures(): Promise<string[]>;
+  completeErasure(userId: string): Promise<void>;
+  // Une page de fichiers de ce genre, `next` : où reprendre (`null` : fini). Un snapshot en `state` seul n'y figure pas.
+  listFiles(
+    kind: StoredFileKind,
+    cursor: string | null,
+    maxFiles: number,
+  ): Promise<{ files: StoredFile[]; next: string | null }>;
+  getFile(kind: StoredFileKind, storageId: string): Promise<Uint8Array | null>;
+  // Le nouveau fichier remplace l'ancien pour toutes ses lignes, d'un bloc ; l'ancien part ensuite. `missing` : plus aucune ligne
+  // ne le désigne, le nouveau fichier part aussi.
+  replaceFile(
+    kind: StoredFileKind,
+    storageId: string,
+    bytes: Uint8Array,
+    accountsFilter: string,
+  ): Promise<"replaced" | "missing">;
+  stampFilter(kind: StoredFileKind, storageId: string, accountsFilter: string): Promise<void>;
+  // Un fichier illisible ne peut pas être prouvé propre, et personne ne peut le lire : ses lignes et lui partent.
+  discardFile(kind: StoredFileKind, storageId: string): Promise<void>;
+}
+
 // Le miroir `user:<id>` d'une personne, perdu avec Redis et gardé par la table `users` de Convex.
 export type RestoredUser = Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>;
 
@@ -743,6 +869,8 @@ export interface RecoveryStore {
   hasCanvas(canvasId: string): Promise<boolean>; // il existe encore dans `canvases` (une archive supprimée, non)
   listRecentSnapshots(canvasId: string): Promise<RecentSnapshot[]>; // du plus récent au plus ancien, au plus deux
   listUsers(userIds: readonly string[]): Promise<RestoredUser[]>; // ceux que Convex connaît
+  // Les comptes supprimés dont les fichiers ne sont pas tous réécrits : une sauvegarde lue ici peut encore les nommer.
+  listPendingErasures(): Promise<string[]>;
 }
 
 // Ce que le web écrit pour qu'une page dise « en récupération » dès son rendu, avant que le worker ait vu la perte.
@@ -789,6 +917,8 @@ export type TwitchLiveEvent =
 export type TwitchWebhookEvent =
   | { kind: "verification"; challenge: string }
   | { kind: "revocation"; broadcasterId: string }
+  // CDC §8 : la personne a retiré l'accès à LivePlace dans Twitch. Signée comme le reste, avant tout effacement.
+  | { kind: "accessRevoked"; userId: string }
   | { kind: "ban"; broadcasterId: string; user: TwitchUser; isPermanent: boolean }
   | { kind: "unban"; broadcasterId: string; user: TwitchUser }
   | { kind: "moderator"; broadcasterId: string; user: TwitchUser; isModerator: boolean }
@@ -804,6 +934,11 @@ export interface TwitchWebhook {
 export interface TwitchEventSub {
   subscribeToModeration(broadcasterId: string): Promise<void>;
   subscribeToLive(broadcasterId: string): Promise<void>; // §10.4
+  // CDC §8 : l'accès retiré dans Twitch vaut pour toute l'application, non pour une chaîne : un seul abonnement, pris au démarrage.
+  subscribeToAccessRevoked(): Promise<void>;
+  // CDC §8 : ceux de live et de modération qui nomment ce compte, quels que soient leur adresse et leur état. Un abonnement déjà
+  // parti n'est pas une erreur ; une panne de Twitch en est une, que la reprise de l'effacement refait.
+  deleteSubscriptions(userId: string): Promise<void>;
 }
 
 // §10.4 : ce que Twitch dit d'une chaîne maintenant, avec le jeton de l'application.

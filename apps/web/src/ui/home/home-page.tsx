@@ -3,6 +3,8 @@
 // bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le
 // stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
 
+import { AccountDeletedToast } from "../account/account-deleted-toast";
+import { ToastProvider } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { useMediaQuery } from "../design/use-media-query";
 import { Wordmark } from "../design/wordmark";
@@ -49,7 +51,10 @@ export const HomePage = () => {
   return (
     <main className="lp-home-page">
       <div className="lp-void" aria-hidden="true" />
-      <HomeContent />
+      <ToastProvider>
+        <HomeContent />
+        <AccountDeletedToast />
+      </ToastProvider>
     </main>
   );
 };

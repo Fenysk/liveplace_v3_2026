@@ -164,15 +164,15 @@ const LIVE_SUBSCRIPTIONS = [
   { type: "channel.update", version: "2" },
 ];
 const LIVE_TYPES = LIVE_SUBSCRIPTIONS.map(({ type }) => type);
+// CDC §8 : la personne a retiré l'accès à LivePlace dans Twitch. Un abonnement de toute l'application (condition `client_id`),
+// jamais d'une chaîne, et seulement par webhook.
+const ACCESS_REVOKED_TYPE = "user.authorization.revoke";
 
 const VerificationSchema = z.object({ challenge: z.string().min(1) });
-const RevocationSchema = z.object({
-  subscription: z.object({
-    type: z.string(),
-    condition: z.object({ broadcaster_user_id: z.string().min(1) }),
-  }),
-});
+const RevocationSchema = z.object({ subscription: z.object({ type: z.string(), condition: z.unknown() }) });
 const BroadcasterEventSchema = z.object({ broadcaster_user_id: z.string().min(1) });
+// `user_login` et `user_name` sont nuls quand le compte Twitch n'existe plus : seul l'identifiant sert.
+const AccessRevokedEventSchema = z.object({ user_id: z.string().min(1) });
 const StreamEventSchema = BroadcasterEventSchema.extend({ type: z.string() });
 const CategoryEventSchema = BroadcasterEventSchema.extend({ category_name: z.string().default("") });
 const ChannelUserEventSchema = ModerationUserSchema.extend(BroadcasterEventSchema.shape);
@@ -198,6 +198,8 @@ const toUser = (event: z.infer<typeof ChannelUserEventSchema>) => ({
 const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
   const { subscription, event } = NotificationSchema.parse(body);
   switch (subscription.type) {
+    case ACCESS_REVOKED_TYPE:
+      return { kind: "accessRevoked", userId: AccessRevokedEventSchema.parse(event).user_id };
     // §10.4 : seul un `type: live` allume le statut, jamais une rediffusion.
     case "stream.online": {
       const online = StreamEventSchema.parse(event);
@@ -236,9 +238,11 @@ const toNotificationEvent = (body: unknown): TwitchWebhookEvent => {
 // §10.4 : un abonnement de live retiré n'est jamais la synchro de modération révoquée.
 const toRevocationEvent = (body: unknown): TwitchWebhookEvent => {
   const { subscription } = RevocationSchema.parse(body);
+  // Le nôtre, retiré par Twitch : aucune chaîne n'est nommée, le démarrage suivant le recrée.
+  if (subscription.type === ACCESS_REVOKED_TYPE) return { kind: "ignored" };
   return {
     kind: LIVE_TYPES.includes(subscription.type) ? "liveRevoked" : "revocation",
-    broadcasterId: subscription.condition.broadcaster_user_id,
+    broadcasterId: BroadcasterEventSchema.parse(subscription.condition).broadcaster_user_id,
   };
 };
 
@@ -346,28 +350,31 @@ export function createTwitchEventSub({
     return isBeta ? "emplacement de bêta" : null;
   };
 
-  const listSubscriptions = async (broadcasterId: string): Promise<Subscription[]> => {
-    const listed = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams({ user_id: broadcasterId })}`);
+  // Un seul filtre par requête, c'est la règle de Twitch : le compte nommé dans la condition, ou le type.
+  const listSubscriptions = async (filter: string | { type: string }): Promise<Subscription[]> => {
+    const query = typeof filter === "string" ? { user_id: filter } : filter;
+    const listed = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams(query)}`);
     if (!listed.ok) throw new Error(`eventsub/subscriptions refuse la liste (${listed.status})`);
     return SubscriptionsSchema.parse(await listed.json()).data;
   };
 
-  // Un des nôtres vers une autre adresse (une bêta d'avant le 2026-10-05) : la prod le reprend.
-  const clearElsewhere = async (found: Subscription[]): Promise<void> => {
-    const elsewhere = found.filter(
-      (one) => MODERATION_TYPES.includes(one.type) && one.transport.callback !== callbackUrl,
-    );
-    for (const one of elsewhere) {
-      const cleared = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams({ id: one.id })}`, {
+  // 404 : déjà parti, entre la liste et maintenant.
+  const deleteAll = async (subscriptions: readonly Subscription[]): Promise<void> => {
+    for (const one of subscriptions) {
+      const deleted = await callHelix(`${SUBSCRIPTIONS_URL}?${new URLSearchParams({ id: one.id })}`, {
         method: "DELETE",
       });
-      if (!cleared.ok && cleared.status !== 404)
-        throw new Error(`eventsub ${one.type} non supprimé (${cleared.status})`);
+      if (!deleted.ok && deleted.status !== 404)
+        throw new Error(`eventsub ${one.type} non supprimé (${deleted.status})`);
     }
   };
 
+  // Un des nôtres vers une autre adresse (une bêta d'avant le 2026-10-05) : la prod le reprend.
+  const clearElsewhere = (found: Subscription[], types: readonly string[]): Promise<void> =>
+    deleteAll(found.filter((one) => types.includes(one.type) && one.transport.callback !== callbackUrl));
+
   const createMissing = async (
-    broadcasterId: string,
+    condition: Record<string, string>,
     found: Subscription[],
     wanted: readonly { type: string; version: string }[],
   ): Promise<void> => {
@@ -383,7 +390,7 @@ export function createTwitchEventSub({
         body: JSON.stringify({
           type,
           version,
-          condition: { broadcaster_user_id: broadcasterId },
+          condition,
           transport: { method: "webhook", callback: callbackUrl, secret },
         }),
       });
@@ -393,26 +400,44 @@ export function createTwitchEventSub({
     }
   };
 
-  // Les abonnements de la chaîne, ou `null` quand on ne s'abonne pas d'ici.
-  const listWhenAllowed = async (broadcasterId: string): Promise<Subscription[] | null> => {
+  // Ce que Twitch liste, ou `null` quand on ne s'abonne pas d'ici.
+  const listWhenAllowed = async (list: () => Promise<Subscription[]>): Promise<Subscription[] | null> => {
     const reason = skipReason();
-    if (!reason) return listSubscriptions(broadcasterId);
+    if (!reason) return list();
     console.info(`EventSub sauté : ${reason}`, callbackUrl);
     return null;
   };
+  const listOfChannel = (broadcasterId: string) => listWhenAllowed(() => listSubscriptions(broadcasterId));
 
   return {
     async subscribeToModeration(broadcasterId) {
-      const found = await listWhenAllowed(broadcasterId);
+      const found = await listOfChannel(broadcasterId);
       if (!found) return;
-      await clearElsewhere(found);
-      await createMissing(broadcasterId, found, MODERATION_SUBSCRIPTIONS);
+      await clearElsewhere(found, MODERATION_TYPES);
+      await createMissing({ broadcaster_user_id: broadcasterId }, found, MODERATION_SUBSCRIPTIONS);
     },
 
     // §10.4 : le live de la chaîne, avec les mêmes règles que la modération.
     async subscribeToLive(broadcasterId) {
-      const found = await listWhenAllowed(broadcasterId);
-      if (found) await createMissing(broadcasterId, found, LIVE_SUBSCRIPTIONS);
+      const found = await listOfChannel(broadcasterId);
+      if (found) await createMissing({ broadcaster_user_id: broadcasterId }, found, LIVE_SUBSCRIPTIONS);
+    },
+
+    // CDC §8 : un seul, pour l'application, là où les autres se créent seulement (prod : ni bêta ni poste, JOURNAL 2026-11-02).
+    async subscribeToAccessRevoked() {
+      const found = await listWhenAllowed(() => listSubscriptions({ type: ACCESS_REVOKED_TYPE }));
+      if (!found) return;
+      await clearElsewhere(found, [ACCESS_REVOKED_TYPE]);
+      await createMissing({ client_id: credentials.clientId }, found, [
+        { type: ACCESS_REVOKED_TYPE, version: "1" },
+      ]);
+    },
+
+    // CDC §8 : tout ce que Twitch garde au nom du compte, pour les chaînes comme pour la modération, quelle que soit l'adresse.
+    async deleteSubscriptions(userId) {
+      const found = await listOfChannel(userId);
+      if (found)
+        await deleteAll(found.filter((one) => [...LIVE_TYPES, ...MODERATION_TYPES].includes(one.type)));
     },
   };
 }

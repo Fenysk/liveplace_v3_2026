@@ -23,6 +23,8 @@ export type SignInDeps = {
   recovery?: Pick<RecoveryStore, "hasSnapshot"> | undefined;
   signer: SessionSigner;
   tracker: Pick<TwitchLiveTracker, "track">; // §10.4 : jamais bloquant, ni en échec
+  // CDC §8 : un effacement interrompu de ce compte finit avant qu'on le recrée, sinon il effacerait le compte neuf.
+  finishPendingDeletion: (userId: string) => Promise<void>;
   randomCanvasId: () => string;
   now: () => Timestamp;
 };
@@ -65,6 +67,7 @@ export async function signInTwitchUser(
 ): Promise<SignInResult> {
   // §10.1 : l'e-mail ne va qu'à Convex, jamais dans Redis ni dans la session.
   const { email, ...user } = signedIn;
+  await deps.finishPendingDeletion(user.userId);
   const discoveredViaUserId = await getDiscoveredViaUserId(deps.durable, user, returnPath);
   await deps.durable.upsertUserFromTwitch({ ...user, ...(email ? { email } : {}) }, discoveredViaUserId);
   // §5.8 : un canvas neuf naît en taille dynamique, 10×10 ; Convex garde cette taille de naissance, Redis fait foi ensuite.

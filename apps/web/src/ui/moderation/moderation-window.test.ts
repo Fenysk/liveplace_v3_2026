@@ -67,6 +67,26 @@ describe("what a screen reader hears of the moderation window", () => {
     expect(countOf(markup)).toContain("Assez de signalements");
   });
 
+  // Le dessin d'un compte supprimé s'efface ou se signale seul : sans plage, sans « tous ses dessins », sans nom dans le titre (CDC §8)
+  it("clears or reports the drawing of a deleted account alone, with no range, no clear-all box, and no name", () => {
+    const deleted = { ...author, isDeleted: true, displayName: "" };
+    const clearing = render({ request: { kind: "clear", author: deleted } });
+    const reporting = render({
+      request: {
+        kind: "report",
+        author: { x: 1, y: 2, displayName: "", placementId: "pdemo0001", isDeleted: true },
+      },
+    });
+
+    expect(clearing).toContain("Effacer ce dessin ?");
+    expect(reporting).toContain("Signaler ce dessin ?");
+    for (const markup of [clearing, reporting]) {
+      expect(markup).not.toContain("Plage de temps");
+      expect(markup).not.toContain("Effacer tous ses dessins");
+    }
+    expect(render({ request: { kind: "clear", author } })).toContain("Effacer tous ses dessins");
+  });
+
   // Une connexion coupée se dit tout de suite, dans l'alerte, avec la phrase de la fenêtre
   it("says a lost connection at once, in the alert, with the window's own sentence", () => {
     expect(alertOf(render({ status: "failed" }))).toBe(CONNECTION_LOST);

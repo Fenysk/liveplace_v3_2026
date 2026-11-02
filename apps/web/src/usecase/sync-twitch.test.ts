@@ -22,7 +22,9 @@ const channel: TwitchChannel = {
 };
 
 // Des doubles qui notent ce qu'on leur demande d'écrire.
-const doubles = () => {
+const doubles = (options: { isDeleted?: boolean; isDeletedDuringCall?: boolean } = {}) => {
+  let isDeletedNow = options.isDeleted ?? false;
+  const isDeletedDuringCall = options.isDeletedDuringCall ?? isDeletedNow;
   const names: TwitchUser[] = [];
   const commands: TwitchCommand[] = [];
   const syncs: { canvasId: string; sync: TwitchSync }[] = [];
@@ -53,6 +55,7 @@ const doubles = () => {
       },
     },
     tracker: { track: () => undefined },
+    finishPendingDeletion: async () => undefined,
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };
@@ -67,18 +70,25 @@ const doubles = () => {
       syncs.push({ canvasId, sync });
     },
   };
+  const removed: string[] = [];
   const eventSub = {
     subscribeToModeration: async (broadcasterId: string) => {
       subscribed.push(broadcasterId);
+      isDeletedNow = isDeletedDuringCall;
+    },
+    deleteSubscriptions: async (userId: string) => {
+      removed.push(userId);
     },
   };
+  const accounts = { isDeletedAccount: async () => isDeletedNow };
   return {
-    deps: { ...deps, twitchWrites, eventSub, now: () => now },
+    deps: { ...deps, twitchWrites, eventSub, accounts, now: () => now },
     names,
     commands,
     syncs,
     signedUsers,
     subscribed,
+    removed,
   };
 };
 
@@ -117,5 +127,25 @@ describe("completeTwitchSync (JOURNAL 2026-09-27)", () => {
       { userId: "31", login: "troll", displayName: "Troll" },
     ]);
     expect(syncs).toEqual([{ canvasId: "canvas-1", sync: { status: "ok", syncedAt: now } }]);
+  });
+
+  // Un streamer dont l'effacement est en cours (ou fait) n'est pas abonné : la synchro ne recrée rien chez Twitch
+  it("does not subscribe a streamer whose account is being deleted", async () => {
+    const { deps, subscribed, removed } = doubles({ isDeleted: true });
+
+    await completeTwitchSync(deps, "code", null);
+
+    expect(subscribed).toEqual([]);
+    expect(removed).toEqual([]);
+  });
+
+  // L'effacement qui passe pendant l'appel à Twitch retire ce que l'appel vient de créer
+  it("removes the subscriptions it just created when the deletion passed during the call", async () => {
+    const { deps, subscribed, removed } = doubles({ isDeleted: false, isDeletedDuringCall: true });
+
+    await completeTwitchSync(deps, "code", null);
+
+    expect(subscribed).toEqual([owner.userId]);
+    expect(removed).toEqual([owner.userId]);
   });
 });

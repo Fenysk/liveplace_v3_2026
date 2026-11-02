@@ -125,8 +125,10 @@ export function createBroadcast(
       pendingArrivals: [],
       ticksWaited: 0,
       subscription: core.subscribe(canvasId, (message) => {
-        if ("e" in message) enqueue(canvas, message.e);
-        else for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
+        if ("e" in message) return enqueue(canvas, message.e);
+        // Un compte supprimé sort du classement sans qu'aucune pose ne le dise (JOURNAL 2026-11-01).
+        if (message.ctl.t === "tracesPurged") canvas.isScoreboardStale = true;
+        for (const { onControl } of canvas.listeners.values()) onControl(message.ctl);
       }),
       isScoreboardStale: false,
       isReadingScoreboard: false,

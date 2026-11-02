@@ -21,6 +21,7 @@ const windowProps = (props: Partial<WindowProps> = {}): WindowProps => ({
   appearanceChoice: "auto",
   onPickAppearance: doNothing,
   onRestartTutorial: doNothing,
+  onDeleteAccount: doNothing,
   ...props,
 });
 
@@ -155,6 +156,42 @@ describe("« Revoir le tuto » dans Mon compte (§9.8)", () => {
   // Le bouton est un bouton pressé comme les autres, qui n'envoie ni ne lie rien à une adresse
   it("is a plain button, not a link", () => {
     expect(renderWindow()).not.toMatch(/<a[^>]*>(?:(?!<\/a>).)*Revoir le tuto/);
+  });
+});
+
+// CDC §8 : Supprimer son compte, en bas de Mon compte, sous un filet
+describe("« Supprimer mon compte » dans Mon compte (CDC §8)", () => {
+  const ROW =
+    /<div class="lp-window-row lp-type-body lp-row--ruled"><span><span class="lp-muted">Efface tout, sans retour\.<\/span><\/span>(<button.*?<\/button>)<\/div>/s;
+
+  // Une ligne sous filet, en dernier : « Efface tout, sans retour. » atténué, et le bouton rouge plein avec la corbeille
+  it("ends the section with a ruled row: the muted hint, and the red button with the trash icon", () => {
+    const markup = renderWindow();
+    const [, button = ""] = ROW.exec(markup) ?? [];
+
+    expect(button).toMatch(/lp-btn--danger/);
+    expect(button).toContain("<svg");
+    expect(button).toContain("<span>Supprimer mon compte</span>");
+    expect(markup.indexOf("Supprimer mon compte")).toBeGreaterThan(markup.indexOf("Revoir le tuto"));
+    // La dernière ligne de la section est celle du filet.
+    expect(markup.lastIndexOf('class="lp-window-row')).toBe(
+      markup.indexOf('class="lp-window-row lp-type-body lp-row--ruled"'),
+    );
+  });
+
+  // Le bouton ouvre la confirmation de la page, et rien ne s'efface en le pressant
+  it("hands the press to the page, which opens the confirmation", () => {
+    const markup = renderWindow({ onDeleteAccount: () => undefined });
+
+    expect(markup).not.toMatch(/<a[^>]*>(?:(?!<\/a>).)*Supprimer mon compte/);
+  });
+
+  // Dans Mon compte seulement, pour tous les rôles
+  it("is in the Mon compte section alone, for every role", () => {
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "canvas" })).not.toContain("Supprimer mon compte");
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "obs" })).not.toContain("Supprimer mon compte");
+    expect(renderWindow()).toContain("Supprimer mon compte");
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "account" })).toContain("Supprimer mon compte");
   });
 });
 

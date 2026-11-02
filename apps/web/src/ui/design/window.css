@@ -139,6 +139,35 @@
   min-height: var(--control-size);
 }
 
+/* Une ligne sous un filet, à l'écart du reste de la section : l'action qu'on ne défait pas (Supprimer mon compte, maquette du
+   2026-11-01) */
+.lp-window-row.lp-row--ruled {
+  padding-top: var(--space-4);
+}
+
+/* Un texte qui explique, dans le corps d'une fenêtre : sans la marge d'un paragraphe, la liste en retrait, le titre d'un bloc
+   serré sur sa liste, un lien de la couleur du texte (maquette du 2026-11-01) */
+.lp-window-text {
+  margin: 0;
+}
+
+.lp-window-list {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 2px;
+}
+
+.lp-window-block {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-window-link {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* Le libellé est un profil (modérateurs, bannis) : il prend la place qui reste et son nom se coupe, les actions
    gardent leur taille. Sur mobile, elles passent sous le profil, à droite. */
 .lp-window-row--profile {

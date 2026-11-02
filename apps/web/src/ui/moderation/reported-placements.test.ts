@@ -34,6 +34,21 @@ const render = (...reports: PendingReport[]) =>
     }),
   );
 
+describe("a deleted account in the reported placements (CDC §8)", () => {
+  // Dit « Compte supprimé » sans nom ni lien, propose Effacer et Rétablir, jamais Bannir
+  it("says Compte supprimé with no name and no link, and offers Effacer and Rétablir but never Bannir", () => {
+    const html = render(
+      report({ userId: "deleted", login: "", displayName: "", hasAccount: false, isDeleted: true }),
+    );
+
+    expect(html).toContain("Compte supprimé");
+    expect(html).toContain("Effacer le dessin");
+    expect(html).toContain("Rétablir");
+    expect(html).not.toContain("Bannir");
+    expect(html).not.toContain("href=");
+  });
+});
+
 describe("Bannir in the reported placements (§5.4)", () => {
   // Un signalement offre Effacer, Bannir et Rétablir pour un joueur, et pour un modérateur venu de Twitch seul
   it("offers Effacer, Bannir and Rétablir on a player, and on a moderator who comes from Twitch only", () => {

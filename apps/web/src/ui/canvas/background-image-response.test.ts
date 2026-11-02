@@ -17,19 +17,39 @@ const session: Session = { userId: "owner-1", login: "owner1", displayName: "Own
 
 afterEach(() => vi.restoreAllMocks());
 
-const imagesOf = (stored: Record<string, Uint8Array>): BackgroundImages => ({
+const imagesOf = (stored: Record<string, Uint8Array>): Pick<BackgroundImages, "get"> => ({
   get: async (login, at) => (at === AT ? (stored[login] ?? null) : null),
 });
 
 describe("la réponse GET de /{login}/background", () => {
-  // Quand le login a l'image de cet instant, le système doit répondre ses octets en WebP, gardés un an par tous les caches
-  it("answers the bytes as a WebP that every cache keeps a year, since the instant dates the address", async () => {
+  // Quand le login a l'image de cet instant, le système doit répondre ses octets en WebP, gardés un jour par les caches
+  it("answers the bytes as a WebP that the caches keep a day, not a year", async () => {
     const response = await backgroundImageResponse(imagesOf({ fenysk: WEBP }), "fenysk", String(AT));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/webp");
-    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=86400");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(WEBP);
+  });
+
+  // Une copie ne survit pas longtemps après la suppression du compte : un jour au plus, et jamais `immutable`, qui la garderait
+  // sans revérifier (CDC §8)
+  it("never marks the image immutable, and lets no copy live longer than a day", async () => {
+    const response = await backgroundImageResponse(imagesOf({ fenysk: WEBP }), "fenysk", String(AT));
+    const control = response.headers.get("cache-control") ?? "";
+    const maxAge = Number(/max-age=(\d+)/.exec(control)?.[1]);
+
+    expect(control).not.toContain("immutable");
+    expect(maxAge).toBeGreaterThan(0);
+    expect(maxAge).toBeLessThanOrEqual(24 * 3600);
+  });
+
+  // L'adresse d'une image supprimée ne rend plus rien, et ce rien n'est retenu par aucun cache : la copie d'un navigateur expire seule
+  it("answers nothing, kept by no cache, once the image is gone: the copy of a browser expires by itself", async () => {
+    const gone = await backgroundImageResponse(imagesOf({}), "fenysk", String(AT));
+
+    expect(gone.status).toBe(404);
+    expect(gone.headers.get("cache-control")).toBe("no-store");
   });
 
   // Si l'instant manque, n'est pas un entier, ou n'est plus celui de l'image, alors le système doit répondre 404 sans corps, qu'aucun cache ne retient
@@ -53,7 +73,7 @@ describe("la réponse GET de /{login}/background", () => {
   // Si la lecture échoue, alors le système doit répondre 503 sans corps ni cache, et journaliser l'erreur avec son contexte
   it("answers 503 with no body and no cache when the read fails, and logs the error with its context", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const failing: BackgroundImages = {
+    const failing: Pick<BackgroundImages, "get"> = {
       get: async () => {
         throw new Error("Convex down");
       },

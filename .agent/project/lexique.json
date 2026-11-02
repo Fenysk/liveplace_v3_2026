@@ -27,7 +27,7 @@
     { "canonical": "userId",       "definition": "L'identifiant d'une personne, égal au `twitchId`, immuable. Jamais le `login`, jamais le `displayName`.", "banned": [] },
     { "canonical": "login",        "definition": "Le pseudo Twitch en minuscules. Sert UNIQUEMENT dans les URL. Peut changer : ne sert jamais de clé. Ne désigne JAMAIS l'action de se connecter.", "banned": ["username", "nickname", "handle"] },
     { "canonical": "displayName",  "definition": "Le nom affiché, au propre. Sert uniquement à l'affichage.",            "banned": ["pseudo"] },
-    { "canonical": "cleared",      "definition": "La pierre tombale versionnée qui empêche un pixel supprimé de réapparaître (D-16).", "banned": ["deleted", "hidden", "tombstone"] },
+    { "canonical": "cleared",      "definition": "La pierre tombale versionnée qui empêche un pixel supprimé de réapparaître (D-16).", "banned": ["hidden", "tombstone"] },
     { "canonical": "snapshot",     "definition": "La copie complète de l'état, avec son `tier` (working, hourly, daily, weekly).", "banned": ["backup", "dump"] },
     { "canonical": "chunk",        "definition": "Le lot d'événements rangé dans Convex, dont le contenu compressé est le `payload`. Jamais une subdivision spatiale, jamais une `archive`.", "banned": [] },
     { "canonical": "payload",      "definition": "Le contenu compressé d'un `chunk`.",                                   "banned": [] },
@@ -47,12 +47,13 @@
     { "canonical": "ceiling",      "definition": "Le plafond d'une ressource : la valeur où elle cesse de servir, comme `gaugeMaxCeiling` pour la jauge. Un quota Convex est un `ceiling` (JOURNAL 2026-10-07).", "banned": [] },
     { "canonical": "saturation",   "definition": "Le plus haut des taux, et la ressource qui le porte (JOURNAL 2026-10-07).", "banned": ["pressure"] },
     { "canonical": "twitchLive",   "definition": "Le live Twitch en cours d'un compte, avec sa catégorie ; absent hors live (JOURNAL 2026-10-07).", "banned": [] },
-    { "canonical": "bubble",       "definition": "Une surface de pill sans action qui guide un geste, avec ou sans flèche vers l'élément visé, et qui ne se montre qu'une fois, retenue par clé dans le navigateur (JOURNAL 2026-10-08).", "banned": ["popover", "callout"] }
+    { "canonical": "bubble",       "definition": "Une surface de pill sans action qui guide un geste, avec ou sans flèche vers l'élément visé, et qui ne se montre qu'une fois, retenue par clé dans le navigateur (JOURNAL 2026-10-08).", "banned": ["popover", "callout"] },
+    { "canonical": "deletedAccount", "definition": "Un compte supprimé (`deleteAccount`) : ses pixels restent sur les fresques des autres sous l'auteur `deleted` (`DELETED_AUTHOR`), sans identité. Jamais un pixel retiré par la modération, qui est `cleared` (JOURNAL 2026-11-01).", "banned": [] }
   ],
 
   "verbs": [
     { "canonical": "place",   "meaning": "Poser des pixels sur le canvas.",                                          "banned": ["draw", "paint", "put"] },
-    { "canonical": "clear",   "meaning": "Retirer des pixels par modération : `clearUser`, `clearPlacement`. Restaure ce qu'il y avait dessous.", "banned": ["delete", "remove", "erase"] },
+    { "canonical": "clear",   "meaning": "Retirer des pixels par modération : `clearUser`, `clearPlacement`. Restaure ce qu'il y avait dessous.", "banned": ["remove", "erase"] },
     { "canonical": "restore", "meaning": "Remettre le pixel d'en dessous — et, pour `restore.lua`, réécrire un état complet.", "banned": [] },
     { "canonical": "ban",     "meaning": "Interdire de poser sur ce canvas. L'inverse est `unban`.",                  "banned": ["block"] },
     { "canonical": "conflate","meaning": "Fusionner plusieurs changements d'une même case dans un tick (D-13).",      "banned": ["merge", "dedupe"] },
@@ -63,7 +64,8 @@
     { "canonical": "get",     "meaning": "Lire UNE ressource par son identifiant.",                                   "banned": ["find", "load"] },
     { "canonical": "list",    "meaning": "Lire une collection. Vide = résultat valide, pas une erreur.",              "banned": ["read", "fetch", "getAll", "fetchAll"] },
     { "canonical": "signIn",  "meaning": "L'action de se connecter. Le mot `login` est pris : c'est le pseudo.",      "banned": ["login", "authenticate"] },
-    { "canonical": "signOut", "meaning": "L'action de se déconnecter.",                                               "banned": ["logout"] }
+    { "canonical": "signOut", "meaning": "L'action de se déconnecter.",                                               "banned": ["logout"] },
+    { "canonical": "delete",  "meaning": "Supprimer un compte entier et tout ce qui le nomme : `deleteAccount` (JOURNAL 2026-11-01). Retirer des pixels par modération reste `clear`.", "banned": [] }
   ],
 
   "bannedNames": [

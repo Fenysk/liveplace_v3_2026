@@ -37,6 +37,10 @@ local isRefused = redis.call("SISMEMBER", bansKey, reporterId) == 1
 if isRefused then
   return "forbidden"
 end
+-- CDC §8 : la pose d'un compte supprimé se signale seule. Sa plage réunirait les poses de tous les comptes supprimés.
+if rangeFrom and entry.author == ARGV[15] then
+  return "forbidden"
+end
 
 -- 3. Les poses visées : celle-ci, et avec une plage, chaque pose de l'auteur dont un pixel visible y tombe.
 local placements, seen = { entry.placement }, { [entry.placement] = true }

@@ -86,6 +86,8 @@ export interface Activity {
     dayAt: Timestamp,
     canvasId: string,
   ): Promise<Result<ActivityDay, "future"> | null>;
+  // CDC §8 : un streamer supprimé ne sert plus ni son miroir, ni ses canvas, que le gateway gardait en mémoire.
+  forgetOwner(userId: string): void;
   tick(): Promise<void>; // toutes les 2 s : la minute écoulée part dans Redis, la frame aux sockets qui regardent
   start(): Promise<void>; // au démarrage : la température d'avant, les heures vues, et l'élagage
 }
@@ -656,6 +658,11 @@ export function createActivity(deps: ActivityDeps): Activity {
       ]);
       const canvases = await Promise.all(listed.map(getDayCanvas));
       return { ok: true, value: { dayAt: day, ...read, canvases, here: { canvasId, ...here } } };
+    },
+
+    forgetOwner(userId) {
+      owners.delete(userId);
+      for (const [canvasId, ownerId] of canvasOwners) if (ownerId === userId) canvasOwners.delete(canvasId);
     },
 
     // Un tic à la fois : deux écritures d'une même minute en doubleraient les pixels.

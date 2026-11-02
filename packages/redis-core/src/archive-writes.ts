@@ -45,14 +45,14 @@ const canvasKeysOf = (canvasId: string) => {
   return buildCanvasKeys(canvasId);
 };
 
-const scanKeys = async (redis: Redis, pattern: string): Promise<string[]> => {
+export const scanKeys = async (redis: Redis, pattern: string): Promise<string[]> => {
   const found = new Set<string>();
   for await (const names of redis.scanStream({ match: pattern, count: SCAN_COUNT }))
     for (const name of names) found.add(name);
   return [...found];
 };
 
-const unlinkAll = async (redis: Redis, keys: readonly string[]): Promise<void> => {
+export const unlinkAll = async (redis: Redis, keys: readonly string[]): Promise<void> => {
   for (let first = 0; first < keys.length; first += UNLINK_BATCH)
     await redis.unlink(...keys.slice(first, first + UNLINK_BATCH));
 };

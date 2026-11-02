@@ -1,23 +1,132 @@
-/* « LivePlace » en haut à gauche de /confidentialite, là où l'accueil l'écrit : les mêmes marges (.lp-home-page) et le même bloc de
-   1600 px au plus, centré (.lp-home), dans home.css. Le mot est hors du flux : la pill du titre garde sa place, au centre. */
-.lp-privacy {
+/* /confidentialite, variante A de la maquette du 02/11. Le fond, les marges et l'en-tête sont ceux de l'accueil (.lp-home-page et .lp-home,
+   dans home.css). Ici, le document : une colonne de 600 px au plus, et dès 1100 px de bloc deux colonnes, le sommaire collant à
+   gauche et le texte à droite. Comme l'accueil, la mise en page suit la largeur du bloc, pas celle de la fenêtre. */
+
+/* Un clic sur le sommaire défile doucement, sauf pour qui a demandé moins de mouvement */
+@media (prefers-reduced-motion: no-preference) {
+  :root:has(.lp-privacy-doc) {
+    scroll-behavior: smooth;
+  }
+}
+
+.lp-privacy-doc {
   position: relative;
+  display: block;
 }
 
-.lp-privacy-top {
-  --lp-privacy-margin: var(--space-4);
+/* Le repère du bas du document (use-current-section.ts) : hors du flux, il ne prend aucune place dans la grille */
+.lp-privacy-end {
   position: absolute;
-  top: 0;
   left: 0;
-  right: 0;
-  box-sizing: border-box;
-  max-width: calc(1600px + 2 * var(--lp-privacy-margin));
-  margin-inline: auto;
-  padding: var(--lp-privacy-margin);
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
 }
 
-@media (min-width: 641px) {
-  .lp-privacy-top {
-    --lp-privacy-margin: clamp(24px, 2.5vw, 40px);
+/* Le sommaire n'existe pas sous le seuil : le téléphone lit une seule colonne */
+.lp-privacy-nav {
+  display: none;
+}
+
+.lp-privacy-contents {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Des liens sans soulignement : le courant est à l'encre, avec un filet à gauche */
+.lp-privacy-link {
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.lp-privacy-link:hover {
+  color: var(--ink);
+}
+
+.lp-privacy-link[aria-current] {
+  border-left-color: var(--ink);
+  color: var(--ink);
+}
+
+.lp-privacy-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.lp-privacy-column {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 600px;
+  margin: var(--space-4) auto 0;
+}
+
+.lp-privacy-column h1 {
+  margin: 0;
+}
+
+/* La carte : le contenu d'une pill, sur toute la largeur de la colonne */
+.lp-pill.lp-privacy-card {
+  display: grid;
+  gap: calc(2 * var(--space-4));
+  width: 100%;
+  max-width: none;
+  padding: var(--space-4);
+}
+
+.lp-privacy-card :is(p, h2) {
+  margin: 0;
+}
+
+/* Une section : son titre, puis ses phrases, serrés les uns sur les autres (CDC §8, Supprimer ton compte) */
+.lp-privacy-section {
+  display: grid;
+  gap: var(--space-3);
+  scroll-margin-top: var(--space-4);
+}
+
+/* L'adresse de contact est le lien du texte de la fenêtre Supprimer mon compte (.lp-window-link, window.css) :
+   ici, seulement l'anneau du clavier */
+.lp-privacy-section .lp-window-link:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Le sommaire à gauche (240 px), le texte à droite : 784 px de carte, moins 2 fois 32 px de marge, soit 720 px de texte.
+   Le sommaire reste collé en haut, aligné sur le titre. */
+@container lp-home (min-width: 1100px) {
+  .lp-privacy-doc {
+    display: grid;
+    grid-template-columns: 240px 784px;
+    column-gap: 48px;
+    justify-content: center;
+    align-items: start;
+  }
+
+  .lp-privacy-nav {
+    display: block;
+    position: sticky;
+    top: var(--space-4);
+    padding-top: var(--space-4);
+  }
+
+  .lp-privacy-column {
+    max-width: none;
+    margin: var(--space-4) 0 0;
+  }
+
+  .lp-pill.lp-privacy-card {
+    gap: 48px;
+    padding: 32px;
   }
 }

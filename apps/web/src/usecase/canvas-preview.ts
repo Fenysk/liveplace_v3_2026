@@ -23,6 +23,7 @@ export type CanvasPreviewDeps = {
 export type CanvasPreviews = {
   // `null` : le login n'a pas de canvas, ou Redis ne le sert pas (perdu, en récupération).
   get(login: string): Promise<Uint8Array<ArrayBuffer> | null>;
+  forget(login: string): void; // CDC §8 : le streamer est supprimé, sa carte ne se sert plus de la mémoire
 };
 
 type Preview = Promise<Uint8Array<ArrayBuffer> | null>;
@@ -52,6 +53,10 @@ export function createCanvasPreviews({ durable, redis, render, now }: CanvasPrev
       };
       preview.then((png) => png ?? forget(), forget);
       return preview;
+    },
+
+    forget(login) {
+      cached.delete(login.toLowerCase());
     },
   };
 }

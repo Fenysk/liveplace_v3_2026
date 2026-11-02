@@ -56,6 +56,24 @@ export function isDeveloper(userId: string | undefined): boolean {
   return userId === DEVELOPER_USER_ID;
 }
 
+// CDC §8, Supprimer son compte : l'auteur des pixels d'un compte supprimé, une valeur sans identité (un identifiant
+// Twitch est numérique, jamais « deleted »). Ses cases restent sur les fresques des autres : leur pose se retire ou se
+// signale, mais lui ne se bannit ni ne se retire en bloc (JOURNAL 2026-11-01).
+export const DELETED_AUTHOR = "deleted";
+
+export function isDeletedAuthor(userId: string | undefined): boolean {
+  return userId === DELETED_AUTHOR;
+}
+
+// La durée d'une session (30 jours) et un jour de marge : plus long, l'empreinte d'un compte supprimé ne refuserait plus aucun
+// jeton. Redis la garde ce temps (`EX`), Convex aussi (JOURNAL 2026-11-02).
+export const DELETED_ACCOUNT_TTL_SECONDS = 31 * 24 * 3600;
+
+// Ce qui déclenche l'effacement d'un compte : le bouton, l'accès retiré chez Twitch, une demande par le contact (un
+// héritier, un parent), ou deux ans sans connexion.
+export const ACCOUNT_DELETION_TRIGGERS = ["button", "twitch", "contact", "inactivity"] as const;
+export type AccountDeletionTrigger = (typeof ACCOUNT_DELETION_TRIGGERS)[number];
+
 // §16.1 : 24 h (un point par minute), 30 jours (un par heure), ou tout (un par jour).
 export const ACTIVITY_PERIODS = ["day", "month", "all"] as const;
 export type ActivityPeriod = (typeof ACTIVITY_PERIODS)[number];

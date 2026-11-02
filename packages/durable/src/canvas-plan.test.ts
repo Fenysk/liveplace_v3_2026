@@ -6,6 +6,7 @@ import {
   planArchive,
   planBackgroundImage,
   planDiscard,
+  planDiscardAll,
   planNameToTheme,
   planReopen,
   planSetTheme,
@@ -230,6 +231,25 @@ describe("planDiscard (§17.1)", () => {
     expect(planDiscard(canvases, ownerId, active.canvasId)).toEqual({ ok: false, error: "not_archive" });
     expect(planDiscard(canvases, "owner-2", "canvas-archive-2")).toEqual({ ok: false, error: "not_archive" });
     expect(planDiscard(canvases, ownerId, "canvas-elsewhere")).toEqual({ ok: false, error: "not_archive" });
+  });
+});
+
+describe("planDiscardAll (CDC §8, Supprimer son compte)", () => {
+  // Supprime tous les canvas de ce propriétaire, l'actif compris, et aucun autre
+  it("deletes every canvas of this owner, the active one included, and no other", () => {
+    const strangers = [{ ...active, canvasId: "canvas-elsewhere", ownerId: "owner-2" }];
+
+    expect(planDiscardAll([active, ...archives(2), ...strangers], ownerId)).toEqual([
+      { kind: "delete", canvasId: "canvas-active" },
+      { kind: "delete", canvasId: "canvas-archive-1" },
+      { kind: "delete", canvasId: "canvas-archive-2" },
+    ]);
+  });
+
+  // Un propriétaire sans canvas n'a rien à supprimer : relancée, la suppression ne fait rien
+  it("has nothing to delete for an owner without canvases, so that running it again does nothing", () => {
+    expect(planDiscardAll([active], "owner-2")).toEqual([]);
+    expect(planDiscardAll([], ownerId)).toEqual([]);
   });
 });
 

@@ -1,6 +1,7 @@
 // Remettre en place un canvas que Redis a perdu (§7.4). Toutes les 5 s, un seul pipeline Redis nomme
 // les canvas sauvegardés qui manquent ; Convex n'est lu que pour un canvas à remettre, jamais en boucle.
 
+import { deleteAccountFromSnapshot } from "@liveplace/domain/account-erasure";
 import type { RecoveryStore, RecoveryTarget } from "@liveplace/domain/ports";
 import { type CanvasSnapshot, RECOVERY_VERSION_JUMP } from "@liveplace/domain/snapshot";
 import type { Result } from "@liveplace/shared";
@@ -53,11 +54,13 @@ export function createRecoveryCycle({ target, store, decode, getCursor, now, log
         await target.cancelRestore(canvasId);
         return log(`canvas ${canvasId} supprimé de Convex : il n'est pas remis en place`);
       }
-      const snapshot = await getReadable(canvasId);
-      if (!snapshot) {
+      const readable = await getReadable(canvasId);
+      if (!readable) {
         retryAt.set(canvasId, now() + RECOVERY_RETRY_MS);
         return log(`canvas ${canvasId} bloqué en récupération : aucune sauvegarde lisible`);
       }
+      // Un compte supprimé dont les fichiers restent à réécrire ne revient pas, même si Redis a tout perdu (JOURNAL 2026-11-02).
+      const snapshot = (await store.listPendingErasures()).reduce(deleteAccountFromSnapshot, readable);
       const users = await store.listUsers(userIdsOf(snapshot));
       const version = Math.max(snapshot.version, getCursor(canvasId)) + RECOVERY_VERSION_JUMP;
       const answer = await target.restore(canvasId, { snapshot, users, version, at: now() });

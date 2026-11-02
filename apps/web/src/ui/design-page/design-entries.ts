@@ -72,6 +72,7 @@ const ENTRIES_BY_SLUG = {
   banni: { title: "Banni", chapterId: "dialogs" },
   "archiver-ou-rouvrir": { title: "Archiver ou rouvrir", chapterId: "dialogs" },
   "supprimer-une-archive": { title: "Supprimer une archive", chapterId: "dialogs" },
+  "supprimer-son-compte": { title: "Supprimer son compte", chapterId: "dialogs" },
   "telecharger-en-png": { title: "Télécharger en PNG", chapterId: "dialogs" },
 
   accueil: { title: "Accueil", chapterId: "pages" },

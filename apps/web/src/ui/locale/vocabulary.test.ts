@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ACCOUNT_TEXTS } from "../account/account-texts";
+import { DELETE_ACCOUNT_TEXTS } from "../account/delete-account-texts";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import { DESIGN_TEXTS } from "../design/design-texts";
@@ -18,6 +19,7 @@ import { SCOREBOARD_TEXTS } from "../scoreboard/scoreboard-texts";
 
 const MODULES = {
   account: ACCOUNT_TEXTS,
+  deleteAccount: DELETE_ACCOUNT_TEXTS,
   archive: ARCHIVE_TEXTS,
   canvas: CANVAS_TEXTS,
   design: DESIGN_TEXTS,

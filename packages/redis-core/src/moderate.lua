@@ -24,6 +24,8 @@ local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], AR
 -- §5.8 : ce que reframe.lua décale, et les bornes d'une taille dynamique.
 local banPrefix, recentlyClearedPrefix = ARGV[19], ARGV[20]
 local growthLimits = { margin = tonumber(ARGV[21]), maxWidth = tonumber(ARGV[22]), maxHeight = tonumber(ARGV[23]) }
+-- CDC §8 : l'auteur des pixels d'un compte supprimé.
+local deletedAuthor = ARGV[24]
 local placement = target .. ":" .. placementId
 
 -- 0. Canvas prêt. §5.5, comme place.lua. §17.1 : une archive ne reçoit plus rien.
@@ -45,6 +47,11 @@ if by ~= ownerId and redis.call("SISMEMBER", bansKey, by) == 1 then
   return { "forbidden" }
 end
 if action == "ban" and redis.call("SISMEMBER", modsLiveplaceKey, target) == 1 then
+  return { "forbidden" }
+end
+-- CDC §8 : sur l'auteur d'un compte supprimé, seule la pose se retire (sans plage, elle réunirait les poses de tous les
+-- comptes supprimés) ou se rétablit : ni ban, ni déban, ni retrait en bloc.
+if target == deletedAuthor and (not (action == "clearPlacement" or action == "approvePlacement") or rangeFrom) then
   return { "forbidden" }
 end
 

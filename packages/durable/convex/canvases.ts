@@ -9,6 +9,7 @@ import {
   planArchive,
   planBackgroundImage,
   planDiscard,
+  planDiscardAll,
   planNameToTheme,
   planReopen,
   planSetTheme,
@@ -275,5 +276,22 @@ export const discard = mutation({
     if (image) await releaseFile(ctx, image.storageId, image.size);
     await purgeLater(ctx, canvasId);
     return settled;
+  },
+});
+
+// CDC §8, Supprimer son compte : toutes les fresques du propriétaire, l'active comprise, que `discard` refuse. Leurs
+// sauvegardes et leurs fichiers partent en tâche de fond, comme pour une archive. Rend leurs identifiants : un effacement
+// repris, qui repasse ici, n'en trouve plus et relit ceux qu'il a gardés.
+export const discardAll = mutation({
+  args: { serviceKey: v.string(), ownerId: v.string() },
+  handler: async (ctx, { serviceKey, ownerId }) => {
+    requireServiceKey(serviceKey);
+    const docs = await canvasesOf(ctx.db, ownerId);
+    await applyWrites(ctx.db, docs, planDiscardAll(docs, ownerId));
+    for (const { canvasId, backgroundImage } of docs) {
+      if (backgroundImage) await releaseFile(ctx, backgroundImage.storageId, backgroundImage.size);
+      await purgeLater(ctx, canvasId);
+    }
+    return docs.map(({ canvasId }) => canvasId);
   },
 });

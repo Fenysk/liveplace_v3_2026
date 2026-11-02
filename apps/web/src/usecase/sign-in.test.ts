@@ -25,6 +25,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
   const signed: object[] = [];
   const signups: Signup[] = [];
   const tracked: string[] = [];
+  const steps: string[] = [];
   const known = [user, owner];
   const deps: SignInDeps = {
     twitch: {
@@ -34,6 +35,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
     },
     durable: {
       upsertUserFromTwitch: async (upserted, discoveredViaUserId) => {
+        steps.push("upsert");
         upserts.push({ user: upserted, discoveredViaUserId });
       },
       getUserByLogin: async (login) => known.find((candidate) => candidate.login === login) ?? null,
@@ -71,11 +73,15 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
         tracked.push(trackedUserId);
       },
     },
+    finishPendingDeletion: async (finishedUserId) => {
+      steps.push(`finish ${finishedUserId}`);
+    },
     randomCanvasId: () => "random-candidate",
     now: () => now,
   };
   return {
     deps,
+    steps,
     tracked,
     activeCanvasReads,
     createdCanvases,
@@ -89,6 +95,29 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
     signups,
   };
 };
+
+describe("completeSignIn after a deletion (CDC §8, Supprimer son compte)", () => {
+  // Termine l'effacement interrompu de ce compte avant de rien créer : sinon il effacerait le compte neuf
+  it("finishes an interrupted deletion of this account before it creates anything", async () => {
+    const { deps, steps } = doubles("canvas-1");
+
+    await completeSignIn(deps, "code", null);
+
+    expect(steps).toEqual([`finish ${user.userId}`, "upsert"]);
+  });
+
+  // Une reconnexion sans effacement en cours se fait comme avant, et un effacement qui échoue arrête la connexion
+  it("stops the sign-in when the interrupted deletion cannot finish", async () => {
+    const { deps, steps } = doubles("canvas-1");
+    deps.finishPendingDeletion = async () => {
+      throw new Error("Convex a coupé");
+    };
+
+    await expect(completeSignIn(deps, "code", null)).rejects.toThrow("Convex a coupé");
+
+    expect(steps).toEqual([]);
+  });
+});
 
 describe("completeSignIn (§10.1)", () => {
   // Crée dans Redis le canvas que rend Convex, jamais le candidat tiré au hasard
@@ -191,6 +220,16 @@ describe("completeSignIn (§10.1)", () => {
     expect(upserts[0]?.user.email).toBe("fenysk@example.com");
     expect(mirrored[0]).not.toHaveProperty("email");
     expect(signed[0]).not.toHaveProperty("email");
+  });
+
+  // Un jeton qui n'a plus le droit d'e-mail (réduction de portée) : Convex reçoit la ligne sans e-mail, et c'est ce qui efface celui gardé
+  it("sends Convex the account without an email when the token no longer carries one, which erases the kept one", async () => {
+    const { deps, upserts } = doubles("existing-canvas", user);
+
+    await completeSignIn(deps, "code", null);
+
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0]?.user).not.toHaveProperty("email");
   });
 
   // Lie le compte au streamer dont la page a lancé la connexion, jamais à soi-même ni depuis l'accueil (JOURNAL 2026-09-27)

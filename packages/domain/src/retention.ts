@@ -122,6 +122,10 @@ export function planRetention(rows: readonly TierRow[], nowMs: Timestamp): Reten
   return [...promotions, ...degradations, ...discards];
 }
 
+// CDC §8 (JOURNAL 2026-11-02) : un fichier sans ligne n'est retiré qu'après ce délai. L'adresse d'envoi de Convex vit une heure :
+// plus vieux, aucun enregistrement n'est en cours.
+export const ORPHAN_GRACE_MS = HOUR_MS;
+
 // Le budget des chunks d'un scope : 700 Mo en production, 50 Mo ailleurs (décision du 08/10).
 export const HISTORY_BUDGET_PROD_BYTES = 700 * 1024 * 1024;
 export const HISTORY_BUDGET_OTHER_BYTES = 50 * 1024 * 1024;

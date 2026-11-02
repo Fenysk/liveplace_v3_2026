@@ -1448,3 +1448,55 @@ describe("protocol 23: the dynamic size", () => {
     expect(decodeServerFrame({ ...welcome, canvas: { ...welcome.canvas, origin: { x: 1 } } }).ok).toBe(false);
   });
 });
+
+// Protocole 24 (CDC §8) : l'auteur d'un compte supprimé, dans l'inspected et dans les signalements.
+describe("the author of a deleted account", () => {
+  const inspected = {
+    t: "inspected",
+    requestId: "inspect-1",
+    x: 1,
+    y: 2,
+    entry: {
+      login: "",
+      displayName: "",
+      isDeleted: true,
+      colorIndex: 3,
+      placedAt: 1,
+      placementId: "pviewer001",
+    },
+  };
+  const reports = {
+    t: "reports",
+    requestId: "reports-1",
+    reports: [
+      {
+        userId: "deleted",
+        login: "",
+        displayName: "",
+        hasAccount: false,
+        isDeleted: true,
+        placementId: "pviewer001",
+        reportCount: 1,
+        reportedAt: 1,
+        isOffStream: true,
+        pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+      },
+    ],
+  };
+
+  // Garde la marque dans l'entrée inspectée et dans le signalement, et refuse une marque qui n'est pas un booléen
+  it("keeps the mark in an inspected entry and in a report, and refuses a mark that is not a boolean", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(24);
+    expect(decodeServerFrame(inspected)).toEqual({ ok: true, value: inspected });
+    expect(decodeServerFrame(reports)).toEqual({ ok: true, value: reports });
+    expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, isDeleted: "yes" } }).ok).toBe(
+      false,
+    );
+    expect(
+      decodeServerFrame({
+        ...reports,
+        reports: reports.reports.map((report) => ({ ...report, isDeleted: 1 })),
+      }).ok,
+    ).toBe(false);
+  });
+});

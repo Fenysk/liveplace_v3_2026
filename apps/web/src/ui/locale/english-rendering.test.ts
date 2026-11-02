@@ -110,6 +110,7 @@ describe("the account in English (§9.9)", () => {
         appearanceChoice: "dark",
         onPickAppearance: doNothing,
         onRestartTutorial: doNothing,
+        onDeleteAccount: doNothing,
         canvasTab: tab("a"),
         canvasesTab: tab("b"),
         obsTab: tab("c"),

@@ -2,7 +2,7 @@
 // d'un envoi que le serveur a refusés, gardés dans le brouillon, le streamer qui change de canvas
 // (§17.1), et le brouillon effacé par une réduction qui rapproche les dessins (§5.8).
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { OwnSwitchTracker } from "../archive/own-switch";
@@ -13,18 +13,23 @@ import { connectionToast } from "./connection-toast";
 import { switchToast } from "./switch-toast";
 
 // `ownerName` : le nom affiché du streamer, que le toast d'un changement de canvas dit.
+// `isDeletingAccount` (CDC §8) : la suppression du compte est lancée, le gateway ferme la socket (4001) : la connexion perdue puis revenue ne se dit pas.
 export function useCanvasToasts(
   { canvas, draft }: { canvas: CanvasStore; draft: DraftStore },
   tracker: OwnSwitchTracker,
   ownerName: string,
+  isDeletingAccount: boolean,
 ): void {
   const toast = useToast();
   const locale = useLocale();
+  // Écrit pendant le rendu, lu par l'abonnement : l'abonné ne se refait pas à chaque changement.
+  const isDeleting = useRef(isDeletingAccount);
+  isDeleting.current = isDeletingAccount;
   useEffect(() => {
     let seen = canvas.getView();
     const onCanvas = () => {
       const next = canvas.getView();
-      const connection = connectionToast(seen, next, locale);
+      const connection = connectionToast(seen, next, locale, { isDeletingAccount: isDeleting.current });
       if (connection) toast(connection.tone, connection.text);
       // Le brouillon se lit ici, à l'instant de la bascule : la page ferme ce store un peu après.
       const switched = switchToast(

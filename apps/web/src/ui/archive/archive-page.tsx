@@ -9,6 +9,8 @@ import { createDraftStore, type DraftStore } from "../../state/draft-store";
 import type { ResolvedArchive } from "../../usecase/resolve-archive";
 import { AccountPill } from "../account/account-pill";
 import { AccountWindow } from "../account/account-window";
+import { DeleteAccountWindow } from "../account/delete-account-window";
+import { type AccountDeletion, useAccountDeletion } from "../account/use-account-deletion";
 import { useAccountPillProps } from "../account/use-account-pill";
 import { useSigningIn } from "../account/use-signing-in";
 import { useIsCanvasMissing } from "../canvas/canvas-missing";
@@ -37,10 +39,12 @@ const ArchiveAccount = ({
   stores,
   login,
   isCompact,
+  deletion,
 }: {
   stores: Stores;
   login: string;
   isCompact: boolean;
+  deletion: AccountDeletion;
 }) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
@@ -66,16 +70,23 @@ const ArchiveAccount = ({
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
           onRestartTutorial={restartDeviceTutorial}
+          onDeleteAccount={deletion.onOpen}
         />
       )}
+      <DeleteAccountWindow {...deletion.window} />
       <InspectionPill {...inspection} />
     </>
   );
 };
 
-type ArchiveControlsProps = { archive: ResolvedArchive; stores: Stores | undefined; isCompact: boolean };
+type ArchiveControlsProps = {
+  archive: ResolvedArchive;
+  stores: Stores | undefined;
+  isCompact: boolean;
+  deletion: AccountDeletion; // CDC §8 : portée par la page, que l'archive qui part sous elle ne fait pas disparaître
+};
 
-const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) => {
+const ArchiveControls = ({ archive, stores, isCompact, deletion }: ArchiveControlsProps) => {
   const toast = useToast();
   const locale = useLocale();
   const t = useTexts(ARCHIVE_TEXTS);
@@ -135,7 +146,9 @@ const ArchiveControls = ({ archive, stores, isCompact }: ArchiveControlsProps) =
         onConfirm={confirm}
         onClose={() => setIsChoosing(false)}
       />
-      {stores && <ArchiveAccount stores={stores} login={owner.login} isCompact={isCompact} />}
+      {stores && (
+        <ArchiveAccount stores={stores} login={owner.login} isCompact={isCompact} deletion={deletion} />
+      )}
     </>
   );
 };
@@ -148,9 +161,11 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
   const navigate = useNavigate();
-  const isMissing = useIsCanvasMissing(stores?.canvas);
-  const isRecovering = useIsCanvasRecovering(stores?.canvas);
-  const isDiscarded = useIsCanvasDiscarded(stores?.canvas);
+  const deletion = useAccountDeletion();
+  // CDC §8 : l'archive d'un compte qui se supprime part sous ses pieds ; la page reste telle quelle jusqu'à l'accueil.
+  const isMissing = useIsCanvasMissing(stores?.canvas) && !deletion.isRunning;
+  const isRecovering = useIsCanvasRecovering(stores?.canvas) && !deletion.isRunning;
+  const isDiscarded = useIsCanvasDiscarded(stores?.canvas) && !deletion.isRunning;
   const isReopened = useIsCanvasReopened(stores?.canvas);
 
   // Le WebSocket et le stockage n'existent que dans le navigateur : tout s'ouvre après le rendu serveur.
@@ -188,7 +203,7 @@ export const ArchivePage = ({ archive, openCanvas }: ArchivePageProps) => {
         />
       )}
       <ToastProvider>
-        <ArchiveControls archive={archive} stores={stores} isCompact={isCompact} />
+        <ArchiveControls archive={archive} stores={stores} isCompact={isCompact} deletion={deletion} />
       </ToastProvider>
     </main>
   );

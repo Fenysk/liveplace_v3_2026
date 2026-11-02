@@ -3,13 +3,13 @@
 
 import { MINUTE_MS, type Timestamp } from "@liveplace/domain";
 import type {
+  AccountList,
   TwitchEventSub,
   TwitchLive,
   TwitchLiveEvent,
   TwitchLiveSource,
   TwitchLiveState,
   TwitchLiveStore,
-  TwitchWrites,
 } from "@liveplace/domain/ports";
 
 // Au-delà, l'état d'un streamer dont on rend la page est revérifié chez Twitch : un live resté allumé s'éteint.
@@ -17,9 +17,10 @@ const STALE_AFTER_MS = 5 * MINUTE_MS;
 
 export type TwitchLiveDeps = {
   source: TwitchLiveSource;
-  eventSub: Pick<TwitchEventSub, "subscribeToLive">;
+  eventSub: Pick<TwitchEventSub, "subscribeToLive" | "deleteSubscriptions">;
+  // CDC §8 : un compte supprimé n'est plus suivi (JOURNAL 2026-11-02).
+  accounts: Pick<AccountList, "isDeletedAccount">;
   store: TwitchLiveStore;
-  commands: Pick<TwitchWrites, "queueTwitchCommands">;
   now: () => Timestamp;
 };
 
@@ -35,19 +36,21 @@ export type TwitchLiveTracker = {
 export function createTwitchLiveTracker({
   source,
   eventSub,
+  accounts,
   store,
-  commands,
   now,
 }: TwitchLiveDeps): TwitchLiveTracker {
   const checking = new Set<string>(); // les comptes dont Twitch est déjà interrogé : un rendu de plus n'en refait pas un appel
 
-  // Note le live d'un compte ; le gateway n'est prévenu que si ce qu'on voit à l'écran change.
+  // Note le live d'un compte ; le gateway n'est prévenu que si ce qu'on voit à l'écran change. Un compte supprimé ne reçoit ni
+  // l'un ni l'autre : le magasin les refuse d'un seul bloc.
   const settle = async (userId: string, previous: TwitchLiveState | null, twitchLive?: TwitchLive) => {
-    await store.setTwitchLiveState(userId, { ...(twitchLive ? { twitchLive } : {}), checkedAt: now() });
-    if (previous?.twitchLive?.category === twitchLive?.category) return;
-    await commands.queueTwitchCommands([
-      { kind: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) },
-    ]);
+    const hasChanged = previous?.twitchLive?.category !== twitchLive?.category;
+    await store.setTwitchLiveState(
+      userId,
+      { ...(twitchLive ? { twitchLive } : {}), checkedAt: now() },
+      hasChanged ? { kind: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) } : undefined,
+    );
   };
 
   // L'événement `stream.online` ne porte pas la catégorie : sans elle, le live reste un live.
@@ -55,7 +58,7 @@ export function createTwitchLiveTracker({
     try {
       return await source.getCategory(userId);
     } catch (error) {
-      console.error(`twitch live : catégorie de ${userId} illisible`, error);
+      console.error("twitch live : catégorie illisible", error);
       return "";
     }
   };
@@ -71,14 +74,22 @@ export function createTwitchLiveTracker({
     }
   };
 
-  // Hors du chemin de la connexion ou du rendu : un échec est journalisé, il ne remonte jamais.
-  const inBackground = (what: string, userId: string, work: () => Promise<void>): void => {
-    work().catch((error: unknown) => console.error(`twitch live : ${what} de ${userId} en échec`, error));
+  // Hors du chemin de la connexion ou du rendu : un échec est journalisé sans le compte, il ne remonte jamais.
+  const inBackground = (what: string, work: () => Promise<void>): void => {
+    work().catch((error: unknown) => console.error(`twitch live : ${what} en échec`, error));
+  };
+
+  // S'abonner, sauf pour un compte supprimé. L'effacement a pu passer pendant l'appel à Twitch : ce qui vient d'être créé pour
+  // lui est alors retiré, car l'effacement, lui, avait déjà fini de retirer les siens.
+  const subscribe = async (userId: string): Promise<void> => {
+    if (await accounts.isDeletedAccount(userId)) return;
+    await eventSub.subscribeToLive(userId);
+    if (await accounts.isDeletedAccount(userId)) await eventSub.deleteSubscriptions(userId);
   };
 
   const track = (userId: string): void => {
-    inBackground("abonnement", userId, () => eventSub.subscribeToLive(userId));
-    inBackground("état de départ", userId, () => reconcile(userId));
+    inBackground("abonnement", () => subscribe(userId));
+    inBackground("état de départ", () => reconcile(userId));
   };
 
   return {
@@ -105,13 +116,13 @@ export function createTwitchLiveTracker({
       try {
         state = await store.getTwitchLiveState(userId);
       } catch (error) {
-        console.error(`twitch live : état de ${userId} illisible`, error);
+        console.error("twitch live : état illisible", error);
         return undefined;
       }
       if (!state)
         track(userId); // la première visite de ce canvas : abonner son streamer
       else if (now() - state.checkedAt > STALE_AFTER_MS)
-        inBackground("vérification", userId, () => reconcile(userId));
+        inBackground("vérification", () => reconcile(userId));
       return state?.twitchLive;
     },
   };

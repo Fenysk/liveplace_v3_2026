@@ -29,12 +29,15 @@ export type ModeratedAuthor = InspectEntry & { userId: string };
 // plusieurs (JOURNAL 2026-10-07). `moderatorOrigin` : un modérateur nommé ici ne se bannit pas (§5.4).
 export type ModerationTarget = Pick<
   ModeratedAuthor,
-  "userId" | "displayName" | "placementId" | "moderatorOrigin"
+  "userId" | "displayName" | "placementId" | "moderatorOrigin" | "isDeleted"
 > &
   Pick<ClearTarget, "placementIds">;
 
 // Qui signale n'a pas l'identifiant de l'auteur : la case inspectée et sa pose le désignent (JOURNAL 2026-09-29).
-export type ReportTarget = Pick<InspectEntry, "displayName" | "placementId"> & { x: number; y: number };
+export type ReportTarget = Pick<InspectEntry, "displayName" | "placementId" | "isDeleted"> & {
+  x: number;
+  y: number;
+};
 
 export type ModerationRequest =
   | { kind: Exclude<ModerationKind, "report">; author: ModerationTarget }
@@ -65,6 +68,8 @@ type Texts = (typeof MODERATION_TEXTS)["fr"];
 const titleOf = (request: ModerationRequest, { isAll, spanMs }: ClearScope, t: Texts): string => {
   const { kind, author } = request;
   const name = author.displayName;
+  // CDC §8 : un compte supprimé n'a pas de nom pour le titre, et sa pose se retire ou se signale seule.
+  if (author.isDeleted) return kind === "report" ? t.reportDeletedTitle : t.clearDeletedTitle;
   if (kind === "ban") return t.banTitle(name);
   if (kind === "banAfterClear") return t.banAfterClearTitle(name);
   if (kind === "report") return t.reportTitle({ name, isSingle: spanMs === 0 });
@@ -146,7 +151,7 @@ export const ModerationWindow = ({
   const count = useRef<string | null>(null);
   if (!shown) return null;
   const words = wordsOf(shown.kind, t, design.cancel);
-  const hasScope = shown.kind === "clear" || shown.kind === "report";
+  const hasScope = (shown.kind === "clear" || shown.kind === "report") && !shown.author.isDeleted;
   const title = titleOf(shown, scope, t);
   // Fermée, la fenêtre garde son dernier décompte : sans demande, les hooks rendent tous les pixels, un chiffre que
   // personne n'a demandé, que la région dirait pendant la fermeture.
@@ -177,7 +182,11 @@ export const ModerationWindow = ({
       <span role="status" className="lp-visually-hidden">
         {shown.kind === "banAfterClear" ? title : null}
       </span>
-      <Preview pixels={pixels} canvas={canvas} name={shown.author.displayName} />
+      <Preview
+        pixels={pixels}
+        canvas={canvas}
+        name={shown.author.isDeleted ? design.deletedAccount : shown.author.displayName}
+      />
       {/* Des régions toujours là, vides jusqu'à leur message : le décompte arrive avec l'aperçu et suit la plage, l'échec s'alerte. */}
       <p
         role="status"

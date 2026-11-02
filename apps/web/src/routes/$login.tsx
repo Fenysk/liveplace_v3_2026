@@ -7,6 +7,8 @@ import { createDraftStore, type DraftStore } from "../state/draft-store";
 import { AccountPill } from "../ui/account/account-pill";
 import { accountPillOpeners } from "../ui/account/account-pill-openers";
 import { type AccountSection, AccountWindow } from "../ui/account/account-window";
+import { DeleteAccountWindow } from "../ui/account/delete-account-window";
+import { type AccountDeletion, useAccountDeletion } from "../ui/account/use-account-deletion";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
 import { useSigningIn } from "../ui/account/use-signing-in";
 import { ArchivesTab } from "../ui/archive/archives-tab";
@@ -90,6 +92,8 @@ type LivePillsProps = {
   isCompact: boolean;
   isOwnerSession: boolean; // le serveur a lu le cookie : vrai tant que le gateway n'a pas dit le rôle (JOURNAL 2026-10-06)
   canvasPillFold: CanvasPillFold;
+  // CDC §8 : la suppression du compte vit dans la page, pas dans ses pills : le canvas qui part sous elle ne la fait pas disparaître.
+  deletion: AccountDeletion;
 };
 
 // Un seul menu flottant (CDC 2026) : la pill Compte l'ouvre sur Mon compte, ou sur Canvas par Réglages.
@@ -100,7 +104,15 @@ const shownSection = ({ isOpen, sectionId }: WindowState): AccountSection | unde
   isOpen ? sectionId : undefined;
 
 // Les pills qui lisent les stores : chacune reçoit ses props de son hook (JOURNAL 2026-09-24).
-const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPillFold }: LivePillsProps) => {
+const LivePills = ({
+  stores,
+  login,
+  owner,
+  isCompact,
+  isOwnerSession,
+  canvasPillFold,
+  deletion,
+}: LivePillsProps) => {
   const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
   // §17.1 : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
@@ -113,7 +125,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
   const help = useHelpBubbles(stores, draft.state, shownSection(windowState), moderation.controls);
   useDraftingAttribute(stores.draft); // §9.7 : en Dessin sur mobile, seule la bande Thème reste en haut
   const reporting = useReport(stores.canvas);
-  useCanvasToasts(stores, switchTracker, owner.displayName);
+  useCanvasToasts(stores, switchTracker, owner.displayName, deletion.isRunning);
   const inspection = useInspectionPillProps(stores, moderation.controls, reporting.control);
   const firstHint = useFirstHintProps(stores, help.isBusy); // §9.11 : le conseil de première visite
   const banned = useBannedWindowProps(stores.canvas);
@@ -176,6 +188,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
           onRestartTutorial={restartDeviceTutorial}
+          onDeleteAccount={deletion.onOpen}
           moderationTab={
             moderation.controls && (
               <ModerationTab
@@ -234,6 +247,7 @@ const LivePills = ({ stores, login, owner, isCompact, isOwnerSession, canvasPill
       <ModerationWindow {...moderation.window} />
       <ModerationWindow {...reporting.window} />
       <BannedWindow {...banned} />
+      <DeleteAccountWindow {...deletion.window} />
     </BubbleTargetsContext>
   );
 };
@@ -254,8 +268,10 @@ const GamePage = () => {
   const t = useTexts(CANVAS_TEXTS);
   const [stores, setStores] = useState<Stores>();
   const isCompact = useMediaQuery(COMPACT_SCREEN_QUERY);
-  const isCanvasMissing = useIsCanvasMissing(stores?.canvas);
-  const isCanvasRecovering = useIsCanvasRecovering(stores?.canvas);
+  const deletion = useAccountDeletion();
+  // CDC §8 : le canvas d'un compte qui se supprime part sous ses pieds ; la page reste telle quelle jusqu'à l'accueil.
+  const isCanvasMissing = useIsCanvasMissing(stores?.canvas) && !deletion.isRunning;
+  const isCanvasRecovering = useIsCanvasRecovering(stores?.canvas) && !deletion.isRunning;
   // §9.7 : la pill Canvas se replie quand on déplace, zoome, recentre ou ouvre une case ; rien n'est retenu.
   const [isCanvasPillFolded, setIsCanvasPillFolded] = useState(false);
   const foldCanvasPill = useCallback(() => setIsCanvasPillFolded(true), []);
@@ -318,6 +334,7 @@ const GamePage = () => {
             isCompact={isCompact}
             isOwnerSession={isOwnerSession}
             canvasPillFold={{ isFolded: isCanvasPillFolded, onUnfold: unfoldCanvasPill }}
+            deletion={deletion}
           />
         </ToastProvider>
       ) : (

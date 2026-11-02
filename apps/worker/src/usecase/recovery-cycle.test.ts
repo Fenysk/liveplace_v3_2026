@@ -58,6 +58,7 @@ const setup = (
     deleted?: string[];
     cursors?: Record<string, number>;
     alreadyLive?: string[];
+    pendingErasures?: string[];
   } = {},
 ) => {
   let clock = t0;
@@ -111,6 +112,7 @@ const setup = (
       calls.push(`listUsers ${[...userIds].sort().join(",")}`);
       return userIds.map((userId): RestoredUser => ({ userId, login: userId, displayName: userId }));
     },
+    listPendingErasures: async () => options.pendingErasures ?? [],
   };
   const cycle = createRecoveryCycle({
     target,
@@ -137,6 +139,50 @@ const setup = (
 };
 
 describe("the recovery cycle (§7.4)", () => {
+  // Un compte supprimé dont les fichiers restent à réécrire ne revient pas, même si la sauvegarde le nomme encore (CDC §8)
+  it("does not bring back an account whose backup files are still to rewrite, nor ask for its name", async () => {
+    const { cycle, restorations, calls, advance } = setup(
+      {
+        "canvas-1": [
+          {
+            snapshot: snapshotOf("canvas-1", 275, {
+              bans: ["troll", "author-a"],
+              mods: ["mod-1", "author-a"],
+              reports: { "troll:pose0001": ["author-a", "player-1"] },
+              reported: [["troll:pose0001", t0]],
+            }),
+          },
+        ],
+      },
+      { lost: ["canvas-1"], pendingErasures: ["author-a"] },
+    );
+    cycle.noteSaved("canvas-1");
+
+    advance(RECOVERY_CHECK_MS);
+    await cycle.tick();
+
+    const restored = restorations[0]?.restoration.snapshot;
+    expect(JSON.stringify(restored)).not.toContain("author-a");
+    expect(restored?.bans).toEqual(["troll"]);
+    expect(restored?.authors).toEqual(["deleted", "author-b"]);
+    expect(calls.find((call) => call.startsWith("listUsers"))).not.toContain("author-a");
+  });
+
+  // Sans compte à réécrire, la sauvegarde est remise telle quelle
+  it("restores the save as it is when no account is waiting to be rewritten", async () => {
+    const save = snapshotOf("canvas-1", 275);
+    const { cycle, restorations, advance } = setup(
+      { "canvas-1": [{ snapshot: save }] },
+      { lost: ["canvas-1"] },
+    );
+    cycle.noteSaved("canvas-1");
+
+    advance(RECOVERY_CHECK_MS);
+    await cycle.tick();
+
+    expect(restorations[0]?.restoration.snapshot).toEqual(save);
+  });
+
   // Un canvas que Redis a perdu et dont Convex garde une sauvegarde revient, avec une version qui saute d'un million
   it("restores a lost canvas from its latest save, with a version a million above", async () => {
     const { cycle, restorations, advance } = setup(

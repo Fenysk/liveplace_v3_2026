@@ -12,7 +12,7 @@ import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { ColorChip } from "../design/palette";
 import { Pill, type PillDock } from "../design/pill";
-import { Profile } from "../design/profile";
+import { DeletedProfile, Profile } from "../design/profile";
 import { SkeletonBar, SkeletonBlock, SkeletonProfile, SkeletonSlot } from "../design/skeleton";
 import { TwitchGlyph } from "../design/twitch";
 import { useAfterDelay } from "../design/use-after-delay";
@@ -109,6 +109,15 @@ const ModerationRow = ({ moderation, author }: ModerationRowProps) => {
   const userId = moderableUserId(moderation, author);
   if (!userId) return null;
   const moderated = { ...author, userId };
+  // CDC §8 : sur le dessin d'un compte supprimé, qui modère n'a que cette pose : ni tous ses dessins, ni Bannir, ni rôle.
+  if (author.isDeleted)
+    return (
+      <div className="lp-row lp-row--ruled">
+        <BubbleTarget name="clear">
+          <Button label={t.clearThisDrawing} onPress={() => moderation.onModerate("clear", moderated)} />
+        </BubbleTarget>
+      </div>
+    );
   return (
     <>
       <div className="lp-row lp-row--ruled">
@@ -151,7 +160,7 @@ const InspectedCell = ({ inspection, palette, nowMs, onClose, report, moderation
   return (
     <>
       <div className="lp-row">
-        <Profile user={entry} variant="full" />
+        {entry.isDeleted ? <DeletedProfile /> : <Profile user={entry} variant="full" />}
         <span className="lp-spacer" />
         <CloseButton onClose={onClose} />
       </div>

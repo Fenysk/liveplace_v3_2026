@@ -9,11 +9,13 @@ import {
   CELL_STRIDE,
   COUNTED_PIXELS_PER_DAY,
   claimableRewards,
+  DELETED_AUTHOR,
   DYNAMIC_SIZE_MARGIN,
   FIXED_DEFAULT_CANVAS_SIZE,
   GAUGE_GROWTH_FACTOR,
   type GaugeLimits,
   isBackgroundImageOpacity,
+  isDeletedAuthor,
   OBS_BACKGROUND,
   OBS_BACKGROUNDS,
   PALETTE,
@@ -53,16 +55,20 @@ import type {
   Unsubscribe,
 } from "@liveplace/domain/ports";
 import { planResize, type ResizePlan } from "@liveplace/domain/resize";
+import { listCommandAccounts, withoutCommandAccounts } from "@liveplace/domain/twitch-command";
 import { decodeServerFrame, type Event } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { Redis, Result as RedisResult } from "ioredis";
 import { createSignupWrites } from "./activity";
+import { IS_DELETED_ACCOUNT_LUA, toDeletedAccountFingerprint } from "./deleted-accounts";
 import {
   buildCanvasKeys,
   CLEAR_SLICE_CELLS,
+  deletedAccountKey,
   EVENTS_MAXLEN,
   GAUGE_TTL_SECONDS,
   HIST_DEPTH,
+  PENDING_DELETIONS_KEY,
   RECENT_MAX_EVENTS,
   RECENTLY_CLEARED_TTL_SECONDS,
   REQ_TTL_SECONDS,
@@ -112,6 +118,15 @@ const parseEntry = (entry: string): PileHead => {
 
 // Un pixel visible d'un auteur : son heure et sa pose sont connues.
 type VisiblePixel = Required<AuthoredPixel>;
+
+type Profile = {
+  userId: string;
+  login: string;
+  displayName: string;
+  avatarUrl?: string;
+  hasAccount: boolean;
+  isDeleted?: true;
+};
 
 // §5.4 : la pose visée et sa plage, vides pour les autres actions (moderate.lua).
 const placementArgsOf = (action: Moderation["action"]): [string, number | "", number | ""] => {
@@ -234,16 +249,87 @@ export function createSignInWrites(redis: Redis): SignInWrites {
   };
 }
 
-// §2 : des noms et des actions à appliquer, jamais un pixel ni un script.
-export function createTwitchWrites(redis: Redis): TwitchWrites {
+// CDC §8, Supprimer son compte (JOURNAL 2026-11-02) : ce que Twitch nomme d'un compte supprimé et livre après la purge de Redis ne s'écrit
+// pas, ni son nom ni l'action qui le vise. La garde est celle du suivi du live (`isDeletedAccount`), lue dans le même script que
+// l'écriture : l'effacement ne passe pas entre les deux.
+
+// KEYS : la file, l'effacement en cours, puis pour chaque compte son empreinte et son miroir ; ARGV : la taille de la file, l'action en
+// JSON, puis les comptes. Rend les comptes supprimés que l'action nomme : sans eux elle est écrite, avec eux rien ne l'est.
+const QUEUE_COMMAND = `${IS_DELETED_ACCOUNT_LUA}
+local deleted = {}
+for index = 3, #ARGV do
+  local offset = 2 * (index - 2)
+  if isDeletedAccount(ARGV[index], KEYS[2], KEYS[offset + 1], KEYS[offset + 2]) then
+    deleted[#deleted + 1] = ARGV[index]
+  end
+end
+if #deleted == 0 then
+  redis.call("XADD", KEYS[1], "MAXLEN", "~", ARGV[1], "*", "c", ARGV[2])
+end
+return deleted`;
+
+// KEYS : la table des noms, l'effacement en cours, puis pour chaque compte son empreinte et son miroir ; ARGV : pour chaque compte
+// son identifiant puis son nom en JSON. Le nom d'un compte supprimé n'y entre pas.
+const NAME_USERS = `${IS_DELETED_ACCOUNT_LUA}
+for index = 1, #ARGV, 2 do
+  if not isDeletedAccount(ARGV[index], KEYS[2], KEYS[index + 2], KEYS[index + 3]) then
+    redis.call("HSET", KEYS[1], ARGV[index], ARGV[index + 1])
+  end
+end
+return 1`;
+
+// Les clés que la garde lit pour ces comptes, dans l'ordre des scripts : l'effacement en cours, puis l'empreinte et le miroir de chacun.
+const guardKeysOf = (secret: string, userIds: readonly string[]): string[] => [
+  PENDING_DELETIONS_KEY,
+  ...userIds.flatMap((userId) => [
+    deletedAccountKey(toDeletedAccountFingerprint(secret, userId)),
+    userKey(userId),
+  ]),
+];
+
+const toUserIds = (reply: unknown): string[] => {
+  if (!Array.isArray(reply) || !reply.every((item) => typeof item === "string"))
+    throw new Error("réponse Redis : une liste de comptes était attendue");
+  return reply;
+};
+
+// Une action écrite si aucun de ses comptes n'est supprimé ; sinon sans eux, et rien du tout pour une action sur eux seuls.
+const queueCommand = async (redis: Redis, secret: string, command: TwitchCommand): Promise<void> => {
+  for (let current: TwitchCommand | null = command; current; ) {
+    const userIds = [...new Set(listCommandAccounts(current))];
+    const deleted = toUserIds(
+      await redis.eval(
+        QUEUE_COMMAND,
+        1 + 1 + 2 * userIds.length,
+        TWITCH_COMMANDS_KEY,
+        ...guardKeysOf(secret, userIds),
+        TWITCH_COMMANDS_MAXLEN,
+        JSON.stringify(current),
+        ...userIds,
+      ),
+    );
+    if (deleted.length === 0) return;
+    current = withoutCommandAccounts(current, new Set(deleted));
+  }
+};
+
+// §2 : des noms et des actions à appliquer, jamais un pixel ni un script. `secret` : celui des sessions, dont l'empreinte d'un compte
+// supprimé découle (deleted-accounts.ts).
+export function createTwitchWrites(redis: Redis, secret: string): TwitchWrites {
   return {
     async setTwitchUsers(canvasId, users) {
       if (users.length === 0) return;
-      const entries = users.map(({ userId, login, displayName }) => [
-        userId,
-        JSON.stringify({ login, displayName }),
-      ]);
-      await redis.hset(buildCanvasKeys(canvasId).twitchUsers, Object.fromEntries(entries));
+      const userIds = users.map(({ userId }) => userId);
+      await redis.eval(
+        NAME_USERS,
+        1 + 1 + 2 * userIds.length,
+        buildCanvasKeys(canvasId).twitchUsers,
+        ...guardKeysOf(secret, userIds),
+        ...users.flatMap(({ userId, login, displayName }) => [
+          userId,
+          JSON.stringify({ login, displayName }),
+        ]),
+      );
     },
 
     async setTwitchSync(canvasId, { status, syncedAt }) {
@@ -251,19 +337,7 @@ export function createTwitchWrites(redis: Redis): TwitchWrites {
     },
 
     async queueTwitchCommands(commands) {
-      if (commands.length === 0) return;
-      const transaction = redis.multi();
-      for (const command of commands)
-        transaction.xadd(
-          TWITCH_COMMANDS_KEY,
-          "MAXLEN",
-          "~",
-          TWITCH_COMMANDS_MAXLEN,
-          "*",
-          "c",
-          JSON.stringify(command),
-        );
-      await transaction.exec();
+      for (const command of commands) await queueCommand(redis, secret, command);
     },
 
     // `NX` : le premier message de cet identifiant gagne, une redélivrance trouve la clé posée (JOURNAL 2026-10-08).
@@ -526,7 +600,10 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
     (await redis.sismember(buildCanvasKeys(canvasId).bans, userId)) === 1;
 
   // Le nom d'une personne : le miroir de son compte, sinon le nom venu de Twitch, sinon l'identifiant, comme `inspect`.
-  const getProfile = async (keys: CanvasKeys, userId: string) => {
+  // CDC §8 : l'auteur d'un compte supprimé n'a pas de nom, et se dit tel.
+  const getProfile = async (keys: CanvasKeys, userId: string): Promise<Profile> => {
+    if (isDeletedAuthor(userId))
+      return { userId, login: "", displayName: "", hasAccount: false, isDeleted: true };
     const [user, twitchUser] = await Promise.all([
       redis.hgetall(userKey(userId)),
       redis.hget(keys.twitchUsers, userId),
@@ -726,6 +803,9 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const head = await redis.lindex(buildCanvasKeys(canvasId).hist(toCellKey(x, y)), 0);
       if (head === null) return null;
       const { authorId: userId, colorIndex, placedAt, placementId } = parseEntry(head);
+      // CDC §8 : le pixel d'un compte supprimé garde sa couleur et sa date, jamais un nom.
+      if (isDeletedAuthor(userId))
+        return { userId, login: "", displayName: "", isDeleted: true, colorIndex, placedAt, placementId };
       // Sans miroir, l'auteur garde au moins son identifiant : le miroir n'expire jamais, c'est un filet.
       const user = await redis.hgetall(userKey(userId));
       return {
@@ -791,6 +871,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         DYNAMIC_SIZE_MARGIN,
         CANVAS_WIDTH,
         CANVAS_HEIGHT,
+        DELETED_AUTHOR,
       );
       if (isRefusal(status) || status === "forbidden") return { ok: false, error: status };
       if (status !== "moderated" || version === undefined || cells === undefined)
@@ -858,6 +939,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
         EVENTS_MAXLEN,
         range?.from ?? "",
         range?.to ?? "",
+        DELETED_AUTHOR,
       );
       if (status === "reported") return { ok: true, value: undefined };
       if (isRefusal(status) || status === "changed" || status === "forbidden")

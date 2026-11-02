@@ -6,6 +6,7 @@
 import { EyeOff } from "lucide-react";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
+import { DESIGN_TEXTS } from "../design/design-texts";
 import { PixelPreview } from "../design/pixel-preview";
 import { SkeletonRows, SkeletonSwap } from "../design/skeleton";
 import { formatPlacedAgo } from "../inspection/placed-ago";
@@ -48,6 +49,7 @@ const ReportRow = ({
 }: ReportRowProps) => {
   const locale = useLocale();
   const t = useTexts(MODERATION_TEXTS);
+  const design = useTexts(DESIGN_TEXTS);
   const hasSeveralPlacements = report.placementIds.length > 1;
   return (
     <div className="lp-report lp-arrives">
@@ -55,11 +57,14 @@ const ReportRow = ({
         <PixelPreview
           {...canvas}
           pixels={report.pixels}
-          label={t.reportedPlacementPreview({ hasSeveral: hasSeveralPlacements, name: report.displayName })}
+          label={t.reportedPlacementPreview({
+            hasSeveral: hasSeveralPlacements,
+            name: report.isDeleted ? design.deletedAccount : report.displayName,
+          })}
         />
       </div>
       <div className="lp-report-body">
-        <MarkedProfile user={report} hasAccount={report.hasAccount} />
+        <MarkedProfile user={report} hasAccount={report.hasAccount} isDeleted={report.isDeleted} />
         <span className="lp-row lp-type-caption lp-muted">
           {t.reportCount(report.reportCount)} · {formatPlacedAgo(report.reportedAt, nowMs, locale)}
           {report.isOffStream && <Badge label={t.hiddenFromStream} icon={EyeOff} />}

@@ -1301,3 +1301,73 @@ describe("a past day in Redis (§16.1)", () => {
     expect(await store.getFirstDayAt()).toBe(toActivityPointStarts(now - 40 * DAY_MS).day);
   });
 });
+
+describe("the activity of a canvas deleted with its streamer (CDC §8, JOURNAL 2026-11-02)", () => {
+  // Une minute que le gateway écrit après la suppression : le canvas disparu n'est pas recréé, le reste de la minute est écrit
+  it("writes nothing for a deleted canvas in a minute, and writes the rest of it", async () => {
+    const { keys, store } = stores();
+    await redis.sadd(keys.gone, "gone");
+
+    await store.storeActivityMinute(
+      minute(minuteAt - MINUTE_MS, {
+        people: 2,
+        pixelsByCanvas: new Map([
+          ["gone", 5],
+          ["alive", 3],
+        ]),
+        canvases: new Map([
+          ["gone", canvasMinute({ people: 1, pixels: 5, playerIds: new Set(["p1"]) })],
+          ["alive", canvasMinute({ people: 1, pixels: 3 })],
+        ]),
+      }),
+    );
+
+    const gone = keys.canvas("gone");
+    expect(await redis.exists(gone.minutes, gone.hours, gone.days)).toBe(0);
+    expect(await redis.exists(gone.activePlayers(toParisDay(minuteAt - MINUTE_MS)))).toBe(0);
+    expect(await redis.hlen(keys.canvas("alive").minutes)).toBe(1);
+    expect(await redis.hlen(keys.minutes)).toBe(1);
+    expect(await redis.hgetall(keys.canvasPixels(minuteAt - MINUTE_MS))).toEqual({ alive: "3" });
+  });
+
+  // Ni le comblement d'un stream coupé, ni l'heure vue ne le recréent non plus
+  it("recreates it neither by filling the gap of a stream nor by the time it was seen", async () => {
+    const { keys, store } = stores();
+    await redis.sadd(keys.gone, "gone");
+
+    await store.storeActivityGap({
+      canvasId: "gone",
+      minutes: [minuteAt - 3 * MINUTE_MS, minuteAt - 2 * MINUTE_MS],
+    });
+    await store.storeSeen(
+      new Map([
+        ["gone", now],
+        ["alive", now],
+      ]),
+    );
+
+    expect(await redis.hlen(keys.canvas("gone").minutes)).toBe(0);
+    expect(await redis.hlen(keys.minutes)).toBe(0);
+    expect(await redis.hkeys(keys.seen)).toEqual(["alive"]);
+  });
+
+  // Un nouveau compte venu de la page d'un canvas disparu compte pour LivePlace, pas pour ce canvas
+  it("counts a signup that came from the page of a deleted canvas for LivePlace, not for the canvas", async () => {
+    const { keys, signups } = stores();
+    await redis.sadd(keys.gone, "gone");
+
+    await signups.storeSignup({ nowMs: minuteAt, discoveredViaCanvasId: "gone" });
+
+    expect(await redis.hlen(keys.canvas("gone").minutes)).toBe(0);
+    expect(await redis.hlen(keys.minutes)).toBeGreaterThan(0);
+  });
+
+  // Sans canvas supprimé, rien ne change : le même canvas écrit ses compteurs
+  it("changes nothing for a canvas that was not deleted", async () => {
+    const { keys, store } = stores();
+
+    await store.storeActivityMinute(inMinute(minuteAt - MINUTE_MS, { c1: canvasMinute({ people: 1 }) }));
+
+    expect(await redis.hlen(keys.canvas("c1").minutes)).toBe(1);
+  });
+});

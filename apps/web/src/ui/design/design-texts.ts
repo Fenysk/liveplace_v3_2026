@@ -48,6 +48,8 @@ export const DESIGN_TEXTS = defineTexts({
     fr: "Cette personne n'a pas de compte LivePlace.",
     en: "This person doesn't have a LivePlace account.",
   },
+  // CDC §8 : l'auteur d'un pixel dont le compte est supprimé n'a ni photo, ni nom, ni page.
+  deletedAccount: { fr: "Compte supprimé", en: "Deleted account" },
 
   signInWithTwitch: { fr: "Se connecter avec Twitch", en: "Sign in with Twitch" },
   signInNote: { fr: "En te connectant, tu acceptes la ", en: "By signing in, you accept the " },

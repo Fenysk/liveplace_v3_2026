@@ -1,6 +1,6 @@
 // La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte, ou Canvas par Réglages) : Canvas et Vue
 // OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour tous : son profil, l'apparence,
-// la langue, Se déconnecter.
+// la langue, Se déconnecter, et en bas, sous un filet, Supprimer mon compte (CDC §8).
 
 import {
   Layers,
@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Scaling,
   Shield,
+  Trash2,
   Trophy,
   User,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import { Window, WindowRow } from "../design/window";
 import { BubbleTarget, type BubbleTargetName } from "../help/bubble-target";
 import { useTexts } from "../locale/use-locale";
 import { ACCOUNT_TEXTS } from "./account-texts";
+import { DELETE_ACCOUNT_TEXTS } from "./delete-account-texts";
 
 export type AccountSection = "canvas" | "canvases" | "obs" | "moderation" | "scoreboard" | "account";
 
@@ -64,6 +66,7 @@ type AccountWindowProps = {
   appearanceChoice: AppearanceChoice;
   onPickAppearance: (choice: AppearanceChoice) => void;
   onRestartTutorial: () => void; // « Revoir le tuto » : le tutoriel repart de zéro sur cet appareil (§9.11)
+  onDeleteAccount: () => void; // « Supprimer mon compte » : ouvre la confirmation (CDC §8), que la page porte
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
   canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
@@ -81,6 +84,7 @@ export const AccountWindow = ({
   appearanceChoice,
   onPickAppearance,
   onRestartTutorial,
+  onDeleteAccount,
   moderationTab,
   obsTab,
   canvasTab,
@@ -88,6 +92,7 @@ export const AccountWindow = ({
   scoreboardTab,
 }: AccountWindowProps) => {
   const t = useTexts(ACCOUNT_TEXTS);
+  const deletion = useTexts(DELETE_ACCOUNT_TEXTS);
   const design = useTexts(DESIGN_TEXTS);
   const toast = useToast();
   const section = (id: AccountSection, label: string) => ({ id, label, icon: SECTION_ICONS[id] });
@@ -135,6 +140,9 @@ export const AccountWindow = ({
                 toast("success", t.tutorialRestarted);
               }}
             />
+          </WindowRow>
+          <WindowRow label={<span className="lp-muted">{deletion.rowHint}</span>} isRuled>
+            <Button label={deletion.deleteAccount} icon={Trash2} variant="danger" onPress={onDeleteAccount} />
           </WindowRow>
         </>
       )}

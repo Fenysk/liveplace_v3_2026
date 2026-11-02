@@ -7,7 +7,9 @@ afterEach(() => {
 });
 
 // Des doubles : les comptes connus, ce qui est suivi dans l'ordre, et chaque attente entre deux comptes.
-const setup = (options: { userIds?: string[]; isListFailing?: boolean; failingOn?: string } = {}) => {
+const setup = (
+  options: { userIds?: string[]; isListFailing?: boolean; failingOn?: string; deleted?: string[] } = {},
+) => {
   const tracked: string[] = [];
   const waits: number[] = [];
   const accounts: AccountList = {
@@ -15,6 +17,7 @@ const setup = (options: { userIds?: string[]; isListFailing?: boolean; failingOn
       if (options.isListFailing) throw new Error("Redis ne répond pas");
       return options.userIds ?? [];
     },
+    isDeletedAccount: async (userId) => options.deleted?.includes(userId) ?? false,
   };
   const tracker = {
     track: (userId: string) => {
@@ -70,5 +73,26 @@ describe("following every known account at the web's start (§10.4)", () => {
 
     expect(tracked).toEqual(["1", "3"]);
     expect(logged).toHaveBeenCalledTimes(1);
+  });
+
+  // Un compte supprimé depuis que la liste a été lue n'est pas suivi (CDC §8), et ne coûte aucune attente
+  it("skips an account deleted since the list was read, without any wait for it", async () => {
+    const { deps, tracked, waits } = setup({ userIds: ["1", "2", "3"], deleted: ["2"] });
+
+    await trackKnownAccounts(deps);
+
+    expect(tracked).toEqual(["1", "3"]);
+    expect(waits).toHaveLength(2);
+  });
+
+  // Les journaux d'un suivi qui échoue ne portent pas l'identifiant du compte
+  it("never logs the identifier of the account whose tracking fails", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { deps } = setup({ userIds: ["424242"], failingOn: "424242" });
+
+    await trackKnownAccounts(deps);
+
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("424242");
   });
 });

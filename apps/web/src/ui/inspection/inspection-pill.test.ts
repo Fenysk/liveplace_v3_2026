@@ -80,6 +80,40 @@ describe("Bannir in the Inspection pill (§5.4)", () => {
   });
 });
 
+describe("the Inspection pill on the drawing of a deleted account (CDC §8)", () => {
+  const deleted: InspectEntry = {
+    userId: "deleted",
+    login: "",
+    displayName: "",
+    isDeleted: true,
+    colorIndex: 5,
+    placedAt: now - 60_000,
+    placementId: "pdemo0004",
+  };
+
+  // Dit « Compte supprimé », sans photo ni lien ni chaîne
+  it("says Compte supprimé, with no photo, no link and no channel", () => {
+    const html = render({ ...deleted, canReport: true });
+
+    expect(html).toContain("Compte supprimé");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<a ");
+    expect(html).not.toContain("twitch.tv");
+  });
+
+  // Qui modère n'a que cette pose : Effacer ce dessin, ni tous ses dessins, ni Bannir, ni rôle à nommer
+  it("gives whoever moderates this placement only: Effacer ce dessin, no clear of all, no Bannir, no role", () => {
+    for (const controls of [moderating, owning]) {
+      const html = render(deleted, controls);
+
+      expect(html).toContain("Effacer ce dessin");
+      expect(html).not.toContain("Effacer ses dessins");
+      expect(html).not.toContain("Bannir");
+      expect(html).not.toContain("Nommer modérateur");
+    }
+  });
+});
+
 describe("the Inspection pill while its pixel loads", () => {
   const renderLoading = () =>
     renderToStaticMarkup(

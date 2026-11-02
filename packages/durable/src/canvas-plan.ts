@@ -150,6 +150,14 @@ export function planDiscard(
   return { ok: true, writes: [{ kind: "delete", canvasId }] };
 }
 
+// CDC §8, Supprimer son compte : toutes les fresques du propriétaire partent, l'active comprise, ce que `planDiscard` refuse.
+// Jamais celle d'un autre.
+export function planDiscardAll(canvases: readonly StoredCanvas[], ownerId: string): CanvasWrite[] {
+  return canvases
+    .filter((canvas) => canvas.ownerId === ownerId)
+    .map(({ canvasId }) => ({ kind: "delete" as const, canvasId }));
+}
+
 // Le thème du canvas actif seulement, jamais d'une archive ni d'un autre propriétaire. Sans thème, `undefined` retire le champ.
 // La mutation `rename`, ancien appel (retirée au prochain changement de schéma), passe aussi par ce plan, `name` pris comme thème.
 export function planSetTheme(

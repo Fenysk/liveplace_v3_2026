@@ -1,5 +1,7 @@
 // Le cycle de l'historique (§7.1) : écouter le canal, balayer les versions, ranger ce qui est dû.
 
+import { listChunkAccounts } from "@liveplace/domain/account-erasure";
+import { createAccountsFilter } from "@liveplace/domain/accounts-filter";
 import {
   CHUNK_SCHEMA_VERSION,
   type Chunk,
@@ -39,13 +41,8 @@ export function createHistoryCycle({ source, store, plan, encode, now, log }: Hi
       if (!first || !last) return plan.noteChecked(canvasId, upTo, now());
 
       const [fromVersion, toVersion] = [first[0], last[0]];
-      const payload = await encode({
-        schemaVersion: CHUNK_SCHEMA_VERSION,
-        canvasId,
-        fromVersion,
-        toVersion,
-        entries,
-      });
+      const chunk: Chunk = { schemaVersion: CHUNK_SCHEMA_VERSION, canvasId, fromVersion, toVersion, entries };
+      const payload = await encode(chunk);
       const answer = await store.storeChunk({
         canvasId,
         fromVersion,
@@ -63,6 +60,7 @@ export function createHistoryCycle({ source, store, plan, encode, now, log }: Hi
           recovered,
         ),
         ...(isFirstAfterRecovery(cursor, recovered) ? { recoveredAt: recovered.at } : {}),
+        accountsFilter: createAccountsFilter(listChunkAccounts(chunk)),
         payload,
       });
       if (answer === "overlap") {

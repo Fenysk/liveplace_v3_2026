@@ -2,13 +2,23 @@
 // la chaîne confiés au gateway, qui les applique (§2). Le web n'écrit que des noms, des actions et l'état.
 
 import type { Timestamp } from "@liveplace/domain";
-import type { TwitchChannel, TwitchEventSub, TwitchWrites } from "@liveplace/domain/ports";
+import type { AccountList, TwitchChannel, TwitchEventSub, TwitchWrites } from "@liveplace/domain/ports";
 import { type SignInDeps, type SignInResult, signInTwitchUser } from "./sign-in";
 
 export type TwitchSyncDeps = SignInDeps & {
   twitchWrites: Pick<TwitchWrites, "setTwitchUsers" | "queueTwitchCommands" | "setTwitchSync">;
-  eventSub: Pick<TwitchEventSub, "subscribeToModeration">;
+  eventSub: Pick<TwitchEventSub, "subscribeToModeration" | "deleteSubscriptions">;
+  // CDC §8 : un compte supprimé n'a plus d'abonnement (JOURNAL 2026-11-02).
+  accounts: Pick<AccountList, "isDeletedAccount">;
   now: () => Timestamp;
+};
+
+// S'abonner, sauf pour un compte supprimé. L'effacement a pu passer pendant l'appel à Twitch : ce qui vient d'être créé pour lui est
+// alors retiré, car l'effacement, lui, avait déjà fini de retirer les siens (la même garde que le suivi du live).
+const subscribeToModeration = async (deps: TwitchSyncDeps, userId: string): Promise<void> => {
+  if (await deps.accounts.isDeletedAccount(userId)) return;
+  await deps.eventSub.subscribeToModeration(userId);
+  if (await deps.accounts.isDeletedAccount(userId)) await deps.eventSub.deleteSubscriptions(userId);
 };
 
 const syncChannel = async (
@@ -31,7 +41,7 @@ const syncChannel = async (
     { kind: "bans", canvasId, userIds: permanentBans.map((ban) => ban.userId) },
   ]);
   // A2 : rester à jour ensuite, sans garder de jeton. Un échec remonte : la synchro n'est pas notée faite.
-  await deps.eventSub.subscribeToModeration(user.userId);
+  await subscribeToModeration(deps, user.userId);
   await deps.twitchWrites.setTwitchSync(canvasId, { status: "ok", syncedAt: deps.now() });
 };
 

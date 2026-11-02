@@ -11,6 +11,8 @@ import type {
   TwitchWebhookMessage,
   TwitchWrites,
 } from "@liveplace/domain/ports";
+import type { Result } from "@liveplace/shared";
+import type { BeganDeletion } from "./delete-account";
 import type { TwitchLiveTracker } from "./twitch-live";
 
 export type TwitchWebhookDeps = {
@@ -19,12 +21,17 @@ export type TwitchWebhookDeps = {
   durable: Pick<DurableStore, "getActiveCanvasForOwner">;
   twitchWrites: TwitchWrites;
   tracker: Pick<TwitchLiveTracker, "apply">; // §10.4
+  // CDC §8 : inscrit l'effacement du compte qui a retiré l'accès, et rend la main sans l'attendre.
+  beginDeletion: (request: { userId: string; trigger: "twitch" }) => Promise<Result<BeganDeletion, "failed">>;
 };
 
 // `204` dès que c'est noté : Twitch réessaie, puis coupe l'abonnement, si la réponse tarde.
 export type TwitchWebhookAnswer = { status: 200; challenge: string } | { status: 204 } | { status: 403 };
 
-type ChannelEvent = Exclude<TwitchWebhookEvent, { kind: "verification" | "ignored" } | TwitchLiveEvent>;
+type ChannelEvent = Exclude<
+  TwitchWebhookEvent,
+  { kind: "verification" | "ignored" | "accessRevoked" } | TwitchLiveEvent
+>;
 
 // §10.4 : le live n'a pas de canvas ici, et sa révocation n'est pas celle de la modération.
 const isLiveEvent = (event: TwitchWebhookEvent): event is TwitchLiveEvent =>
@@ -63,8 +70,17 @@ const applyChannelEvent = async (deps: TwitchWebhookDeps, event: ChannelEvent): 
 
 type AppliedEvent = Exclude<TwitchWebhookEvent, { kind: "verification" }>;
 
+// CDC §8 : le compte entre dans `deletions:pending`, puis la réponse part. La routine et la reprise font le reste : Twitch veut un
+// 2xx en quelques secondes. Un compte inconnu de LivePlace passe aussi, la routine balaie ses traces. Une inscription ratée lève :
+// le message est rendu, la redélivrance de Twitch repasse.
+const deleteRevokedAccount = async (deps: TwitchWebhookDeps, userId: string): Promise<void> => {
+  const began = await deps.beginDeletion({ userId, trigger: "twitch" });
+  if (!began.ok) throw new Error("effacement du compte non inscrit");
+};
+
 const applyEvent = async (deps: TwitchWebhookDeps, event: AppliedEvent): Promise<void> => {
   if (isLiveEvent(event)) await deps.tracker.apply(event);
+  else if (event.kind === "accessRevoked") await deleteRevokedAccount(deps, event.userId);
   else if (event.kind !== "ignored") await applyChannelEvent(deps, event);
 };
 

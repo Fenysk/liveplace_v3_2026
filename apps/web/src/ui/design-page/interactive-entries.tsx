@@ -4,6 +4,7 @@ import { PALETTE, TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Layers, LocateFixed, Minus, Plus, RotateCcw, Scaling, User } from "lucide-react";
 import { useState } from "react";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "../../state/recent-color-indexes";
+import { DELETE_ACCOUNT_TEXTS } from "../account/delete-account-texts";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import { switchToast } from "../canvas/switch-toast";
@@ -272,23 +273,6 @@ export const WindowEntry = () => (
   </Entry>
 );
 
-export const AccountWindowEntry = () => (
-  <Entry
-    slug="mon-compte"
-    components={["Window", "WindowRow"]}
-    file="ui/design/window.tsx"
-    note="Les sections dépendent du rôle ; seules celles qui servent aujourd'hui existent."
-  >
-    <Block title="États">
-      <StateRow name="Modale sur un voile" detail="Échap ou Fermer, le focus revient au bouton.">
-        <OpenWindow>
-          {({ isOpen, close }) => <SectionsWindow isOpen={isOpen} close={close} initialId="account" />}
-        </OpenWindow>
-      </StateRow>
-    </Block>
-  </Entry>
-);
-
 export const SignInEntry = () => (
   <Entry
     slug="se-connecter"
@@ -359,6 +343,7 @@ const GAME_TOASTS = [
   { name: "Ses viewers, sans brouillon", text: viewerToast(0) },
   { name: "Ses viewers, avec un brouillon non vide", text: viewerToast(3) },
   { name: "Ses viewers, quand une réduction rapproche les dessins", text: CANVAS_TEXTS.fr.draftWiped },
+  { name: "Le compte est supprimé, à l'accueil", text: DELETE_ACCOUNT_TEXTS.fr.deleted },
 ] as const;
 
 // Les deux régions d'un toast sont invisibles dans le jeu : ici elles se montrent, avec ce qu'elles diraient.

@@ -10,7 +10,7 @@ describe("le sommaire de /design", () => {
     expect(slugs.filter((slug) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug))).toEqual([]);
   });
 
-  it("holds the six chapters and the 47 entries of the brief", () => {
+  it("holds the six chapters and the 48 entries of the brief", () => {
     expect(DESIGN_CHAPTERS.map(({ id }) => id)).toEqual([
       "foundations",
       "components",
@@ -19,7 +19,7 @@ describe("le sommaire de /design", () => {
       "dialogs",
       "pages",
     ]);
-    expect(DESIGN_ENTRIES).toHaveLength(47);
+    expect(DESIGN_ENTRIES).toHaveLength(48);
   });
 
   // Les pages du produit ont leur chapitre : l'accueil s'ouvre par son slug, `/design#accueil`

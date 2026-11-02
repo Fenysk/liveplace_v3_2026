@@ -21,6 +21,7 @@ export type AvatarPhotosDeps = {
 export type AvatarPhotos = {
   // Une data URI, `null` si la photo manque ou ne charge pas.
   get(url: string): Promise<string | null>;
+  forget(url: string): void; // CDC §8 : la photo d'un compte supprimé ne se sert plus de la mémoire
 };
 
 const isTwitchAvatar = (url: string): boolean => {
@@ -46,7 +47,8 @@ export function createAvatarPhotos({ fetchPhoto, now }: AvatarPhotosDeps): Avata
       const bytes = new Uint8Array(await response.arrayBuffer());
       return bytes.length > MAX_AVATAR_BYTES ? null : `data:${type};base64,${toBase64(bytes)}`;
     } catch (error) {
-      console.error(`avatar-photos : ${url} non chargée`, error);
+      // Jamais l'adresse : celle d'une photo Twitch porte souvent le pseudo du compte (CDC §8, journaux sans identifiant).
+      console.error("avatar-photos : une photo n'a pas pu être chargée", error);
       return null;
     }
   };
@@ -62,6 +64,10 @@ export function createAvatarPhotos({ fetchPhoto, now }: AvatarPhotosDeps): Avata
         if (uri === null && cached.get(url) === photo) cached.set(url, photo, AVATAR_FAILED_RETRY_MS);
       });
       return photo;
+    },
+
+    forget(url) {
+      cached.delete(url);
     },
   };
 }

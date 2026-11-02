@@ -2,7 +2,8 @@
 
 import type { AccountList, TwitchLive, TwitchLiveState, TwitchLiveStore } from "@liveplace/domain/ports";
 import type { Redis } from "ioredis";
-import { twitchLiveKey, userKey } from "./keys";
+import { deletedAccountGuardKeys, IS_DELETED_ACCOUNT_LUA } from "./deleted-accounts";
+import { TWITCH_COMMANDS_KEY, TWITCH_COMMANDS_MAXLEN, twitchLiveKey, userKey } from "./keys";
 
 // `category` présent : en live, même vide. Sans `checkedAt`, la clé n'est pas la nôtre : aucun état.
 export async function getTwitchLiveState(redis: Redis, userId: string): Promise<TwitchLiveState | null> {
@@ -29,8 +30,27 @@ export async function listTwitchLives(
   return lives;
 }
 
+// Un compte supprimé n'a plus d'état de live à écrire (JOURNAL 2026-11-02) : un suivi parti avant l'effacement et revenu après ne
+// recrée ni `twitch:live:<userId>` ni l'action qui le dit au gateway. Un seul script : la garde, l'état et l'action ne laissent pas
+// l'effacement passer entre eux. KEYS : l'état de live, les trois clés de la garde, la file des actions ; ARGV : le compte, l'heure
+// de vérification, la taille de la file, l'action en JSON (vide : aucune), puis la catégorie si le compte est en live.
+const SET_LIVE_STATE = `${IS_DELETED_ACCOUNT_LUA}
+if isDeletedAccount(ARGV[1], KEYS[2], KEYS[3], KEYS[4]) then
+  return 0
+end
+redis.call("DEL", KEYS[1])
+if ARGV[5] then
+  redis.call("HSET", KEYS[1], "checkedAt", ARGV[2], "category", ARGV[5])
+else
+  redis.call("HSET", KEYS[1], "checkedAt", ARGV[2])
+end
+if ARGV[4] ~= "" then
+  redis.call("XADD", KEYS[5], "MAXLEN", "~", ARGV[3], "*", "c", ARGV[4])
+end
+return 1`;
+
 // Un SCAN par pages (jamais KEYS, qui bloquerait Redis) sur le miroir `user:`, dont la clé finit par l'identifiant.
-export function createAccountList(redis: Redis): AccountList {
+export function createAccountList(redis: Redis, secret: string): AccountList {
   const prefix = userKey("");
   return {
     async listAccountIds() {
@@ -39,21 +59,44 @@ export function createAccountList(redis: Redis): AccountList {
         for (const key of keys) userIds.add(key.slice(prefix.length));
       return [...userIds];
     },
+
+    async isDeletedAccount(userId) {
+      const [pendingKey, fingerprintKey, mirrorKey] = deletedAccountGuardKeys(secret, userId);
+      return (
+        (await redis.eval(
+          `${IS_DELETED_ACCOUNT_LUA}
+return isDeletedAccount(ARGV[1], KEYS[1], KEYS[2], KEYS[3]) and 1 or 0`,
+          3,
+          pendingKey,
+          fingerprintKey,
+          mirrorKey,
+          userId,
+        )) === 1
+      );
+    },
   };
 }
 
-export function createTwitchLiveStore(redis: Redis): TwitchLiveStore {
+// `secret` : celui des sessions, dont l'empreinte d'un compte supprimé découle (deleted-accounts.ts).
+export function createTwitchLiveStore(redis: Redis, secret: string): TwitchLiveStore {
   return {
     getTwitchLiveState: (userId) => getTwitchLiveState(redis, userId),
 
-    // Un seul MULTI : l'ancienne catégorie ne survit pas à un état hors live.
-    async setTwitchLiveState(userId, { twitchLive, checkedAt }) {
-      const key = twitchLiveKey(userId);
-      await redis
-        .multi()
-        .del(key)
-        .hset(key, { checkedAt, ...(twitchLive ? { category: twitchLive.category } : {}) })
-        .exec();
+    // L'ancienne catégorie ne survit pas à un état hors live. Faux : le compte est supprimé, ni état ni action n'est écrit.
+    async setTwitchLiveState(userId, { twitchLive, checkedAt }, announce) {
+      const written = await redis.eval(
+        SET_LIVE_STATE,
+        5,
+        twitchLiveKey(userId),
+        ...deletedAccountGuardKeys(secret, userId),
+        TWITCH_COMMANDS_KEY,
+        userId,
+        checkedAt,
+        TWITCH_COMMANDS_MAXLEN,
+        announce ? JSON.stringify(announce) : "",
+        ...(twitchLive ? [twitchLive.category] : []),
+      );
+      return written === 1;
     },
   };
 }

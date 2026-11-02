@@ -111,6 +111,22 @@ export function twitchLiveKey(userId: string): string {
   return `twitch:live:${userId}`;
 }
 
+// CDC §8, Supprimer son compte (JOURNAL 2026-11-01). Le canal annonce un compte supprimé aux gateways, qui ferment ses
+// connexions : l'identifiant n'y passe qu'une fois, sans mémoire.
+export const DELETED_ACCOUNTS_CHANNEL = "accounts:deleted";
+// `HASH` `userId` → `{runId, trigger, startedAt, canvasIds}` : le seul endroit où l'identifiant reste, le temps de l'effacement.
+export const PENDING_DELETIONS_KEY = "deletions:pending";
+// Posé quand plus rien ne nomme le compte, retiré quand `BGREWRITEAOF` est parti : l'ancien contenu sort alors de l'AOF.
+export const REWRITE_AOF_KEY = "deletions:rewrite";
+// Posée quand les empreintes de Convex ont été remises dans Redis, jamais expirée : un Redis qui a tout perdu ne l'a plus, et le web
+// relit alors la liste (JOURNAL 2026-11-02).
+export const DELETED_MARKS_SYNCED_KEY = "deleted:accounts:synced";
+
+// L'empreinte HMAC d'un compte supprimé (jamais son identifiant) → l'instant de la suppression, en millisecondes.
+export function deletedAccountKey(fingerprint: string): string {
+  return `deleted:account:${fingerprint}`;
+}
+
 // §17.2 : le verrou d'un propriétaire, pris par le web le temps d'un changement de canvas actif.
 // Il expire de lui-même : un web tombé en plein changement ne bloque personne plus de 30 s.
 export const OWNER_LOCK_TTL_MS = 30_000;
@@ -126,6 +142,7 @@ export const ACTIVITY_HOURS_RETENTION_MS = 366 * 24 * 3600 * 1000;
 export const ACTIVITY_CANVAS_MINUTES_RETENTION_MS = 2 * 24 * 3600 * 1000;
 // §16.2 : un canvas vu streamé il y a plus de 10 minutes, le double de la tolérance, ne comble plus rien.
 export const ACTIVITY_SEEN_RETENTION_MS = 10 * 60 * 1000;
+export const ACTIVITY_GONE_TTL_SECONDS = 2 * 24 * 3600; // le gateway ne garde un canvas en mémoire que quelques minutes
 export const CANVAS_PIXELS_TTL_SECONDS = 61 * 60; // la température relit les 59 minutes d'avant la minute en cours
 export const SIGNUPS_TTL_SECONDS = 31 * 24 * 3600; // les 30 jours des nouveaux comptes venus de la page d'un streamer
 export const WITHOUT_DISCOVERED_VIA = "none"; // un nouveau compte venu de l'accueil (§8.1)
@@ -170,7 +187,9 @@ export function buildCapacityKeys(prefix = "capacity:") {
 }
 
 export function buildActivityKeys(prefix = "activity:") {
+  const canvasPrefix = `${prefix}cv:`;
   return {
+    canvasPrefix, // toutes les clés d'un canvas sous `activity:`, que la suppression de son compte balaie
     // `HASH` début du point → `people,streamed,pixels,visits,phoneVisits,visitMinutes,live` (activity.lua ; un point d'avant
     // l'audience en a trois, un point d'avant le live six ; `streamed` et `live` y portent le même état streamé depuis
     // JOURNAL 2026-10-08), `toSignupsField` → nouveaux comptes, et pour les jours `toActiveField` → distincts.
@@ -182,6 +201,9 @@ export function buildActivityKeys(prefix = "activity:") {
     // `obsSeenAt,liveSeenAt`, se relit par sa dernière heure), versé à la minute et à la fermeture de la dernière vue OBS, relu
     // au démarrage ; élagué au-delà de 10 minutes.
     seen: `${prefix}seen`,
+    // CDC §8 (JOURNAL 2026-11-02) : `SET` des canvas supprimés avec le compte de leur streamer, EXPIRE 2 jours après la dernière
+    // inscription. Le suivi n'écrit plus rien pour eux : le gateway, qui les garde en mémoire une minute de plus, les recréerait.
+    gone: `${prefix}gone`,
     signups: (parisDay: string) => `${prefix}signups:${parisDay}`, // provenance → nouveaux comptes, EXPIRE
     // Des HyperLogLog, un par jour de Paris, EXPIRE 31 jours : de quoi compter les distincts sans garder qui.
     activeAccounts: (parisDay: string) => `${prefix}accounts:${parisDay}`, // les comptes qui ont ouvert le jeu
@@ -193,11 +215,11 @@ export function buildActivityKeys(prefix = "activity:") {
       // `HASH` comme ceux du global, `people,obsViews,pixels,visits,phoneVisits,visitMinutes,live` (activity.lua ; `live` y est
       // la somme de ses minutes streamées), `toSignupsField` → nouveaux comptes venus de sa page, et pour les jours
       // `toActiveField` → joueurs actifs.
-      minutes: `${prefix}cv:${canvasId}:minute`, // élagué au-delà de 2 jours
-      hours: `${prefix}cv:${canvasId}:hour`, // élagué au-delà de 366 jours
-      days: `${prefix}cv:${canvasId}:day`, // le début du jour de Paris, sans limite
+      minutes: `${canvasPrefix}${canvasId}:minute`, // élagué au-delà de 2 jours
+      hours: `${canvasPrefix}${canvasId}:hour`, // élagué au-delà de 366 jours
+      days: `${canvasPrefix}${canvasId}:day`, // le début du jour de Paris, sans limite
       // Un HyperLogLog par jour de Paris, EXPIRE 31 jours : les comptes qui y ont posé un pixel.
-      activePlayers: (parisDay: string) => `${prefix}cv:${canvasId}:players:${parisDay}`,
+      activePlayers: (parisDay: string) => `${canvasPrefix}${canvasId}:players:${parisDay}`,
     }),
   };
 }

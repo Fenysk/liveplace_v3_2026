@@ -34,6 +34,7 @@ export type ChunkIndex = {
   gaps?: VersionGap[];
   resizedAt?: number;
   recoveredAt?: Timestamp;
+  accountsFilter?: string; // les comptes que le fichier nomme (`createAccountsFilter`)
 };
 
 export type ChunkFile = ChunkIndex & { payload: Uint8Array };

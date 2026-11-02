@@ -27,6 +27,7 @@ export const record = mutation({
     gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))),
     resizedAt: v.optional(v.number()),
     recoveredAt: v.optional(v.number()),
+    accountsFilter: v.optional(v.string()),
   },
   handler: async (ctx, { serviceKey, ...incoming }) => {
     requireServiceKey(serviceKey);

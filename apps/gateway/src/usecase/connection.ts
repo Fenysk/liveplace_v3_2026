@@ -42,6 +42,7 @@ import type {
 } from "./broadcast";
 import type { Capacity } from "./capacity";
 import { toCellsFrame } from "./cells-frame";
+import type { OpenConnection, OpenConnections } from "./open-connections";
 import { type ScoreboardFrame, toScoreboardFrame } from "./scoreboard-frame";
 
 // « policy violation » : la frame est refusée et la connexion fermée.
@@ -158,6 +159,7 @@ export type ConnectionDeps = {
   activity: Omit<Activity, "tick" | "start">; // §16.1 : le gateway décide, et ne dit rien aux autres
   // §16.1 : de même ; §16.3 : il compte aussi les poses refusées
   capacity: Pick<Capacity, "watch" | "listHistory" | "countRefusedPlacement">;
+  connections: Pick<OpenConnections, "add">; // CDC §8 : de quoi fermer la connexion d'un compte supprimé
   now: () => Timestamp;
 };
 
@@ -272,6 +274,7 @@ const controlFrameOf = (control: Control, session: Session | null, page: Page): 
   if (isBackgroundImageControl(control)) return backgroundImageFrameOf(control);
   if (control.t === "theme") return { t: "theme", theme: control.theme };
   if (control.t === "twitchLive") return twitchLiveFrameOf(control, session, page);
+  if (control.t === "tracesPurged") return null; // ne devient pas une frame : `tellStaleList` périme les listes
   return control.userId === session?.userId ? { t: control.t } : null;
 };
 
@@ -293,6 +296,9 @@ export function createConnection(
   let state: State = { status: "awaitingHello" };
   let member: ActivityMember | null = null;
   let queue: Promise<void> = Promise.resolve();
+  // Fermée par le gateway si son compte, ou le streamer de sa page, est supprimé (JOURNAL 2026-11-01).
+  const openConnection: OpenConnection = { userId: session?.userId, ownerId: undefined, socket };
+  const release = deps.connections.add(openConnection);
   // Un budget par connexion et par genre : les inspections ne mangent pas celui des poses, ni l'inverse.
   const isInspectAllowed = createPerSecondLimit(INSPECT_MAX_PER_SECOND);
   const isPlaceAllowed = createPerSecondLimit(PLACE_MAX_PER_SECOND);
@@ -328,11 +334,14 @@ export function createConnection(
     else void refreshRole().catch((error: unknown) => console.error("rôle non relu", error));
   };
 
-  // JOURNAL 2026-10-06 : un ban, un déban ou un rôle, de qui que ce soit, périme la liste de qui modère.
+  // JOURNAL 2026-10-06 : un ban, un déban ou un rôle, de qui que ce soit, périme la liste de qui modère. Un compte supprimé
+  // les périme toutes deux (JOURNAL 2026-11-01).
   const tellStaleList = (control: Exclude<ControlMessage, ScoreboardControl>): void => {
     if (state.status === "awaitingHello" || !canModerate(state.role)) return;
-    if (control.t === "banned" || control.t === "unbanned") deliverControl({ t: "staleList", list: "bans" });
-    if (control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
+    const isPurged = control.t === "tracesPurged";
+    if (isPurged || control.t === "banned" || control.t === "unbanned")
+      deliverControl({ t: "staleList", list: "bans" });
+    if (isPurged || control.t === "role") deliverControl({ t: "staleList", list: "moderators" });
   };
 
   // §10.3 : un banni ne modère plus, son déban lui rend son rôle ; la frame `banned` part ensuite.
@@ -472,6 +481,7 @@ export function createConnection(
     scoreboard: ScoreboardFrame | null,
   ) => {
     startJoining(frame.canvasId, frame.mode, meta.ownerId, role);
+    openConnection.ownerId = meta.ownerId;
     // §8 : le seuil de signalement se compte en comptes, jamais un invité ni la vue OBS.
     const accountId = frame.mode === "ui" ? session?.userId : undefined;
     await deps.broadcast.join(frame.canvasId, listener, onControl, accountId);
@@ -660,7 +670,9 @@ export function createConnection(
 
   // §10.4 : l'auteur est-il en live ? Une lecture Redis, au débit déjà plafonné de l'inspection.
   const withTwitchLive = async (inspected: InspectEntry): Promise<InspectEntry> => {
-    const twitchLive = inspected.userId ? await deps.core.getTwitchLive(inspected.userId) : null;
+    // CDC §8 : un compte supprimé n'a ni chaîne ni live à lire.
+    const twitchLive =
+      inspected.userId && !inspected.isDeleted ? await deps.core.getTwitchLive(inspected.userId) : null;
     return twitchLive ? { ...inspected, twitchLive } : inspected;
   };
 
@@ -930,6 +942,7 @@ export function createConnection(
     },
 
     async close() {
+      release();
       member?.leave();
       deps.activity.watch(socket, session, false);
       deps.capacity.watch(socket, session, false);

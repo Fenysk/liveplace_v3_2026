@@ -14,6 +14,7 @@ import {
 import type { LiveMessage, Placement, TwitchCommand } from "@liveplace/domain/ports";
 import type { Event } from "@liveplace/protocol";
 import { describe, expect, it } from "vitest";
+import { createAccountPurge } from "./account-purge";
 import { createSignInWrites, createTwitchCommandQueue, createTwitchWrites } from "./client";
 import {
   buildCanvasKeys,
@@ -49,7 +50,7 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
       { kind: "moderator", canvasId: "canvas-1", userId: "mod-1", isModerator: true },
     ];
 
-    await createTwitchWrites(redis).queueTwitchCommands(commands);
+    await createTwitchWrites(redis, harness.secret).queueTwitchCommands(commands);
     const first = await createTwitchCommandQueue(reader).listTwitchCommands(100);
     await createTwitchCommandQueue(reader).ackTwitchCommand(first[0]?.id ?? "");
     const restarted = createTwitchCommandQueue(reader);
@@ -66,18 +67,41 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
     await redis.del(TWITCH_COMMANDS_KEY);
   });
 
+  // Les actions qui nomment un compte supprimé partent de la file, acquittées ou non ; celles des autres restent (CDC §8)
+  it("drops the actions that name a deleted account, acknowledged or not, and keeps the others", async () => {
+    await redis.del(TWITCH_COMMANDS_KEY);
+    const reader = redis.duplicate();
+    const [gone, kept] = [`${runId}-gone`, `${runId}-kept`];
+    const commands: TwitchCommand[] = [
+      { kind: "ban", canvasId: "canvas-1", userId: gone },
+      { kind: "moderators", canvasId: "canvas-1", userIds: [kept, gone] },
+      { kind: "twitchLive", userId: gone },
+      { kind: "unban", canvasId: "canvas-1", userId: kept },
+    ];
+    await createTwitchWrites(redis, harness.secret).queueTwitchCommands(commands);
+    const queue = createTwitchCommandQueue(reader);
+    await queue.ackTwitchCommand((await queue.listTwitchCommands(100))[0]?.id ?? "");
+
+    await createAccountPurge(redis, "un-secret-de-session-de-plus-de-32-octets").purgeAccountKeys(gone);
+
+    const left = await redis.xrange(TWITCH_COMMANDS_KEY, "-", "+");
+    expect(left.map(([, fields]) => JSON.parse(fields[1] ?? "null"))).toEqual([commands[3]]);
+    reader.disconnect();
+    await redis.del(TWITCH_COMMANDS_KEY);
+  });
+
   // Une action gardée sans acquit (canvas en récupération) est relue au redémarrage, une fois : elle ne bloque pas les nouvelles
   it("hands back an unacknowledged command once at start-up, then goes on to the new ones", async () => {
     await redis.del(TWITCH_COMMANDS_KEY);
     const reader = redis.duplicate();
     const waiting: TwitchCommand = { kind: "ban", canvasId: "canvas-1", userId: "troll" };
     const fresh: TwitchCommand = { kind: "unban", canvasId: "canvas-1", userId: "troll" };
-    await createTwitchWrites(redis).queueTwitchCommands([waiting]);
+    await createTwitchWrites(redis, harness.secret).queueTwitchCommands([waiting]);
     await createTwitchCommandQueue(reader).listTwitchCommands(100);
     const restarted = createTwitchCommandQueue(reader);
 
     const again = await restarted.listTwitchCommands(100);
-    await createTwitchWrites(redis).queueTwitchCommands([fresh]);
+    await createTwitchWrites(redis, harness.secret).queueTwitchCommands([fresh]);
     const next = await restarted.listTwitchCommands(100);
 
     expect(again.map((entry) => entry.command)).toEqual([waiting]);
@@ -110,7 +134,7 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
     await queue.listTwitchCommands(50);
     await redis.del(TWITCH_COMMANDS_KEY);
     const command: TwitchCommand = { kind: "ban", canvasId: "canvas-1", userId: "troll" };
-    await createTwitchWrites(redis).queueTwitchCommands([command]);
+    await createTwitchWrites(redis, harness.secret).queueTwitchCommands([command]);
 
     const handed = await queue.listTwitchCommands(100);
 
@@ -120,13 +144,97 @@ describe("the Twitch command queue (JOURNAL 2026-09-27)", () => {
   });
 });
 
+describe("the Twitch actions that name a deleted account (CDC §8, JOURNAL 2026-11-02)", () => {
+  const purge = createAccountPurge(redis, harness.secret);
+  const writes = createTwitchWrites(redis, harness.secret);
+  const startedAt = 1_700_000_000_000;
+  const begin = (userId: string) =>
+    purge.begin({ userId, runId: randomUUID(), trigger: "twitch", startedAt, canvasIds: [] });
+
+  // Ce que la file garde, parmi les actions qui nomment l'un de ces comptes : le flux est celui de tout le Redis de test.
+  const queuedNaming = async (userIds: readonly string[]): Promise<TwitchCommand[]> =>
+    (await redis.xrange(TWITCH_COMMANDS_KEY, "-", "+"))
+      .map(([, fields]): TwitchCommand => JSON.parse(fields[1] ?? "null"))
+      .filter((command) => userIds.some((userId) => JSON.stringify(command).includes(userId)));
+
+  // Pendant l'effacement, ni l'action qui le vise, ni son nom dans une liste complète : la liste du reste part
+  it("writes neither the action on the account nor its place in a complete list while its deletion is in progress", async () => {
+    const [gone, kept] = [`${runId}-queue-gone`, `${runId}-queue-kept`];
+    await begin(gone);
+
+    await writes.queueTwitchCommands([
+      { kind: "ban", canvasId: "canvas-1", userId: gone },
+      { kind: "moderators", canvasId: "canvas-1", userIds: [kept, gone] },
+      { kind: "unban", canvasId: "canvas-1", userId: kept },
+    ]);
+
+    expect(await queuedNaming([gone, kept])).toEqual([
+      { kind: "moderators", canvasId: "canvas-1", userIds: [kept] },
+      { kind: "unban", canvasId: "canvas-1", userId: kept },
+    ]);
+  });
+
+  // L'effacement fini, son empreinte reste 31 jours et son miroir est parti : l'action arrivée après la purge n'est pas déposée
+  it("refuses an action that arrives after the purge, as long as the fingerprint is there and the mirror is not", async () => {
+    const gone = `${runId}-late-gone`;
+    await begin(gone);
+    await purge.purgeAccountKeys(gone);
+    await purge.finish(gone);
+
+    await writes.queueTwitchCommands([
+      { kind: "moderator", canvasId: "canvas-1", userId: gone, isModerator: true },
+      { kind: "bans", canvasId: "canvas-1", userIds: [gone] },
+    ]);
+
+    // Une liste complète qui se vide reste écrite : « plus aucun banni » est une réponse.
+    expect(await queuedNaming([gone])).toEqual([]);
+    expect(
+      (await redis.xrange(TWITCH_COMMANDS_KEY, "-", "+")).some(([, fields]) =>
+        (fields[1] ?? "").includes('"kind":"bans","canvasId":"canvas-1","userIds":[]'),
+      ),
+    ).toBe(true);
+  });
+
+  // Se reconnecter pose un miroir neuf : le compte neuf n'est pas un compte supprimé, ses actions passent
+  it("lets the actions of an account through once it has signed in again", async () => {
+    const back = `${runId}-queue-back`;
+    await begin(back);
+    await purge.purgeAccountKeys(back);
+    await purge.finish(back);
+    await createSignInWrites(redis).setUser({ userId: back, login: "back", displayName: "Back" });
+
+    await writes.queueTwitchCommands([{ kind: "ban", canvasId: "canvas-1", userId: back }]);
+
+    expect(await queuedNaming([back])).toEqual([{ kind: "ban", canvasId: "canvas-1", userId: back }]);
+    await redis.del(userKey(back));
+  });
+
+  // Le nom d'un compte supprimé n'entre pas dans les noms Twitch d'une fresque, celui des autres si
+  it("keeps the name of a deleted account out of the Twitch names of a canvas, and keeps the names of the others", async () => {
+    const [gone, kept] = [`${runId}-name-gone`, `${runId}-name-kept`];
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    await begin(gone);
+
+    await writes.setTwitchUsers(canvasId, [
+      { userId: gone, login: "gone", displayName: "Gone" },
+      { userId: kept, login: "kept", displayName: "Kept" },
+    ]);
+
+    expect(await redis.hkeys(buildCanvasKeys(canvasId).twitchUsers)).toEqual([kept]);
+  });
+});
+
 describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
   // Note l'état de la synchro dans `meta`, sans toucher au reste
   it("records the sync state in meta, leaving the rest alone", async () => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
 
-    await createTwitchWrites(redis).setTwitchSync(canvasId, { status: "revoked", syncedAt: 1234 });
+    await createTwitchWrites(redis, harness.secret).setTwitchSync(canvasId, {
+      status: "revoked",
+      syncedAt: 1234,
+    });
 
     expect(
       await redis.hmget(buildCanvasKeys(canvasId).meta, "twitchSync", "twitchSyncedAt", "ready"),
@@ -139,7 +247,7 @@ describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
     await core.createCanvas(synced, meta);
     await core.createCanvas(never, meta);
 
-    await createTwitchWrites(redis).setTwitchSync(synced, { status: "ok", syncedAt: 5678 });
+    await createTwitchWrites(redis, harness.secret).setTwitchSync(synced, { status: "ok", syncedAt: 5678 });
 
     expect(await core.getTwitchSync(synced)).toEqual({ status: "ok", syncedAt: 5678 });
     expect(await core.getTwitchSync(never)).toBeNull();
@@ -149,7 +257,7 @@ describe("the Twitch sync state (JOURNAL 2026-09-27)", () => {
 describe("the Twitch message ids (JOURNAL 2026-10-08)", () => {
   // Retient un identifiant 11 minutes, et refuse de le réserver une seconde fois
   it("keeps a message id for 11 minutes, and refuses to reserve it a second time", async () => {
-    const writes = createTwitchWrites(redis);
+    const writes = createTwitchWrites(redis, harness.secret);
     const messageId = `${runId}-first`;
 
     expect(await writes.reserveTwitchMessage(messageId)).toBe(true);
@@ -161,7 +269,7 @@ describe("the Twitch message ids (JOURNAL 2026-10-08)", () => {
 
   // Réserve un autre identifiant sans gêne, et rend le sien quand on le relâche
   it("reserves another id freely, and hands its own back when released", async () => {
-    const writes = createTwitchWrites(redis);
+    const writes = createTwitchWrites(redis, harness.secret);
     const [kept, other] = [`${runId}-kept`, `${runId}-other`];
     await writes.reserveTwitchMessage(kept);
 

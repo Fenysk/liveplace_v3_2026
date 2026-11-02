@@ -47,6 +47,16 @@ describe("le cache à durée", () => {
     expect(cache.get("a")).toBeUndefined();
   });
 
+  // Quand un prédicat désigne des clés, le système ne doit plus rendre aucune d'elles, et garder les autres
+  it("gives nothing back for the keys a predicate designates, and keeps the others", () => {
+    const { cache } = setup();
+    for (const key of ["ada:1", "ada:2", "bob:1"]) cache.set(key, key, 100);
+
+    cache.deleteWhere((key) => key.startsWith("ada:"));
+
+    expect(["ada:1", "ada:2", "bob:1"].map((key) => cache.get(key))).toEqual([undefined, undefined, "bob:1"]);
+  });
+
   // Quand le plafond est dépassé, le système doit oublier la plus ancienne clé et garder les autres
   it("forgets the oldest key once past the cap, and keeps the others", () => {
     const { cache } = setup(3);

@@ -5,8 +5,10 @@ import {
   createActivityStore,
   createCanvasCore,
   createCapacityStore,
+  createDeletedAccounts,
   createTwitchCommandQueue,
   revokeBannedModerators,
+  watchDeletedAccounts,
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createHostProbe } from "../infra/host";
@@ -17,6 +19,7 @@ import { createBroadcast, SCOREBOARD_WINDOW_MS } from "../usecase/broadcast";
 import { CAPACITY_TICK_MS, createCapacity } from "../usecase/capacity";
 import { createConnection } from "../usecase/connection";
 import { createDelayTally } from "../usecase/delay-tally";
+import { createOpenConnections } from "../usecase/open-connections";
 import { consumeTwitchCommands } from "../usecase/twitch-commands";
 import { parseGatewayConfig } from "./config";
 
@@ -76,6 +79,14 @@ setInterval(() => {
 }, CAPACITY_SAMPLE_MS);
 setInterval(capacity.tick, CAPACITY_TICK_MS);
 
+// CDC §8 : un compte supprimé voit fermer ses connexions et celles des pages de ses fresques, et le gateway l'oublie. Sur sa
+// propre connexion abonnée : le canal n'a pas de rapport avec ceux des canvas.
+const connections = createOpenConnections();
+await watchDeletedAccounts(new Redis(config.redisUrl), (userId) => {
+  connections.closeAccount(userId);
+  activity.forgetOwner(userId);
+});
+
 // §2 : les actions venues de Twitch, sur une connexion à elles, car la lecture attend.
 let isRunning = true;
 consumeTwitchCommands(
@@ -91,9 +102,14 @@ consumeTwitchCommands(
 const server = startGatewayServer({
   port: config.port,
   publicOrigin: config.publicOrigin,
-  verifier: createSessionVerifier(config.sessionSecret),
+  verifier: createSessionVerifier(config.sessionSecret, createDeletedAccounts(redis, config.sessionSecret)),
   openConnection: (socket, session, device) =>
-    createConnection({ core, broadcast, activity, capacity, now: Date.now }, socket, session, device),
+    createConnection(
+      { core, broadcast, activity, capacity, connections, now: Date.now },
+      socket,
+      session,
+      device,
+    ),
   onBytesSent: capacity.countBytes,
   onClosedBehind: capacity.countClosedConnection,
 });

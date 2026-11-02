@@ -327,6 +327,21 @@ describe("the scoreboard window of a canvas (JOURNAL 2026-10-06)", () => {
     expect(scoreboard.topReads).toBe(3);
   });
 
+  // Relit le top quand les traces d'un compte supprimé partent, sans qu'aucune pose ne l'ait dit (JOURNAL 2026-11-01)
+  it("rereads the top when the traces of a deleted account are purged, though nothing was placed", async () => {
+    const { core, control, scoreboard } = fakeCore();
+    const broadcast = createBroadcast(core);
+    await joinPage(broadcast);
+    await broadcast.tickScoreboard();
+    expect(scoreboard.topReads).toBe(0);
+
+    control("canvas-1", { t: "tracesPurged" });
+    await broadcast.tickScoreboard();
+    await broadcast.tickScoreboard();
+
+    expect(scoreboard.topReads).toBe(1);
+  });
+
   // Ne lit rien pour un retrait de pixels, qui ne change aucun score
   it("reads nothing for a removal of pixels, which changes no score", async () => {
     const { core, publish, scoreboard } = fakeCore();

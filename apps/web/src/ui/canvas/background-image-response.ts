@@ -12,7 +12,9 @@ import {
 } from "../../usecase/canvas-background-image";
 import { withOwnerSession } from "../../usecase/owner-session";
 
-const A_YEAR_SECONDS = 365 * 24 * 3600;
+// CDC §8 : un jour, sans `immutable`. Une copie ne survit pas longtemps dans les navigateurs après la suppression du compte (JOURNAL 2026-11-02) ;
+// l'adresse porte l'instant de l'image, un changement d'image ne passe donc jamais par ce délai.
+const A_DAY_SECONDS = 24 * 3600;
 
 // L'instant de l'adresse : un entier positif de seize chiffres au plus, rien d'autre ne mène à une lecture de Convex.
 const toInstant = (version: string | null): number | null =>
@@ -22,7 +24,7 @@ const notFound = (): Response =>
   new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
 
 export async function backgroundImageResponse(
-  images: BackgroundImages,
+  images: Pick<BackgroundImages, "get">,
   login: string,
   version: string | null,
 ): Promise<Response> {
@@ -41,7 +43,7 @@ export async function backgroundImageResponse(
     status: 200,
     headers: {
       "content-type": "image/webp",
-      "cache-control": `public, max-age=${A_YEAR_SECONDS}, immutable`,
+      "cache-control": `public, max-age=${A_DAY_SECONDS}`,
     },
   });
 }

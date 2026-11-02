@@ -20,6 +20,7 @@ import { Route as LoginBackgroundRouteImport } from './../routes/$login_.backgro
 import { Route as LoginManifestDotwebmanifestRouteImport } from './../routes/$login_.manifest[.]webmanifest'
 import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as LoginPreviewDotpngRouteImport } from './../routes/$login_.preview[.]png'
+import { Route as AuthDeleteAccountRouteImport } from './../routes/auth/delete-account'
 import { Route as AuthExpiredRouteImport } from './../routes/auth/expired'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
@@ -83,6 +84,11 @@ const LoginPreviewDotpngRoute = LoginPreviewDotpngRouteImport.update({
   path: '/$login/preview.png',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthDeleteAccountRoute = AuthDeleteAccountRouteImport.update({
+  id: '/auth/delete-account',
+  path: '/auth/delete-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthExpiredRoute = AuthExpiredRouteImport.update({
   id: '/auth/expired',
   path: '/auth/expired',
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/$login/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login/obs': typeof LoginObsRoute
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/$login_/manifest.webmanifest': typeof LoginManifestDotwebmanifestRoute
   '/$login_/obs': typeof LoginObsRoute
   '/$login_/preview.png': typeof LoginPreviewDotpngRoute
+  '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/$login/preview.png'
+    | '/auth/delete-account'
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/$login/manifest.webmanifest'
     | '/$login/obs'
     | '/$login/preview.png'
+    | '/auth/delete-account'
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/$login_/manifest.webmanifest'
     | '/$login_/obs'
     | '/$login_/preview.png'
+    | '/auth/delete-account'
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
@@ -244,6 +256,7 @@ export interface RootRouteChildren {
   LoginManifestDotwebmanifestRoute: typeof LoginManifestDotwebmanifestRoute
   LoginObsRoute: typeof LoginObsRoute
   LoginPreviewDotpngRoute: typeof LoginPreviewDotpngRoute
+  AuthDeleteAccountRoute: typeof AuthDeleteAccountRoute
   AuthExpiredRoute: typeof AuthExpiredRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
@@ -330,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginPreviewDotpngRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/delete-account': {
+      id: '/auth/delete-account'
+      path: '/auth/delete-account'
+      fullPath: '/auth/delete-account'
+      preLoaderRoute: typeof AuthDeleteAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/expired': {
       id: '/auth/expired'
       path: '/auth/expired'
@@ -399,6 +419,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginManifestDotwebmanifestRoute: LoginManifestDotwebmanifestRoute,
   LoginObsRoute: LoginObsRoute,
   LoginPreviewDotpngRoute: LoginPreviewDotpngRoute,
+  AuthDeleteAccountRoute: AuthDeleteAccountRoute,
   AuthExpiredRoute: AuthExpiredRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,

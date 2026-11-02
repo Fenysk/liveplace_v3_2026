@@ -48,6 +48,7 @@ export const record = mutation({
     schemaVersion: v.number(),
     size: v.number(),
     storageId: v.id("_storage"),
+    accountsFilter: v.optional(v.string()),
   },
   handler: async (ctx, { serviceKey, ...incoming }) => {
     requireServiceKey(serviceKey);
@@ -227,7 +228,7 @@ export const degrade = mutation({
       await ctx.storage.delete(storageId);
       return row ? ("degraded" as const) : ("missing" as const);
     }
-    await ctx.db.patch(row._id, { storageId, size, isStateOnly: true });
+    await ctx.db.patch(row._id, { storageId, size, isStateOnly: true, accountsFilter: undefined });
     await addUsage(ctx, FILES_KEY, size, 1);
     await releaseFile(ctx, row.storageId, row.size);
     return "degraded" as const;

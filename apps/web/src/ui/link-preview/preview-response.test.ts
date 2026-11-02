@@ -5,7 +5,7 @@ import { canvasPreviewResponse } from "./preview-response";
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
 
-const previewsOf = (pngs: Record<string, Uint8Array<ArrayBuffer>>): CanvasPreviews => ({
+const previewsOf = (pngs: Record<string, Uint8Array<ArrayBuffer>>): Pick<CanvasPreviews, "get"> => ({
   get: async (login) => pngs[login] ?? null,
 });
 

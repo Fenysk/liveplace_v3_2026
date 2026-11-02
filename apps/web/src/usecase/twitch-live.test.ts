@@ -18,6 +18,7 @@ type SetupOptions = {
   isSubscriptionFailing?: boolean;
   isSourceHanging?: boolean; // Twitch ne répond jamais
   isStoreDown?: boolean; // Redis ne répond pas
+  isDeletedOnCheck?: boolean[]; // CDC §8 : la réponse de chaque question « ce compte est-il supprimé ? », dans l'ordre ; ensuite non
 };
 
 // Des doubles qui notent leurs appels : l'état est gardé en mémoire, les actions du gateway sont listées.
@@ -25,7 +26,9 @@ const setup = (options: SetupOptions = {}) => {
   const states = new Map<string, TwitchLiveState>(options.state ? [[userId, options.state]] : []);
   const commands: TwitchCommand[] = [];
   const subscribed: string[] = [];
+  const unsubscribed: string[] = [];
   const asked: string[] = [];
+  const isDeletedOnCheck = [...(options.isDeletedOnCheck ?? [])];
   const deps = {
     source: {
       async getLive(asking: string) {
@@ -45,24 +48,30 @@ const setup = (options: SetupOptions = {}) => {
         subscribed.push(broadcasterId);
         if (options.isSubscriptionFailing) throw new Error("abonnement refusé");
       },
+      async deleteSubscriptions(asking: string) {
+        unsubscribed.push(asking);
+      },
+    },
+    accounts: {
+      async isDeletedAccount() {
+        return isDeletedOnCheck.shift() ?? false;
+      },
     },
     store: {
       async getTwitchLiveState(asking: string) {
         if (options.isStoreDown) throw new Error("Redis ne répond pas");
         return states.get(asking) ?? null;
       },
-      async setTwitchLiveState(asking: string, state: TwitchLiveState) {
+      // Le magasin écrit l'état et l'action du gateway d'un seul bloc.
+      async setTwitchLiveState(asking: string, state: TwitchLiveState, announce?: TwitchCommand) {
         states.set(asking, state);
-      },
-    },
-    commands: {
-      async queueTwitchCommands(queued: readonly TwitchCommand[]) {
-        commands.push(...queued);
+        if (announce) commands.push(announce);
+        return true;
       },
     },
     now: () => now,
   };
-  return { tracker: createTwitchLiveTracker(deps), states, commands, subscribed, asked };
+  return { tracker: createTwitchLiveTracker(deps), states, commands, subscribed, unsubscribed, asked };
 };
 
 const online: TwitchLiveEvent = { kind: "online", broadcasterId: userId };
@@ -192,6 +201,53 @@ describe("tracking an account at its sign-in (§10.4)", () => {
     const { tracker } = setup({ isSourceHanging: true });
 
     expect(tracker.track(userId)).toBeUndefined();
+  });
+
+  // Un compte supprimé n'est pas abonné : rien n'est demandé à Twitch pour ses abonnements
+  it("subscribes nothing for a deleted account", async () => {
+    const { tracker, subscribed, unsubscribed } = setup({ streaming: art, isDeletedOnCheck: [true] });
+
+    tracker.track(userId);
+    await flush();
+
+    expect(subscribed).toEqual([]);
+    expect(unsubscribed).toEqual([]);
+  });
+
+  // L'effacement qui passe pendant l'appel à Twitch retire ce qui vient d'être créé pour le compte (CDC §8)
+  it("removes what it just created when the deletion passed during the call to Twitch", async () => {
+    const { tracker, subscribed, unsubscribed } = setup({ streaming: art, isDeletedOnCheck: [false, true] });
+
+    tracker.track(userId);
+    await flush();
+
+    expect(subscribed).toEqual([userId]);
+    expect(unsubscribed).toEqual([userId]);
+  });
+
+  // Un compte qui existe encore garde ses abonnements, sans aucun retrait
+  it("removes nothing when the account is still there after the call to Twitch", async () => {
+    const { tracker, subscribed, unsubscribed } = setup({ streaming: art });
+
+    tracker.track(userId);
+    await flush();
+
+    expect(subscribed).toEqual([userId]);
+    expect(unsubscribed).toEqual([]);
+  });
+
+  // Les journaux d'un suivi qui échoue ne portent jamais l'identifiant du compte
+  it("never logs the identifier of the account when a step fails", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { tracker } = setup({ isSourceDown: true, isSubscriptionFailing: true, isStoreDown: true });
+
+    tracker.track(userId);
+    await tracker.getLive(userId);
+    await tracker.apply({ kind: "online", broadcasterId: userId }).catch(() => undefined);
+    await flush();
+
+    expect(logged).toHaveBeenCalled();
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(userId);
   });
 });
 

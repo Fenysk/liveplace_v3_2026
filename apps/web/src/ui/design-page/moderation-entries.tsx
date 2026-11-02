@@ -1,7 +1,7 @@
 // La modération (JOURNAL 2026-09-25) : la pill Inspection, la section Modération de la fenêtre (signalements compris,
 // JOURNAL 2026-09-28), la confirmation et la fenêtre du banni. Les vrais composants, avec des props d'exemple.
 
-import { HOUR_MS, MINUTE_MS, PALETTE } from "@liveplace/domain";
+import { DELETED_AUTHOR, HOUR_MS, MINUTE_MS, PALETTE } from "@liveplace/domain";
 import type { AuthoredPixel, InspectEntry } from "@liveplace/domain/ports";
 import { useEffect, useState } from "react";
 import type { Inspection } from "../../state/canvas-store";
@@ -134,6 +134,25 @@ const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
     },
     report: { status: "reported", onReport: noop },
   },
+  {
+    name: "Le dessin d'un compte supprimé",
+    detail: "« Compte supprimé » : ni photo, ni nom, ni lien. Signaler.",
+    inspection: {
+      status: "found",
+      x: 122,
+      y: 82,
+      entry: {
+        login: "",
+        displayName: "",
+        isDeleted: true,
+        colorIndex: 5,
+        placedAt: nowMs - 90_000,
+        placementId: "pdemo0004",
+        canReport: true,
+      },
+    },
+    report: { status: "available", onReport: noop },
+  },
   { name: "Une case jamais posée", inspection: { status: "empty", x: 200, y: 180 } },
 ];
 
@@ -153,6 +172,18 @@ const FOR_MODERATORS = (nowMs: number): readonly InspectionScene[] => [
   {
     name: "Sans photo",
     inspection: inspectionOf(nowMs, { userId: "2", ...SAMPLE_VIEWER, placementId: "pdemo0002" }),
+    moderation: MODERATING,
+  },
+  {
+    name: "Le dessin d'un compte supprimé",
+    detail: "Effacer ce dessin seul : ni plage, ni tous ses dessins, ni Bannir.",
+    inspection: inspectionOf(nowMs, {
+      userId: DELETED_AUTHOR,
+      login: "",
+      displayName: "",
+      isDeleted: true,
+      placementId: "pdemo0004",
+    }),
     moderation: MODERATING,
   },
 ];
@@ -253,7 +284,7 @@ export const InspectionEntry = () => {
       <InspectionBlock title="Pour tous" nowMs={nowMs} scenes={FOR_ALL(nowMs)} />
       <InspectionBlock
         title="Pour qui modère"
-        note="Sous un filet : Effacer ses dessins et Bannir, sauf sur un modérateur nommé ici. Rien sur les pixels du streamer ni sur les siens."
+        note="Sous un filet : Effacer ses dessins et Bannir, sauf sur un modérateur nommé ici. Rien sur les pixels du streamer ni sur les siens. Sur un compte supprimé : Effacer ce dessin, seul."
         nowMs={nowMs}
         scenes={FOR_MODERATORS(nowMs)}
       />

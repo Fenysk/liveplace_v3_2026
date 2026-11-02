@@ -7,7 +7,7 @@ import {
   toSession,
   toSessionClaims,
 } from "@liveplace/domain";
-import type { SessionSigner, SessionVerifier } from "@liveplace/domain/ports";
+import type { DeletedAccounts, SessionSigner, SessionVerifier } from "@liveplace/domain/ports";
 import { cookieValue } from "@liveplace/shared";
 import { jwtVerify, SignJWT } from "jose";
 import { JOSEError } from "jose/errors";
@@ -25,7 +25,7 @@ export function createSessionSigner(secret: string): SessionSigner {
 }
 
 // §10.2 : le web lit aussi le cookie, pour l'affichage seulement. Même règle que le gateway.
-export function createSessionVerifier(secret: string): SessionVerifier {
+export function createSessionVerifier(secret: string, deletedAccounts: DeletedAccounts): SessionVerifier {
   const key = new TextEncoder().encode(secret);
   return {
     async verify(cookieHeader) {
@@ -33,7 +33,11 @@ export function createSessionVerifier(secret: string): SessionVerifier {
       if (!signed) return null;
       try {
         const verified = await jwtVerify(signed, key, { algorithms: [SESSION_ALGORITHM] });
-        return toSession(verified.payload);
+        const session = toSession(verified.payload);
+        // CDC §8 : la session d'un compte supprimé depuis son émission vaut un invité (JOURNAL 2026-11-01).
+        if (session && (await deletedAccounts.isSessionRevoked(session.userId, verified.payload.iat ?? 0)))
+          return null;
+        return session;
       } catch (error) {
         // Signature fausse, jeton expiré, jeton illisible : un invité, jamais une erreur.
         if (error instanceof JOSEError) return null;

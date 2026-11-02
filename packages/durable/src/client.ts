@@ -4,7 +4,9 @@ import { MAX_ARCHIVES } from "@liveplace/domain";
 import type {
   BudgetStore,
   DurableStore,
+  ErasureStore,
   HistoryStore,
+  OrphanStore,
   RecoveryStore,
   RetentionStore,
   SnapshotStore,
@@ -108,6 +110,24 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
     },
     getArchiveByLinkCode: (ownerId, linkCode) =>
       convex.query(api.canvases.getByLinkCode, { serviceKey, ownerId, linkCode }),
+
+    // CDC §8, Supprimer son compte.
+    discardOwnedCanvases: (ownerId) => convex.mutation(api.canvases.discardAll, { serviceKey, ownerId }),
+    deleteUser: (userId, proof) =>
+      convex.mutation(api.users.deleteByUserId, { serviceKey, userId, ...proof }),
+    async detachDiscoveredAccounts(userId) {
+      let detached: number;
+      do {
+        detached = await convex.mutation(api.users.detachDiscovered, { serviceKey, userId });
+      } while (detached > 0);
+    },
+    async requestErasure(userId) {
+      await convex.mutation(api.erasures.request, { serviceKey, userId });
+    },
+    async keepDeletedAccount({ fingerprint, deletedAt }) {
+      await convex.mutation(api.fingerprints.keep, { serviceKey, fingerprint, deletedAt });
+    },
+    syncDeletedAccounts: (since) => convex.mutation(api.fingerprints.sync, { serviceKey, since }),
   };
 }
 
@@ -115,7 +135,7 @@ export function createDurableStore(url: string, serviceKey: string): DurableStor
 export function createSnapshotStore(url: string, serviceKey: string, scope: string): SnapshotStore {
   const convex = new ConvexHttpClient(url);
   return {
-    async storeSnapshot({ canvasId, tier, version, takenAt, schemaVersion, bytes }) {
+    async storeSnapshot({ canvasId, tier, version, takenAt, schemaVersion, bytes, accountsFilter }) {
       const uploadUrl = await convex.mutation(api.snapshots.generateUploadUrl, { serviceKey });
       const storageId = await uploadFile(uploadUrl, bytes);
       return convex.mutation(api.snapshots.record, {
@@ -128,6 +148,7 @@ export function createSnapshotStore(url: string, serviceKey: string, scope: stri
         schemaVersion,
         size: bytes.byteLength,
         storageId,
+        ...(accountsFilter === undefined ? {} : { accountsFilter }),
       });
     },
 
@@ -300,5 +321,63 @@ export function createRecoveryStore(url: string, serviceKey: string, scope: stri
         );
       return found;
     },
+
+    listPendingErasures: () => convex.query(api.erasures.listPending, { serviceKey }),
+  };
+}
+
+// CDC §8, Supprimer son compte (JOURNAL 2026-11-02) : le travail du worker sur les fichiers de tout le déploiement, quel que soit
+// leur scope. Le nouveau fichier part à l'adresse d'envoi de Convex, puis une mutation le met à la place de l'ancien.
+export function createErasureStore(url: string, serviceKey: string): ErasureStore {
+  const convex = new ConvexHttpClient(url);
+  // Un identifiant que `listFiles` a rendu : Convex le reconnaît.
+  const named = (kind: "snapshot" | "chunk", storageId: string) => ({
+    serviceKey,
+    kind,
+    storageId: storageId as Id<"_storage">,
+  });
+  return {
+    listPendingErasures: () => convex.query(api.erasures.listPending, { serviceKey }),
+    async completeErasure(userId) {
+      await convex.mutation(api.erasures.complete, { serviceKey, userId });
+    },
+    listFiles: (kind, cursor, maxFiles) =>
+      convex.query(api.erasures.listFiles, { serviceKey, kind, cursor, maxFiles }),
+
+    async getFile(kind, storageId) {
+      const fileUrl = await convex.query(api.erasures.getFileUrl, {
+        serviceKey,
+        storageId: storageId as Id<"_storage">,
+      });
+      return fileUrl ? downloadFile(fileUrl, `un fichier de ${kind}`) : null;
+    },
+
+    async replaceFile(kind, storageId, bytes, accountsFilter) {
+      const uploadUrl = await convex.mutation(api.snapshots.generateUploadUrl, { serviceKey });
+      const replacementId = await uploadFile(uploadUrl, bytes);
+      return convex.mutation(api.erasures.replaceFile, {
+        ...named(kind, storageId),
+        replacementId,
+        size: bytes.byteLength,
+        accountsFilter,
+      });
+    },
+
+    async stampFilter(kind, storageId, accountsFilter) {
+      await convex.mutation(api.erasures.stampFilter, { ...named(kind, storageId), accountsFilter });
+    },
+
+    async discardFile(kind, storageId) {
+      await convex.mutation(api.erasures.discardFile, named(kind, storageId));
+    },
+  };
+}
+
+// Le ménage des fichiers sans ligne, tout le déploiement (JOURNAL 2026-11-02).
+export function createOrphanStore(url: string, serviceKey: string): OrphanStore {
+  const convex = new ConvexHttpClient(url);
+  return {
+    purgeOrphans: (after, graceMs, maxFiles) =>
+      convex.mutation(api.orphans.purge, { serviceKey, after, graceMs, maxFiles }),
   };
 }

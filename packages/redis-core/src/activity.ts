@@ -51,6 +51,19 @@ declare module "ioredis" {
 
 type ActivityKeys = ReturnType<typeof buildActivityKeys>;
 
+// Parmi ces canvas, ceux que la suppression du compte de leur streamer a retirés (JOURNAL 2026-11-02) : le suivi n'écrit plus rien
+// pour eux. Sans aucun canvas supprimé, la lecture ne coûte qu'un `SMISMEMBER`.
+const listGone = async (
+  redis: Redis,
+  keys: ActivityKeys,
+  canvasIds: Iterable<string>,
+): Promise<Set<string>> => {
+  const ids = [...new Set(canvasIds)];
+  if (ids.length === 0) return new Set();
+  const flags = await redis.smismember(keys.gone, ...ids);
+  return new Set(ids.filter((_, index) => flags[index] === 1));
+};
+
 const POINT_FIELD = /^\d+$/; // le début d'un point ; celui de ses nouveaux comptes a un suffixe
 
 // `stored` : `people,streamed,pixels,visits,phoneVisits,visitMinutes,live`, écrit par activity.lua ; un point d'avant l'audience
@@ -198,7 +211,11 @@ export function createSignupWrites(redis: Redis, keys: ActivityKeys = buildActiv
       const signups = keys.signups(toParisDay(nowMs));
       const transaction = redis.multi();
       addSignupPoints(transaction, keys, starts);
-      if (discoveredViaCanvasId) addSignupPoints(transaction, keys.canvas(discoveredViaCanvasId), starts);
+      if (
+        discoveredViaCanvasId &&
+        !(await listGone(redis, keys, [discoveredViaCanvasId])).has(discoveredViaCanvasId)
+      )
+        addSignupPoints(transaction, keys.canvas(discoveredViaCanvasId), starts);
       transaction
         .hincrby(signups, discoveredViaUserId ?? WITHOUT_DISCOVERED_VIA, 1)
         .expire(signups, SIGNUPS_TTL_SECONDS);
@@ -303,8 +320,10 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     // Les distincts d'abord, qui se rejouent sans dégât : une minute qui échoue plus loin revient au tic suivant, et ses
     // sommes ne s'écrivent qu'une fois, celles des canvas avec les siennes.
     async storeActivityMinute(closed) {
-      const { at, people, streamed, pixels, visits, phoneVisits, visitMinutes, pixelsByCanvas, canvases } =
-        closed;
+      const { at, people, streamed, pixels, visits, phoneVisits, visitMinutes } = closed;
+      const gone = await listGone(redis, keys, [...closed.canvases.keys(), ...closed.pixelsByCanvas.keys()]);
+      const canvases = new Map([...closed.canvases].filter(([canvasId]) => !gone.has(canvasId)));
+      const pixelsByCanvas = new Map([...closed.pixelsByCanvas].filter(([canvasId]) => !gone.has(canvasId)));
       await storeActiveDay(closed);
       await Promise.all(
         [...canvases].map(([canvasId, { playerIds }]) => storeCanvasPlayers(canvasId, at, playerIds)),
@@ -344,7 +363,7 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     // Les points d'abord, atomiques : un canvas streamé au passage de minuit l'est aussi pour le nouveau jour, un HyperLogLog
     // qui se rejoue sans dégât.
     async storeActivityGap({ canvasId, minutes }) {
-      if (minutes.length === 0) return;
+      if (minutes.length === 0 || (await listGone(redis, keys, [canvasId])).size > 0) return;
       const { minutes: canvasMinutes, hours, days } = keys.canvas(canvasId);
       const starts = minutes.map((minute) => toActivityPointStarts(minute));
       await redis.activityGap(
@@ -367,8 +386,10 @@ export function createActivityStore(redis: Redis, keys: ActivityKeys = buildActi
     },
 
     async storeSeen(seen) {
-      if (seen.size === 0) return;
-      await redis.hset(keys.seen, Object.fromEntries(seen));
+      const gone = await listGone(redis, keys, seen.keys());
+      const alive = [...seen].filter(([canvasId]) => !gone.has(canvasId));
+      if (alive.length === 0) return;
+      await redis.hset(keys.seen, Object.fromEntries(alive));
     },
 
     async listSeen() {

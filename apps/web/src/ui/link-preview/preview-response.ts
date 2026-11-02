@@ -3,7 +3,10 @@
 import type { CanvasPreviews } from "../../usecase/canvas-preview";
 import { PREVIEW_SLICE_SECONDS } from "./link-preview";
 
-export async function canvasPreviewResponse(previews: CanvasPreviews, login: string): Promise<Response> {
+export async function canvasPreviewResponse(
+  previews: Pick<CanvasPreviews, "get">,
+  login: string,
+): Promise<Response> {
   const png = await previews.get(login);
   if (!png) return new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
   return new Response(png, {

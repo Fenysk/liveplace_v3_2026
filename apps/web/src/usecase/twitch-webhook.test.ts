@@ -20,17 +20,29 @@ const message: TwitchWebhookMessage = {
 };
 
 // Des doubles : l'adaptateur rend l'événement donné, les écritures sont notées. `queueFailures` : combien de mises en file échouent d'abord.
-const setup = (event: TwitchWebhookEvent | null, queueFailures = 0) => {
+const setup = (event: TwitchWebhookEvent | null, queueFailures = 0, deletionFailures = 0) => {
   const names: TwitchUser[] = [];
   const commands: TwitchCommand[] = [];
   const syncs: TwitchSync[] = [];
   const lookedUp: string[] = []; // les propriétaires dont le canvas a été demandé à Convex
   const applied: TwitchLiveEvent[] = [];
   const reserved = new Set<string>(); // les identifiants de message retenus, comme le SET NX de Redis
+  const deletions: { userId: string; trigger: string }[] = []; // les effacements inscrits
+  let isRoutineRunning = false; // la routine tourne en tâche de fond : le webhook ne l'attend jamais
   let failuresLeft = queueFailures;
+  let deletionFailuresLeft = deletionFailures;
   const deps = {
     webhook: { read: () => event },
     now: () => now,
+    beginDeletion: async (request: { userId: string; trigger: "twitch" }) => {
+      if (deletionFailuresLeft > 0) {
+        deletionFailuresLeft -= 1;
+        return { ok: false, error: "failed" } as const;
+      }
+      deletions.push(request);
+      isRoutineRunning = true;
+      return { ok: true, value: { done: new Promise<never>(() => undefined) } } as const;
+    },
     durable: {
       getActiveCanvasForOwner: async (ownerId: string) => {
         lookedUp.push(ownerId);
@@ -66,7 +78,17 @@ const setup = (event: TwitchWebhookEvent | null, queueFailures = 0) => {
       },
     },
   };
-  return { deps, names, commands, syncs, lookedUp, applied, reserved };
+  return {
+    deps,
+    names,
+    commands,
+    syncs,
+    lookedUp,
+    applied,
+    reserved,
+    deletions,
+    routineRuns: () => isRoutineRunning,
+  };
 };
 
 describe("receiveTwitchWebhook (JOURNAL 2026-09-27)", () => {
@@ -159,6 +181,62 @@ describe("receiveTwitchWebhook (JOURNAL 2026-09-27)", () => {
     expect(ban.applied).toEqual([]);
     expect(revoked.applied).toEqual([]);
     expect(revoked.syncs).toEqual([{ status: "revoked", syncedAt: now }]);
+  });
+});
+
+describe("receiveTwitchWebhook, the access removed in Twitch (CDC §8, JOURNAL 2026-11-02)", () => {
+  const revoked: TwitchWebhookEvent = { kind: "accessRevoked", userId: "777" };
+
+  // Quand l'accès est retiré, le compte entre dans les effacements en cours et la réponse part sans attendre la routine
+  it("registers the account for deletion and answers at once, without waiting for the routine", async () => {
+    const { deps, deletions, routineRuns } = setup(revoked);
+
+    // La routine de ce double ne finit jamais : la réponse qui part prouve qu'elle n'est pas attendue.
+    expect(await receiveTwitchWebhook(deps, message)).toEqual({ status: 204 });
+
+    expect(deletions).toEqual([{ userId: "777", trigger: "twitch" }]);
+    expect(routineRuns()).toBe(true);
+  });
+
+  // Le même message livré deux fois n'inscrit qu'un effacement
+  it("registers one deletion for the same message delivered twice", async () => {
+    const { deps, deletions } = setup(revoked);
+
+    await receiveTwitchWebhook(deps, message);
+    await receiveTwitchWebhook(deps, message);
+
+    expect(deletions).toHaveLength(1);
+  });
+
+  // Un message d'un autre identifiant passe : l'inscription est idempotente, la routine aussi
+  it("lets another message id through, the registration being idempotent", async () => {
+    const { deps, deletions } = setup(revoked);
+
+    await receiveTwitchWebhook(deps, message);
+    await receiveTwitchWebhook(deps, { ...message, id: "m-2" });
+
+    expect(deletions).toHaveLength(2);
+  });
+
+  // Si l'inscription échoue, le message est rendu et la redélivrance de Twitch repasse
+  it("gives the message back when the registration fails, so Twitch's redelivery goes through", async () => {
+    const { deps, deletions, reserved } = setup(revoked, 0, 1);
+
+    await expect(receiveTwitchWebhook(deps, message)).rejects.toThrow("effacement du compte non inscrit");
+    expect(reserved.size).toBe(0);
+    expect(await receiveTwitchWebhook(deps, message)).toEqual({ status: 204 });
+
+    expect(deletions).toEqual([{ userId: "777", trigger: "twitch" }]);
+  });
+
+  // Un message que l'adaptateur n'a pas authentifié n'efface rien, et ne retient rien
+  it("deletes nothing for a message that is not authenticated", async () => {
+    const { deps, deletions, reserved } = setup(null);
+
+    expect(await receiveTwitchWebhook(deps, message)).toEqual({ status: 403 });
+
+    expect(deletions).toEqual([]);
+    expect(reserved.size).toBe(0);
   });
 });
 

@@ -132,6 +132,20 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
   );
 };
 
+// CDC §8, Inspection : l'auteur d'un compte supprimé n'a ni photo, ni nom, ni page, ni chaîne : un contour, comme une
+// personne sans compte, et « Compte supprimé ». Rien ne s'ouvre.
+export const DeletedProfile = () => {
+  const t = useTexts(DESIGN_TEXTS);
+  return (
+    <span className="lp-profile">
+      <span className="lp-profile-main">
+        <Avatar displayName="?" hasAccount={false} />
+        <span className="lp-profile-name lp-type-title">{t.deletedAccount}</span>
+      </span>
+    </span>
+  );
+};
+
 // Dans la pill Compte, sa propre photo n'est pas un profil : c'est le bouton Mon compte.
 // `hasDot` : quelque chose l'attend, un signalement pour qui modère (JOURNAL 2026-09-28) ; `title` le dit.
 // `isLive` (§9.7) : la pill Canvas repliée, où la photo déplie le profil ; en live, le rond

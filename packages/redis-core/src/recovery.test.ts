@@ -16,7 +16,7 @@ const watchSubscriber = redis.duplicate();
 const source = createSnapshotSource(redis, watchSubscriber);
 const target = createRecoveryTarget(redis);
 const marks = createRecoveryMarks(redis);
-const twitchWrites = createTwitchWrites(redis);
+const twitchWrites = createTwitchWrites(redis, harness.secret);
 const archiveWrites = createArchiveWrites(redis);
 
 afterAll(() => {

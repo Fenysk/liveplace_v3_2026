@@ -13,7 +13,7 @@ import { createRedisHarness } from "./test-harness";
 const harness = createRedisHarness();
 const { redis, core, runId } = harness;
 const watchSubscriber = redis.duplicate();
-const twitchWrites = createTwitchWrites(redis);
+const twitchWrites = createTwitchWrites(redis, harness.secret);
 const source = createSnapshotSource(redis, watchSubscriber);
 
 afterAll(() => {

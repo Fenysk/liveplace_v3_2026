@@ -11,6 +11,14 @@ export const snapshotTier = v.union(
   v.literal("weekly"),
 );
 
+// Les déclencheurs de `ACCOUNT_DELETION_TRIGGERS` (domain) : même garde que pour les paliers.
+export const accountDeletionTrigger = v.union(
+  v.literal("button"),
+  v.literal("twitch"),
+  v.literal("contact"),
+  v.literal("inactivity"),
+);
+
 export default defineSchema({
   // Le pseudo n'est jamais un identifiant : il peut changer chez Twitch.
   users: defineTable({
@@ -25,7 +33,27 @@ export default defineSchema({
     discoveredViaUserId: v.optional(v.string()), // le streamer d'où part la première connexion
   })
     .index("by_userId", ["userId"])
-    .index("by_login", ["login"]),
+    .index("by_login", ["login"])
+    .index("by_discoveredVia", ["discoveredViaUserId"]), // vider le lien d'un streamer supprimé, par lots (CDC §8)
+
+  // CDC §8, Supprimer son compte (RGPD art. 5.2) : la preuve d'un effacement, sans nom, sans e-mail, sans identifiant. Une
+  // ligne par effacement, nommée par un `runId` tiré au hasard ; écrite avec la ligne du compte, jamais seule.
+  accountDeletions: defineTable({
+    runId: v.string(),
+    deletedAt: v.number(),
+    trigger: accountDeletionTrigger,
+    // Ce qui est parti en plus de la ligne du compte, de ses traces sur les fresques des autres et de ses clés Redis.
+    erased: v.object({ hasEmail: v.boolean(), ownedCanvases: v.number() }),
+  }).index("by_runId", ["runId"]),
+
+  // CDC §8, Supprimer son compte (JOURNAL 2026-11-02) : l'empreinte HMAC de la session d'un compte supprimé, gardée 31 jours pour que
+  // le web la remette dans Redis si celui-ci la perd. Jamais l'identifiant : sans `SESSION_SECRET`, rien n'y mène.
+  deletedAccounts: defineTable({
+    fingerprint: v.string(),
+    deletedAt: v.number(),
+  })
+    .index("by_fingerprint", ["fingerprint"])
+    .index("by_deletedAt", ["deletedAt"]),
 
   // `canvasId` est opaque (D-14) : un propriétaire a exactement un canvas actif, et au plus cinq archives.
   canvases: defineTable({
@@ -48,7 +76,8 @@ export default defineSchema({
     backgroundImage: v.optional(v.object({ storageId: v.id("_storage"), at: v.number(), size: v.number() })),
   })
     .index("by_canvasId", ["canvasId"])
-    .index("by_owner_active", ["ownerId", "isActive"]),
+    .index("by_owner_active", ["ownerId", "isActive"])
+    .index("by_backgroundStorage", ["backgroundImage.storageId"]), // le ménage des fichiers sans ligne (JOURNAL 2026-11-02)
 
   // Une ligne par snapshot : le contenu est un fichier (§8.1). `scope` nomme l'environnement :
   // le poste et les bêtas partagent ce déploiement, et un même `canvasId` existe dans plusieurs Redis.
@@ -64,6 +93,9 @@ export default defineSchema({
     // §7.3 : le dessin seul, sans auteurs. Absent : une sauvegarde complète. Un fichier peut servir
     // plusieurs lignes (une promotion en ajoute une sans le copier) : `by_storage` compte ses références.
     isStateOnly: v.optional(v.boolean()),
+    // CDC §8 : les comptes que le fichier nomme, en filtre de Bloom (`createAccountsFilter`). Absent : une sauvegarde d'avant, que
+    // la première suppression lit une fois et marque.
+    accountsFilter: v.optional(v.string()),
   })
     .index("by_scope_canvas_tier_takenAt", ["scope", "canvasId", "tier", "takenAt"])
     .index("by_canvas", ["canvasId"]) // le ménage d'un canvas supprimé, tous scopes (JOURNAL 2026-10-08)
@@ -85,10 +117,19 @@ export default defineSchema({
     gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))), // des versions perdues
     resizedAt: v.optional(v.number()), // la version sans événement d'un changement de taille
     recoveredAt: v.optional(v.number()), // la date d'une récupération : posé par l'étape E, jamais par le worker
+    accountsFilter: v.optional(v.string()), // comme pour un snapshot
   })
     .index("by_scope_canvas_version", ["scope", "canvasId", "fromVersion"])
     .index("by_scope_toTs", ["scope", "toTs"]) // le budget retire le plus ancien d'abord, canvas confondus
-    .index("by_canvas", ["canvasId"]),
+    .index("by_canvas", ["canvasId"])
+    .index("by_storage", ["storageId"]), // le fichier qu'une réécriture remplace, et le ménage des fichiers sans ligne
+
+  // CDC §8, Supprimer son compte (JOURNAL 2026-11-02) : un compte supprimé dont les fichiers de sauvegarde restent à réécrire. L'identifiant
+  // reste ici le temps du travail du worker, qui efface la ligne en le finissant.
+  erasures: defineTable({
+    userId: v.string(),
+    requestedAt: v.number(),
+  }).index("by_userId", ["userId"]),
 
   // §8.4 : les octets des fichiers, comptés à chaque ajout et retrait pour qu'une lecture n'en coûte
   // qu'une ligne. `files` : tous les fichiers du déploiement ; `chunks:<scope>` : l'historique d'un scope, que le budget borne.

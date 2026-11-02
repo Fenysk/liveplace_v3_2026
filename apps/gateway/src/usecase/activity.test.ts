@@ -478,6 +478,18 @@ describe("the activity in the gateway (§16.1)", () => {
     expect(userReads).toEqual(["owner-a"]);
   });
 
+  // Oublie le streamer d'un compte supprimé : son miroir est relu, et ses canvas ne sont plus servis de mémoire (CDC §8)
+  it("forgets the owner of a deleted account: its mirror is read again", async () => {
+    const { activity, join, userReads, watched } = setup();
+    join("canvas-a", viewer);
+    await watched();
+
+    activity.forgetOwner("owner-a");
+    await watched();
+
+    expect(userReads).toEqual(["owner-a", "owner-a"]);
+  });
+
   // Ne rend l'historique qu'au développeur
   it("gives the history to the developer only", async () => {
     const { activity } = setup();

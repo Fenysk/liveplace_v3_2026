@@ -1,5 +1,7 @@
 // Le cycle du worker (§7.2) : écouter Redis, balayer, sauvegarder ce que le plan dit dû.
 
+import { listSnapshotAccounts } from "@liveplace/domain/account-erasure";
+import { createAccountsFilter } from "@liveplace/domain/accounts-filter";
 import type { SnapshotSource, SnapshotStore, Unsubscribe } from "@liveplace/domain/ports";
 import type { CanvasSnapshot } from "@liveplace/domain/snapshot";
 import type { SnapshotPlan } from "./snapshot-plan";
@@ -47,6 +49,8 @@ export function createSnapshotCycle({
         takenAt,
         schemaVersion: snapshot.schemaVersion,
         bytes,
+        // Les comptes que le fichier nomme : une suppression ne lit que les fichiers qui peuvent nommer le sien (JOURNAL 2026-11-02).
+        accountsFilter: createAccountsFilter(listSnapshotAccounts(snapshot)),
       });
       if (answer === "refused")
         log(`snapshot ${canvasId} refusé : Convex garde une version plus avancée que Redis (${version})`);

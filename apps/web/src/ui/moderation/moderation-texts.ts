@@ -170,6 +170,9 @@ export const MODERATION_TEXTS = defineTexts({
   report: { fr: "Signaler", en: "Report" },
   no: { fr: "Non", en: "No" },
   clearAllPixels: { fr: "Effacer tous ses dessins", en: "Clear all their drawings" },
+  // CDC §8 : le dessin d'un compte supprimé n'a pas de nom à écrire dans le titre, et pas de plage.
+  clearDeletedTitle: { fr: "Effacer ce dessin ?", en: "Clear this drawing?" },
+  reportDeletedTitle: { fr: "Signaler ce dessin ?", en: "Report this drawing?" },
   timeRange: { fr: "Plage de temps", en: "Time range" },
   // Les crans de la plage : un dessin seul, ou ses voisins dans une plage d'heures (« 5 min avant et après ce dessin »).
   spanPlacementOnly: { fr: "Ce dessin seul", en: "This drawing only" },

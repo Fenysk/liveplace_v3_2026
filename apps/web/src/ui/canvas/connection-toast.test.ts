@@ -105,3 +105,38 @@ describe("the connection toast on a real store (§17.1)", () => {
     expect(toasts).toEqual([]);
   });
 });
+
+describe("the connection toast while the account is being deleted (CDC §8)", () => {
+  // Le gateway ferme la socket (4001), la page se reconnecte en invité : ni connexion perdue, ni connexion revenue
+  it("says neither the connection lost nor the connection back while the deletion runs", () => {
+    const deleting = { isDeletingAccount: true };
+
+    expect(connectionToast({ status: "live" }, { status: "reconnecting" }, "fr", deleting)).toBeNull();
+    expect(connectionToast({ status: "reconnecting" }, { status: "live" }, "fr", deleting)).toBeNull();
+    expect(connectionToast({ status: "live" }, { status: "reconnecting" }, "en", deleting)).toBeNull();
+  });
+
+  // La coupure du gateway sur un vrai store : le toast écouté comme le fait la page ne dit rien, puis redit tout après un échec
+  it("stays silent on a real store cut by the gateway, and speaks again once the deletion is over", () => {
+    const { store, dropSocket, open, receive } = setup();
+    const toasts: string[] = [];
+    let isDeletingAccount = true;
+    let seen = store.getView();
+    store.subscribe(() => {
+      const next = store.getView();
+      const toast = connectionToast(seen, next, "fr", { isDeletingAccount });
+      if (toast) toasts.push(toast.text);
+      seen = next;
+    });
+
+    dropSocket();
+    open();
+    receive(welcome);
+    expect(toasts).toEqual([]);
+
+    isDeletingAccount = false;
+    dropSocket();
+
+    expect(toasts).toEqual([CONNECTION_LOST_TOAST]);
+  });
+});

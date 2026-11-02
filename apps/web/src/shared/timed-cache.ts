@@ -4,6 +4,7 @@ export type TimedCache<Value> = {
   get(key: string): Value | undefined; // absent ou expiré : `undefined`
   set(key: string, value: Value, keptMs: number): void;
   delete(key: string): void;
+  deleteWhere(isForgotten: (key: string) => boolean): void; // toutes les clés qui répondent vrai
 };
 
 export function createTimedCache<Value>(maxEntries: number, now: () => number): TimedCache<Value> {
@@ -30,6 +31,10 @@ export function createTimedCache<Value>(maxEntries: number, now: () => number): 
 
     delete(key) {
       entries.delete(key);
+    },
+
+    deleteWhere(isForgotten) {
+      for (const key of entries.keys()) if (isForgotten(key)) entries.delete(key);
     },
   };
 }

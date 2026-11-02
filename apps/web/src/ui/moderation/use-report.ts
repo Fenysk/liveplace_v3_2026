@@ -83,7 +83,13 @@ export function useReport(canvas: CanvasStore): {
           onReport: () => {
             if (sentStatus) return;
             const { x, y, entry } = found;
-            open({ x, y, displayName: entry.displayName, placementId: entry.placementId });
+            open({
+              x,
+              y,
+              displayName: entry.displayName,
+              placementId: entry.placementId,
+              ...(entry.isDeleted ? { isDeleted: true } : {}),
+            });
           },
         }
       : undefined;

@@ -1,6 +1,7 @@
 // Le rendu de chaque entrée du sommaire, branché par son slug : le type oblige à n'en oublier aucune.
 
 import type { ComponentType } from "react";
+import { AccountWindowEntry, DeleteAccountWindowEntry } from "./account-entries";
 import {
   ArchiveBannerEntry,
   ArchivesEntry,
@@ -46,14 +47,7 @@ import {
 } from "./game-entries";
 import { GaugeEntry } from "./gauge-entry";
 import { HomeEntry } from "./home-entries";
-import {
-  AccountWindowEntry,
-  PaletteEntry,
-  PillEntry,
-  SignInEntry,
-  ToastEntry,
-  WindowEntry,
-} from "./interactive-entries";
+import { PaletteEntry, PillEntry, SignInEntry, ToastEntry, WindowEntry } from "./interactive-entries";
 import {
   BannedWindowEntry,
   InspectionEntry,
@@ -113,6 +107,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   banni: BannedWindowEntry,
   "archiver-ou-rouvrir": SwitchWindowEntry,
   "supprimer-une-archive": DiscardWindowEntry,
+  "supprimer-son-compte": DeleteAccountWindowEntry,
   "telecharger-en-png": DownloadWindowEntry,
 
   accueil: HomeEntry,

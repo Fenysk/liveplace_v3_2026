@@ -25,7 +25,7 @@ import { createRedisHarness } from "./test-harness";
 const harness = createRedisHarness();
 const { redis, core, runId } = harness;
 const writes = createSignInWrites(redis);
-const twitchWrites = createTwitchWrites(redis);
+const twitchWrites = createTwitchWrites(redis, harness.secret);
 
 const OWNER = "owner-1";
 const now = 1_700_000_000_000;

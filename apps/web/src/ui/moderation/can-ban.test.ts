@@ -22,6 +22,14 @@ describe("canBan (§5.4)", () => {
     expect(canBan(author(fromTwitch))).toBe(true);
     expect(canBan(author())).toBe(true);
   });
+
+  // L'auteur d'un compte supprimé ne se bannit pas non plus (CDC §8), et aucun retrait ne propose de le bannir
+  it("refuses the author of a deleted account, and no clear offers to ban it", () => {
+    const deleted: ModerationTarget = { ...author(), isDeleted: true };
+
+    expect(canBan(deleted)).toBe(false);
+    expect(askBanAfterClear({ kind: "clear", author: deleted })).toBeNull();
+  });
 });
 
 describe("the ban offered after a clear (§5.4)", () => {

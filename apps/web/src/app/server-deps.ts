@@ -5,8 +5,10 @@ import { generateLinkCode } from "@liveplace/domain";
 import { createDurableStore, createRecoveryStore } from "@liveplace/durable";
 import {
   createAccountList,
+  createAccountPurge,
   createArchiveWrites,
   createCapacityWrites,
+  createDeletedAccounts,
   createRecoveryMarks,
   createSignInWrites,
   createTwitchLiveStore,
@@ -23,6 +25,12 @@ import {
 } from "../infra/twitch";
 import { createBackgroundImages } from "../usecase/background-images";
 import { createCanvasPreviews } from "../usecase/canvas-preview";
+import {
+  beginAccountDeletion,
+  type DeleteAccountDeps,
+  type DeleteAccountRequest,
+  finishPendingDeletion,
+} from "../usecase/delete-account";
 import { createTwitchLiveTracker } from "../usecase/twitch-live";
 import { parseWebConfig } from "./config";
 import { createPreviewRenderer } from "./render-preview-png";
@@ -31,7 +39,7 @@ const buildServerDeps = () => {
   // Fail-closed (§11.5) : une variable manquante lève ici, en la nommant.
   const config = parseWebConfig(process.env);
   const redis = new Redis(config.redisUrl);
-  const twitchWrites = createTwitchWrites(redis); // JOURNAL 2026-09-27
+  const twitchWrites = createTwitchWrites(redis, config.sessionSecret); // JOURNAL 2026-09-27
   const durable = createDurableStore(config.convexUrl, config.convexServiceKey);
   const archiveWrites = createArchiveWrites(redis); // §17.2 : archiver, rouvrir, supprimer
   const eventSub = createTwitchEventSub({
@@ -41,6 +49,31 @@ const buildServerDeps = () => {
     secret: config.twitchEventSubSecret,
     isBeta: config.betaLabel !== null,
   });
+  const accounts = createAccountList(redis, config.sessionSecret);
+  const avatarPhotos = createAvatarPhotos({ fetchPhoto: fetch, now: Date.now });
+  // §9.10 : l'image de la carte d'aperçu d'un lien, un rendu par canvas et par minute, avec la
+  // photo Twitch du streamer que le serveur récupère lui-même
+  const canvasPreviews = createCanvasPreviews({
+    durable,
+    redis: archiveWrites,
+    render: createPreviewRenderer({ photos: avatarPhotos }),
+    now: Date.now,
+  });
+  // §9.5 : l'image du fond d'une fresque, lue dans Convex une fois par login et par instant
+  const backgroundImages = createBackgroundImages({ durable, now: Date.now });
+  // CDC §8 : `deleteAccount` et sa reprise, avec ce que le web gardait en mémoire d'un streamer supprimé.
+  const accountDeletion: DeleteAccountDeps = {
+    durable,
+    purge: createAccountPurge(redis, config.sessionSecret),
+    eventSub,
+    forgetOwner: ({ login, avatarUrl }) => {
+      canvasPreviews.forget(login);
+      backgroundImages.forget(login);
+      avatarPhotos.forget(avatarUrl);
+    },
+    now: Date.now,
+    randomRunId: randomUUID,
+  };
   return {
     twitch: createTwitchAuth({
       clientId: config.twitchClientId,
@@ -57,22 +90,17 @@ const buildServerDeps = () => {
     recoveryMarks: createRecoveryMarks(redis),
     twitchWrites,
     archiveWrites,
-    // §9.10 : l'image de la carte d'aperçu d'un lien, un rendu par canvas et par minute, avec la
-    // photo Twitch du streamer que le serveur récupère lui-même
-    canvasPreviews: createCanvasPreviews({
-      durable,
-      redis: archiveWrites,
-      render: createPreviewRenderer({
-        photos: createAvatarPhotos({ fetchPhoto: fetch, now: Date.now }),
-      }),
-      now: Date.now,
-    }),
-    // §9.5 : l'image du fond d'une fresque, lue dans Convex une fois par login et par instant
-    backgroundImages: createBackgroundImages({ durable, now: Date.now }),
+    canvasPreviews,
+    backgroundImages,
+    accountDeletion,
+    // Une reconnexion termine d'abord l'effacement interrompu du même compte (CDC §8).
+    finishPendingDeletion: (userId: string) => finishPendingDeletion(accountDeletion, userId),
+    // Le bouton de Mon compte et l'accès retiré chez Twitch inscrivent l'effacement, puis la routine finit seule (CDC §8).
+    beginDeletion: (request: DeleteAccountRequest) => beginAccountDeletion(accountDeletion, request),
     capacityWrites: createCapacityWrites(redis), // §16.3 : l'occupation du web, l'usage de Convex
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub,
-    accounts: createAccountList(redis), // §10.4 : les comptes que le démarrage suit tous
+    accounts, // §10.4 : les comptes que le démarrage suit tous
     // §10.4 : le live des comptes, par EventSub, avec helix/streams en filet
     tracker: createTwitchLiveTracker({
       source: createTwitchLiveSource({
@@ -80,13 +108,14 @@ const buildServerDeps = () => {
         clientSecret: config.twitchClientSecret,
       }),
       eventSub,
-      store: createTwitchLiveStore(redis),
-      commands: twitchWrites,
+      accounts,
+      store: createTwitchLiveStore(redis, config.sessionSecret),
       now: Date.now,
     }),
     now: Date.now,
     signer: createSessionSigner(config.sessionSecret),
-    verifier: createSessionVerifier(config.sessionSecret), // §10.2 : l'affichage de `/{login}`
+    // §10.2 : l'affichage de `/{login}`, qui refuse la session d'un compte supprimé (CDC §8)
+    verifier: createSessionVerifier(config.sessionSecret, createDeletedAccounts(redis, config.sessionSecret)),
     randomCanvasId: randomUUID,
     // §17.2 : le code d'une archive, tiré par le web, sans biais de modulo.
     randomLinkCode: () => generateLinkCode((size) => randomBytes(size)),

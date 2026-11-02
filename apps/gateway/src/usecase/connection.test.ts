@@ -1,6 +1,7 @@
 import {
   type CanvasMeta,
   type CanvasOrigin,
+  DELETED_AUTHOR,
   DEVELOPER_USER_ID,
   type Device,
   defaultCanvasMeta,
@@ -46,6 +47,7 @@ import { createBroadcast } from "./broadcast";
 import { createCapacity } from "./capacity";
 import { createConnection } from "./connection";
 import { createDelayTally } from "./delay-tally";
+import { CLOSE_ACCOUNT_DELETED, createOpenConnections } from "./open-connections";
 
 const canvasId = "canvas-1";
 const now = 1_700_000_000_000;
@@ -213,6 +215,7 @@ const moderate = (action: string, target = "user-2") =>
 type SetupOptions = {
   session?: Session | null;
   isModerator?: boolean;
+  author?: InspectEntry; // ce que rend `inspect` en (1, 2) ; absent : `entry`
   authorOrigin?: ModeratorOrigin; // ce que rend `getModeratorOrigin` (l'auteur inspecté est modérateur) ; absent : il ne l'est pas
   twitchSync?: TwitchSync; // l'état de la synchro Twitch lu dans `meta`
   version?: number;
@@ -301,7 +304,7 @@ const setup = (options: SetupOptions = {}) => {
     },
     async inspect(_asked: string, x: number, y: number) {
       inspected.push({ x, y });
-      return x === 1 && y === 2 ? entry : null;
+      return x === 1 && y === 2 ? (options.author ?? entry) : null;
     },
     async place(_asked: string, placement: Placement) {
       placements.push(placement);
@@ -435,6 +438,7 @@ const setup = (options: SetupOptions = {}) => {
     now: () => clock.nowMs,
     isProduction: false,
   });
+  const connections = createOpenConnections();
   const capacity = createCapacity({
     store: capacityStore,
     host: quietHost,
@@ -460,7 +464,7 @@ const setup = (options: SetupOptions = {}) => {
     };
     return {
       connection: createConnection(
-        { core, broadcast, activity, capacity, now: () => clock.nowMs },
+        { core, broadcast, activity, capacity, connections, now: () => clock.nowMs },
         socket,
         opened,
         device,
@@ -475,6 +479,7 @@ const setup = (options: SetupOptions = {}) => {
     connection,
     broadcast,
     activity,
+    connections,
     capacity,
     sent,
     closed,
@@ -695,6 +700,34 @@ describe("createConnection (§6.1)", () => {
     expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicEntry, canReport: true } });
     expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
     expect(byModerator.sent.at(-1)).toEqual({ ...inspected, entry: { ...entry, canReport: true } });
+  });
+
+  // Dit un compte supprimé à tous, avec sa pose et sans nom ; son identifiant `deleted` ne part qu'à qui modère (CDC §8)
+  it("tells everyone the author is a deleted account, and gives its marker only to whoever moderates", async () => {
+    const deletedAuthor: InspectEntry = {
+      userId: DELETED_AUTHOR,
+      login: "",
+      displayName: "",
+      isDeleted: true,
+      colorIndex: 3,
+      placedAt: now,
+      placementId: "pviewer001",
+    };
+    const { userId: _marker, ...publicDeleted } = deletedAuthor;
+    const byViewer = setup({ author: deletedAuthor });
+    const byGuest = setup({ session: null, author: deletedAuthor });
+    const byOwner = setup({ session: owner, author: deletedAuthor });
+    for (const { connection } of [byViewer, byGuest, byOwner]) {
+      await connection.receive(hello());
+      await connection.receive(inspect(1, 2));
+    }
+
+    const inspected = { t: "inspected", requestId: "inspect-1", x: 1, y: 2 };
+    expect(byViewer.sent.at(-1)).toEqual({ ...inspected, entry: { ...publicDeleted, canReport: true } });
+    expect(byGuest.sent.at(-1)).toEqual({ ...inspected, entry: publicDeleted });
+    expect(byOwner.sent.at(-1)).toEqual({ ...inspected, entry: { ...deletedAuthor, canReport: true } });
+    // Son live n'est jamais lu : un compte supprimé n'a ni chaîne ni état.
+    expect(byOwner.twitchLiveReads).not.toContain(DELETED_AUTHOR);
   });
 
   // Dit à qui modère, en inspectant, que l'auteur est modérateur et d'où il vient, au streamer (JOURNAL 2026-09-27) comme à un
@@ -1150,6 +1183,24 @@ describe("moderation in the connection (§5.4, JOURNAL 2026-09-25)", () => {
     for (const context of [byOwner, byViewer]) context.control({ t: "role", userId: "mod-1" });
 
     expect(byOwner.sent.at(-1)).toEqual({ t: "staleList", list: "moderators" });
+    expect(byViewer.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
+      "welcome",
+      "snapshot",
+    ]);
+  });
+
+  // Un compte supprimé périme les deux listes de qui modère, et ne dit rien aux autres (JOURNAL 2026-11-01)
+  it("tells the moderators that both lists are stale when the traces of a deleted account are purged, and no one else", async () => {
+    const byOwner = setup({ session: owner });
+    const byViewer = setup();
+    for (const context of [byOwner, byViewer]) await context.connection.receive(hello());
+
+    for (const context of [byOwner, byViewer]) context.control({ t: "tracesPurged" });
+
+    expect(byOwner.sent.slice(3)).toEqual([
+      { t: "staleList", list: "bans" },
+      { t: "staleList", list: "moderators" },
+    ]);
     expect(byViewer.sent.map((frame) => ("t" in frame ? frame.t : "snapshot"))).toEqual([
       "welcome",
       "snapshot",
@@ -2693,5 +2744,32 @@ describe("the Twitch live in the connection (§10.4)", () => {
     const welcomes = context.sent.filter((frame) => hasFrame(frame, "welcome"));
     expect(welcomes).toHaveLength(2);
     expect(welcomes.at(-1)).toMatchObject({ canvas: { ownerTwitchLive: art }, you: { twitchLive: art } });
+  });
+});
+
+describe("a deleted account in the connection (CDC §8, JOURNAL 2026-11-01)", () => {
+  // Ferme la connexion d'un compte supprimé même avant son hello, et celle des pages de ses fresques
+  it("closes the connection of a deleted account even before its hello, and the pages of its canvases", async () => {
+    const before = setup();
+    const onItsCanvas = before.open(null);
+    await onItsCanvas.connection.receive(hello());
+
+    before.connections.closeAccount(session.userId);
+    before.connections.closeAccount(meta.ownerId);
+
+    expect(before.closed).toEqual([CLOSE_ACCOUNT_DELETED]);
+    expect(onItsCanvas.closed).toEqual([CLOSE_ACCOUNT_DELETED]);
+  });
+
+  // Une connexion fermée n'est plus retrouvée
+  it("no longer finds a connection once it was closed", async () => {
+    const page = setup();
+    await page.connection.receive(hello());
+
+    await page.connection.close();
+
+    expect(page.connections.closeAccount(session.userId)).toBe(0);
+    expect(page.connections.closeAccount(meta.ownerId)).toBe(0);
+    expect(page.closed).toEqual([]);
   });
 });

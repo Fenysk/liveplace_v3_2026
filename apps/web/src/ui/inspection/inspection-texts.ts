@@ -11,6 +11,8 @@ export const INSPECTION_TEXTS = defineTexts({
   report: { fr: "Signaler", en: "Report" },
   reported: { fr: "Signalé", en: "Reported" },
   clearTheirPixels: { fr: "Effacer ses dessins", en: "Clear their drawings" },
+  // CDC §8 : sur le dessin d'un compte supprimé, qui modère n'a que cette pose.
+  clearThisDrawing: { fr: "Effacer ce dessin", en: "Clear this drawing" },
   ban: { fr: "Bannir", en: "Ban" },
 
   // JOURNAL 2026-09-27 : pour le streamer. Nommé ici, il se retire ici ; venu de Twitch seul, il se retire sur Twitch.

@@ -1,3 +1,4 @@
+import type { DeletedAccounts } from "@liveplace/domain/ports";
 import { SignJWT, UnsecuredJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import { createSessionVerifier } from "./session";
@@ -5,7 +6,15 @@ import { createSessionVerifier } from "./session";
 const secret = "s".repeat(32);
 const key = new TextEncoder().encode(secret);
 const claims = { sub: "user-1", login: "user1", displayName: "User 1" };
-const verifier = createSessionVerifier(secret);
+// userId → la seconde où son compte a été supprimé.
+const deletions = new Map<string, number>();
+const deletedAccounts: DeletedAccounts = {
+  async isSessionRevoked(userId, issuedAt) {
+    const deletedAt = deletions.get(userId);
+    return deletedAt !== undefined && issuedAt < deletedAt;
+  },
+};
+const verifier = createSessionVerifier(secret, deletedAccounts);
 
 const sign = (payload: Record<string, unknown>, expiration: string | number, signingKey = key) =>
   new SignJWT(payload).setProtectedHeader({ alg: "HS256" }).setExpirationTime(expiration).sign(signingKey);
@@ -58,5 +67,24 @@ describe("createSessionVerifier (§10.2)", () => {
   // Rend un invité quand une information d'identité manque
   it("returns a guest when an identity field is missing", async () => {
     expect(await verifier.verify(cookie(await sign({ sub: claims.sub }, "30d")))).toBeNull();
+  });
+
+  // Rend un invité quand le compte a été supprimé après l'émission du cookie, mais la session d'une reconnexion passe (CDC §8)
+  it("returns a guest when the account was deleted after the cookie was issued, not for a reconnection", async () => {
+    const issuedAt = (seconds: number) =>
+      new SignJWT(claims)
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt(seconds)
+        .setExpirationTime("30d")
+        .sign(key);
+    deletions.set(claims.sub, 2000);
+
+    expect(await verifier.verify(cookie(await issuedAt(1999)))).toBeNull();
+    expect(await verifier.verify(cookie(await sign(claims, "30d")))).toBeNull(); // sans `iat` : plus ancien que tout
+    expect(await verifier.verify(cookie(await issuedAt(2000)))).toMatchObject({ userId: claims.sub });
+    expect(await verifier.verify(cookie(await sign({ ...claims, sub: "user-2" }, "30d")))).toMatchObject({
+      userId: "user-2",
+    });
+    deletions.delete(claims.sub);
   });
 });

@@ -20,7 +20,14 @@ import { LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
 import { Pill } from "../design/pill";
 import { PixelPreview } from "../design/pixel-preview";
-import { Avatar, AvatarButton, Profile, type ProfileUser, type ProfileVariant } from "../design/profile";
+import {
+  Avatar,
+  AvatarButton,
+  DeletedProfile,
+  Profile,
+  type ProfileUser,
+  type ProfileVariant,
+} from "../design/profile";
 import { Reveal } from "../design/reveal";
 import { SaturationFigure } from "../design/saturation-figure";
 import { Segmented, type SegmentedOption } from "../design/segmented";
@@ -153,7 +160,7 @@ const PROFILE_LIVE_STATES: readonly {
 export const ProfileEntry = () => (
   <Entry
     slug="avatar-et-profil"
-    components={["Avatar", "Profile", "AvatarButton"]}
+    components={["Avatar", "Profile", "DeletedProfile", "AvatarButton"]}
     file="ui/design/profile.tsx"
     note="L'avatar et le nom mènent à la fresque ; seul le bouton Twitch mène à la chaîne, et il dit quand la personne est en live."
   >
@@ -172,6 +179,16 @@ export const ProfileEntry = () => (
           </Pill>
         </StateRow>
       ))}
+    </Block>
+    <Block
+      title="Compte supprimé"
+      note="L'auteur d'un pixel dont le compte est supprimé : un contour, « Compte supprimé », ni nom, ni photo, ni lien, ni chaîne."
+    >
+      <StateRow name="DeletedProfile">
+        <Pill>
+          <DeletedProfile />
+        </Pill>
+      </StateRow>
     </Block>
     <Block
       title="Bouton Twitch"

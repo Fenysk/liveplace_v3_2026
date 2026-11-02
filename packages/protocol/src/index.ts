@@ -45,7 +45,9 @@ import { z } from "zod";
 // 22 : le `welcome` dit la version du dernier rapprochement qui a déplacé des pixels, `movedAtVersion` (§5.8).
 // 23 : la taille dynamique, `setDynamicSize`, `isDynamicSize` et `origin` dans le `welcome`, et l'`origin` de la page dans `place`
 // (§4.6 et §5.8).
-export const PROTOCOL_VERSION = 23;
+// 24 : l'auteur d'un compte supprimé, `isDeleted` dans l'entrée de `inspected` et dans chaque signalement de `reports`
+// (CDC §8, Supprimer son compte).
+export const PROTOCOL_VERSION = 24;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -155,6 +157,8 @@ const InspectEntrySchema = z.object({
   moderatorOrigin: ModeratorOriginSchema.optional(), // pour qui modère (§4.3), quand l'auteur est modérateur
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
+  // CDC §8 : l'auteur d'un compte supprimé n'a ni pseudo, ni nom, ni photo (`login` et `displayName` vides), et se dit ainsi.
+  isDeleted: z.boolean().optional(),
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
   twitchLive: TwitchLiveSchema.optional(), // §4.3 : lu à l'inspection
   colorIndex: ColorIndexSchema,
@@ -542,6 +546,7 @@ const ReportedPlacementSchema = z.object({
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
   hasAccount: z.boolean(),
+  isDeleted: z.boolean().optional(), // CDC §8 : la pose d'un compte supprimé, sans nom (`login` et `displayName` vides)
   moderatorOrigin: ModeratorOriginSchema.optional(), // §4.3 : un modérateur nommé ici ne se bannit pas
   placementId: PlacementIdSchema,
   reportCount: z.number().int().positive(),

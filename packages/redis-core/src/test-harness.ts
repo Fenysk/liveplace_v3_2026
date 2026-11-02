@@ -53,6 +53,9 @@ export function createRedisHarness() {
     await redis.quit();
   });
 
+  // Le secret des sessions des tests : l'empreinte d'un compte supprimé en découle (deleted-accounts.ts).
+  const secret = "un-secret-de-session-de-plus-de-32-octets";
+
   const readyCanvas = async (meta: CanvasMeta) => {
     const canvasId = uniqueCanvasId();
     await core.createCanvas(canvasId, meta);
@@ -88,6 +91,7 @@ export function createRedisHarness() {
     redis,
     core,
     runId,
+    secret,
     uniqueCanvasId,
     uniqueActivityKeys,
     uniqueCapacityKeys,

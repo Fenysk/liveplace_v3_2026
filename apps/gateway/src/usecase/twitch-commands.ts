@@ -220,14 +220,15 @@ export async function consumeTwitchCommands(
 ): Promise<void> {
   const waiting = new Map<string, TwitchCommand>();
   const settle = async (id: string, command: TwitchCommand): Promise<void> => {
+    // Jamais la commande entière : elle nomme des comptes (CDC §8, journaux sans identifiant). Son genre dit déjà ce qui a échoué.
     const outcome = await applyTwitchCommand(deps, command).catch((error: unknown) => {
-      console.error("gateway: action Twitch non appliquée", command, error);
+      console.error(`gateway: action Twitch non appliquée (${command.kind})`, error);
       return "done" as const;
     });
     if (outcome === "recovering") return void waiting.set(id, command);
     waiting.delete(id);
     if (outcome === "lost")
-      console.error("gateway: action Twitch sans canvas prêt, gardée sans acquit", command);
+      console.error(`gateway: action Twitch sans canvas prêt, gardée sans acquit (${command.kind})`);
     else await queue.ackTwitchCommand(id);
   };
   while (isRunning()) {

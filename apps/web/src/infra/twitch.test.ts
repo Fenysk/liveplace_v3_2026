@@ -270,6 +270,65 @@ describe("createTwitchEventSub (JOURNAL 2026-09-27)", () => {
   });
 });
 
+describe("createTwitchWebhook, the access removed in Twitch (CDC §8, JOURNAL 2026-11-02)", () => {
+  const secret = "eventsub-secret";
+  const sentAt = Date.parse("2026-09-27T12:00:00Z");
+  const webhook = createTwitchWebhook(secret);
+  const messageOf = (type: string, body: string, signedWith = secret): TwitchWebhookMessage => {
+    const id = "message-1";
+    const timestamp = "2026-09-27T12:00:00Z";
+    const hmac = createHmac("sha256", signedWith)
+      .update(id + timestamp + body)
+      .digest("hex");
+    return { id, timestamp, signature: `sha256=${hmac}`, type, body };
+  };
+  const REVOKED =
+    '{"subscription":{"type":"user.authorization.revoke","condition":{"client_id":"client-id"}},' +
+    '"event":{"client_id":"client-id","user_id":"777","user_login":"gone","user_name":"Gone"}}';
+  // Le compte Twitch n'existe plus : Twitch envoie le login et le nom à null
+  const REVOKED_DELETED_USER = REVOKED.replace(
+    '"user_login":"gone","user_name":"Gone"',
+    '"user_login":null,"user_name":null',
+  );
+
+  // Quand l'accès est retiré, la notification dit quel compte, avec son identifiant seul, même si le compte Twitch n'existe plus
+  it("reads the account whose access was removed, from its identifier alone", () => {
+    expect(webhook.read(messageOf("notification", REVOKED), sentAt)).toEqual({
+      kind: "accessRevoked",
+      userId: "777",
+    });
+    expect(webhook.read(messageOf("notification", REVOKED_DELETED_USER), sentAt)).toEqual({
+      kind: "accessRevoked",
+      userId: "777",
+    });
+  });
+
+  // Si la signature est fausse, le message n'est lu en rien : un tiers ne peut pas faire effacer un compte
+  it("reads nothing from a message signed with another secret, with a tampered body, or too old", () => {
+    const tampered = { ...messageOf("notification", REVOKED), body: REVOKED.replace("777", "888") };
+
+    expect(webhook.read(messageOf("notification", REVOKED, "another-secret"), sentAt)).toBeNull();
+    expect(webhook.read(tampered, sentAt)).toBeNull();
+    expect(webhook.read(messageOf("notification", REVOKED), sentAt + 11 * 60_000)).toBeNull();
+  });
+
+  // Un identifiant absent n'est pas un compte à effacer : le message est refusé à la lecture
+  it("refuses a notification that names no account", () => {
+    const nobody = REVOKED.replace('"user_id":"777",', "");
+
+    expect(() => webhook.read(messageOf("notification", nobody), sentAt)).toThrow();
+  });
+
+  // Twitch qui retire notre propre abonnement ne nomme aucune chaîne : le message est ignoré, sans erreur
+  it("ignores the revocation of its own subscription, which names no channel", () => {
+    const revocation =
+      '{"subscription":{"type":"user.authorization.revoke","status":"notification_failures_exceeded",' +
+      '"condition":{"client_id":"client-id"}}}';
+
+    expect(webhook.read(messageOf("revocation", revocation), sentAt)).toEqual({ kind: "ignored" });
+  });
+});
+
 describe("createTwitchWebhook, the live of a channel (§10.4)", () => {
   const secret = "eventsub-secret";
   const sentAt = Date.parse("2026-10-07T12:00:00Z");
@@ -437,6 +496,185 @@ describe("createTwitchEventSub, the live of a channel (§10.4)", () => {
     expect(asked).toEqual([]);
     expect(logged).toHaveBeenCalledTimes(2);
     logged.mockRestore();
+  });
+});
+
+describe("createTwitchEventSub, the account deletion (CDC §8, JOURNAL 2026-11-02)", () => {
+  const options = {
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    callbackUrl: "https://liveplace.tv/twitch/eventsub",
+    secret: "eventsub-secret",
+    isBeta: false,
+  };
+  const OURS = "https://liveplace.tv/twitch/eventsub";
+  const OTHER = "https://beta.liveplace.tv/twitch/eventsub";
+  const subscription = (id: string, type: string, callback = OURS, status = "enabled") =>
+    `{"id":"${id}","type":"${type}","status":"${status}","transport":{"callback":"${callback}"}}`;
+
+  // Twitch, joué par URL : chaque appel est noté avec sa méthode et ses filtres ; `failDeleting` : les identifiants que Twitch refuse.
+  const stubEventSub = (existing: string, failDeleting: readonly string[] = []) => {
+    const created: unknown[] = [];
+    const deleted: string[] = [];
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
+      const url = new URL(input);
+      asked.push(`${init?.method ?? "GET"} ${url.pathname}${url.search}`);
+      if (url.pathname === "/oauth2/token") return json('{"access_token":"app-token","expires_in":3600}');
+      if (url.pathname !== "/helix/eventsub/subscriptions") return new Response("inconnu", { status: 404 });
+      if (init?.method === "POST") {
+        created.push(String(init.body));
+        return new Response("{}", { status: 202 });
+      }
+      if (init?.method === "DELETE") {
+        const id = url.searchParams.get("id") ?? "";
+        deleted.push(id);
+        if (failDeleting.includes(id)) return new Response("panne", { status: 503 });
+        return new Response(null, { status: id === "gone" ? 404 : 204 });
+      }
+      return json(`{"data":[${existing}],"pagination":{}}`);
+    });
+    return { created, deleted, asked };
+  };
+
+  describe("subscribeToAccessRevoked", () => {
+    // Abonne l'application à l'accès retiré, avec son identifiant comme condition, en version 1, par webhook signé
+    it("subscribes the application, on its client id, in version 1, by signed webhook", async () => {
+      const { created, asked } = stubEventSub("");
+
+      await createTwitchEventSub(options).subscribeToAccessRevoked();
+
+      const transport = `{"method":"webhook","callback":"${OURS}","secret":"${options.secret}"}`;
+      expect(created).toEqual([
+        `{"type":"user.authorization.revoke","version":"1","condition":{"client_id":"client-id"},"transport":${transport}}`,
+      ]);
+      // Un seul filtre par requête, c'est la règle de Twitch : celui du type
+      expect(asked).toContain("GET /helix/eventsub/subscriptions?type=user.authorization.revoke");
+    });
+
+    // Un abonnement déjà actif vers notre adresse n'est pas recréé
+    it("does not subscribe again when ours is already active", async () => {
+      const { created } = stubEventSub(subscription("revoke", "user.authorization.revoke"));
+
+      await createTwitchEventSub(options).subscribeToAccessRevoked();
+
+      expect(created).toEqual([]);
+    });
+
+    // Un abonnement échoué ou parti vers une autre adresse est repris : Twitch n'en garde qu'un par type
+    it("takes back a failed one and one pointing to another address", async () => {
+      const { created, deleted } = stubEventSub(
+        [
+          subscription("failed", "user.authorization.revoke", OURS, "notification_failures_exceeded"),
+          subscription("from-beta", "user.authorization.revoke", OTHER),
+        ].join(","),
+      );
+
+      await createTwitchEventSub(options).subscribeToAccessRevoked();
+
+      expect(deleted).toEqual(["from-beta"]);
+      expect(created).toHaveLength(1);
+    });
+
+    // Une bêta et le poste de développement ne demandent rien à Twitch : la même règle que les autres abonnements
+    it("asks Twitch nothing from a beta slot nor from a development address, like the other subscriptions", async () => {
+      const { asked } = stubEventSub("");
+      const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+      await createTwitchEventSub({ ...options, callbackUrl: OTHER, isBeta: true }).subscribeToAccessRevoked();
+      await createTwitchEventSub({
+        ...options,
+        callbackUrl: "http://localhost:3000/twitch/eventsub",
+      }).subscribeToAccessRevoked();
+
+      expect(asked).toEqual([]);
+      expect(logged).toHaveBeenCalledTimes(2);
+      logged.mockRestore();
+    });
+  });
+
+  describe("deleteSubscriptions", () => {
+    const FOR_THE_ACCOUNT = [
+      subscription("online", "stream.online"),
+      subscription("offline", "stream.offline"),
+      subscription("update", "channel.update"),
+      subscription("ban", "channel.ban"),
+      subscription("unban", "channel.unban"),
+      subscription("mod-add", "channel.moderator.add"),
+      subscription("mod-remove", "channel.moderator.remove"),
+    ];
+
+    // Retire les abonnements de live et de modération qui nomment le compte, et rien d'autre, après les avoir listés par son identifiant
+    it("deletes the live and moderation subscriptions naming the account, and nothing else", async () => {
+      const { deleted, asked } = stubEventSub(
+        [...FOR_THE_ACCOUNT, subscription("revoke", "user.authorization.revoke")].join(","),
+      );
+
+      await createTwitchEventSub(options).deleteSubscriptions("777");
+
+      expect(deleted).toEqual(["online", "offline", "update", "ban", "unban", "mod-add", "mod-remove"]);
+      expect(asked).toContain("GET /helix/eventsub/subscriptions?user_id=777");
+    });
+
+    // Quelle que soit l'adresse ou l'état : un abonnement d'une bêta, révoqué ou échoué, nomme aussi le compte
+    it("deletes them whatever their address or status", async () => {
+      const { deleted } = stubEventSub(
+        [
+          subscription("from-beta", "stream.online", OTHER),
+          subscription("revoked", "channel.ban", OURS, "authorization_revoked"),
+          subscription("failed", "stream.offline", OURS, "webhook_callback_verification_failed"),
+        ].join(","),
+      );
+
+      await createTwitchEventSub(options).deleteSubscriptions("777");
+
+      expect(deleted).toEqual(["from-beta", "revoked", "failed"]);
+    });
+
+    // Un abonnement déjà parti (404) n'est pas une erreur : la routine peut se rejouer
+    it("takes an already deleted subscription (404) as done, so the routine can run again", async () => {
+      const { deleted } = stubEventSub(
+        [subscription("gone", "stream.online"), subscription("kept", "channel.ban")].join(","),
+      );
+
+      await expect(createTwitchEventSub(options).deleteSubscriptions("777")).resolves.toBeUndefined();
+
+      expect(deleted).toEqual(["gone", "kept"]);
+    });
+
+    // Une panne de Twitch lève l'erreur : l'effacement reste en cours et sa reprise refait l'étape, qui retire alors le reste
+    it("fails when Twitch refuses, and a second pass removes what is left", async () => {
+      const first = stubEventSub(FOR_THE_ACCOUNT.slice(0, 3).join(","), ["offline"]);
+
+      await expect(createTwitchEventSub(options).deleteSubscriptions("777")).rejects.toThrow(
+        "stream.offline",
+      );
+      expect(first.deleted).toEqual(["online", "offline"]);
+
+      // Entre-temps, Twitch ne liste plus que ce qui reste.
+      vi.unstubAllGlobals();
+      const second = stubEventSub(
+        [subscription("offline", "stream.offline"), subscription("update", "channel.update")].join(","),
+      );
+      await createTwitchEventSub(options).deleteSubscriptions("777");
+
+      expect(second.deleted).toEqual(["offline", "update"]);
+    });
+
+    // Une bêta et le poste n'en retirent aucun : ils n'en créent aucun non plus
+    it("deletes nothing from a beta slot nor from a development address", async () => {
+      const { asked } = stubEventSub(FOR_THE_ACCOUNT.join(","));
+      const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+      await createTwitchEventSub({ ...options, callbackUrl: OTHER, isBeta: true }).deleteSubscriptions("777");
+      await createTwitchEventSub({
+        ...options,
+        callbackUrl: "http://localhost:3000/twitch/eventsub",
+      }).deleteSubscriptions("777");
+
+      expect(asked).toEqual([]);
+      logged.mockRestore();
+    });
   });
 });
 

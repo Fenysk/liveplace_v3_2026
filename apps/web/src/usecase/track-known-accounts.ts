@@ -13,7 +13,7 @@ export type TrackKnownAccountsDeps = {
   wait: (ms: number) => Promise<void>;
 };
 
-// Ne rejette jamais : un échec de la liste ou d'un suivi est journalisé, le démarrage n'en dépend pas.
+// Ne rejette jamais : un échec de la liste ou d'un suivi est journalisé sans le compte, le démarrage n'en dépend pas.
 export async function trackKnownAccounts({ accounts, tracker, wait }: TrackKnownAccountsDeps): Promise<void> {
   let userIds: string[];
   try {
@@ -24,9 +24,11 @@ export async function trackKnownAccounts({ accounts, tracker, wait }: TrackKnown
   }
   for (const userId of userIds) {
     try {
+      // La liste date du démarrage et le suivi dure des minutes : un compte supprimé entre-temps n'est plus suivi (CDC §8).
+      if (await accounts.isDeletedAccount(userId)) continue;
       tracker.track(userId);
     } catch (error) {
-      console.error(`twitch live : suivi de ${userId} impossible au démarrage`, error);
+      console.error("twitch live : suivi impossible au démarrage", error);
     }
     await wait(PACE_MS);
   }

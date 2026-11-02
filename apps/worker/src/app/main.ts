@@ -5,7 +5,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { historyBudgetBytes } from "@liveplace/domain/retention";
 import {
   createBudgetStore,
+  createErasureStore,
   createHistoryStore,
+  createOrphanStore,
   createRecoveryStore,
   createRetentionStore,
   createSnapshotStore,
@@ -17,13 +19,15 @@ import {
   createSnapshotSource,
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
-import { encodeChunk } from "../infra/chunk-codec";
+import { decodeChunk, encodeChunk } from "../infra/chunk-codec";
 import { encodeImage } from "../infra/image-codec";
 import { createPresence } from "../infra/presence";
 import { decodeSnapshot, encodeSnapshot } from "../infra/snapshot-codec";
 import { createBudgetCycle } from "../usecase/budget-cycle";
+import { createErasureCycle } from "../usecase/erasure-cycle";
 import { createHistoryCycle } from "../usecase/history-cycle";
 import { createHistoryPlan } from "../usecase/history-plan";
+import { createOrphanCycle } from "../usecase/orphan-cycle";
 import { createRecoveryCycle } from "../usecase/recovery-cycle";
 import { createRetentionCycle } from "../usecase/retention-cycle";
 import { createSnapshotCycle } from "../usecase/snapshot-cycle";
@@ -117,6 +121,28 @@ const budget =
         now: Date.now,
         log,
       });
+// CDC §8, Supprimer son compte : les fichiers qui nomment un compte supprimé sont réécrits à la demande de la routine du web.
+const erasure =
+  config.scope === null
+    ? null
+    : createErasureCycle({
+        store: createErasureStore(config.convexUrl, config.convexServiceKey),
+        decodeSnapshot,
+        encodeSnapshot,
+        decodeChunk,
+        encodeChunk,
+        now: Date.now,
+        log,
+      });
+// Les fichiers de Convex qu'aucune ligne ne désigne (un envoi dont l'enregistrement a échoué) partent au bout d'une heure.
+const orphans =
+  config.scope === null
+    ? null
+    : createOrphanCycle({
+        store: createOrphanStore(config.convexUrl, config.convexServiceKey),
+        now: Date.now,
+        log,
+      });
 const delayWrites = createSnapshotDelayWrites(redis);
 console.log(`worker: scope ${config.scope ?? "off"}`);
 
@@ -155,6 +181,8 @@ while (isRunning) {
   await history?.tick();
   await retention?.tick();
   await budget?.tick();
+  await erasure?.tick();
+  await orphans?.tick();
   await delay(TICK_MS);
 }
 
