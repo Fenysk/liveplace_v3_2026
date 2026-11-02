@@ -92,7 +92,7 @@ const kalyssDay: CanvasDayPoint = {
 };
 
 // Les fresques actives ce jour-là, dans le désordre : l'écran les trie. Une qui a streamé, une moins, une qui n'a pas streamé,
-// une dont le streamer est introuvable.
+// une qui n'existe plus.
 const sampleDayCanvases = (dayAt: number): ActivityDayCanvas[] => [
   {
     canvasId: "nuagelle",
@@ -138,7 +138,7 @@ const sampleDayCanvases = (dayAt: number): ActivityDayCanvas[] => [
     },
   },
   {
-    // Archivée depuis, et son streamer n'a plus de miroir
+    // Archivée puis supprimée depuis : le gateway ne la retrouve plus
     canvasId: "archive-1",
     point: {
       ...kalyssDay,

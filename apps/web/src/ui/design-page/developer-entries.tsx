@@ -310,7 +310,7 @@ export const DeveloperEntry = () => {
       >
         <StateRow
           name="Tout LivePlace hier"
-          detail="Les fresques par minutes streamées, puis personnes, puis pixels. Une fresque archivée depuis y figure aussi ; sans streamer retrouvé, la ligne dit « Streamer inconnu »."
+          detail="Les fresques par minutes streamées, puis personnes, puis pixels. Une fresque archivée depuis y figure aussi ; si elle n'existe plus, la ligne dit « Fresque supprimée »."
           isDemo
         >
           <InWindow>

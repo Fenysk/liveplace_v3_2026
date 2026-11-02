@@ -18,7 +18,7 @@ export type CanvasActivityAccount = {
   devices: readonly Device[];
 };
 
-// `owner` à `null` : le streamer est introuvable, dans un jour passé. Sans `onToggle`, la ligne n'a pas de chevron : personne n'est
+// `owner` à `null` : la fresque n'existe plus, dans un jour passé. Sans `onToggle`, la ligne n'a pas de chevron : personne n'est
 // gardé d'un jour passé (JOURNAL 2026-10-14), ni `accounts`, ni `guestsLine`, ni `isOpen`.
 export type CanvasActivityCardProps = {
   owner: ProfileUser | null;
@@ -46,10 +46,10 @@ const DeviceIcon = ({ device }: { device: Device }) => {
 
 type CanvasActivityOwnerProps = Pick<CanvasActivityCardProps, "owner">;
 
-// Le streamer d'un canvas : le bouton Twitch de son profil dit s'il est en live. Introuvable, la ligne le dit.
+// Le streamer d'un canvas : le bouton Twitch de son profil dit s'il est en live. Si la fresque n'existe plus, la ligne le dit.
 export const CanvasActivityOwner = ({ owner }: CanvasActivityOwnerProps) => (
   <span className="lp-canvas-activity-owner">
-    {owner ? <Profile user={owner} /> : <span className="lp-type-title lp-muted">Streamer inconnu</span>}
+    {owner ? <Profile user={owner} /> : <span className="lp-type-title lp-muted">Fresque supprimée</span>}
   </span>
 );
 

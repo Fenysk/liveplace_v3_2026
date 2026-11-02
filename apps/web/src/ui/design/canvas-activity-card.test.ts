@@ -68,11 +68,12 @@ describe("the owner of a canvas in the developer's activity (§10.4)", () => {
     expect(row).not.toContain("lp-canvas-activity-accounts");
   });
 
-  // Dit « Streamer inconnu » quand le streamer est introuvable, sans profil ni lien à suivre
-  it("says Streamer inconnu when the owner cannot be found, with no profile or link to follow", () => {
+  // Dit « Fresque supprimée » quand la fresque n'existe plus, sans profil ni lien à suivre
+  it("says Fresque supprimée when the canvas no longer exists, with no profile or link to follow", () => {
     const row = renderToString(createElement(CanvasActivityCard, { owner: null, facts: ["12 visites"] }));
 
-    expect(row).toContain("Streamer inconnu");
+    expect(row).toContain("Fresque supprimée");
+    expect(row).not.toContain("Streamer inconnu");
     expect(row).toContain("12 visites");
     expect(row).not.toContain("<a ");
     expect(row).not.toContain("lp-profile");

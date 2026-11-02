@@ -440,7 +440,7 @@ describe("the words of a past day (JOURNAL 2026-10-14)", () => {
     expect(given.map(({ canvasId }) => canvasId)).toEqual(["b", "a"]);
   });
 
-  // Dit de chaque fresque son streamer et ses cinq chiffres du jour, ou « inconnu » faute de streamer
+  // Dit de chaque fresque son streamer et ses cinq chiffres du jour, ou aucun streamer quand la fresque n'existe plus
   it("tells of each canvas its owner and its five figures of the day, or an unknown owner", () => {
     const owner = { userId: "1", login: "kalyss", displayName: "Kalyss" };
 

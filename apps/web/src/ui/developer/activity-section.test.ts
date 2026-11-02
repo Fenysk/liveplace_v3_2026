@@ -307,14 +307,15 @@ describe("the activity section on a past day (JOURNAL 2026-10-14)", () => {
       expect(table).toContain(text);
   });
 
-  // Range les fresques par minutes streamées, sans chevron ni live, et garde « Streamer inconnu » à celle sans streamer
-  it("sorts the canvases by streamed minutes, with no chevron or live, and keeps an unknown owner on its row", () => {
+  // Range les fresques par minutes streamées, sans chevron ni live, et garde « Fresque supprimée » à celle sans streamer
+  it("sorts the canvases by streamed minutes, with no chevron or live, and keeps a missing canvas on its row", () => {
     const markup = ready();
 
     const list = markup.slice(markup.indexOf("Les fresques"), markup.indexOf("L&#x27;historique"));
     expect(list.match(/<article/g)).toHaveLength(3);
     expect(list.indexOf("Kalyss")).toBeLessThan(list.indexOf("Moth"));
-    expect(list.indexOf("Moth")).toBeLessThan(list.indexOf("Streamer inconnu"));
+    expect(list.indexOf("Moth")).toBeLessThan(list.indexOf("Fresque supprimée"));
+    expect(list).not.toContain("Streamer inconnu");
     expect(list).toContain("3 h 35 min streamées");
     expect(list).toContain("9 personnes au pic");
     expect(list).not.toContain("Qui est dessus");
