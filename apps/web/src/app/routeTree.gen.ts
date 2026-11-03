@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './../routes/$login'
 import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
+import { Route as NouveautesRouteImport } from './../routes/nouveautes'
 import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './../routes/sitemap[.]xml'
 import { Route as LoginBackgroundRouteImport } from './../routes/$login_.background'
@@ -51,6 +52,11 @@ const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
 const DesignRoute = DesignRouteImport.update({
   id: '/design',
   path: '/design',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NouveautesRoute = NouveautesRouteImport.update({
+  id: '/nouveautes',
+  path: '/nouveautes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login/background': typeof LoginBackgroundRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login/background': typeof LoginBackgroundRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/$login_/background': typeof LoginBackgroundRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/$login/background'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/$login/background'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/$login_/background'
@@ -250,6 +262,7 @@ export interface RootRouteChildren {
   AdsDottxtRoute: typeof AdsDottxtRoute
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
+  NouveautesRoute: typeof NouveautesRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   LoginBackgroundRoute: typeof LoginBackgroundRoute
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       path: '/design'
       fullPath: '/design'
       preLoaderRoute: typeof DesignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nouveautes': {
+      id: '/nouveautes'
+      path: '/nouveautes'
+      fullPath: '/nouveautes'
+      preLoaderRoute: typeof NouveautesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -413,6 +433,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdsDottxtRoute: AdsDottxtRoute,
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
+  NouveautesRoute: NouveautesRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   LoginBackgroundRoute: LoginBackgroundRoute,

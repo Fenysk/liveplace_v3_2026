@@ -8,7 +8,7 @@ import type { CanvasOpener, CanvasStore } from "../../state/canvas-store";
 import { createDraftStore, type DraftStore } from "../../state/draft-store";
 import type { ResolvedArchive } from "../../usecase/resolve-archive";
 import { AccountPill } from "../account/account-pill";
-import { AccountWindow } from "../account/account-window";
+import { type AccountSection, AccountWindow } from "../account/account-window";
 import { DeleteAccountWindow } from "../account/delete-account-window";
 import { type AccountDeletion, useAccountDeletion } from "../account/use-account-deletion";
 import { useAccountPillProps } from "../account/use-account-pill";
@@ -25,6 +25,7 @@ import { restartDeviceTutorial } from "../help/tutorial";
 import { InspectionPill } from "../inspection/inspection-pill";
 import { useInspectionPillProps } from "../inspection/use-inspection-pill";
 import { useLocale, useTexts } from "../locale/use-locale";
+import { ReleaseNotesTab } from "../release-notes/release-notes-tab";
 import { ArchiveBanner } from "./archive-banner";
 import { ArchiveNotFound } from "./archive-not-found";
 import { ARCHIVE_TEXTS, bannerCaption, bannerTitle } from "./archive-texts";
@@ -46,31 +47,36 @@ const ArchiveAccount = ({
   isCompact: boolean;
   deletion: AccountDeletion;
 }) => {
-  const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
+  const { signOutHref, audiences, windowUser, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
   const inspection = useInspectionPillProps(stores, undefined, undefined);
-  const [isOpen, setIsOpen] = useState(false);
+  const [windowState, setWindowState] = useState<{ isOpen: boolean; sectionId: AccountSection }>({
+    isOpen: false,
+    sectionId: "account",
+  });
+  const openWindow = (sectionId: AccountSection) => setWindowState({ isOpen: true, sectionId });
   return (
     <>
       <AccountPill
         {...account}
         isCompact={isCompact}
         hasBottomBar={false}
-        onOpenAccount={() => setIsOpen(true)}
+        onOpenAccount={() => openWindow("account")}
+        onOpenReleaseNotes={() => openWindow("releaseNotes")}
         onSignIn={signingIn.onSignIn}
       />
-      {account.identity.kind === "signedIn" && (
+      {account.identity.kind !== "unknown" && (
         <AccountWindow
-          isOpen={isOpen}
-          sectionId="account"
-          onSelect={() => undefined}
-          onClose={() => setIsOpen(false)}
-          user={account.identity.user}
+          {...windowState}
+          onSelect={openWindow}
+          onClose={() => setWindowState((shown) => ({ ...shown, isOpen: false }))}
+          user={windowUser}
           signOutHref={signOutHref}
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
           onRestartTutorial={restartDeviceTutorial}
           onDeleteAccount={deletion.onOpen}
+          releaseNotesTab={<ReleaseNotesTab audiences={audiences} isOpen={windowState.isOpen} />}
         />
       )}
       <DeleteAccountWindow {...deletion.window} />

@@ -15,6 +15,7 @@ import { INSPECTION_TEXTS } from "../inspection/inspection-texts";
 import { LINK_PREVIEW_TEXTS } from "../link-preview/link-preview-texts";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import { OBS_TEXTS } from "../obs/obs-texts";
+import { RELEASE_NOTES_TEXTS, RELEASES } from "../release-notes/release-notes-texts";
 import { SCOREBOARD_TEXTS } from "../scoreboard/scoreboard-texts";
 
 const MODULES = {
@@ -30,6 +31,7 @@ const MODULES = {
   linkPreview: LINK_PREVIEW_TEXTS,
   moderation: MODERATION_TEXTS,
   obs: OBS_TEXTS,
+  releaseNotes: RELEASE_NOTES_TEXTS,
   scoreboard: SCOREBOARD_TEXTS,
 };
 
@@ -49,6 +51,12 @@ describe("the words of the interface (§9.9)", () => {
       for (const [name, texts] of Object.entries(MODULES))
         for (const [key, value] of Object.entries(texts[locale]))
           expect(textOf(value), `${name}.${key}`).not.toMatch(BANNED[locale]);
+    });
+
+    // Ni les titres ni les phrases des Nouveautés, publication par publication
+    it(`has no banned word in the ${locale} lines of the release notes`, () => {
+      for (const { date, lines } of RELEASES)
+        for (const { texts } of lines) expect(textOf(texts[locale]), date).not.toMatch(BANNED[locale]);
     });
   }
 });

@@ -54,6 +54,7 @@ import {
   ModerationEntry,
   ModerationWindowEntry,
 } from "./moderation-entries";
+import { ReleaseNotesEntry } from "./release-notes-entries";
 import { ScoreboardListEntry, ScoreboardPillEntry } from "./scoreboard-entries";
 import { SkeletonEntry } from "./skeleton-entries";
 
@@ -99,6 +100,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   moderation: ModerationEntry,
   "fenetre-classement": ScoreboardListEntry,
   "mon-compte": AccountWindowEntry,
+  nouveautes: ReleaseNotesEntry,
   developpeur: DeveloperEntry,
 
   "taille-du-canvas": ResizeWindowEntry,

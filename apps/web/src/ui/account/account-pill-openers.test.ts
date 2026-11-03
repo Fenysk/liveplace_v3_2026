@@ -23,6 +23,15 @@ describe("ce que la pill Compte ouvre", () => {
     expect(openers.onOpenModeration).toBeUndefined();
   });
 
+  // Quel que soit le rôle, invité et rôle pas encore connu compris, Nouveautés ouvre la fenêtre sur Nouveautés
+  it("opens Nouveautés from its own button, whatever the role", () => {
+    for (const role of ["owner", "moderator", "viewer", "guest", undefined] as const) {
+      const sections: AccountSection[] = [];
+      accountPillOpeners(role, 0, (sectionId) => sections.push(sectionId)).onOpenReleaseNotes?.();
+      expect(sections).toEqual(["releaseNotes"]);
+    }
+  });
+
   // Tant qu'aucun signalement n'attend, la photo ouvre Mon compte, et un viewer n'a aucun bouton en plus
   it("opens Mon compte from the photo with no report, with no extra button for a viewer", () => {
     const sections: AccountSection[] = [];

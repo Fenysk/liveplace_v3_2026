@@ -74,6 +74,7 @@ const PhoneHeader = ({
             appearanceChoice={appearanceChoice}
             onPickAppearance={pickAppearance}
             onOpenAccount={noop}
+            onOpenReleaseNotes={identity.kind === "unknown" ? undefined : noop}
             isCompact
             isDocked={false}
           />
@@ -252,6 +253,7 @@ type AccountScene = {
   identity: AccountPillProps["identity"];
   isCompact?: boolean;
   pendingReports?: number;
+  hasUnreadReleaseNotes?: boolean; // le point de Nouveautés ; le bouton lui-même est là pour tout le monde, une fois le compte connu
   hasSettings?: boolean;
   hasModeration?: boolean;
   isDeveloper?: boolean; // §10.3 : le bouton Développeur
@@ -263,13 +265,33 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
   {
     title: "Avant connexion et invité",
     scenes: [
-      { name: "Avant la réponse du gateway", identity: { kind: "unknown" } },
-      { name: "Invité", identity: { kind: "guest" } },
+      {
+        name: "Avant la réponse du gateway",
+        detail: "Pas encore de Nouveautés : le point dépend du rôle.",
+        identity: { kind: "unknown" },
+      },
+      {
+        name: "Invité",
+        detail: "Nouveautés ouvre la fenêtre, qui n'a pas Mon compte.",
+        identity: { kind: "guest" },
+      },
     ],
   },
   {
     title: "Connecté",
-    scenes: [{ name: "Connecté", detail: "Sa photo ouvre Mon compte.", identity: SIGNED_IN }],
+    scenes: [
+      {
+        name: "Connecté",
+        detail: "Nouveautés avant sa photo, qui ouvre Mon compte ; l'apparence passe à droite.",
+        identity: SIGNED_IN,
+      },
+      {
+        name: "Une nouveauté à lire",
+        detail: "Le point sur Nouveautés, jamais sur la photo : elle garde celui des signalements.",
+        identity: SIGNED_IN,
+        hasUnreadReleaseNotes: true,
+      },
+    ],
   },
   {
     title: "Qui modère sur la fresque d'un autre",
@@ -286,6 +308,14 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
         identity: SIGNED_IN,
         pendingReports: 2,
         hasModeration: true,
+      },
+      {
+        name: "Qui modère, avec une nouveauté à lire",
+        detail: "Deux points, chacun sur son bouton : Modération et Nouveautés.",
+        identity: SIGNED_IN,
+        pendingReports: 2,
+        hasModeration: true,
+        hasUnreadReleaseNotes: true,
       },
     ],
   },
@@ -320,19 +350,25 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
       {
         name: "Invité",
         detail:
-          "Aucune pill : la barre du bas dit déjà « Se connecter pour dessiner », et l'apparence est dans Mon compte.",
+          "Nouveautés seul : la barre du bas dit déjà « Se connecter pour dessiner », et l'apparence est dans Mon compte.",
         identity: { kind: "guest" },
         isCompact: true,
         isInRow: true,
       },
       {
         name: "Invité, sur la page d'une archive",
-        detail: "Sans barre du bas, Se connecter reste dans la pill, avec son libellé.",
+        detail: "Sans barre du bas, Se connecter reste dans la pill, avec son libellé, après Nouveautés.",
         identity: { kind: "guest" },
         isCompact: true,
         hasBottomBar: false,
       },
-      { name: "Connecté", detail: "Sa photo seule.", identity: SIGNED_IN, isCompact: true },
+      { name: "Connecté", detail: "Nouveautés, puis sa photo.", identity: SIGNED_IN, isCompact: true },
+      {
+        name: "Connecté, une nouveauté à lire",
+        identity: SIGNED_IN,
+        isCompact: true,
+        hasUnreadReleaseNotes: true,
+      },
       { name: "Le streamer sur sa fresque", identity: SIGNED_IN, isCompact: true, hasSettings: true },
       {
         name: "Qui modère, des signalements attendent",
@@ -358,6 +394,7 @@ const AccountSceneView = ({ scene }: { scene: AccountScene }) => {
     identity,
     isCompact,
     pendingReports,
+    hasUnreadReleaseNotes,
     hasSettings,
     hasModeration,
     isDeveloper,
@@ -375,6 +412,8 @@ const AccountSceneView = ({ scene }: { scene: AccountScene }) => {
       onOpenSettings={hasSettings ? noop : undefined}
       onOpenModeration={hasModeration ? noop : undefined}
       onOpenDeveloper={isDeveloper ? noop : undefined}
+      onOpenReleaseNotes={identity.kind === "unknown" ? undefined : noop}
+      hasUnreadReleaseNotes={hasUnreadReleaseNotes ?? false}
       pendingReports={pendingReports ?? 0}
       isCompact={isCompact ?? false}
       hasBottomBar={hasBottomBar ?? true}
@@ -388,7 +427,7 @@ export const AccountPillEntry = () => (
     slug="pill-compte"
     components={["AccountPill"]}
     file="ui/account/account-pill.tsx"
-    note="Le streamer sur sa fresque n'a que la pill Compte. Avec Développeur, Réglages ou Modération, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
+    note="Le streamer sur sa fresque n'a que la pill Compte. Nouveautés est là pour tout le monde, après Développeur, Réglages ou Modération, avant la photo : avec l'un d'eux, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
     where="En haut à droite"
   >
     {ACCOUNT_BLOCKS.map(({ title, scenes }) => (

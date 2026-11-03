@@ -229,6 +229,70 @@ describe("la section Classement de la fenêtre, sur mobile (JOURNAL 2026-10-06)"
   });
 });
 
+describe("la section Nouveautés de la fenêtre", () => {
+  const releaseNotesTab = tab("contenu de la section Nouveautés");
+
+  // Nouveautés est la dernière section de la liste, après Mon compte, pour chaque rôle
+  it("is the last section, after Mon compte, for every role", () => {
+    expect(sectionsOf(renderWindow({ releaseNotesTab }))).toEqual(["Mon compte", "Nouveautés"]);
+    expect(sectionsOf(renderWindow({ ...OWNER_TABS, releaseNotesTab }))).toEqual([
+      "Fresque",
+      "Vue OBS",
+      "Modération",
+      "Mon compte",
+      "Nouveautés",
+    ]);
+    expect(
+      sectionsOf(renderWindow({ scoreboardTab: tab("contenu du Classement"), releaseNotesTab })),
+    ).toEqual(["Classement", "Mon compte", "Nouveautés"]);
+  });
+
+  // Quand la fenêtre s'ouvre sur Nouveautés, le titre et le contenu sont ceux de Nouveautés
+  it("opens on Nouveautés, with its title and its content", () => {
+    const markup = renderWindow({ sectionId: "releaseNotes", releaseNotesTab });
+
+    expect(markup).toMatch(/<h2[^>]*>Nouveautés<\/h2>/);
+    expect(markup).toContain("contenu de la section Nouveautés");
+    expect(markup).not.toContain("Se déconnecter");
+  });
+
+  // Sans contenu donné, la fenêtre n'a pas de section Nouveautés : rien ne change pour qui ne le donne pas
+  it("has no such section when no content is given", () => {
+    expect(sectionsOf(renderWindow())).not.toContain("Nouveautés");
+  });
+
+  // Un invité (sans compte) a la fenêtre : Nouveautés seule, sans Mon compte ni Se déconnecter
+  it("opens for a guest, with Nouveautés alone and no Mon compte", () => {
+    const guestWindow = { user: undefined, releaseNotesTab } as const;
+    const markup = renderWindow({ ...guestWindow, sectionId: "releaseNotes" });
+
+    expect(sectionsOf(markup)).toEqual(["Nouveautés"]);
+    expect(markup).toContain("contenu de la section Nouveautés");
+    expect(markup).not.toContain("Se déconnecter");
+    expect(markup).not.toContain("Mon compte");
+  });
+
+  // Sur mobile, un invité a le Classement là où il apparaît déjà, puis Nouveautés
+  it("gives a guest on mobile the Classement, then Nouveautés", () => {
+    const markup = renderWindow({
+      user: undefined,
+      scoreboardTab: tab("contenu du Classement"),
+      releaseNotesTab,
+      sectionId: "releaseNotes",
+    });
+
+    expect(sectionsOf(markup)).toEqual(["Classement", "Nouveautés"]);
+  });
+
+  // Un invité n'a pas Mon compte : une fenêtre ouverte dessus montre la première section, sans en inventer
+  it("falls back to the first section for a guest asked for Mon compte", () => {
+    const markup = renderWindow({ user: undefined, releaseNotesTab, sectionId: "account" });
+
+    expect(markup).toMatch(/<h2[^>]*>Nouveautés<\/h2>/);
+    expect(markup).not.toContain("Se déconnecter");
+  });
+});
+
 // §9.11 : les onglets Vue OBS et Modération sont la cible des bulles qui invitent le streamer à les ouvrir
 describe("les onglets Vue OBS et Modération, cibles d'une bulle d'aide (§9.11)", () => {
   const refs = createBubbleTargets();

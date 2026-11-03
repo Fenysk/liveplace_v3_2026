@@ -77,11 +77,16 @@ const SPECS: Record<HelpBubble, HelpBubbleSpec> = {
 
 export const helpTargetOf = (bubble: HelpBubble): BubbleTargetName | undefined => SPECS[bubble].target;
 
+export const helpIconOf = (bubble: HelpBubble): ButtonIcon => SPECS[bubble].icon;
+
+// Ce que dit une bulle d'aide, dans la langue de la page.
+export const useHelpText = (bubble: HelpBubble, context: HelpTextContext): string =>
+  SPECS[bubble].text(useTexts(HELP_TEXTS), context);
+
 // Le contenu d'une bulle d'aide : sur le jeu comme sur /design, le même.
 export const HelpBubbleLine = ({ bubble, ...context }: HelpTextContext & { bubble: HelpBubble }) => {
-  const t = useTexts(HELP_TEXTS);
-  const { icon, text } = SPECS[bubble];
-  return <BubbleLine icon={icon}>{text(t, context)}</BubbleLine>;
+  const text = useHelpText(bubble, context);
+  return <BubbleLine icon={helpIconOf(bubble)}>{text}</BubbleLine>;
 };
 
 type HelpBubblesProps = HelpTextContext & { shown: HelpBubble | undefined };

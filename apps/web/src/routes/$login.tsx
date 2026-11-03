@@ -58,6 +58,7 @@ import { ObsTab } from "../ui/obs/obs-tab";
 import { isObsView, useIsObsView } from "../ui/obs/obs-view";
 import { pwaHead } from "../ui/pwa/pwa-head";
 import { useBarColor } from "../ui/pwa/use-bar-color";
+import { ReleaseNotesTab } from "../ui/release-notes/release-notes-tab";
 import { ScoreboardList } from "../ui/scoreboard/scoreboard-list";
 import { ScoreboardPill } from "../ui/scoreboard/scoreboard-pill";
 import { useScoreboardRows } from "../ui/scoreboard/use-scoreboard";
@@ -113,7 +114,7 @@ const LivePills = ({
   canvasPillFold,
   deletion,
 }: LivePillsProps) => {
-  const { signOutHref, ...account } = useAccountPillProps(stores.canvas, login);
+  const { signOutHref, audiences, windowUser, ...account } = useAccountPillProps(stores.canvas, login);
   const signingIn = useSigningIn();
   // §17.1 : cette page sait quand elle a demandé le changement de canvas, pour ne pas le dire à ses viewers.
   const [switchTracker] = useState(createOwnSwitchTracker);
@@ -178,12 +179,13 @@ const LivePills = ({
           </DeveloperWindow>
         </FixedLocale>
       )}
-      {account.identity.kind === "signedIn" && (
+      {/* Un invité a la fenêtre aussi : Nouveautés, et le Classement sur mobile. */}
+      {account.identity.kind !== "unknown" && (
         <AccountWindow
           {...windowState}
           onSelect={openWindow}
           onClose={() => setWindowState((shown) => ({ ...shown, isOpen: false }))}
-          user={account.identity.user}
+          user={windowUser}
           signOutHref={signOutHref}
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}
@@ -220,6 +222,7 @@ const LivePills = ({
             ) : undefined
           }
           scoreboardTab={isCompact ? <ScoreboardList rows={scoreboard} /> : undefined}
+          releaseNotesTab={<ReleaseNotesTab audiences={audiences} isOpen={windowState.isOpen} />}
         />
       )}
       <InspectionPill {...inspection} />

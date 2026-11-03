@@ -111,6 +111,11 @@
   --type-title-line: 20px;
   --type-title-weight: 800;
 
+  /* La taille « display », en jetons : la date de la page des Nouveautés la prend au PC (release-notes.css) */
+  --type-display-size: 32px;
+  --type-display-line: 36px;
+  --type-display-weight: 900;
+
   /* Les pills laissent deviner ce qui passe derrière elles : très légèrement transparentes, et floutées */
   --pill-opacity: 92%;
   --pill-blur: 16px;
@@ -166,9 +171,9 @@
 
 .lp-type-display {
   font-family: var(--font-sans);
-  font-size: 32px;
-  line-height: 36px;
-  font-weight: 900;
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-line);
+  font-weight: var(--type-display-weight);
   font-variant-numeric: tabular-nums;
 }
 

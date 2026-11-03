@@ -1,0 +1,1377 @@
+/* Les Nouveautés (CDC 2026) : des lignes sous un filet, jamais des cartes encadrées. La vignette est un bouton de 112 × 72 qui s'ouvre
+   en grand. Toute la vignette se dimensionne en `--lp-u` (1 px, ou plus en grand : la vignette agrandie est un vrai dessin à plus
+   grande échelle, jamais une image étirée). Aucun `style` dans le HTML du serveur : formes, tailles et teintes sont des classes. */
+
+.lp-releases {
+  display: grid;
+  gap: calc(2 * var(--space-4));
+}
+
+.lp-release {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lp-release :is(h2, h3, h4, p) {
+  margin: 0;
+}
+
+.lp-release-audience {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lp-release-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-release-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--control-size-touch);
+  padding: var(--space-3) 0;
+}
+
+.lp-release-line + .lp-release-line {
+  border-top: 1px solid var(--chip-hover);
+}
+
+/* Le texte garde sa place à gauche, avec ou sans vignette */
+.lp-release-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+}
+
+/* La vignette : le fond pointillé des fresques, aux dimensions de --lp-u */
+.lp-release-shot {
+  --lp-u: 1px;
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  width: calc(112 * var(--lp-u));
+  height: calc(72 * var(--lp-u));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: calc(12 * var(--lp-u));
+  background:
+    radial-gradient(circle, var(--void-dot) 0 calc(1 * var(--lp-u)), transparent calc(1.5 * var(--lp-u))) 50%
+    50% / calc(16 * var(--lp-u)) calc(16 * var(--lp-u)),
+    var(--void);
+  color: inherit;
+  font: inherit;
+}
+
+button.lp-release-shot {
+  appearance: none;
+  cursor: zoom-in;
+}
+
+button.lp-release-shot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* Le survol se montre par un anneau, rien ne bouge : seulement avec une souris, au doigt il resterait collé */
+@media (hover: hover) {
+  button.lp-release-shot:hover {
+    box-shadow:
+      0 0 0 2px var(--pill-surface),
+      0 0 0 3px var(--muted);
+  }
+}
+
+.lp-release-svg {
+  display: block;
+  width: calc(112 * var(--lp-u));
+  height: calc(72 * var(--lp-u));
+}
+
+/* Les dessins sont ceux d'une fresque sur fond blanc, dans les deux apparences, comme la maquette : le papier est le vrai blanc de la vue
+   OBS, le damier du transparent en est une teinte plus grise, l'ombre est celle du voile, adoucie */
+.lp-release-paper {
+  fill: var(--obs-white);
+}
+
+.lp-release-shadow {
+  fill: var(--scrim);
+  opacity: 0.5;
+}
+
+.lp-release-background--black {
+  fill: var(--obs-black);
+}
+
+.lp-release-background--white {
+  fill: var(--obs-white);
+}
+
+.lp-release-checker {
+  fill: color-mix(in srgb, var(--obs-white) 89%, var(--obs-black));
+}
+
+/* « Ton fond » : l'aperçu au-dessus, le choix du fond dessous. Ce sont les pastilles du jeu (palette.css), à l'échelle de la vignette :
+   leur taille, leur arrondi et leur anneau de sélection suivent --lp-u. Celle de l'image montre le paysage, qui se pose par-dessus. */
+.lp-release-bg {
+  display: grid;
+  justify-items: center;
+  gap: calc(6 * var(--lp-u));
+}
+
+.lp-release-bg-preview {
+  display: block;
+  width: calc(88 * var(--lp-u));
+  height: calc(40 * var(--lp-u));
+}
+
+.lp-release-swatches {
+  display: flex;
+  gap: calc(8 * var(--lp-u));
+}
+
+.lp-release-swatches .lp-swatch {
+  --lp-swatch-size: calc(12 * var(--lp-u));
+  --radius-sm: calc(3 * var(--lp-u));
+  display: block;
+  overflow: hidden;
+  cursor: inherit;
+  box-shadow: inset 0 0 0 calc(0.75 * var(--lp-u)) var(--chip-hover);
+}
+
+.lp-release-swatches .lp-swatch.is-transparent {
+  background-size: calc(6 * var(--lp-u)) calc(6 * var(--lp-u));
+}
+
+/* La pastille choisie : le même anneau que dans le jeu, sur le fond de la vignette plutôt que sur celui de la fenêtre */
+.lp-release-swatches .lp-swatch.lp-release-swatch--on {
+  box-shadow:
+    0 0 0 calc(1 * var(--lp-u)) var(--void),
+    0 0 0 calc(2 * var(--lp-u)) var(--ink);
+}
+
+.lp-release-swatch-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Le podium de la colonne dépliée, à l'échelle de la vignette : la pill, les vrais anneaux, le numéro de la place et le pseudo ; les
+   lignes glissent de place en place. Les jetons d'espace et de contrôle sont redéfinis ici, pour que la pill et son arrondi suivent
+   --lp-u. Le texte garde la taille d'une légende (13 px) à l'échelle 1, jamais moins. */
+.lp-pill.lp-release-podium {
+  --control-size: calc(16 * var(--lp-u));
+  --space-2: calc(5 * var(--lp-u));
+  --lp-release-pitch: calc(19 * var(--lp-u));
+  --lp-release-number: calc(21 * var(--lp-u));
+  --lp-release-gap: calc(4 * var(--lp-u));
+  --lp-release-name: calc(32 * var(--lp-u));
+}
+
+.lp-release-ranks {
+  position: relative;
+  display: block;
+  width: calc(
+    var(--lp-release-number) +
+    2 *
+    var(--lp-release-gap) +
+    var(--control-size) +
+    var(--lp-release-name)
+  );
+  height: calc(var(--lp-release-pitch) * 2 + var(--control-size));
+}
+
+/* Une ligne : la place du numéro (qui ne bouge pas), puis l'anneau et le pseudo, qui glissent ensemble de place en place */
+.lp-release-rank {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: var(--control-size);
+  padding-left: calc(var(--lp-release-number) + var(--lp-release-gap));
+  transform: translateY(calc(var(--lp-slot, 0) * var(--lp-release-pitch)));
+}
+
+.lp-release-rank .lp-rank-name {
+  width: var(--lp-release-name);
+  margin-left: var(--lp-release-gap);
+}
+
+/* Le numéro reste celui de la place : 1er, 2e, 3e de haut en bas, avant l'anneau */
+.lp-release-number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  width: var(--lp-release-number);
+  height: var(--control-size);
+  transform: translateY(calc(var(--lp-slot, 0) * var(--lp-release-pitch)));
+}
+
+.lp-release-podium :is(.lp-type-body, .lp-type-numeric) {
+  font-size: calc(13 * var(--lp-u));
+  line-height: calc(16 * var(--lp-u));
+}
+
+.lp-release-slot--0 {
+  --lp-slot: 0;
+}
+
+.lp-release-slot--1 {
+  --lp-slot: 1;
+}
+
+.lp-release-slot--2 {
+  --lp-slot: 2;
+}
+
+.lp-release-podium .lp-rank-ring {
+  padding: calc(1.25 * var(--lp-u));
+}
+
+.lp-release-podium .lp-avatar {
+  font-size: calc(8 * var(--lp-u));
+  line-height: 1;
+}
+
+/* La vignette agrandie : au PC, 4 fois sa taille ; sur un écran étroit, la largeur de l'écran moins une marge de chaque côté. Sans
+   dépasser la hauteur de l'écran, légende et marges comprises. */
+.lp-release-shot--zoomed {
+  --lp-u: calc(min(4 * 112px, 100vw - 2 * var(--space-4), (100dvh - 8 * var(--space-4)) * 112 / 72) / 112);
+  cursor: default;
+}
+
+/* Un second dialogue modal, par-dessus la fenêtre : le voile du design system, et un flou sur tout ce qui est derrière */
+.lp-zoom {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--pill-blur));
+  backdrop-filter: blur(var(--pill-blur));
+  color: var(--ink);
+}
+
+.lp-zoom[open] {
+  display: grid;
+  place-items: center;
+}
+
+.lp-zoom::backdrop {
+  background: transparent;
+}
+
+.lp-zoom:focus {
+  outline: none;
+}
+
+.lp-zoom-figure {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  animation: lp-zoom-in var(--lp-dur) var(--lp-ease);
+}
+
+.lp-zoom-caption {
+  max-width: calc(100vw - 2 * var(--space-4));
+}
+
+.lp-zoom-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+}
+
+/* Sous `prefers-reduced-motion`, --lp-dur vaut 0 : l'agrandissement s'ouvre sans animation */
+@keyframes lp-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* La page `/nouveautes` : le titre, une phrase, puis les publications dans une pill, sur 600 px au plus. Chaque nouveauté y est une carte :
+   la vignette en haut, à toute la largeur de la carte, le titre et la phrase dessous. Au PC (le bloc de l'accueil, `.lp-home` de home.css,
+   à 760 px de large), la colonne s'élargit à 960 puis 1200 px et les cartes d'un groupe se rangent en 2 colonnes, puis 3. */
+.lp-release-column {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 600px;
+  margin: var(--space-4) auto 0;
+}
+
+.lp-release-column h1 {
+  margin: 0;
+}
+
+.lp-release-intro {
+  max-width: 60ch;
+  margin: 0;
+}
+
+.lp-release-card {
+  width: 100%;
+  max-width: none;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.lp-releases--grid .lp-release-audience {
+  gap: var(--space-3);
+}
+
+.lp-releases--grid .lp-release-lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: calc(2 * var(--space-4));
+}
+
+/* Une carte n'est pas une ligne : la vignette au-dessus du texte, sans filet, sans la hauteur d'un contrôle */
+.lp-releases--grid .lp-release-entry {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: 0;
+  border-top: 0;
+}
+
+/* La cellule de la vignette mesure la largeur de la carte : la vignette la remplit, 112 × --lp-u. L'agrandissement (le dialogue) garde
+   sa propre échelle. */
+.lp-releases--grid .lp-release-shot-cell {
+  container-type: inline-size;
+}
+
+.lp-releases--grid .lp-release-shot-cell .lp-release-shot:not(.lp-release-shot--zoomed) {
+  --lp-u: calc(100cqw / 112);
+}
+
+/* Le classement ne grossit pas avec la colonne : à 2,5 px par unité ses pseudos font 32 px, au-delà ils écraseraient le texte dessous */
+.lp-releases--grid .lp-release-shot-cell .lp-release-shot:not(.lp-release-shot--zoomed) .lp-release-podium {
+  --lp-u: min(calc(100cqw / 112), 2.5px);
+}
+
+@container lp-home (min-width: 760px) {
+  .lp-release-column {
+    max-width: 960px;
+  }
+
+  .lp-release-card {
+    padding: calc(2 * var(--space-4));
+  }
+
+  .lp-releases--grid .lp-release {
+    gap: calc(2 * var(--space-4));
+  }
+
+  .lp-releases--grid .lp-release-lines {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: calc(2 * var(--space-4));
+  }
+}
+
+@container lp-home (min-width: 1100px) {
+  .lp-release-column {
+    max-width: 1200px;
+  }
+
+  .lp-releases--grid .lp-release-lines {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Les vignettes d'une pill (Modération, Dessin) : un coin d'interface sur une mini-fresque, à sa place. Tout se dimensionne en
+   --lp-u, comme le podium ; les pills ne grossissent pas au-delà de 2,5 px par unité sur la page (la mini-fresque, elle, remplit la carte). */
+.lp-release-scene {
+  --lp-release-pu: var(--lp-u);
+  position: relative;
+  display: block;
+  width: calc(112 * var(--lp-u));
+  height: calc(72 * var(--lp-u));
+}
+
+.lp-releases--grid .lp-release-shot-cell .lp-release-shot:not(.lp-release-shot--zoomed) .lp-release-scene {
+  --lp-release-pu: min(var(--lp-u), 2.5px);
+}
+
+.lp-release-scene > .lp-release-svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* Les jetons de contrôle et d'espace sont redéfinis, pour que la pill, son arrondi et ses boutons suivent l'échelle */
+.lp-release-pill {
+  --control-size: calc(16 * var(--lp-release-pu));
+  --space-2: calc(4 * var(--lp-release-pu));
+  transition: none;
+}
+
+.lp-release-pill .lp-btn {
+  transition: none;
+  pointer-events: none;
+}
+
+.lp-release-pill .lp-btn svg {
+  width: calc(8 * var(--lp-release-pu));
+  height: calc(8 * var(--lp-release-pu));
+}
+
+.lp-release-pill .lp-avatar {
+  font-size: calc(7 * var(--lp-release-pu));
+  line-height: 1;
+}
+
+.lp-release-pill--top-right {
+  position: absolute;
+  top: calc(8 * var(--lp-u));
+  right: calc(8 * var(--lp-u));
+}
+
+.lp-release-pill--bottom-center {
+  position: absolute;
+  bottom: calc(8 * var(--lp-u));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lp-release-pill--top-center {
+  position: absolute;
+  top: calc(8 * var(--lp-u));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Modération facile : le point rouge paraît, le curseur vient cliquer le bouclier, la liste s'ouvre dessous */
+.lp-release-dot {
+  position: absolute;
+  top: calc(1.5 * var(--lp-release-pu));
+  right: calc(1.5 * var(--lp-release-pu));
+  width: calc(5 * var(--lp-release-pu));
+  height: calc(5 * var(--lp-release-pu));
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 calc(1 * var(--lp-release-pu)) var(--pill-surface);
+  opacity: var(--lp-release-dot, 1);
+  transform: scale(var(--lp-release-dot, 1));
+}
+
+.lp-release-shield {
+  transform: scale(calc(1 - 0.12 * var(--lp-release-press, 0)));
+}
+
+.lp-release-cursor {
+  position: absolute;
+  top: calc(8 * var(--lp-u) + 12 * var(--lp-release-pu));
+  left: calc(104 * var(--lp-u) - 52 * var(--lp-release-pu));
+  z-index: 2;
+  width: calc(9 * var(--lp-release-pu));
+  height: calc(9 * var(--lp-release-pu));
+  fill: var(--ink);
+  stroke: var(--pill-surface);
+  opacity: var(--lp-release-cursor, 0);
+  transform: translate(
+    calc(var(--lp-release-dx, 0) * var(--lp-release-pu)),
+    calc(var(--lp-release-dy, 0) * var(--lp-release-pu))
+  );
+  pointer-events: none;
+}
+
+.lp-release-sheet {
+  --control-size: calc(10 * var(--lp-release-pu));
+  position: absolute;
+  top: calc(8 * var(--lp-u) + 28 * var(--lp-release-pu));
+  right: calc(8 * var(--lp-u));
+  opacity: var(--lp-release-sheet, 0);
+  transform: translateY(calc((1 - var(--lp-release-sheet, 0)) * -3 * var(--lp-release-pu)));
+}
+
+.lp-release-sheet-content {
+  display: grid;
+  gap: calc(3 * var(--lp-release-pu));
+}
+
+.lp-release-report {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--lp-release-pu));
+}
+
+.lp-release-sheet .lp-avatar {
+  font-size: calc(5 * var(--lp-release-pu));
+}
+
+.lp-release-bar {
+  width: calc(22 * var(--lp-release-pu));
+  height: calc(3 * var(--lp-release-pu));
+  border-radius: var(--radius-pill);
+}
+
+/* Annuler, refaire : la pill Dessin réduite à trois pastilles et trois outils (des contrôles de 12 unités). La flèche pressée s'enfonce
+   et s'éclaire, celle qui ne peut rien faire est grisée, comme dans le jeu */
+.lp-release-undo .lp-release-pill,
+.lp-release-eyedropper .lp-release-pill {
+  --control-size: calc(12 * var(--lp-release-pu));
+}
+
+.lp-release-undo .lp-release-pill .lp-btn svg,
+.lp-release-eyedropper .lp-release-pill .lp-btn svg {
+  width: calc(6.5 * var(--lp-release-pu));
+  height: calc(6.5 * var(--lp-release-pu));
+}
+
+.lp-release-swatches {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--lp-release-pu));
+}
+
+/* Les pastilles sont des disques SVG (leur couleur est celle de la palette, sans attribut style), la choisie porte son anneau */
+.lp-release-undo .lp-release-swatch,
+.lp-release-eyedropper .lp-release-swatch {
+  width: calc(7 * var(--lp-release-pu));
+  height: calc(7 * var(--lp-release-pu));
+  box-shadow: none;
+  cursor: inherit;
+  pointer-events: none;
+  transition: none;
+}
+
+.lp-release-undo .lp-release-swatch[data-chosen="true"],
+.lp-release-eyedropper .lp-release-swatch[data-chosen="true"] {
+  box-shadow:
+    0 0 0 calc(1 * var(--lp-release-pu)) var(--pill-surface),
+    0 0 0 calc(2 * var(--lp-release-pu)) var(--ink);
+}
+
+.lp-release-swatch-dot {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lp-release-swatch-dot circle {
+  stroke: var(--chip-hover);
+  stroke-width: 0.5;
+}
+
+.lp-release-undo .lp-release-tool-undo {
+  transform: scale(calc(1 - 0.14 * var(--lp-release-undo-tap, 0)));
+  background: color-mix(in srgb, var(--chip-hover) calc(var(--lp-release-undo-tap, 0) * 100%), transparent);
+}
+
+.lp-release-undo .lp-release-tool-redo {
+  transform: scale(calc(1 - 0.14 * var(--lp-release-redo-tap, 0)));
+  background: color-mix(in srgb, var(--chip-hover) calc(var(--lp-release-redo-tap, 0) * 100%), transparent);
+}
+
+.lp-release-undo[data-can-undo="false"] .lp-release-tool-undo,
+.lp-release-undo[data-can-redo="false"] .lp-release-tool-redo,
+.lp-release-undo[data-can-discard="false"] .lp-release-tool-discard {
+  opacity: 0.45;
+}
+
+/* La souris : sa pointe est à (ax, ay) unités de la vignette, plus (bx, by) unités de la pill. Elle s'enfonce au clic. Sans mouvement,
+   l'image fixe n'a pas de souris */
+.lp-release-pointer {
+  position: absolute;
+  top: calc(
+    var(--lp-release-ay, 0) *
+    var(--lp-u) +
+    var(--lp-release-by, 0) *
+    var(--lp-release-pu) -
+    1.1 *
+    var(--lp-release-pu)
+  );
+  left: calc(
+    var(--lp-release-ax, 0) *
+    var(--lp-u) +
+    var(--lp-release-bx, 0) *
+    var(--lp-release-pu) -
+    1.1 *
+    var(--lp-release-pu)
+  );
+  z-index: 3;
+  width: calc(9 * var(--lp-release-pu));
+  height: calc(9 * var(--lp-release-pu));
+  fill: var(--ink);
+  stroke: var(--pill-surface);
+  opacity: var(--lp-release-pointer, 0);
+  transform: scale(calc(1 - 0.18 * var(--lp-release-pointer-press, 0)));
+  transform-origin: 12% 12%;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-release-pointer {
+    display: none;
+  }
+}
+
+/* ===== Les vignettes à texte et à souris : Signaler, Effacer, la pipette, le clavier, la jauge, le format =====
+   Les pills y gardent leurs vraies classes ; les jetons de contrôle et d'espace sont redéfinis par scène, en unités de pill, pour que le
+   texte, les boutons et l'arrondi suivent l'échelle de la vignette. Les valeurs par défaut des variables sont celles de l'image fixe. */
+.lp-release-text-scene {
+  --lp-release-font: calc(5 * var(--lp-release-pu));
+}
+
+.lp-release-text-scene .lp-release-pill {
+  --control-size: calc(9 * var(--lp-release-pu));
+  --space-1: calc(1 * var(--lp-release-pu));
+  --space-2: calc(3 * var(--lp-release-pu));
+  --space-3: calc(2 * var(--lp-release-pu));
+}
+
+.lp-release-text-scene .lp-release-pill :is(.lp-type-body, .lp-type-numeric, .lp-type-caption) {
+  font-size: var(--lp-release-font);
+  line-height: 1.25;
+}
+
+.lp-release-text-scene .lp-release-pill .lp-btn:not(.lp-btn--icon) {
+  padding: 0 calc(3 * var(--lp-release-pu));
+  gap: calc(1.5 * var(--lp-release-pu));
+}
+
+.lp-release-text-scene .lp-release-pill .lp-btn svg {
+  width: calc(5.5 * var(--lp-release-pu));
+  height: calc(5.5 * var(--lp-release-pu));
+}
+
+.lp-release-text-scene .lp-release-pill .lp-avatar {
+  font-size: calc(5 * var(--lp-release-pu));
+}
+
+.lp-release-text-scene .lp-release-pill .lp-prompt {
+  padding: 0 calc(1 * var(--lp-release-pu));
+}
+
+/* L'appui d'un bouton (`data-tap`) : il s'enfonce, et s'éclaire de la teinte du survol, ou s'éclaircit s'il est plein (ou violet de Twitch) */
+.lp-release-pill .lp-btn[data-tap] {
+  transform: scale(calc(1 - 0.12 * var(--lp-release-tap, 0)));
+}
+
+.lp-release-pill .lp-btn--ghost[data-tap] {
+  background: color-mix(in srgb, var(--chip-hover) calc(var(--lp-release-tap, 0) * 100%), transparent);
+}
+
+.lp-release-pill .lp-btn[data-tap]:not(.lp-btn--ghost, .lp-btn--primary, .lp-btn--danger, .lp-btn--twitch) {
+  background: color-mix(in srgb, var(--chip-hover) calc(var(--lp-release-tap, 0) * 100%), var(--chip));
+}
+
+.lp-release-pill :is(.lp-btn--primary, .lp-btn--danger, .lp-btn--twitch)[data-tap] {
+  filter: brightness(calc(1 + 0.15 * var(--lp-release-tap, 0)));
+}
+
+/* Le contour d'une case visée ou inspectée (noir dehors, blanc dedans) et le voile d'une fenêtre : les jetons du jeu */
+.lp-release-outline {
+  fill: none;
+  stroke-width: 1;
+}
+
+.lp-release-outline--out {
+  stroke: var(--draft-outline-out);
+}
+
+.lp-release-outline--in {
+  stroke: var(--draft-outline-in);
+}
+
+/* Le voile d'une fenêtre : il couvre toute la scène, pills comprises, comme celui du jeu */
+.lp-release-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--scrim);
+  opacity: var(--lp-release-window, 0);
+  pointer-events: none;
+}
+
+/* Signaler un dessin, Effacer : la pill Inspection, au centre à droite ; la fenêtre au centre ; le toast en bas à gauche */
+.lp-release-pill--center-right {
+  position: absolute;
+  top: 50%;
+  right: calc(8 * var(--lp-u));
+  z-index: 1;
+  opacity: var(--lp-release-pill, 1);
+  transform: translateY(-50%) scale(calc(0.94 + 0.06 * var(--lp-release-pill, 1)));
+  transform-origin: right center;
+}
+
+.lp-release-inspection .lp-profile-name {
+  max-width: calc(18 * var(--lp-release-pu));
+}
+
+.lp-release-chip-dot {
+  display: block;
+  flex: none;
+  width: calc(5 * var(--lp-release-pu));
+  height: calc(5 * var(--lp-release-pu));
+  border-radius: calc(1.5 * var(--lp-release-pu));
+  box-shadow: inset 0 0 0 calc(0.4 * var(--lp-release-pu)) var(--chip-hover);
+}
+
+.lp-release-inspection .lp-release-bar {
+  width: calc(16 * var(--lp-release-pu));
+}
+
+/* Signalé : le bouton prend la place de Signaler, grisé, avec sa coche */
+.lp-release-reported {
+  display: none;
+  opacity: 0.45;
+}
+
+.lp-release-report-scene[data-done="true"] .lp-release-report {
+  display: none;
+}
+
+.lp-release-report-scene[data-done="true"] .lp-release-reported {
+  display: inline-flex;
+}
+
+.lp-release-confirm {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  opacity: var(--lp-release-window, 0);
+  transform: translate(-50%, -50%) scale(calc(0.96 + 0.04 * var(--lp-release-window, 0)));
+  pointer-events: none;
+}
+
+.lp-release-confirm-title {
+  display: block;
+  max-width: calc(44 * var(--lp-release-pu));
+  white-space: normal;
+}
+
+.lp-release-confirm-actions {
+  justify-content: flex-end;
+}
+
+.lp-release-toast {
+  position: absolute;
+  bottom: calc(8 * var(--lp-u));
+  left: calc(8 * var(--lp-u));
+  z-index: 3;
+  opacity: var(--lp-release-toast, 1);
+  transform: translateY(calc((1 - var(--lp-release-toast, 1)) * 3 * var(--lp-release-pu)));
+}
+
+.lp-release-toast .lp-toast {
+  max-width: none;
+}
+
+.lp-release-toast .lp-pill-content .lp-toast svg {
+  width: calc(6.5 * var(--lp-release-pu));
+  height: calc(6.5 * var(--lp-release-pu));
+}
+
+/* La pipette : la pill Dessin réduite à trois pastilles et la pipette. Armée, elle prend l'anneau intérieur du jeu ; sur la fresque, la
+   souris est l'icône du bouton (canvas-cursor.ts), dont la pointe est le coin bas gauche */
+.lp-release-eyedropper[data-armed="true"] .lp-release-tool-eyedropper {
+  box-shadow: inset 0 0 0 calc(0.7 * var(--lp-release-pu)) var(--ink);
+}
+
+.lp-release-eyedropper .lp-release-pointer:not(.lp-release-pointer--tool) {
+  opacity: calc(var(--lp-release-pointer, 0) * (1 - var(--lp-release-tool, 0)));
+}
+
+.lp-release-pointer--tool {
+  top: calc(
+    var(--lp-release-ay, 0) *
+    var(--lp-u) +
+    var(--lp-release-by, 0) *
+    var(--lp-release-pu) -
+    7.4 *
+    var(--lp-release-pu)
+  );
+  left: calc(
+    var(--lp-release-ax, 0) *
+    var(--lp-u) +
+    var(--lp-release-bx, 0) *
+    var(--lp-release-pu) -
+    0.7 *
+    var(--lp-release-pu)
+  );
+  fill: none;
+  stroke: var(--draft-outline-out);
+  stroke-width: 2;
+  opacity: calc(var(--lp-release-pointer, 0) * var(--lp-release-tool, 0));
+  filter: drop-shadow(0 0 calc(0.4 * var(--lp-release-pu)) var(--draft-outline-in))
+    drop-shadow(0 0 calc(0.4 * var(--lp-release-pu)) var(--draft-outline-in));
+  transform-origin: 8% 92%;
+}
+
+/* Dessiner au clavier : les touches du jeu (.lp-kbd) en petit, dans une pill (les flèches en T renversé, Espace à gauche). Une touche
+   pressée s'allume : son fond prend la couleur du texte, son icône celle de la pill, et elle s'enfonce (`--lp-release-tap`) */
+.lp-release-keys {
+  display: grid;
+  grid-template-areas:
+    ". . up ."
+    "space left down right";
+  grid-template-columns: calc(22 * var(--lp-release-pu)) repeat(3, calc(9 * var(--lp-release-pu)));
+  gap: calc(1.5 * var(--lp-release-pu));
+}
+
+.lp-release-keys .lp-release-key {
+  display: grid;
+  place-items: center;
+  height: calc(9 * var(--lp-release-pu));
+  padding: 0;
+  border-width: calc(0.6 * var(--lp-release-pu));
+  border-radius: calc(2 * var(--lp-release-pu));
+  background: color-mix(in srgb, var(--ink) calc(var(--lp-release-tap, 0) * 85%), transparent);
+  color: color-mix(in srgb, var(--pill-surface) calc(var(--lp-release-tap, 0) * 100%), var(--ink));
+  opacity: calc(0.7 + 0.3 * var(--lp-release-tap, 0));
+  transform: scale(calc(1 - 0.1 * var(--lp-release-tap, 0)));
+}
+
+.lp-release-key-icon {
+  width: calc(5 * var(--lp-release-pu));
+  height: calc(5 * var(--lp-release-pu));
+}
+
+.lp-release-key--space .lp-release-key-icon {
+  width: calc(9 * var(--lp-release-pu));
+}
+
+.lp-release-key--up {
+  grid-area: up;
+}
+
+.lp-release-key--left {
+  grid-area: left;
+}
+
+.lp-release-key--down {
+  grid-area: down;
+}
+
+.lp-release-key--right {
+  grid-area: right;
+}
+
+.lp-release-key--space {
+  grid-area: space;
+}
+
+/* Augmente ta jauge : la pill Dessin en Vue. La jauge du jeu écrit des tailles en px et des `style` ; ici tout suit l'échelle de la pill
+   et le niveau est plein. Avant et après la récompense sont superposés (le plus large donne la largeur), un attribut dit lequel se lit.
+   Les vignettes de l'aide et de la langue y montrent la même jauge, le niveau à moitié ou plein. */
+.lp-release-gauge,
+.lp-release-help,
+.lp-release-locale {
+  --lp-release-font: calc(6 * var(--lp-release-pu));
+}
+
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-release-pill {
+  --control-size: calc(12 * var(--lp-release-pu));
+}
+
+.lp-release-gauge .lp-release-pill {
+  opacity: var(--lp-release-pill, 1);
+}
+
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge {
+  gap: calc(2 * var(--lp-release-pu));
+}
+
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge-tube {
+  --lp-level: 100%;
+  width: calc(36 * var(--lp-release-pu));
+  height: calc(8 * var(--lp-release-pu));
+  transform: scale(calc(1 + 0.12 * var(--lp-release-grow, 0)));
+}
+
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-fluid-charge {
+  width: var(--lp-level);
+  transition: none;
+}
+
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge-text {
+  padding-inline: calc(2 * var(--lp-release-pu));
+  clip-path: none;
+  transition: none;
+}
+
+.lp-release-claim-slot {
+  display: grid;
+}
+
+.lp-release-claim-slot > * {
+  grid-area: 1 / 1;
+}
+
+.lp-release-gauge .lp-release-pill .lp-btn.lp-claim {
+  min-width: 0;
+  animation: none;
+  box-shadow: 0 0 calc(5 * var(--lp-release-pu)) color-mix(in srgb, var(--claim) 45%, transparent);
+}
+
+.lp-release-gauge .lp-release-pill .lp-btn.lp-claim::after {
+  animation: none;
+}
+
+/* Le +1 s'enfonce et s'éclaircit au clic, sans perdre son or */
+.lp-release-gauge .lp-release-pill .lp-btn.lp-claim[data-tap] {
+  background: var(--claim);
+  filter: brightness(calc(1 + 0.15 * var(--lp-release-tap, 0)));
+}
+
+.lp-release-gauge[data-claimed="false"] .lp-release-after,
+.lp-release-gauge[data-claimed="true"] .lp-release-before {
+  visibility: hidden;
+}
+
+/* Le format de la fresque, et le choix de la langue : le sélecteur de la fenêtre Fresque (.lp-segmented, segmented.css) en petit, dans une pill. Ses mesures en
+   px suivent l'échelle de la pill ; l'option choisie garde son fond qui se lit sur le fond du sélecteur (selection-glide.css). */
+.lp-release-format {
+  --lp-release-font: calc(5.2 * var(--lp-release-pu));
+}
+
+.lp-release-format .lp-release-pill {
+  --control-size: calc(10 * var(--lp-release-pu));
+}
+
+:is(.lp-release-format, .lp-release-locale) .lp-segmented {
+  padding: calc(1 * var(--lp-release-pu));
+  gap: calc(0.7 * var(--lp-release-pu));
+}
+
+:is(.lp-release-format, .lp-release-locale) .lp-segmented-option {
+  height: calc(var(--control-size) - 2 * var(--lp-release-pu));
+  padding: 0 calc(3 * var(--lp-release-pu));
+  cursor: inherit;
+}
+
+:is(.lp-release-format, .lp-release-locale) .lp-segmented-option[data-tap] {
+  transform: scale(calc(1 - 0.1 * var(--lp-release-tap, 0)));
+}
+
+/* Lancement de LivePlace : la pill de l'invité (Se connecter) et celle du compte connecté sont posées au même endroit, l'une laisse la place
+   à l'autre. Les valeurs par défaut sont celles de l'image fixe : le compte connecté. */
+.lp-release-launch .lp-release-guest {
+  opacity: var(--lp-release-guest, 0);
+}
+
+.lp-release-launch .lp-release-account {
+  opacity: var(--lp-release-account, 1);
+}
+
+/* Un coup de pouce : les bulles d'aide du jeu (bubble.css) posées au-dessus de la pill Dessin. Leurs jetons d'espace suivent l'échelle de la
+   vignette ; la flèche et l'anneau autour de la cible sont ceux du jeu, sans transition ni entrée animée (le temps est celui de la boucle).
+   Par défaut, la bulle de Valider se lit seule, comme sur l'image fixe. */
+.lp-release-help {
+  --lp-release-bubble-submit: 1;
+  --lp-release-bubble-gauge: 0;
+  --lp-release-window: 0;
+  --lp-release-toast: 0;
+}
+
+.lp-release-help .lp-gauge-tube {
+  --lp-level: 70%;
+}
+
+.lp-release-help .lp-gauge-text--charge {
+  clip-path: inset(0 calc(100% - var(--lp-level)) 0 0);
+}
+
+.lp-release-help .lp-release-bubble.lp-bubble {
+  --space-1: calc(1 * var(--lp-release-pu));
+  --space-2: calc(3 * var(--lp-release-pu));
+  --control-size: calc(9 * var(--lp-release-pu));
+  --lp-bubble-room: calc(70 * var(--lp-release-pu));
+  position: absolute;
+  bottom: calc(8 * var(--lp-u) + 20 * var(--lp-release-pu));
+  left: 50%;
+  z-index: 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.lp-release-bubble .lp-release-pill {
+  --control-size: calc(9 * var(--lp-release-pu));
+  --lp-release-font: calc(4.6 * var(--lp-release-pu));
+}
+
+.lp-release-bubble > .lp-pill {
+  display: block;
+  animation: none;
+}
+
+.lp-release-bubble .lp-bubble-arrow {
+  animation: none;
+}
+
+.lp-release-bubble .lp-bubble-line {
+  gap: calc(2 * var(--lp-release-pu));
+  text-align: start;
+}
+
+.lp-release-help .lp-release-bubble .lp-bubble-line svg {
+  width: calc(5.5 * var(--lp-release-pu));
+  height: calc(5.5 * var(--lp-release-pu));
+}
+
+/* Les deux bulles sont centrées sur la pill ; seule la flèche change de place : elle vise Valider (à droite du centre de la pill), puis la
+   jauge (à gauche), distances mesurées en unités de pill */
+.lp-release-bubble--submit {
+  --lp-bubble-arrow-x: calc(50% + 26.5 * var(--lp-release-pu));
+  opacity: var(--lp-release-bubble-submit);
+}
+
+.lp-release-bubble--gauge {
+  --lp-bubble-arrow-x: calc(50% - 14.4 * var(--lp-release-pu));
+  opacity: var(--lp-release-bubble-gauge);
+}
+
+.lp-release-help .lp-release-aim::after {
+  border-width: calc(0.8 * var(--lp-release-pu));
+  transition: none;
+}
+
+.lp-release-help .lp-release-aim--submit::after {
+  opacity: var(--lp-release-bubble-submit);
+}
+
+.lp-release-help .lp-release-aim--gauge::after {
+  opacity: var(--lp-release-bubble-gauge);
+}
+
+/* La fenêtre Mon compte, réduite à sa rangée Tutoriel (window.css) ; le toast se pose en haut au centre, comme sur mobile (la pill Dessin
+   tient le bas de la vignette) */
+.lp-release-help .lp-release-confirm .lp-window-row {
+  gap: calc(4 * var(--lp-release-pu));
+}
+
+.lp-release-help .lp-release-toast {
+  top: calc(8 * var(--lp-u));
+  bottom: auto;
+  left: 50%;
+  transform: translate(-50%, calc((var(--lp-release-toast, 0) - 1) * 3 * var(--lp-release-pu)));
+}
+
+/* Hello world! : le choix de la langue en haut, la pill Dessin en bas ; les mots de la pill sont écrits dans les deux langues, un attribut
+   dit celle qui se lit (celle de l'image fixe : English) */
+.lp-release-locale {
+  --lp-release-font: calc(5.4 * var(--lp-release-pu));
+}
+
+.lp-release-locale .lp-release-pill--top-center {
+  --control-size: calc(10 * var(--lp-release-pu));
+}
+
+.lp-release-locale[data-locale="fr"] .lp-release-in-en,
+.lp-release-locale[data-locale="en"] .lp-release-in-fr {
+  display: none;
+}
+
+/* App mobile : un téléphone au milieu de la vignette, tout en unités de --lp-u (il grandit avec la carte, sans le plafond des pills). L'écran
+   d'accueil et l'appli ouverte sont deux calques ; `--lp-release-open` (1 par défaut : l'image fixe) fait grandir l'appli depuis l'icône, qui
+   est à la 2e colonne de la 3e rangée. Les pills du jeu y sont à une échelle de pill plus petite, redéfinie sur l'écran. */
+.lp-release-phone {
+  position: absolute;
+  top: calc(2 * var(--lp-u));
+  left: calc(39 * var(--lp-u));
+  box-sizing: border-box;
+  width: calc(34 * var(--lp-u));
+  height: calc(68 * var(--lp-u));
+  padding: calc(1.2 * var(--lp-u));
+  border-radius: calc(6 * var(--lp-u));
+  background: var(--ink);
+  box-shadow: 0 calc(1.5 * var(--lp-u)) 0 color-mix(in srgb, var(--scrim) 50%, transparent);
+}
+
+.lp-release-phone-screen {
+  --lp-release-pu: calc(0.42 * var(--lp-u));
+  --lp-release-font: calc(6 * var(--lp-release-pu));
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(4.8 * var(--lp-u));
+  background: var(--void);
+}
+
+.lp-release-home {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(4, calc(6.4 * var(--lp-u)));
+  grid-auto-rows: calc(11 * var(--lp-u));
+  align-content: start;
+  justify-content: center;
+  column-gap: calc(1.2 * var(--lp-u));
+  padding-top: calc(7.5 * var(--lp-u));
+  opacity: calc(1 - var(--lp-release-open, 1));
+}
+
+.lp-release-app-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(0.9 * var(--lp-u));
+}
+
+.lp-release-app-icon {
+  display: block;
+  flex: none;
+  width: calc(6.4 * var(--lp-u));
+  height: calc(6.4 * var(--lp-u));
+}
+
+.lp-release-app-icon--other {
+  border-radius: calc(1.5 * var(--lp-u));
+  background: color-mix(in srgb, var(--muted) 45%, var(--void));
+}
+
+/* L'icône de l'appli : les teintes sombres de la pastille « LP » du manifest (`data-appearance="dark"` sur le SVG) */
+.lp-release-app-tile {
+  fill: var(--chip);
+}
+
+.lp-release-app-letters {
+  fill: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 41px;
+  font-weight: 900;
+}
+
+.lp-release-app-slot[data-tap] .lp-release-app-icon {
+  transform: scale(calc(1 - 0.12 * var(--lp-release-tap, 0)));
+}
+
+.lp-release-app-name {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: calc(2.8 * var(--lp-u));
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lp-release-app-bar {
+  width: calc(3.6 * var(--lp-u));
+  height: calc(0.9 * var(--lp-u));
+  border-radius: calc(0.45 * var(--lp-u));
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+/* L'appli : elle part de l'icône (centrée sur elle, de la taille de l'icône) et grandit jusqu'à tout l'écran */
+.lp-release-app {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: calc((1 - var(--lp-release-open, 1)) * 8 * var(--lp-u));
+  background: var(--void);
+  opacity: clamp(0, calc(var(--lp-release-open, 1) * 4), 1);
+  transform: translate(
+      calc((1 - var(--lp-release-open, 1)) * -3.8 * var(--lp-u)),
+      calc((1 - var(--lp-release-open, 1)) * -0.1 * var(--lp-u))
+    )
+    scale(
+      calc(0.2025 + 0.7975 * var(--lp-release-open, 1)),
+      calc(0.0976 + 0.9024 * var(--lp-release-open, 1))
+    );
+}
+
+.lp-release-phone-art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lp-release-phone-pill {
+  position: absolute;
+}
+
+.lp-release-phone-pill--top {
+  top: calc(2.2 * var(--lp-u));
+  right: calc(1.6 * var(--lp-u));
+}
+
+.lp-release-phone-pill--bottom {
+  bottom: calc(2 * var(--lp-u));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lp-release-install .lp-gauge-tube {
+  width: calc(20 * var(--lp-release-pu));
+}
+
+/* Le doigt : un point à la place de la souris, posé aux mêmes variables ; sans mouvement, l'image fixe n'en a pas */
+.lp-release-touch {
+  position: absolute;
+  top: calc(var(--lp-release-ay, 0) * var(--lp-u) - 2.4 * var(--lp-u));
+  left: calc(var(--lp-release-ax, 0) * var(--lp-u) - 2.4 * var(--lp-u));
+  z-index: 3;
+  box-sizing: border-box;
+  width: calc(4.8 * var(--lp-u));
+  height: calc(4.8 * var(--lp-u));
+  border: calc(0.4 * var(--lp-u)) solid var(--ink);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pill-surface) 45%, transparent);
+  opacity: var(--lp-release-pointer, 0);
+  transform: scale(calc(1 - 0.25 * var(--lp-release-pointer-press, 0)));
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-release-touch {
+    display: none;
+  }
+}
+
+/* En live sur Twitch : le bouton Twitch du profil dans ses deux états, superposés dans une même cellule (le plus large donne la largeur).
+   `--lp-release-live` (1 par défaut : l'image fixe) les fond l'un dans l'autre. Les mesures en px du bouton du jeu (twitch.css) suivent
+   l'échelle de la pill ; le logo ne cligne pas, la boucle fixe tout. */
+.lp-release-live .lp-release-pill--center-right {
+  top: 60%;
+}
+
+.lp-release-twitch {
+  display: inline-grid;
+  align-items: center;
+  justify-items: start;
+}
+
+.lp-release-twitch > * {
+  grid-area: 1 / 1;
+}
+
+.lp-release-twitch-off {
+  opacity: calc(1 - var(--lp-release-live, 1));
+}
+
+.lp-release-twitch-on {
+  opacity: var(--lp-release-live, 1);
+}
+
+.lp-release-text-scene .lp-release-pill .lp-btn.lp-btn--live {
+  gap: 0;
+  min-width: calc(11 * var(--lp-release-pu));
+  padding: 0 calc(3.5 * var(--lp-release-pu)) 0 calc(2.75 * var(--lp-release-pu));
+  animation: none;
+}
+
+.lp-release-pill .lp-live-category {
+  max-width: calc(42 * var(--lp-release-pu));
+  margin-inline-start: calc(1.5 * var(--lp-release-pu));
+}
+
+.lp-release-pill .lp-twitch-live-dot {
+  top: calc(-0.5 * var(--lp-release-pu));
+  right: calc(-0.75 * var(--lp-release-pu));
+  width: calc(1.5 * var(--lp-release-pu));
+  height: calc(1.5 * var(--lp-release-pu));
+  box-shadow: 0 0 0 calc(0.4 * var(--lp-release-pu)) var(--twitch-live-bg);
+}
+
+.lp-release-pill .lp-twitch-eye {
+  animation: none;
+}
+
+/* Un thème pour la fresque : la fenêtre Fresque réduite à son champ Thème (text-field.css, window.css) sur un voile, et la pill Thème du
+   jeu (theme-pill.css) en haut au centre. Les valeurs par défaut sont celles de l'image fixe : la pill seule. Le champ du jeu est un
+   `<input>` ; ici un `<span>` aux mêmes classes, dont les lettres s'écrivent une à une et dont le focus est un attribut. */
+.lp-release-theme {
+  --lp-release-font: calc(5 * var(--lp-release-pu));
+  --lp-release-window: 0;
+  --lp-release-toast: 0;
+  --lp-release-theme: 1;
+  --lp-release-caret: 0;
+}
+
+.lp-release-theme .lp-release-theme-pill {
+  opacity: var(--lp-release-theme);
+  transform: translate(-50%, calc((var(--lp-release-theme) - 1) * 3 * var(--lp-release-pu)));
+}
+
+.lp-release-theme .lp-release-theme-pill .lp-pill-content {
+  padding-inline: calc(6 * var(--lp-release-pu));
+}
+
+.lp-release-theme-box {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.lp-release-theme .lp-release-theme-box .lp-type-caption {
+  font-size: calc(4.4 * var(--lp-release-pu));
+}
+
+.lp-release-theme .lp-release-theme-text {
+  font-size: calc(8 * var(--lp-release-pu));
+  line-height: 1.2;
+}
+
+.lp-release-theme .lp-release-confirm .lp-pill-content {
+  width: calc(76 * var(--lp-release-pu));
+  text-align: start;
+}
+
+.lp-release-theme .lp-input {
+  display: flex;
+  align-items: center;
+  padding: 0 calc(3.5 * var(--lp-release-pu));
+  white-space: nowrap;
+}
+
+.lp-release-theme .lp-input[data-focused="true"] {
+  outline: calc(0.8 * var(--lp-release-pu)) solid var(--focus-ring);
+  outline-offset: calc(0.8 * var(--lp-release-pu));
+}
+
+.lp-release-placeholder {
+  color: var(--muted);
+}
+
+.lp-release-theme .lp-input[data-empty="false"] .lp-release-placeholder {
+  display: none;
+}
+
+.lp-release-written {
+  white-space: pre;
+}
+
+.lp-release-letter {
+  display: none;
+}
+
+.lp-release-letter.is-written {
+  display: inline;
+}
+
+.lp-release-caret {
+  flex: none;
+  width: calc(0.6 * var(--lp-release-pu));
+  height: calc(5.5 * var(--lp-release-pu));
+  background: var(--ink);
+  opacity: var(--lp-release-caret);
+}
+
+.lp-release-theme .lp-input[data-empty="true"] .lp-release-caret {
+  order: -1;
+}

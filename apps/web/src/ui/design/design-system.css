@@ -42,6 +42,7 @@
 @import "./saturation-figure.css";
 @import "./capacity-row.css";
 @import "./skeleton.css";
+@import "./release-notes.css";
 
 html,
 body {

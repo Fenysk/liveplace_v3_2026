@@ -4,7 +4,10 @@ import type { Role } from "@liveplace/domain";
 import type { AccountPillProps } from "./account-pill";
 import { type AccountSection, SETTINGS_SECTION } from "./account-window";
 
-type AccountPillOpeners = Pick<AccountPillProps, "onOpenAccount" | "onOpenSettings" | "onOpenModeration">;
+type AccountPillOpeners = Pick<
+  AccountPillProps,
+  "onOpenAccount" | "onOpenSettings" | "onOpenModeration" | "onOpenReleaseNotes"
+>;
 
 export const accountPillOpeners = (
   role: Role | undefined,
@@ -15,4 +18,6 @@ export const accountPillOpeners = (
   onOpenAccount: () => openWindow(pendingReports && role !== "moderator" ? "moderation" : "account"),
   onOpenSettings: role === "owner" ? () => openWindow(SETTINGS_SECTION) : undefined,
   onOpenModeration: role === "moderator" ? () => openWindow("moderation") : undefined,
+  // Pour tous, invité compris : la fenêtre s'ouvre sur Nouveautés.
+  onOpenReleaseNotes: () => openWindow("releaseNotes"),
 });

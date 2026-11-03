@@ -263,3 +263,150 @@ describe("la disposition de la pill Compte (§9.9)", () => {
     expect(render({ onOpenSettings: doNothing, onOpenDeveloper: doNothing })).not.toContain(">FR</span>");
   });
 });
+
+// Nouveautés : un bouton fantôme pour tout le monde, après les boutons de rôle et à gauche de la photo.
+const NEWS = "Nouveautés";
+const ORDER_TITLES = [...ALL_TITLES, NEWS];
+const withNews = { onOpenReleaseNotes: doNothing } as const;
+const guest = { identity: { kind: "guest" } } as const;
+
+const orderWithNews = (markup: string): string[] =>
+  ORDER_TITLES.map((title) => ({ title, at: positionOf(markup, title) }))
+    .filter(({ at }) => at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map(({ title }) => title);
+
+const newsButtonOf = (markup: string): string =>
+  markup.match(/<button[^>]*title="Nouveautés"[^>]*>.*?<\/button>/s)?.[0] ?? "";
+
+describe("le bouton Nouveautés de la pill Compte", () => {
+  // Quand le compte est connu, le bouton Nouveautés est là pour tout le monde, après les boutons de rôle et avant la photo
+  it("stands after the role buttons and before the photo, for every role", () => {
+    expect(orderWithNews(render({ ...withNews, onOpenSettings: doNothing }))).toEqual([
+      "Réglages",
+      NEWS,
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(orderWithNews(render({ ...withNews, onOpenModeration: doNothing }))).toEqual([
+      "Modération",
+      NEWS,
+      "Mon compte",
+      "Apparence : Auto",
+    ]);
+    expect(
+      orderWithNews(render({ ...withNews, onOpenDeveloper: doNothing, onOpenSettings: doNothing })),
+    ).toEqual(["Développeur", "Réglages", NEWS, "Mon compte", "Apparence : Auto"]);
+  });
+
+  // Un viewer connecté : Nouveautés, sa photo, puis l'apparence, comme avec les boutons de rôle
+  it("puts it before the photo of a signed-in viewer, with the appearance after the photo", () => {
+    expect(orderWithNews(render(withNews))).toEqual([NEWS, "Mon compte", "Apparence : Auto"]);
+  });
+
+  // Un invité l'a aussi : avant l'apparence et Se connecter, qui gardent leur ordre
+  it("gives a guest the button too, before the appearance and Se connecter", () => {
+    expect(orderWithNews(render({ ...guest, ...withNews }))).toEqual([NEWS, "Apparence : Auto", SIGN_IN]);
+  });
+
+  // Le bouton est un bouton fantôme à icône seule, dont le titre est son nom accessible
+  it("is a ghost icon button named by its title", () => {
+    const button = newsButtonOf(render(withNews));
+
+    expect(button).toContain("lp-btn--ghost");
+    expect(button).toContain("lp-btn--icon");
+    expect(button).toContain("<svg");
+    expect(button).not.toContain("lp-avatar-dot");
+  });
+
+  // Sans l'ouvreur, la pill n'a pas de bouton Nouveautés : rien ne change pour qui ne le donne pas
+  it("is absent when nothing opens it", () => {
+    expect(render()).not.toContain(NEWS);
+  });
+
+  // Tant que le gateway n'a pas répondu, le rôle est inconnu : pas de bouton, le point dépendrait du rôle
+  it("waits for the gateway: no button while the identity is unknown", () => {
+    expect(render({ identity: { kind: "unknown" }, ...withNews })).not.toContain(NEWS);
+    const compact = render({ identity: { kind: "unknown" }, isCompact: true, ...withNews });
+    expect(compact).toContain("is-hidden");
+    expect(compact).not.toContain("<button");
+  });
+});
+
+describe("le point de Nouveautés", () => {
+  // Tant que la dernière publication a des lignes non lues, le point est sur Nouveautés, et nulle part ailleurs
+  it("sits on the Nouveautés button alone, never on the photo", () => {
+    const markup = render({ ...withNews, hasUnreadReleaseNotes: true });
+
+    expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
+    expect(newsButtonOf(markup)).toContain("lp-avatar-dot");
+    expect(newsButtonOf(markup)).toContain("lp-btn--dot");
+    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Mon compte"));
+  });
+
+  // Tout est lu : pas de point
+  it("shows no dot once everything is read", () => {
+    expect(render({ ...withNews, hasUnreadReleaseNotes: false })).not.toContain("lp-avatar-dot");
+    expect(render(withNews)).not.toContain("lp-avatar-dot");
+  });
+
+  // Le point des signalements garde sa place : sur Modération, ou sur la photo du streamer ; celui de Nouveautés est en plus
+  it("leaves the report dot where it is: on Modération, or on the streamer's photo", () => {
+    const moderator = render({
+      ...withNews,
+      hasUnreadReleaseNotes: true,
+      onOpenModeration: doNothing,
+      pendingReports: 2,
+    });
+    const owner = render({
+      ...withNews,
+      hasUnreadReleaseNotes: true,
+      onOpenSettings: doNothing,
+      pendingReports: 2,
+    });
+
+    expect(moderator.match(/lp-avatar-dot/g)).toHaveLength(2);
+    expect(newsButtonOf(moderator)).toContain("lp-avatar-dot");
+    expect(positionOf(moderator, "Modération · 2 signalements en attente")).toBeGreaterThanOrEqual(0);
+    expect(owner.match(/lp-avatar-dot/g)).toHaveLength(2);
+    expect(positionOf(owner, "Mon compte · 2 signalements en attente")).toBeGreaterThanOrEqual(0);
+    expect(newsButtonOf(owner)).toContain("lp-avatar-dot");
+  });
+
+  // Un invité a le point, lui aussi : c'est le bouton qui le porte, pas un compte
+  it("is carried by the button for a guest too", () => {
+    expect(newsButtonOf(render({ ...guest, ...withNews, hasUnreadReleaseNotes: true }))).toContain(
+      "lp-avatar-dot",
+    );
+  });
+});
+
+describe("la pill Compte de l'invité et du viewer sur mobile, avec Nouveautés", () => {
+  // Sur mobile, un invité garde une pill avec ce seul bouton : ni apparence, ni Se connecter (la barre du bas le dit)
+  it("keeps a guest's pill with the Nouveautés button alone", () => {
+    const markup = render({ ...guest, ...withNews, isCompact: true });
+
+    expect(markup).not.toContain("is-hidden");
+    expect(markup).not.toContain("inert");
+    expect(orderWithNews(markup)).toEqual([NEWS]);
+    expect(markup.match(/<button/g)).toHaveLength(1);
+  });
+
+  // Sans barre du bas (une archive), l'invité sur mobile a Nouveautés, puis Se connecter
+  it("gives a guest without a bottom bar Nouveautés, then Se connecter", () => {
+    expect(orderWithNews(render({ ...guest, ...withNews, isCompact: true, hasBottomBar: false }))).toEqual([
+      NEWS,
+      SIGN_IN,
+    ]);
+  });
+
+  // Un viewer connecté sur mobile : Nouveautés, puis sa photo, sans l'apparence
+  it("gives a signed-in viewer Nouveautés, then the photo, without the appearance", () => {
+    expect(orderWithNews(render({ ...withNews, isCompact: true }))).toEqual([NEWS, "Mon compte"]);
+  });
+
+  // Sans l'ouvreur, l'invité sur mobile n'a toujours rien : la pill s'efface comme avant
+  it("still hides a guest's pill on mobile when nothing opens Nouveautés", () => {
+    expect(render({ ...guest, isCompact: true })).toContain("is-hidden");
+  });
+});

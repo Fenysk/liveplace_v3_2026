@@ -64,6 +64,7 @@ const ENTRIES_BY_SLUG = {
   moderation: { title: "Modération", chapterId: "window" },
   "fenetre-classement": { title: "Classement", chapterId: "window" },
   "mon-compte": { title: "Mon compte", chapterId: "window" },
+  nouveautes: { title: "Nouveautés", chapterId: "window" },
   developpeur: { title: "Développeur", chapterId: "window" },
 
   "taille-du-canvas": { title: "Taille de la fresque", chapterId: "dialogs" },
