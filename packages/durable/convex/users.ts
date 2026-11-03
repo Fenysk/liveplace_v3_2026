@@ -1,12 +1,51 @@
 // Les comptes (§8.2) : écrits par le web au callback OAuth, lus par le loader de `/{login}`.
 
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
+import { latestAccountOf, normalizeEmail } from "../src/donation-link";
 import { requireServiceKey } from "../src/service-key";
 import { toUserPatch } from "../src/user-patch";
-import { mutation, query } from "./_generated/server";
+import { type MutationCtx, mutation, query } from "./_generated/server";
+import { deleteDonationsOf, linkDonationsOf } from "./donations";
 import { accountDeletionTrigger } from "./schema";
 
 const DETACHED_PER_CALL = 200; // des comptes venus de sa page par appel : une transaction reste petite
+
+export type SignedInAccount = {
+  userId: string;
+  login: string;
+  displayName: string;
+  avatarUrl: string;
+  email?: string | undefined;
+  discoveredViaUserId?: string | undefined;
+};
+
+// §8.1 : l'e-mail à chaque connexion, le lien de découverte à la création seulement. L'e-mail s'écrit en minuscules : c'est sous
+// cette forme que `by_email` relie un don Ko-fi (JOURNAL 2026-11-03).
+export async function upsertAccount(
+  ctx: MutationCtx,
+  { email: rawEmail, discoveredViaUserId, ...user }: SignedInAccount,
+): Promise<void> {
+  const email = normalizeEmail(rawEmail);
+  const now = Date.now();
+  const existing = await ctx.db
+    .query("users")
+    .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+    .unique();
+  if (existing) {
+    // Sans e-mail dans ce jeton, celui d'avant part : la réduction de portée (contrat Twitch VI.F).
+    await ctx.db.patch(existing._id, toUserPatch({ ...user, email }, now));
+  } else {
+    await ctx.db.insert("users", {
+      ...user,
+      ...(email ? { email } : {}),
+      ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
+      createdAt: now,
+      lastSignInAt: now,
+    });
+  }
+  // Les dons Ko-fi qui attendaient cette adresse se relient, si ce compte est le seul à la porter.
+  if (email) await linkDonationsOf(ctx, user.userId, email);
+}
 
 export const upsertFromTwitch = mutation({
   args: {
@@ -18,26 +57,9 @@ export const upsertFromTwitch = mutation({
     email: v.optional(v.string()),
     discoveredViaUserId: v.optional(v.string()),
   },
-  // §8.1 : l'e-mail à chaque connexion, le lien de découverte à la création seulement.
-  handler: async (ctx, { serviceKey, email, discoveredViaUserId, ...user }) => {
+  handler: async (ctx, { serviceKey, ...account }) => {
     requireServiceKey(serviceKey);
-    const now = Date.now();
-    const existing = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .unique();
-    if (existing) {
-      // Sans e-mail dans ce jeton, celui d'avant part : la réduction de portée (contrat Twitch VI.F).
-      await ctx.db.patch(existing._id, toUserPatch({ ...user, email: email || undefined }, now));
-      return;
-    }
-    await ctx.db.insert("users", {
-      ...user,
-      ...(email ? { email } : {}),
-      ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
-      createdAt: now,
-      lastSignInAt: now,
-    });
+    await upsertAccount(ctx, account);
   },
 });
 
@@ -49,8 +71,7 @@ export const getByLogin = query({
       .query("users")
       .withIndex("by_login", (q) => q.eq("login", login))
       .collect();
-    // Un pseudo libéré chez Twitch peut être repris : le plus récemment connecté l'emporte.
-    const [latest] = users.sort((a, b) => b.lastSignInAt - a.lastSignInAt);
+    const latest = latestAccountOf(users);
     if (!latest) return null;
     return {
       userId: latest.userId,
@@ -93,6 +114,43 @@ export const listByUserIds = query({
 // CDC §8, Supprimer son compte : la ligne du compte, e-mail compris, et la preuve de son effacement dans la même
 // transaction (RGPD art. 5.2), par `runId` : une reprise qui repasse ici ne double rien. Rend ce qu'il faut pour oublier
 // ses caches ; `null` : la ligne était déjà partie.
+export async function deleteAccountRows(
+  ctx: MutationCtx,
+  {
+    userId,
+    runId,
+    deletedAt,
+    trigger,
+    ownedCanvases,
+  }: {
+    userId: string;
+    runId: string;
+    deletedAt: number;
+    trigger: Infer<typeof accountDeletionTrigger>;
+    ownedCanvases: number;
+  },
+) {
+  const rows = await ctx.db
+    .query("users")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .collect();
+  for (const row of rows) await ctx.db.delete(row._id);
+  await deleteDonationsOf(ctx, userId); // CDC des badges §6 : ses dons reliés partent avec lui
+  const proven = await ctx.db
+    .query("accountDeletions")
+    .withIndex("by_runId", (q) => q.eq("runId", runId))
+    .first();
+  if (!proven)
+    await ctx.db.insert("accountDeletions", {
+      runId,
+      deletedAt,
+      trigger,
+      erased: { hasEmail: rows.some(({ email }) => email !== undefined), ownedCanvases },
+    });
+  const [first] = rows;
+  return first ? { login: first.login, avatarUrl: first.avatarUrl } : null;
+}
+
 export const deleteByUserId = mutation({
   args: {
     serviceKey: v.string(),
@@ -102,26 +160,9 @@ export const deleteByUserId = mutation({
     trigger: accountDeletionTrigger,
     ownedCanvases: v.number(),
   },
-  handler: async (ctx, { serviceKey, userId, runId, deletedAt, trigger, ownedCanvases }) => {
+  handler: async (ctx, { serviceKey, ...deletion }) => {
     requireServiceKey(serviceKey);
-    const rows = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-    for (const row of rows) await ctx.db.delete(row._id);
-    const proven = await ctx.db
-      .query("accountDeletions")
-      .withIndex("by_runId", (q) => q.eq("runId", runId))
-      .first();
-    if (!proven)
-      await ctx.db.insert("accountDeletions", {
-        runId,
-        deletedAt,
-        trigger,
-        erased: { hasEmail: rows.some(({ email }) => email !== undefined), ownedCanvases },
-      });
-    const [first] = rows;
-    return first ? { login: first.login, avatarUrl: first.avatarUrl } : null;
+    return deleteAccountRows(ctx, deletion);
   },
 });
 

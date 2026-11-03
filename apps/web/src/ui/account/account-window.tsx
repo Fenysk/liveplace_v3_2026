@@ -3,6 +3,7 @@
 // l'apparence, la langue, Se déconnecter, et en bas, sous un filet, Supprimer mon compte (CDC §8). Nouveautés est la dernière
 // section, pour tous : un invité n'a que elle (et le Classement sur mobile).
 
+import type { SupportTitle } from "@liveplace/domain/support";
 import {
   Layers,
   LogOut,
@@ -30,6 +31,7 @@ import { useTexts } from "../locale/use-locale";
 import { RELEASE_NOTES_TEXTS } from "../release-notes/release-notes-texts";
 import { ACCOUNT_TEXTS } from "./account-texts";
 import { DELETE_ACCOUNT_TEXTS } from "./delete-account-texts";
+import { SupportBadgeRow } from "./support-badge-row";
 
 export type AccountSection =
   | "canvas"
@@ -73,6 +75,7 @@ type AccountWindowProps = {
   onSelect: (sectionId: AccountSection) => void;
   onClose: () => void;
   user?: ProfileUser | undefined; // absent : un invité, sans Mon compte
+  supportTitle?: SupportTitle | null | undefined; // son titre de Soutien, expiré ou non ; absent ou `null` : aucun don, pas de rangée Badges
   signOutHref: string;
   appearanceChoice: AppearanceChoice;
   onPickAppearance: (choice: AppearanceChoice) => void;
@@ -86,15 +89,16 @@ type AccountWindowProps = {
   releaseNotesTab?: ReactNode | undefined; // les Nouveautés des publics du rôle ; absent : pas de section
 };
 
-// Mon compte : son profil, l'apparence, la langue, le tutoriel, Supprimer mon compte. Un invité n'a pas de compte, donc pas
+// Mon compte : son profil, ses badges (Soutien, sans date), l'apparence, la langue, le tutoriel, Supprimer mon compte. Un invité n'a pas de compte, donc pas
 // cette section.
 type MyAccountProps = Pick<
   AccountWindowProps,
   "signOutHref" | "appearanceChoice" | "onPickAppearance" | "onRestartTutorial" | "onDeleteAccount"
-> & { user: ProfileUser };
+> & { user: ProfileUser; supportTitle: SupportTitle | null | undefined };
 
 const MyAccount = ({
   user,
+  supportTitle,
   signOutHref,
   appearanceChoice,
   onPickAppearance,
@@ -110,6 +114,7 @@ const MyAccount = ({
       <WindowRow label={<Profile user={user} variant="full" />}>
         <Button label={t.signOut} icon={LogOut} href={signOutHref} />
       </WindowRow>
+      {supportTitle && <SupportBadgeRow title={supportTitle} />}
       <WindowRow label={design.appearance}>
         <AppearancePicker choice={appearanceChoice} onPick={onPickAppearance} />
       </WindowRow>
@@ -150,6 +155,7 @@ export const AccountWindow = ({
   onSelect,
   onClose,
   user,
+  supportTitle,
   signOutHref,
   appearanceChoice,
   onPickAppearance,
@@ -182,6 +188,7 @@ export const AccountWindow = ({
     account: user && (
       <MyAccount
         user={user}
+        supportTitle={supportTitle}
         signOutHref={signOutHref}
         appearanceChoice={appearanceChoice}
         onPickAppearance={onPickAppearance}

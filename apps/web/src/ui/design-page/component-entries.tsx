@@ -38,6 +38,7 @@ import { TextField } from "../design/text-field";
 import { TimeCharts } from "../design/time-charts";
 import { TwitchGlyph } from "../design/twitch";
 import { pickAppearance, useAppearanceChoice } from "../design/use-appearance";
+import { BadgeGlyph, UserBadge, UserBadges } from "../design/user-badge";
 import {
   AUDIENCE_COLUMNS,
   toActivityAccounts,
@@ -244,6 +245,73 @@ export const BadgeEntry = () => (
         <div className="lp-row">
           <Badge label="Twitch" icon={TwitchGlyph} />
           <Badge label="Nommé ici" />
+        </div>
+      </StateRow>
+    </Block>
+  </Entry>
+);
+
+export const UserBadgeEntry = () => (
+  <Entry
+    slug="badge-du-pseudo"
+    components={["UserBadge", "UserBadges", "BadgeGlyph"]}
+    file="ui/design/user-badge.tsx"
+    note="Une icône à côté du pseudo, sans fond : Modérateur, puis Soutien. L'infobulle se montre au survol d'une souris, au focus clavier, au toucher ; aucun montant."
+  >
+    <Block title="Les badges">
+      <StateRow
+        name="Modérateur"
+        detail="Modère cette fresque, sur Twitch ou sur LivePlace. Jamais le streamer."
+        isDemo
+      >
+        <UserBadge id="moderator" />
+      </StateRow>
+      <StateRow
+        name="Soutien"
+        detail="Le même cœur, du premier titre à Clé de voûte ; seul le texte de l'infobulle change."
+        isDemo
+      >
+        <div className="lp-row">
+          <UserBadge id="support.supporter" />
+          <UserBadge id="support.regular" />
+          <UserBadge id="support.drivingForce" />
+          <UserBadge id="support.pillar" />
+          <UserBadge id="support.keystone" />
+        </div>
+      </StateRow>
+      <StateRow name="Les deux" detail="Dans l'ordre fixe : Modérateur, puis Soutien." isDemo>
+        <UserBadges ids={["support.pillar", "moderator"]} />
+      </StateRow>
+      <StateRow
+        name="Un repère"
+        detail="Dans le Classement du PC, la ligne est déjà un bouton : le badge n'en est pas un."
+      >
+        <UserBadges ids={["moderator", "support.regular"]} isMarker />
+      </StateRow>
+      <StateRow
+        name="Un id inconnu"
+        detail="Ignoré, sans erreur : un catalogue plus récent ne casse pas la page."
+      >
+        <UserBadges ids={["moderator", "pixels.2"]} />
+      </StateRow>
+    </Block>
+    <Block title="Dans un profil">
+      <StateRow name="Après le pseudo" detail="Avant le bouton Twitch.">
+        <Profile user={{ ...SAMPLE_OWNER, badges: ["moderator", "support.pillar"] }} variant="full" />
+      </StateRow>
+    </Block>
+    <Block title="L'icône seule">
+      <StateRow
+        name="Le cœur et le bouclier, sans bouton ni infobulle"
+        detail="Décoratifs : Mon compte et la section Badges du développeur les posent à côté d'un texte qui nomme le badge ; la fenêtre de soutien met le cœur entre parenthèses dans sa phrase."
+      >
+        <div className="lp-row">
+          <span className="lp-user-badge lp-user-badge--support" aria-hidden="true">
+            <BadgeGlyph family="support" />
+          </span>
+          <span className="lp-user-badge lp-user-badge--moderator" aria-hidden="true">
+            <BadgeGlyph family="moderator" />
+          </span>
         </div>
       </StateRow>
     </Block>

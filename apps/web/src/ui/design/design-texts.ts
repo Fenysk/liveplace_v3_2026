@@ -2,6 +2,7 @@
 // mots que les fenêtres du jeu se partagent (Annuler, Fermer, Chargement…).
 
 import type { ObsBackground } from "@liveplace/domain";
+import type { SupportTitle } from "@liveplace/domain/support";
 import { defineTexts, localized } from "../locale/texts";
 
 export const DESIGN_TEXTS = defineTexts({
@@ -50,13 +51,32 @@ export const DESIGN_TEXTS = defineTexts({
   },
   // CDC §8 : l'auteur d'un pixel dont le compte est supprimé n'a ni photo, ni nom, ni page.
   deletedAccount: { fr: "Compte supprimé", en: "Deleted account" },
+  // Les badges à côté du pseudo (CDC des badges §1 et §3) : ce que dit l'infobulle, reprise par l'`aria-label`. Aucun montant.
+  moderatorBadge: { fr: "Modère cette fresque", en: "Moderates this canvas" },
+  supportTitles: localized<Record<SupportTitle, string>>({
+    fr: {
+      supporter: "Soutien",
+      regular: "Fidèle",
+      drivingForce: "Moteur",
+      pillar: "Pilier",
+      keystone: "Clé de voûte",
+    },
+    en: {
+      supporter: "Supporter",
+      regular: "Regular",
+      drivingForce: "Driving Force",
+      pillar: "Pillar",
+      keystone: "Keystone",
+    },
+  }),
 
   signInWithTwitch: { fr: "Se connecter avec Twitch", en: "Sign in with Twitch" },
   signInNote: { fr: "En te connectant, tu acceptes la ", en: "By signing in, you accept the " },
   privacyPolicy: { fr: "politique de confidentialité", en: "privacy policy" },
 
   // Soutenir LivePlace (CDC 2026) : le bouton, qui ouvre une petite fenêtre, et sa pill. La fenêtre dit à quoi sert le don : aucun
-  // montant, aucune promesse, aucun badge. Le lien vers la page de dons est son bouton « Faire un don ».
+  // montant, aucune promesse. Le badge n'a que sa ligne atténuée, `supportBadgeNote`. Le lien vers la page de dons est son bouton
+  // « Faire un don ».
   supportLiveplace: { fr: "Soutenir LivePlace", en: "Support LivePlace" },
   // Sur l'accueil, le mot-symbole est juste à côté : le bouton à texte n'écrit pas le nom une seconde fois.
   supportShort: { fr: "Soutenir", en: "Support" },
@@ -81,6 +101,18 @@ export const DESIGN_TEXTS = defineTexts({
     fr: "Pas de grosse boîte derrière, juste moi.",
     en: "No big company behind it, just me.",
   },
+  // La ligne qui dit quoi faire pour recevoir le badge (CDC des badges §3) : le cœur du badge Soutien vient entre `before` et `after`,
+  // entre parenthèses, décoratif. Sans lui, la phrase se lit encore.
+  supportBadgeNote: localized({
+    fr: {
+      before: "Pour recevoir le badge Soutien ",
+      after: ", utilise sur Ko-fi l'e-mail de ton compte Twitch.",
+    },
+    en: {
+      before: "To get the Supporter badge ",
+      after: ", use your Twitch account's email on Ko-fi.",
+    },
+  }),
   supportDonate: { fr: "Faire un don", en: "Donate" },
 
   copy: localized({ fr: (value: string) => `Copier ${value}`, en: (value) => `Copy ${value}` }),

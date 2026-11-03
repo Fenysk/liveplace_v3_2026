@@ -685,6 +685,22 @@ describe("createConnection (§6.1)", () => {
     expect(sent.at(-1)).toEqual({ t: "inspected", requestId: "inspect-1", x: 1, y: 2, entry: publicEntry });
   });
 
+  // Les badges de l'auteur partent avec l'inspection, invité compris : ce n'est pas un identifiant (JOURNAL 2026-11-03)
+  it("sends the badges of the author with the inspection, a guest included, and without the id", async () => {
+    const badges = ["moderator", "support.regular"];
+    const { connection, sent } = setup({ session: null, author: { ...entry, badges } });
+    await connection.receive(hello());
+
+    await connection.receive(inspect(1, 2));
+
+    expect(sent.at(-1)).toEqual({
+      t: "inspected",
+      requestId: "inspect-1",
+      x: 1,
+      y: 2,
+      entry: { ...publicEntry, badges },
+    });
+  });
   // Tait l'identifiant de l'auteur à un viewer, et le donne au propriétaire et à un modérateur, qui modèrent
   it("hides the author's id from a viewer, and gives it to the owner and to a moderator", async () => {
     const byViewer = setup();

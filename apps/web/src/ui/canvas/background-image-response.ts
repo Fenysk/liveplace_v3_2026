@@ -4,6 +4,7 @@
 import { BACKGROUND_IMAGE_MAX_BYTES } from "@liveplace/domain";
 import type { SessionVerifier } from "@liveplace/domain/ports";
 import type { Result } from "@liveplace/shared";
+import { getBoundedBody } from "../../shared/bounded-body";
 import type { BackgroundImages } from "../../usecase/background-images";
 import {
   type BackgroundImageDeps,
@@ -76,33 +77,6 @@ const answer = (error?: UploadError): Response =>
     headers: { "cache-control": "no-store" },
   });
 
-// Les octets du corps, jamais plus que la borne : un en-tête qui annonce plus de 2 Mo, ou un corps qui les dépasse sans
-// l'annoncer, s'arrête sans tout lire. `null` : trop gros.
-async function getBoundedBody(request: Request): Promise<Uint8Array | null> {
-  const announced = Number(request.headers.get("content-length"));
-  if (announced > BACKGROUND_IMAGE_MAX_BYTES) return null;
-  const reader = request.body?.getReader();
-  const parts: Uint8Array[] = [];
-  let size = 0;
-  while (reader) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > BACKGROUND_IMAGE_MAX_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    parts.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const part of parts) {
-    bytes.set(part, offset);
-    offset += part.byteLength;
-  }
-  return bytes;
-}
-
 // Le propriétaire est celui du cookie, jamais un paramètre : sans lui, le corps n'est même pas lu. Le canvas visé est
 // `?canvas=` ; Convex vérifie que c'est l'actif de ce propriétaire.
 export async function uploadBackgroundImageResponse(
@@ -116,7 +90,7 @@ export async function uploadBackgroundImageResponse(
     cookieHeader,
     async (ownerId): Promise<Result<void, BackgroundImageError | "bad_request">> => {
       if (canvasId === "" || canvasId.length > 100) return { ok: false, error: "bad_request" };
-      const image = await getBoundedBody(request);
+      const image = await getBoundedBody(request, BACKGROUND_IMAGE_MAX_BYTES);
       if (!image) return { ok: false, error: "too_big" };
       return setCanvasBackgroundImage(deps, ownerId, { canvasId, image });
     },

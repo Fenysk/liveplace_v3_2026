@@ -323,3 +323,42 @@ describe("les onglets Vue OBS et Modération, cibles d'une bulle d'aide (§9.11)
     expect(renderWindow(OWNER_TABS)).not.toContain("lp-bubble-target");
   });
 });
+
+// CDC des badges §3 : Mon compte montre le badge Soutien et son titre, sans date, et rien sans aucun don
+describe("la rangée Badges de Mon compte (CDC des badges §3, JOURNAL 2026-11-03)", () => {
+  const rowOf = (markup: string): string => {
+    const start = markup.indexOf("lp-badge-line");
+    return start === -1
+      ? ""
+      : markup.slice(markup.lastIndexOf("<div", start), markup.indexOf("</div>", start));
+  };
+
+  // Un don : la rangée Badges, avec le cœur dans le rond d'un avatar et son titre ; « Soutien » seul au premier palier
+  it("shows the Support heart in the round of an avatar with its title, right after the profile", () => {
+    const markup = renderWindow({ supportTitle: "regular" });
+    const row = rowOf(markup);
+
+    expect(row).toContain('<span class="lp-avatar lp-avatar--support" aria-hidden="true">');
+    expect(row).toContain("lucide-heart");
+    expect(row).toContain('<span class="lp-profile-name lp-type-title">Soutien · Fidèle</span>');
+    expect(row).toMatch(/<span>Badges<\/span>/);
+    expect(markup.indexOf("Se déconnecter")).toBeLessThan(markup.indexOf("lp-badge-line"));
+    expect(markup.indexOf("lp-badge-line")).toBeLessThan(markup.indexOf("Apparence"));
+    expect(rowOf(renderWindow({ supportTitle: "supporter" }))).toContain(">Soutien</span>");
+  });
+
+  // Aucune date, jamais : ni « Jusqu'au », ni « Expiré le », et aucune couleur atténuée : un Soutien expiré s'y montre à l'identique
+  it("shows no date, and no muted colour: the row is the same whether the Support has expired or not", () => {
+    const row = rowOf(renderWindow({ supportTitle: "pillar" }));
+
+    expect(row).not.toMatch(/Jusqu|Expir|Until|Expired|lp-muted|lp-avatar--expired/);
+    expect(row.replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, "")).toBe("BadgesSoutien · Pilier");
+  });
+
+  // Sans aucun don, ou tant que le titre n'est pas lu : la rangée n'apparaît pas
+  it("does not appear without a donation", () => {
+    expect(renderWindow({ supportTitle: null })).not.toContain("lp-badge-line");
+    expect(renderWindow({})).not.toContain("lp-badge-line");
+    expect(renderWindow({ supportTitle: null })).not.toContain(">Badges<");
+  });
+});

@@ -2,6 +2,7 @@
 // §9.9 : et à l'anglaise, « 1st, 2nd, 3rd ».
 
 import type { ScoreboardRow } from "../../state/scoreboard";
+import { badgeLabels } from "../design/user-badge-label";
 import { formatNumber, INTL_TAGS, type Locale } from "../locale/locale";
 import { defineTexts } from "../locale/texts";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -28,9 +29,21 @@ export const pixelsNumber = (pixels: number, locale: Locale): string => formatNu
 
 export const rankText = (rank: number, locale: Locale): string => `${rank}${ordinalSuffix(rank, locale)}`;
 
-// Le nom d'une ligne : tout ce que l'écran montre au survol, dit d'un trait.
-export const rowLabel = ({ rank, pixels, player }: ScoreboardRow, locale: Locale): string =>
-  `${rankText(rank, locale)}, ${player.displayName}, ${MODERATION_TEXTS[locale].pixelCount(pixels)}`;
+const labelOf = (
+  { rank, pixels, player }: ScoreboardRow,
+  locale: Locale,
+  badges: readonly string[],
+): string =>
+  [rankText(rank, locale), player.displayName, ...badges, MODERATION_TEXTS[locale].pixelCount(pixels)].join(
+    ", ",
+  );
+
+// Le nom d'une ligne : tout ce que l'écran montre au survol, dit d'un trait, badges compris (JOURNAL 2026-11-03).
+export const rowLabel = (row: ScoreboardRow, locale: Locale): string =>
+  labelOf(row, locale, badgeLabels(row.player.badges, locale));
+
+// Sur mobile, chaque badge est un bouton qui se nomme lui-même : la ligne ne les redit pas.
+export const listRowLabel = (row: ScoreboardRow, locale: Locale): string => labelOf(row, locale, []);
 
 // La pastille d'un rang tient dans un petit rond : au-delà de 99, elle ne dit plus que « 99+ ».
 export const badgeRank = (rank: number): string => (rank > 99 ? "99+" : String(rank));

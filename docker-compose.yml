@@ -90,6 +90,8 @@ services:
       REDIS_URL: ${REDIS_URL:?REDIS_URL manquante}
       # JOURNAL 2026-09-27 : la signature des messages que Twitch poste sur /twitch/eventsub.
       TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET:?TWITCH_EVENTSUB_SECRET manquante}
+      # JOURNAL 2026-11-03 : le jeton de vérification de Ko-fi, facultatif ; sans lui, /kofi/webhook répond 503.
+      KOFI_VERIFICATION_TOKEN: ${KOFI_VERIFICATION_TOKEN:-}
       # Vide en production : ni bandeau, ni `noindex`.
       BETA_LABEL: ${BETA_LABEL:-}
       # §16.3 : facultative, des paires « URL clé » ; sans elle, Convex n'est pas mesuré.

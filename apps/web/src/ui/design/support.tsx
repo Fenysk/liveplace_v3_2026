@@ -9,6 +9,7 @@ import { Button } from "./button";
 import { DESIGN_TEXTS } from "./design-texts";
 import { Pill, type PillDock } from "./pill";
 import { Avatar } from "./profile";
+import { BadgeGlyph } from "./user-badge";
 import { SmallWindow } from "./window";
 
 // L'adresse de la page de dons, à un seul endroit.
@@ -61,6 +62,17 @@ export const SupportWindow = ({ isOpen, onClose }: SupportWindowProps) => {
           <span className="lp-type-body lp-muted">{t.supportSignature}</span>
         </span>
       </div>
+      <p className="lp-type-caption lp-muted lp-support-note">
+        {t.supportBadgeNote.before}
+        <span aria-hidden="true">
+          (
+          <span className="lp-support-note-heart">
+            <BadgeGlyph family="support" />
+          </span>
+          )
+        </span>
+        {t.supportBadgeNote.after}
+      </p>
     </SmallWindow>
   );
 };

@@ -11,14 +11,17 @@ import { Button, blurAfterClick } from "./button";
 import { classNames } from "./class-names";
 import { DESIGN_TEXTS } from "./design-texts";
 import { TwitchGlyph, TwitchLiveGlyph } from "./twitch";
+import { UserBadges } from "./user-badge";
 import { SmallWindow } from "./window";
 
 // `twitchLive` (§10.4) : la personne est en live ; le bouton de sa chaîne le dit. Absent : hors live.
+// `badges` (JOURNAL 2026-11-03) : les ids reçus du serveur, après le nom et avant le bouton Twitch. Absent : aucun.
 export type ProfileUser = {
   displayName: string;
   login: string;
   avatarUrl?: string | undefined;
   twitchLive?: TwitchLive | undefined;
+  badges?: string[] | undefined;
 };
 
 // `avatar` : la photo seule. `name` : la photo et le nom. `full` : la photo, le nom et l'icône Twitch.
@@ -104,6 +107,7 @@ export const Profile = ({ user, variant = "name", hasAccount = true }: ProfilePr
           {inner}
         </button>
       )}
+      <UserBadges ids={user.badges} />
       {/* §10.4 : en live, le bouton teinté paraît même sans logo (mobile) ; seule une personne avec compte l'est */}
       {user.twitchLive && hasAccount ? (
         <TwitchLiveLink user={user} twitchLive={user.twitchLive} />

@@ -10,6 +10,7 @@ import { type AccountSection, AccountWindow } from "../ui/account/account-window
 import { DeleteAccountWindow } from "../ui/account/delete-account-window";
 import { type AccountDeletion, useAccountDeletion } from "../ui/account/use-account-deletion";
 import { useAccountPillProps } from "../ui/account/use-account-pill";
+import { useMySupportTitle } from "../ui/account/use-my-support";
 import { useSigningIn } from "../ui/account/use-signing-in";
 import { ArchivesTab } from "../ui/archive/archives-tab";
 import { createOwnSwitchTracker } from "../ui/archive/own-switch";
@@ -29,9 +30,8 @@ import { SupportPill } from "../ui/design/support";
 import { ThemePill } from "../ui/design/theme-pill";
 import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, SIDE_COLUMN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
+import { DeveloperContent } from "../ui/developer/developer-content";
 import { DeveloperWindow } from "../ui/developer/developer-window";
-import { LiveActivitySection } from "../ui/developer/live-activity-section";
-import { LiveCapacitySection } from "../ui/developer/live-capacity-section";
 import { useDeveloperWindow } from "../ui/developer/use-developer-window";
 import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
@@ -136,6 +136,8 @@ const LivePills = ({
   const scoreboardCollapse = useScoreboardCollapse();
   const ownerProfile = useOwnerProfile(stores.canvas, owner); // §10.4 : son live
   const isSidePanel = useMediaQuery(SIDE_COLUMN_QUERY); // §9.7 : paysage sur un écran bas
+  // Mon compte lit son Soutien à l'ouverture de la fenêtre, pour un compte connecté seulement.
+  const supportTitle = useMySupportTitle(windowState.isOpen, windowUser !== undefined);
   const getRole = () => stores.canvas.getView().role;
   const role = useSyncExternalStore(stores.canvas.subscribe, getRole, getRole);
   const isOwner = role === "owner";
@@ -168,15 +170,11 @@ const LivePills = ({
             onSelect={developer.onSelect}
             onClose={developer.onClose}
           >
-            {developer.sectionId === "capacity" ? (
-              <LiveCapacitySection canvas={stores.canvas} isOpen={developer.isOpen} />
-            ) : (
-              <LiveActivitySection
-                canvas={stores.canvas}
-                isOpen={developer.isOpen}
-                sectionId={developer.sectionId}
-              />
-            )}
+            <DeveloperContent
+              canvas={stores.canvas}
+              sectionId={developer.sectionId}
+              isOpen={developer.isOpen}
+            />
           </DeveloperWindow>
         </FixedLocale>
       )}
@@ -187,6 +185,7 @@ const LivePills = ({
           onSelect={openWindow}
           onClose={() => setWindowState((shown) => ({ ...shown, isOpen: false }))}
           user={windowUser}
+          supportTitle={supportTitle}
           signOutHref={signOutHref}
           appearanceChoice={account.appearanceChoice}
           onPickAppearance={account.onPickAppearance}

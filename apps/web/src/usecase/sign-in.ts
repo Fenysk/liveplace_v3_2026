@@ -2,6 +2,7 @@
 
 import { birthCanvasMeta, type Timestamp, type User } from "@liveplace/domain";
 import type {
+  DonationStore,
   DurableStore,
   RecoveryStore,
   SessionSigner,
@@ -9,6 +10,7 @@ import type {
   SignInWrites,
   TwitchAuth,
 } from "@liveplace/domain/ports";
+import { writeSupportMirror } from "./support-mirror";
 import type { TwitchLiveTracker } from "./twitch-live";
 
 export type SignInDeps = {
@@ -19,6 +21,8 @@ export type SignInDeps = {
     "upsertUserFromTwitch" | "getUserByLogin" | "ensureCanvasForOwner" | "getActiveCanvasForOwner"
   >;
   redis: SignInWrites;
+  // JOURNAL 2026-11-03 : les dons que `upsertUserFromTwitch` vient de relier à ce compte, pour son badge Soutien.
+  donations: Pick<DonationStore, "getSupport">;
   // §7.4 : absent sans `DURABLE_SCOPE`, la connexion crée le canvas comme avant.
   recovery?: Pick<RecoveryStore, "hasSnapshot"> | undefined;
   signer: SessionSigner;
@@ -79,7 +83,8 @@ export async function signInTwitchUser(
     width: meta.width,
     height: meta.height,
   });
-  await deps.redis.setUser(user);
+  // Le Soutien se réécrit à chaque connexion, dans le miroir que le gateway lit (JOURNAL 2026-11-03).
+  await writeSupportMirror(deps, user);
   // Un canvas dont ce scope garde une sauvegarde ne naît jamais vide : Redis l'a perdu, le worker le remet en place. Une
   // Convex muette fait échouer la connexion : mieux vaut qu'elle recommence qu'un canvas vide que la récupération ne remplace plus.
   if (!(await deps.recovery?.hasSnapshot(canvasId))) await deps.redis.createCanvas(canvasId, meta);

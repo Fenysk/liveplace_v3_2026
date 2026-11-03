@@ -27,4 +27,5 @@ export const privacySections = (t: (typeof PRIVACY_TEXTS)[Locale]): readonly Pri
     sentences: t.deleteAccountSentences,
     contact: { ...t.deleteAccountContact, address: CONTACT_ADDRESS },
   },
+  { id: "privacy-donations", title: t.donationsTitle, sentences: t.donationsSentences },
 ];

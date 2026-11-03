@@ -1,4 +1,4 @@
-// Le développeur (§10.3) : sa fenêtre et ses trois sections, dans chacun de leurs
+// Le développeur (§10.3) : sa fenêtre et ses quatre sections, dans chacun de leurs
 // états. Les vrais composants du jeu, avec des chiffres d'exemple, aucune connexion.
 
 import type { ActivityPeriod } from "@liveplace/domain";
@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityWatchView } from "../../state/activity-watch";
 import type { CapacityWatchView } from "../../state/capacity-watch";
 import { ActivitySection } from "../developer/activity-section";
+import { BadgesSection, type BadgesView } from "../developer/badges-section";
 import { CanvasSection } from "../developer/canvas-section";
 import { CapacitySection } from "../developer/capacity-section";
 import {
@@ -31,6 +32,7 @@ import {
 
 // Le plus ancien jour gardé des exemples : les flèches ne s'arrêtent qu'à lui.
 const FIRST_DAY_AGO = 400;
+const DAY_MS = 24 * 3600 * 1000;
 const DAY_LOAD_MS = 900; // le temps que prend un jour à se charger dans l'exemple
 
 // Un jour passé choisi dans l'exemple, et s'il est encore en lecture.
@@ -41,7 +43,7 @@ type DaySelection = { dayAt: number; isLoading: boolean } | undefined;
 // charge un instant, puis se montre.
 type SectionSceneProps = {
   nowMs: number;
-  sectionId: Exclude<DeveloperSectionId, "capacity">;
+  sectionId: Exclude<DeveloperSectionId, "capacity" | "badges">;
   here?: ActivityHere;
   daysAgo?: number;
   dayVariant?: SampleDayVariant;
@@ -115,6 +117,29 @@ const CapacityScene = ({ nowMs, variant, initialPeriod = "day" }: CapacitySceneP
   return <CapacitySection view={view} nowMs={nowMs} onSelectPeriod={setPeriod} />;
 };
 
+// Des dons d'exemple : un nom Ko-fi avec son e-mail, un don anonyme sans e-mail. Jamais un montant.
+const sampleWaiting = (nowMs: number): BadgesView => ({
+  status: "ready",
+  report: {
+    holders: 7,
+    waiting: [
+      {
+        donationId: "d1",
+        donatedAt: nowMs - 1 * DAY_MS,
+        kofiName: "Camille R.",
+        email: "camille.r@example.com",
+      },
+      { donationId: "d2", donatedAt: nowMs - 4 * DAY_MS, kofiName: "jeanmi_83", email: "jeanmi@example.com" },
+      { donationId: "d3", donatedAt: nowMs - 6 * DAY_MS },
+    ],
+  },
+});
+
+// Ici, aucun compte ne porte jamais le pseudo : la ligne montre le message d'un pseudo inconnu, et le don reste.
+const linkNobody = async (): Promise<"unknown_account"> => "unknown_account";
+
+const BadgesScene = ({ view }: { view: BadgesView }) => <BadgesSection view={view} onLink={linkNobody} />;
+
 // Elle s'ouvre sur Ce canvas, comme dans le jeu ; le choix d'une section ne la ferme pas.
 const WindowScene = ({ nowMs, here }: { nowMs: number; here: ActivityHere }) => {
   const [sectionId, setSectionId] = useState<DeveloperSectionId>(FIRST_DEVELOPER_SECTION);
@@ -124,6 +149,8 @@ const WindowScene = ({ nowMs, here }: { nowMs: number; here: ActivityHere }) => 
         <DeveloperWindow isOpen={isOpen} sectionId={sectionId} onSelect={setSectionId} onClose={close}>
           {sectionId === "capacity" ? (
             <CapacityScene nowMs={nowMs} variant="watch" />
+          ) : sectionId === "badges" ? (
+            <BadgesScene view={sampleWaiting(nowMs)} />
           ) : (
             <SectionScene nowMs={nowMs} sectionId={sectionId} here={here} />
           )}
@@ -149,9 +176,16 @@ export const DeveloperEntry = () => {
   return (
     <Entry
       slug="developpeur"
-      components={["DeveloperWindow", "CanvasSection", "ActivitySection", "CapacitySection", "DaySwitch"]}
-      file="ui/developer/{developer-window,canvas-section,activity-section,capacity-section,day-switch,past-day}.tsx"
-      note="Ses trois sections à lui : Cette fresque, où elle s'ouvre, Tout LivePlace et Capacité. Les chiffres bougent toutes les 2 s dans le jeu ; les flèches de la date, en tête de Cette fresque et de Tout LivePlace, relisent un jour passé."
+      components={[
+        "DeveloperWindow",
+        "CanvasSection",
+        "ActivitySection",
+        "CapacitySection",
+        "BadgesSection",
+        "DaySwitch",
+      ]}
+      file="ui/developer/{developer-window,canvas-section,activity-section,capacity-section,badges-section,day-switch,past-day}.tsx"
+      note="Ses quatre sections à lui : Cette fresque, où elle s'ouvre, Tout LivePlace, Capacité et Badges. Les chiffres bougent toutes les 2 s dans le jeu ; les flèches de la date, en tête de Cette fresque et de Tout LivePlace, relisent un jour passé."
     >
       <Block title="La fenêtre">
         <StateRow
@@ -456,6 +490,45 @@ export const DeveloperEntry = () => {
               nowMs={nowMs}
               onSelectPeriod={noop}
             />
+          </InWindow>
+        </StateRow>
+      </Block>
+      <Block
+        title="Badges"
+        note="Après Capacité. Le nombre de titulaires du badge Soutien, avec son cœur, puis les dons non reliés : le nom Ko-fi, l'e-mail Ko-fi dessous (pour choisir le compte), le jour du don, jamais un montant. Des lignes simples, comme Modération."
+      >
+        <StateRow
+          name="Trois dons non reliés"
+          detail="Relier à un compte ouvre, dans la ligne, le champ Pseudo Twitch et le bouton Relier (le seul bouton plein, une ligne à la fois). Dans cet exemple, aucun compte ne porte le pseudo : le message d'un pseudo inconnu s'affiche sur la ligne, rien ne change."
+          isDemo
+        >
+          <InWindow>
+            <BadgesScene view={sampleWaiting(nowMs)} />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Aucun don en attente">
+          <InWindow>
+            <BadgesScene view={{ status: "ready", report: { holders: 7, waiting: [] } }} />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Trois dons non reliés, à la largeur de la grande fenêtre">
+          <InLargeWindow>
+            <BadgesScene view={sampleWaiting(nowMs)} />
+          </InLargeWindow>
+        </StateRow>
+        <StateRow name="Trois dons non reliés sur mobile" detail="Un onglet de la feuille.">
+          <InPhone isWindow>
+            <BadgesScene view={sampleWaiting(nowMs)} />
+          </InPhone>
+        </StateRow>
+        <StateRow name="Avant la première lecture" detail="Un squelette, après 200 ms.">
+          <InWindow>
+            <BadgesScene view={{ status: "loading" }} />
+          </InWindow>
+        </StateRow>
+        <StateRow name="Lecture en échec">
+          <InWindow>
+            <BadgesScene view={{ status: "failed" }} />
           </InWindow>
         </StateRow>
       </Block>

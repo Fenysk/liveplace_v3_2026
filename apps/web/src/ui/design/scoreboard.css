@@ -5,7 +5,9 @@
    La pill s'arrondit d'autant pour rester concentrique aux avatars. */
 .lp-pill:has(.lp-scoreboard) {
   --sb-ring: 4px;
-  --sb-width: 196px; /* avec les marges de la pill : 212 px, déplié */
+  /* avec les marges de la pill : 264 px, déplié. 248 = 196 + 52, la place de deux badges (2 x 18 px, 2 px entre eux, 6 px avant le
+     premier : 44 px) et un peu d'air : un pseudo de 12 lettres tient en entier à côté d'eux (JOURNAL 2026-11-03). */
+  --sb-width: 248px;
   --lp-radius-box: calc(var(--control-size) / 2 + var(--sb-ring) + var(--space-2));
   /* Les étiquettes du survol (replié) débordent de la pill : elle ne coupe plus ce qui sort de sa forme */
   overflow: visible;
@@ -229,6 +231,8 @@
   padding: 0;
   list-style: none;
   display: grid;
+  /* Le pseudo et ses badges se coupent à la largeur de la fenêtre : la liste ne s'élargit jamais à leur texte */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -277,4 +281,46 @@
 .lp-scoreboard-meta {
   flex: none;
   white-space: nowrap;
+}
+
+/* Le pseudo et ses badges sur une ligne : le pseudo se coupe avant eux. Ici le badge est un repère (la ligne est un bouton) :
+   pas de zone de 26 px, 2 px entre deux badges, 6 px après le pseudo. */
+.lp-rank-text {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lp-rank-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.lp-rank-line > .lp-rank-name,
+.lp-rank-line > .lp-rank-tip-name,
+.lp-rank-line > .lp-scoreboard-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.lp-rank-line > .lp-user-badges {
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.lp-rank-line .lp-user-badge {
+  padding: 0;
+}
+
+/* Sur mobile, la ligne de la liste prend la place qui reste : le nom se coupe, les badges la suivent, 26 px de toucher chacun */
+.lp-scoreboard-row > .lp-rank-line {
+  flex: 1;
+}
+
+.lp-scoreboard-row > .lp-rank-line > .lp-user-badges {
+  margin-left: 0;
+  gap: 0;
+}
+
+.lp-scoreboard-row .lp-user-badge {
+  padding: var(--space-1);
 }

@@ -1,5 +1,6 @@
 import { birthCanvasMeta, type CanvasMeta, type User } from "@liveplace/domain";
-import type { OwnedCanvas, SignedInUser, Signup } from "@liveplace/domain/ports";
+import type { SupportMirror } from "@liveplace/domain/badges";
+import type { OwnedCanvas, SignedInUser, Signup, SupportSummary } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { completeSignIn, type SignInDeps } from "./sign-in";
 
@@ -13,7 +14,12 @@ const owner: User = {
 };
 
 // Des doubles qui notent ce qu'on leur demande d'écrire. Convex connaît le compte et le streamer de `/benitoad`.
-const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, ownerCanvasId?: string) => {
+const doubles = (
+  ensuredCanvasId: string,
+  twitchUser: SignedInUser = user,
+  ownerCanvasId?: string,
+  support: SupportSummary | null = null,
+) => {
   const activeCanvasReads: string[] = [];
   const createdCanvases: string[] = [];
   const createdMetas: CanvasMeta[] = [];
@@ -22,10 +28,12 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
   const signedUsers: string[] = [];
   const upserts: { user: SignedInUser; discoveredViaUserId: string | undefined }[] = [];
   const mirrored: object[] = [];
+  const mirroredSupports: (SupportMirror | null | undefined)[] = [];
   const signed: object[] = [];
   const signups: Signup[] = [];
   const tracked: string[] = [];
   const steps: string[] = [];
+  const supportSteps: string[] = []; // le Soutien : sa lecture, puis l'écriture du miroir
   const known = [user, owner];
   const deps: SignInDeps = {
     twitch: {
@@ -53,12 +61,20 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
         createdCanvases.push(canvasId);
         createdMetas.push(meta);
       },
-      setUser: async (mirroredUser) => {
+      setUser: async (mirroredUser, mirroredSupport) => {
+        supportSteps.push("mirror");
         mirroredUsers.push(mirroredUser.userId);
         mirrored.push(mirroredUser);
+        mirroredSupports.push(mirroredSupport);
       },
       storeSignup: async (signup) => {
         signups.push(signup);
+      },
+    },
+    donations: {
+      getSupport: async (supportedUserId) => {
+        supportSteps.push(`support ${supportedUserId}`);
+        return support;
       },
     },
     signer: {
@@ -82,6 +98,7 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
   return {
     deps,
     steps,
+    supportSteps,
     tracked,
     activeCanvasReads,
     createdCanvases,
@@ -91,10 +108,49 @@ const doubles = (ensuredCanvasId: string, twitchUser: SignedInUser = user, owner
     signedUsers,
     upserts,
     mirrored,
+    mirroredSupports,
     signed,
     signups,
   };
 };
+
+describe("completeSignIn and the Support badge (JOURNAL 2026-11-03)", () => {
+  const donated = Date.UTC(2026, 9, 15, 10);
+  const summary = { lifetimeCents: 2500, lastDonatedAt: donated };
+
+  // Le Soutien se lit après le lien des dons (upsert) et s'écrit avec le miroir du compte
+  it("writes the title and the end of the Support with the mirror, after Convex linked the donations", async () => {
+    const { deps, steps, supportSteps, mirroredSupports } = doubles("canvas-1", user, undefined, summary);
+
+    await completeSignIn(deps, "code", null);
+
+    expect(steps).toContain("upsert");
+    expect(supportSteps).toEqual([`support ${user.userId}`, "mirror"]);
+    expect(mirroredSupports).toEqual([{ title: "drivingForce", endsAt: Date.UTC(2027, 9, 15, 10) }]);
+  });
+
+  // Sans don relié, le miroir est écrit sans Soutien
+  it("writes the mirror without a Support when no donation is linked", async () => {
+    const { deps, mirroredSupports } = doubles("canvas-1");
+
+    await completeSignIn(deps, "code", null);
+
+    expect(mirroredSupports).toEqual([null]);
+  });
+
+  // Une Convex muette sur les dons fait échouer la connexion, qui recommence : le miroir n'est pas écrit à moitié
+  it("stops the sign-in when Convex cannot tell the donations, and writes no mirror", async () => {
+    const { deps, mirroredUsers } = doubles("canvas-1");
+    deps.donations = {
+      getSupport: async () => {
+        throw new Error("Convex injoignable");
+      },
+    };
+
+    await expect(completeSignIn(deps, "code", null)).rejects.toThrow("Convex injoignable");
+    expect(mirroredUsers).toEqual([]);
+  });
+});
 
 describe("completeSignIn after a deletion (CDC §8, Supprimer son compte)", () => {
   // Termine l'effacement interrompu de ce compte avant de rien créer : sinon il effacerait le compte neuf

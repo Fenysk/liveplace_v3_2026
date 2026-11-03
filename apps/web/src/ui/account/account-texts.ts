@@ -7,6 +7,8 @@ export const ACCOUNT_TEXTS = defineTexts({
   signIn: { fr: "Se connecter", en: "Sign in" },
   signOut: { fr: "Se déconnecter", en: "Sign out" },
   myAccount: { fr: "Mon compte", en: "My account" },
+  // La rangée de Mon compte qui montre ses badges (CDC des badges §3) : le Soutien et son titre, jamais une date.
+  badges: { fr: "Badges", en: "Badges" },
   // Rejouer le tutoriel (§9.11) : la rangée de Mon compte, son bouton, et le toast qui le confirme.
   tutorial: { fr: "Tutoriel", en: "Tutorial" },
   tutorialRestart: { fr: "Revoir le tuto", en: "Replay the tutorial" },

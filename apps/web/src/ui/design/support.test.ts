@@ -180,8 +180,9 @@ describe("la fenêtre Soutenir LivePlace (CDC 2026, Soutenir LivePlace)", () => 
     expect(markup).not.toMatch(/Soutenir|gratuit|Faire un don|Fermer|Échap|boîte/);
   });
 
-  // La liste n'a pas de ponctuation finale, et le texte ne parle ni de montant, ni de promesse, ni de badge
-  it("ends no list item with a punctuation mark, and names no amount, no promise and no badge", () => {
+  // La liste n'a pas de ponctuation finale, et ces textes ne parlent ni de montant, ni de promesse, ni de badge : le badge a sa
+  // propre ligne (`supportBadgeNote`), qui dit quoi faire sans rien promettre
+  it("ends no list item with a punctuation mark, and the lead, the reasons and the signature name no amount, no promise and no badge", () => {
     const texts = (locale: Locale): string[] => [
       DESIGN_TEXTS[locale].supportFree,
       DESIGN_TEXTS[locale].supportPays,
@@ -226,6 +227,40 @@ describe("la fenêtre Soutenir LivePlace (CDC 2026, Soutenir LivePlace)", () => 
 
     expect(photo.startsWith(`${TWITCH_AVATAR_ORIGIN}/`)).toBe(true);
     expect(writers.map(({ name }) => name)).toEqual(["ui/design/support.tsx"]);
+  });
+
+  // Une ligne atténuée après la signature et avant les boutons : l'e-mail à utiliser sur Ko-fi pour recevoir le badge Soutien
+  it("adds a muted line after the signature and before the buttons, saying which e-mail to use on Ko-fi", () => {
+    for (const [locale, before, after] of [
+      ["fr", "Pour recevoir le badge Soutien ", ", utilise sur Ko-fi l&#x27;e-mail de ton compte Twitch."],
+      ["en", "To get the Supporter badge ", ", use your Twitch account&#x27;s email on Ko-fi."],
+    ] as const) {
+      const markup = open(locale);
+      const note = markup.slice(markup.indexOf('<p class="lp-type-caption lp-muted lp-support-note">'));
+      const line = note.slice(0, note.indexOf("</p>"));
+
+      expect(line).toContain(`${before}<span aria-hidden="true">(<span class="lp-support-note-heart">`);
+      expect(line).toContain(`</span>)</span>${after}`);
+      expect(markup.indexOf("lp-support-signature")).toBeLessThan(markup.indexOf("lp-support-note"));
+      expect(markup.indexOf("lp-support-note")).toBeLessThan(markup.indexOf("lp-window-actions"));
+    }
+  });
+
+  // Le cœur est celui du badge Soutien, décoratif : ni bouton, ni infobulle, ni rôle ; le texte se lit sans lui
+  it("shows the real Support heart, decorative, with no button, no tooltip and no role", () => {
+    const markup = open("fr");
+    const start = markup.indexOf('<p class="lp-type-caption lp-muted lp-support-note">');
+    const line = markup.slice(start, markup.indexOf("</p>", start));
+
+    expect(line).toContain("lucide-heart");
+    expect(line).toContain('aria-hidden="true"');
+    expect(line).not.toMatch(/<button|role=|popover|aria-label|title=/);
+    expect(line.replace(/<[^>]+>/g, "")).toBe(
+      "Pour recevoir le badge Soutien (), utilise sur Ko-fi l&#x27;e-mail de ton compte Twitch.",
+    );
+    expect(DESIGN_TEXTS.fr.supportBadgeNote.before + DESIGN_TEXTS.fr.supportBadgeNote.after).toBe(
+      "Pour recevoir le badge Soutien , utilise sur Ko-fi l'e-mail de ton compte Twitch.",
+    );
   });
 
   // En bas à droite : Fermer avec Échap, puis Faire un don, rose, vers Ko-fi dans un nouvel onglet

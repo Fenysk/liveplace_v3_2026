@@ -3,7 +3,13 @@
 
 import type { Scoreboard } from "./canvas-store";
 
-export type ScoreboardPlayer = { displayName: string; login: string; avatarUrl?: string | undefined };
+// `badges` : les ids du serveur (JOURNAL 2026-11-03), absents quand le joueur n'en a aucun.
+export type ScoreboardPlayer = {
+  displayName: string;
+  login: string;
+  avatarUrl?: string | undefined;
+  badges?: readonly string[] | undefined;
+};
 
 export type ScoreboardRow = { rank: number; pixels: number; player: ScoreboardPlayer; isMe: boolean };
 
@@ -16,18 +22,26 @@ export function toScoreboardRows(
 ): ScoreboardRows {
   const entries = scoreboard?.top ?? [];
   const you = scoreboard?.you;
-  const top = entries.map(({ login, displayName, avatarUrl, pixels }, index): ScoreboardRow => {
+  const top = entries.map(({ login, displayName, avatarUrl, badges, pixels }, index): ScoreboardRow => {
     const rank = index + 1;
     return {
       rank,
       pixels,
-      player: { login, displayName, ...(avatarUrl ? { avatarUrl } : {}) },
+      player: { login, displayName, ...(avatarUrl ? { avatarUrl } : {}), ...(badges ? { badges } : {}) },
       isMe: you?.rank === rank,
     };
   });
   const isOutside = you !== undefined && you.rank > top.length;
   return {
     top,
-    outside: isOutside && me ? { rank: you.rank, pixels: you.pixels, player: me, isMe: true } : null,
+    outside:
+      isOutside && me
+        ? {
+            rank: you.rank,
+            pixels: you.pixels,
+            player: { ...me, ...(you.badges ? { badges: you.badges } : {}) },
+            isMe: true,
+          }
+        : null,
   };
 }

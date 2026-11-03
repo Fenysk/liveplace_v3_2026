@@ -1,0 +1,102 @@
+/* Le badge à côté du pseudo (CDC des badges, JOURNAL 2026-11-03) : une icône Lucide, sans fond ni pastille. Une variante de la
+   famille `.lp-badge` (badge.css), pas un second sens du mot. */
+
+/* La rangée : après le pseudo, dans l'ordre fixe du catalogue (Modérateur, puis Soutien) */
+.lp-user-badges {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* Un badge : l'icône de 18 px (comme .lp-btn svg) dans une zone de toucher de 26 px, 2 x --space-1 autour. Un bouton, sauf
+   dans le Classement du PC, où il n'est qu'un repère. */
+.lp-user-badge {
+  appearance: none;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: default;
+}
+
+.lp-user-badge svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.lp-user-badge:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+/* Soutien en rose (--support : 3,4:1 sur la surface claire d'une pill, 4,8:1 sur la sombre, au-dessus des 3:1 de WCAG 1.4.11) ;
+   Modérateur en encre : la forme suffit à les distinguer */
+.lp-user-badge--support {
+  color: var(--support);
+}
+
+.lp-user-badge--moderator {
+  color: var(--ink);
+}
+
+/* L'infobulle : dans la couche supérieure du navigateur (`popover`), au-dessus de toute pill et de toute fenêtre. Ses styles de
+   base (cadre, marge, remplissage, défilement) tombent ; user-badge.tsx la pose contre son badge (--lp-tip-left, --lp-tip-top).
+   La recette de .lp-rank-tip : surface de pill, filet, ombre, rayon --space-3. */
+.lp-user-badge-tip {
+  position: fixed;
+  inset: auto;
+  left: var(--lp-tip-left, 0);
+  top: var(--lp-tip-top, 0);
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--space-3);
+  overflow: visible;
+  background: var(--pill-surface);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--pill-border),
+    var(--pill-shadow);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: lp-user-badge-tip-in var(--lp-dur-fade) var(--lp-ease);
+}
+
+@keyframes lp-user-badge-tip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Dans un profil, les badges viennent après le lien (un bouton ne se glisse pas dans un lien) ; le profil garde son gap de 2 px
+   et le lien ses 6 px à droite du nom */
+.lp-profile > .lp-user-badges {
+  margin-right: var(--space-1);
+}
+
+/* Mon compte (CDC des badges §3) : le badge Soutien dans le rond d'un avatar (comme .lp-avatar, 18 px l'icône), son titre à côté. Aucune
+   couleur de moins quand il a expiré : la rangée est la même. */
+.lp-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Deux classes : `.lp-avatar` (profile.css) pose `color: var(--ink)` et passerait devant, selon l'ordre de chargement des feuilles. */
+.lp-avatar.lp-avatar--support {
+  color: var(--support);
+}
+
+.lp-badge-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}

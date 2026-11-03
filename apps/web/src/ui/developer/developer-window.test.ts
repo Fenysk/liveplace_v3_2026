@@ -31,22 +31,28 @@ const toNavButtons = (markup: string) =>
     }))
     .filter(
       ({ text }) =>
-        text.includes("Cette fresque") || text.includes("Tout LivePlace") || text.includes("Capacité"),
+        text.includes("Cette fresque") ||
+        text.includes("Tout LivePlace") ||
+        text.includes("Capacité") ||
+        text.includes("Badges"),
     );
 
 describe("the developer window (JOURNAL 2026-10-07)", () => {
-  // Offre trois sections, Ce canvas, Tout LivePlace puis Capacité, dans la grande fenêtre
-  it("offers three sections, Cette fresque, Tout LivePlace then Capacité, in the large window", () => {
+  // Offre quatre sections, Ce canvas, Tout LivePlace, Capacité puis Badges, dans la grande fenêtre
+  it("offers four sections, Cette fresque, Tout LivePlace, Capacité then Badges, in the large window", () => {
     const markup = render("here");
 
     expect(DEVELOPER_SECTIONS.map(({ id, label }) => `${id}:${label}`)).toEqual([
       "here:Cette fresque",
       "all:Tout LivePlace",
       "capacity:Capacité",
+      "badges:Badges",
     ]);
     expect(markup).toContain("lp-window--large");
     expect(markup.indexOf("Cette fresque")).toBeLessThan(markup.indexOf("Tout LivePlace"));
     expect(markup.indexOf("Tout LivePlace")).toBeLessThan(markup.indexOf("Capacité"));
+    expect(markup.indexOf("Capacité")).toBeLessThan(markup.indexOf("Badges"));
+    expect(markup).toContain("lucide-award");
     expect(markup).toContain("contenu");
   });
 
@@ -56,6 +62,7 @@ describe("the developer window (JOURNAL 2026-10-07)", () => {
       ["here", "Cette fresque"],
       ["all", "Tout LivePlace"],
       ["capacity", "Capacité"],
+      ["badges", "Badges"],
     ] as const) {
       const markup = render(sectionId);
 

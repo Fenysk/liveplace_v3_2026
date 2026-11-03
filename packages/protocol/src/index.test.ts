@@ -1500,3 +1500,103 @@ describe("the author of a deleted account", () => {
     ).toBe(false);
   });
 });
+
+// Protocole 25 (CDC des badges, JOURNAL 2026-11-03) : `badges` à côté du pseudo, dans cinq frames et la place de qui regarde.
+describe("protocol 25: the badges next to a name", () => {
+  const badges = ["moderator", "support.regular"];
+  const inspected = {
+    t: "inspected",
+    requestId: "inspect-1",
+    x: 1,
+    y: 2,
+    entry: {
+      login: "kalyss",
+      displayName: "Kalyss",
+      badges,
+      colorIndex: 3,
+      placedAt: 1,
+      placementId: "pviewer001",
+    },
+  };
+  const scoreboard = {
+    t: "scoreboard",
+    top: [{ login: "kalyss", displayName: "Kalyss", badges, pixels: 5 }],
+    you: { rank: 7, pixels: 2, badges: ["support.supporter"] },
+  };
+  const bans = {
+    t: "bans",
+    requestId: "bans-1",
+    users: [
+      {
+        userId: "u1",
+        login: "lilou",
+        displayName: "Lilou",
+        badges,
+        pixelCount: 0,
+        isFromTwitch: false,
+        hasAccount: true,
+      },
+    ],
+  };
+  const moderators = {
+    t: "moderators",
+    requestId: "mods-1",
+    users: [
+      {
+        userId: "u1",
+        login: "lilou",
+        displayName: "Lilou",
+        badges,
+        isFromTwitch: true,
+        isNamedHere: false,
+        hasAccount: true,
+      },
+    ],
+  };
+  const reports = {
+    t: "reports",
+    requestId: "reports-1",
+    reports: [
+      {
+        userId: "u1",
+        login: "lilou",
+        displayName: "Lilou",
+        hasAccount: true,
+        badges,
+        placementId: "pviewer001",
+        reportCount: 1,
+        reportedAt: 1,
+        isOffStream: false,
+        pixels: [{ x: 1, y: 2, colorIndex: 3 }],
+      },
+    ],
+  };
+
+  // Les cinq frames gardent la liste telle que le serveur l'a rangée
+  it("keeps the list in the inspected entry, the scoreboard and its place, the bans, the moderators and the reports", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(25);
+    for (const frame of [inspected, scoreboard, bans, moderators, reports])
+      expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+  });
+
+  // Sans `badges`, aucun badge : une frame d'un viewer sans rien reste valide
+  it("accepts a frame without the list", () => {
+    const { badges: _removed, ...bare } = inspected.entry;
+    expect(decodeServerFrame({ ...inspected, entry: bare }).ok).toBe(true);
+  });
+
+  // Un catalogue plus récent peut envoyer un id que cette page ne connaît pas : la frame passe, la page l'ignore (`toKnownBadges`)
+  it("lets an id this page does not know through", () => {
+    const newer = { ...inspected, entry: { ...inspected.entry, badges: ["moderator", "pixels.2"] } };
+    expect(decodeServerFrame(newer)).toEqual({ ok: true, value: newer });
+  });
+
+  // Une liste qui n'en est pas une, un id vide : la frame est refusée
+  it("refuses a list that is not a list of ids", () => {
+    expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, badges: "moderator" } }).ok).toBe(
+      false,
+    );
+    expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, badges: [""] } }).ok).toBe(false);
+    expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, badges: [1] } }).ok).toBe(false);
+  });
+});

@@ -26,6 +26,7 @@ import {
   ProfileEntry,
   StatTilesEntry,
   TimeChartsEntry,
+  UserBadgeEntry,
 } from "./component-entries";
 import type { EntrySlug } from "./design-entries";
 import { DeveloperEntry } from "./developer-entries";
@@ -71,6 +72,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "apercu-de-pixels": PixelPreviewEntry,
   "avatar-et-profil": ProfileEntry,
   badge: BadgeEntry,
+  "badge-du-pseudo": UserBadgeEntry,
   bouton: ButtonEntry,
   bulle: BubbleEntry,
   "carte-d-activite": ActivityCardEntry,

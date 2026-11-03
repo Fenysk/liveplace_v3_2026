@@ -14,6 +14,32 @@ const me = { login: "moi", displayName: "Moi", avatarUrl: "https://static-cdn.jt
 
 const logins = (rows: readonly { player: { login: string } }[]) => rows.map(({ player }) => player.login);
 
+describe("the badges of the scoreboard rows (JOURNAL 2026-11-03)", () => {
+  // Garde les badges d'un joueur du top tels que le serveur les a rangés, et aucune clé pour qui n'en a pas
+  it("keeps the badges of a player of the top, and no key for one who has none", () => {
+    const badges = ["moderator", "support.regular"];
+    const entries = [
+      { login: "ada", displayName: "Ada", badges, pixels: 90 },
+      { login: "kim", displayName: "Kim", pixels: 7 },
+    ];
+    const { top: rows } = toScoreboardRows({ top: entries }, undefined);
+
+    expect(rows[0]?.player.badges).toEqual(badges);
+    expect(rows[1]?.player).not.toHaveProperty("badges");
+  });
+
+  // Sa place à part porte ses propres badges, que le serveur envoie avec son rang
+  it("gives the place apart the badges of whoever watches", () => {
+    const scoreboard: Scoreboard = { top, you: { rank: 9, pixels: 2, badges: ["support.supporter"] } };
+
+    expect(toScoreboardRows(scoreboard, me).outside?.player).toEqual({
+      ...me,
+      badges: ["support.supporter"],
+    });
+    expect(toScoreboardRows({ top, you: { rank: 9, pixels: 2 } }, me).outside?.player).toEqual(me);
+  });
+});
+
 describe("the scoreboard rows (JOURNAL 2026-10-06)", () => {
   // N'a aucune ligne sans classement, ni pour un classement vide
   it("has no row without a scoreboard, or for an empty one", () => {

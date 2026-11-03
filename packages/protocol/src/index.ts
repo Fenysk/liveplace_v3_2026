@@ -47,7 +47,9 @@ import { z } from "zod";
 // (§4.6 et §5.8).
 // 24 : l'auteur d'un compte supprimé, `isDeleted` dans l'entrée de `inspected` et dans chaque signalement de `reports`
 // (CDC §8, Supprimer son compte).
-export const PROTOCOL_VERSION = 24;
+// 25 : les badges à côté du pseudo, `badges` dans l'entrée de `inspected`, chaque ligne de `scoreboard` et sa place `you`, `bans`,
+// `moderators` et `reports` (CDC des badges, JOURNAL 2026-11-03).
+export const PROTOCOL_VERSION = 25;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -146,6 +148,10 @@ const RejectedPixelSchema = z.object({
   reason: z.string(),
 });
 
+// Les ids courts des badges (CDC des badges §1), rangés par le serveur dans l'ordre du catalogue. Des chaînes, pas une énumération :
+// un client ignore un id qu'il ne connaît pas (`toKnownBadges`) au lieu de refuser la frame. Absent : aucun badge.
+const BadgesSchema = z.array(z.string().min(1).max(64)).max(16);
+
 // L'origine d'un rôle de modérateur : nommé sur Twitch, ici, ou les deux (JOURNAL 2026-09-27).
 const ModeratorOriginSchema = z.object({ isFromTwitch: z.boolean(), isNamedHere: z.boolean() });
 
@@ -161,6 +167,7 @@ const InspectEntrySchema = z.object({
   isDeleted: z.boolean().optional(),
   avatarUrl: z.string().optional(), // §4.3 : un ancien client l'ignore
   twitchLive: TwitchLiveSchema.optional(), // §4.3 : lu à l'inspection
+  badges: BadgesSchema.optional(),
   colorIndex: ColorIndexSchema,
   placedAt: TimestampSchema,
   placementId: PlacementIdSchema, // §4.3 : la pose, pour la signaler ou la retirer
@@ -508,6 +515,7 @@ const BannedUserSchema = z.object({
   pixelCount: z.number().int().nonnegative(),
   isFromTwitch: z.boolean(), // §4.3 : un déban Twitch le lèverait
   hasAccount: z.boolean(), // sans compte LivePlace : son nom vient de Twitch
+  badges: BadgesSchema.optional(),
 });
 
 const BansFrameSchema = z.object({
@@ -527,6 +535,7 @@ const ModeratorSchema = z.object({
   isFromTwitch: z.boolean(),
   isNamedHere: z.boolean(),
   hasAccount: z.boolean(),
+  badges: BadgesSchema.optional(),
 });
 
 // La synchro Twitch du canvas : faite, ou à refaire (droits retirés chez Twitch). Absente : jamais faite.
@@ -552,6 +561,7 @@ const ReportedPlacementSchema = z.object({
   reportCount: z.number().int().positive(),
   reportedAt: TimestampSchema, // le premier signalement
   isOffStream: z.boolean(), // cachée du stream : le seuil est atteint
+  badges: BadgesSchema.optional(),
   pixels: z.array(PixelSchema),
 });
 
@@ -584,6 +594,7 @@ const ScoreboardEntrySchema = z.object({
   login: TwitchLoginSchema,
   displayName: DisplayNameSchema,
   avatarUrl: z.string().optional(),
+  badges: BadgesSchema.optional(),
   pixels: z.number().int().positive(),
 });
 
@@ -591,6 +602,7 @@ const ScoreboardEntrySchema = z.object({
 const ScoreboardRankSchema = z.object({
   rank: z.number().int().positive(),
   pixels: z.number().int().positive(),
+  badges: BadgesSchema.optional(), // ses propres badges, pour sa place à part
 });
 
 const ScoreboardFrameSchema = z.object({

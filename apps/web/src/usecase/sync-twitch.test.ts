@@ -43,6 +43,7 @@ const doubles = (options: { isDeleted?: boolean; isDeletedDuringCall?: boolean }
       getActiveCanvasForOwner: async (ownerId) =>
         ownerId === owner.userId ? { canvasId: "canvas-1", width: 256, height: 256 } : null,
     },
+    donations: { getSupport: async () => null },
     redis: {
       createCanvas: async () => undefined,
       setUser: async () => undefined,

@@ -26,6 +26,7 @@ import { Route as AuthDeleteAccountRouteImport } from './../routes/auth/delete-a
 import { Route as AuthExpiredRouteImport } from './../routes/auth/expired'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
+import { Route as KofiWebhookRouteImport } from './../routes/kofi/webhook'
 import { Route as TwitchEventsubRouteImport } from './../routes/twitch/eventsub'
 import { Route as LoginArchivesCodeRouteImport } from './../routes/$login_.archives.$code'
 import { Route as AuthTwitchCallbackRouteImport } from './../routes/auth/twitch.callback'
@@ -116,6 +117,11 @@ const AuthTwitchRoute = AuthTwitchRouteImport.update({
   path: '/auth/twitch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KofiWebhookRoute = KofiWebhookRouteImport.update({
+  id: '/kofi/webhook',
+  path: '/kofi/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TwitchEventsubRoute = TwitchEventsubRouteImport.update({
   id: '/twitch/eventsub',
   path: '/twitch/eventsub',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/kofi/webhook': typeof KofiWebhookRoute
   '/twitch/eventsub': typeof TwitchEventsubRoute
   '/$login/archives/$code': typeof LoginArchivesCodeRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/kofi/webhook': typeof KofiWebhookRoute
   '/twitch/eventsub': typeof TwitchEventsubRoute
   '/$login/archives/$code': typeof LoginArchivesCodeRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/auth/expired': typeof AuthExpiredRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
+  '/kofi/webhook': typeof KofiWebhookRoute
   '/twitch/eventsub': typeof TwitchEventsubRoute
   '/$login_/archives/$code': typeof LoginArchivesCodeRoute
   '/auth/twitch/callback': typeof AuthTwitchCallbackRoute
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/kofi/webhook'
     | '/twitch/eventsub'
     | '/$login/archives/$code'
     | '/auth/twitch/callback'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/kofi/webhook'
     | '/twitch/eventsub'
     | '/$login/archives/$code'
     | '/auth/twitch/callback'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/auth/expired'
     | '/auth/signout'
     | '/auth/twitch'
+    | '/kofi/webhook'
     | '/twitch/eventsub'
     | '/$login_/archives/$code'
     | '/auth/twitch/callback'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   AuthExpiredRoute: typeof AuthExpiredRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
+  KofiWebhookRoute: typeof KofiWebhookRoute
   TwitchEventsubRoute: typeof TwitchEventsubRoute
   LoginArchivesCodeRoute: typeof LoginArchivesCodeRoute
 }
@@ -411,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthTwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kofi/webhook': {
+      id: '/kofi/webhook'
+      path: '/kofi/webhook'
+      fullPath: '/kofi/webhook'
+      preLoaderRoute: typeof KofiWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/twitch/eventsub': {
       id: '/twitch/eventsub'
       path: '/twitch/eventsub'
@@ -465,6 +485,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthExpiredRoute: AuthExpiredRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
+  KofiWebhookRoute: KofiWebhookRoute,
   TwitchEventsubRoute: TwitchEventsubRoute,
   LoginArchivesCodeRoute: LoginArchivesCodeRoute,
 }

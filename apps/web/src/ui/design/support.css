@@ -160,3 +160,21 @@ html[data-drafting] .lp-floating[data-dock="bl"] {
 .lp-support-signature-text {
   display: grid;
 }
+
+/* La ligne qui dit quoi faire pour recevoir le badge (CDC des badges §3) : sans marge de paragraphe, avec le cœur du badge dans le
+   texte, à la taille de la légende */
+.lp-support-note {
+  margin: 0;
+  /* Les deux lignes se partagent le texte : sur 375 px, la coupure ne tombe plus entre « l'e- » et « mail » */
+  text-wrap: balance;
+}
+
+.lp-support-note-heart {
+  color: var(--support);
+}
+
+.lp-support-note-heart svg {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+}

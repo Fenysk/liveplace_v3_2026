@@ -1077,7 +1077,7 @@ export const SupportWindowEntry = () => (
     slug="soutenir-liveplace"
     components={["SupportButton", "SupportWindow"]}
     file="ui/design/support.tsx"
-    note="Le bouton Soutenir LivePlace ouvre cette petite fenêtre à chaque clic, pour tous : la phrase qui dit que LivePlace est gratuit, ce que le don paie, et la signature de Fenysk. Aucun montant, aucune promesse, aucun badge. Échap ou Fermer la ferment ; Faire un don mène à la page Ko-fi de LivePlace dans un nouvel onglet, et ferme aussi la fenêtre."
+    note="Le bouton Soutenir LivePlace ouvre cette petite fenêtre à chaque clic, pour tous : la phrase qui dit que LivePlace est gratuit, ce que le don paie, et la signature de Fenysk. Aucun montant, aucune promesse ; une ligne atténuée dit seulement quoi faire pour recevoir le badge Soutien. Échap ou Fermer la ferment ; Faire un don mène à la page Ko-fi de LivePlace dans un nouvel onglet, et ferme aussi la fenêtre."
   >
     <Block title="États">
       <StateRow

@@ -71,6 +71,22 @@ describe("parseWebConfig (§11.5)", () => {
 });
 
 // §16.3 : les déploiements Convex dont le web lit l'usage, facultatifs.
+describe("KOFI_VERIFICATION_TOKEN (JOURNAL 2026-11-03)", () => {
+  // Absente, vide ou faite d'espaces : aucun jeton, la route répond 503 (défaut fermé)
+  it("is no secret when missing, empty or made of spaces", () => {
+    expect(parseWebConfig(env).kofiSecret).toBeNull();
+    expect(parseWebConfig({ ...env, KOFI_VERIFICATION_TOKEN: "" }).kofiSecret).toBeNull();
+    expect(parseWebConfig({ ...env, KOFI_VERIFICATION_TOKEN: "   " }).kofiSecret).toBeNull();
+  });
+
+  // Posée, elle est lue telle quelle, sans les espaces autour
+  it("reads the secret without the spaces around it", () => {
+    expect(parseWebConfig({ ...env, KOFI_VERIFICATION_TOKEN: " ko-fi-test-secret " }).kofiSecret).toBe(
+      "ko-fi-test-secret",
+    );
+  });
+});
+
 describe("CONVEX_USAGE_DEPLOYMENTS (JOURNAL 2026-10-07)", () => {
   const prod = "https://watchful-spider-409.eu-west-1.convex.cloud";
   const dev = "https://happy-otter-123.convex.cloud";

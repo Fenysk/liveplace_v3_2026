@@ -1,5 +1,5 @@
 // Les mots de la page Confidentialité (§9.9) : son titre, la ligne qui la dit en chantier, le nom de son sommaire, la section
-// Supprimer ton compte, et le titre de l'onglet.
+// Supprimer ton compte, ce que garde un don Ko-fi, et le titre de l'onglet.
 
 import { defineTexts, localized } from "../locale/texts";
 
@@ -30,5 +30,23 @@ export const PRIVACY_TEXTS = defineTexts({
   deleteAccountContact: localized<{ before: string; after: string }>({
     fr: { before: "Tu ne peux pas te connecter ? Écris à ", after: "." },
     en: { before: "Can't sign in? Write to ", after: "." },
+  }),
+
+  // CDC des badges §6 (JOURNAL 2026-11-03) : ce que LivePlace garde d'un don Ko-fi. Jamais le message ; l'e-mail et le nom Ko-fi
+  // n'existent que tant que le don n'est pas relié à un compte.
+  donationsTitle: { fr: "Tes dons", en: "Your donations" },
+  donationsSentences: localized<string[]>({
+    fr: [
+      "Pour un don sur Ko-fi, on garde le montant et la date : ils donnent le titre et la durée de ton badge Soutien.",
+      "On garde l'e-mail et le nom Ko-fi seulement tant que le don n'est pas relié à un compte, puis on les efface.",
+      "On ne garde jamais ton message.",
+      "Supprimer ton compte efface tes dons.",
+    ],
+    en: [
+      "For a Ko-fi donation, we keep the amount and the date: they set the title and the length of your Supporter badge.",
+      "We keep the Ko-fi email and name only until the donation is linked to an account, then we erase them.",
+      "We never keep your message.",
+      "Deleting your account erases your donations.",
+    ],
   }),
 });

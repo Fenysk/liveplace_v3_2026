@@ -28,6 +28,12 @@ import {
   toCellKey,
   toParisDay,
 } from "@liveplace/domain";
+import {
+  type BadgeId,
+  composeBadges,
+  parseSupportMirror,
+  type SupportMirror,
+} from "@liveplace/domain/badges";
 import { planDynamicSize, type Reframe } from "@liveplace/domain/dynamic-size";
 import type {
   AckFrame,
@@ -58,7 +64,7 @@ import { planResize, type ResizePlan } from "@liveplace/domain/resize";
 import { listCommandAccounts, withoutCommandAccounts } from "@liveplace/domain/twitch-command";
 import { decodeServerFrame, type Event } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
-import type { Redis, Result as RedisResult } from "ioredis";
+import type { ChainableCommander, Redis, Result as RedisResult } from "ioredis";
 import { createSignupWrites } from "./activity";
 import { IS_DELETED_ACCOUNT_LUA, toDeletedAccountFingerprint } from "./deleted-accounts";
 import {
@@ -74,6 +80,8 @@ import {
   REQ_TTL_SECONDS,
   SCORE_MAX_PIXELS,
   SCORE_TIE_SPAN,
+  SUPPORT_ENDS_AT_FIELD,
+  SUPPORT_TITLE_FIELD,
   TWITCH_COMMANDS_CONSUMER,
   TWITCH_COMMANDS_KEY,
   TWITCH_COMMANDS_MAXLEN,
@@ -124,6 +132,7 @@ type Profile = {
   login: string;
   displayName: string;
   avatarUrl?: string;
+  badges?: BadgeId[]; // absent : aucun
   hasAccount: boolean;
   isDeleted?: true;
 };
@@ -210,6 +219,36 @@ const unwrap = (entry: [Error | null, unknown] | undefined): unknown => {
   return value;
 };
 
+// Les trois lectures des badges d'un viewer sur cette fresque, ajoutées à un MULTI ou à un pipeline : le Soutien du miroir `user:`,
+// puis le rôle de modérateur et le ban (JOURNAL 2026-11-03). Jamais Convex (D-02).
+const BADGE_READS = 3;
+const queueBadgeReads = <Chain extends ChainableCommander>(
+  chain: Chain,
+  keys: CanvasKeys,
+  userId: string,
+): Chain => {
+  chain
+    .hmget(userKey(userId), SUPPORT_TITLE_FIELD, SUPPORT_ENDS_AT_FIELD)
+    .sismember(keys.mods, userId)
+    .sismember(keys.bans, userId);
+  return chain;
+};
+
+// Les badges lus par ces trois commandes, à l'heure de l'affichage : jamais Modérateur pour un banni (il ne modère pas, §10.3).
+const composeBadgesFromReplies = (
+  replies: readonly ([Error | null, unknown] | undefined)[],
+  from: number,
+  nowMs: Timestamp,
+): BadgeId[] => {
+  const [mirror, isMember, isBannedUser] = [0, 1, 2].map((offset) => unwrap(replies[from + offset]));
+  const [title, endsAt] = Array.isArray(mirror) ? mirror : [];
+  const support: SupportMirror | null = parseSupportMirror(
+    typeof title === "string" ? title : undefined,
+    typeof endsAt === "string" ? endsAt : undefined,
+  );
+  return composeBadges({ isModerator: isMember === 1 && isBannedUser !== 1, support }, nowMs);
+};
+
 // Les champs de `meta` tels que Redis les garde : ceux de `CanvasMeta`, sauf le réglage et l'origine de la taille dynamique (§5.8),
 // qui s'écrivent sous d'autres noms.
 export const toMetaFields = ({
@@ -243,8 +282,14 @@ export function createSignInWrites(redis: Redis): SignInWrites {
         .exec();
     },
 
-    async setUser({ userId, login, displayName, avatarUrl }): Promise<void> {
-      await redis.hset(userKey(userId), { login, displayName, ...(avatarUrl ? { avatarUrl } : {}) });
+    // Le Soutien se réécrit à chaque connexion, dans le même HSET : le titre ne baisse jamais et la fin ne recule pas.
+    async setUser({ userId, login, displayName, avatarUrl }, support): Promise<void> {
+      await redis.hset(userKey(userId), {
+        login,
+        displayName,
+        ...(avatarUrl ? { avatarUrl } : {}),
+        ...(support ? { [SUPPORT_TITLE_FIELD]: support.title, [SUPPORT_ENDS_AT_FIELD]: support.endsAt } : {}),
+      });
     },
   };
 }
@@ -565,7 +610,12 @@ const tryResize = async (redis: Redis, keys: CanvasKeys, by: string, to: CanvasS
 
 const scriptOf = (name: string): string => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 
-export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCore {
+// `now` : l'heure à laquelle un badge s'éteint se compare à celle de l'affichage (JOURNAL 2026-11-03).
+export function createCanvasCore(
+  redis: Redis,
+  liveSubscriber: Redis,
+  now: () => Timestamp = Date.now,
+): CanvasCore {
   // §5.4 : pile.lua, collé devant chaque script qui lit une pile.
   const pile = scriptOf("pile.lua");
   const withPile = (name: string): string => `${pile}\n${scriptOf(name)}`;
@@ -599,14 +649,22 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
   const isBanned = async (canvasId: string, userId: string): Promise<boolean> =>
     (await redis.sismember(buildCanvasKeys(canvasId).bans, userId)) === 1;
 
+  // Les badges d'un viewer sur cette fresque : un MULTI de ses trois lectures.
+  const getBadgesOf = async (keys: CanvasKeys, userId: string): Promise<BadgeId[]> => {
+    const results = await queueBadgeReads(redis.multi(), keys, userId).exec();
+    if (!results) throw new Error(`getBadges ${keys.prefix} : transaction annulée`);
+    return composeBadgesFromReplies(results, 0, now());
+  };
+
   // Le nom d'une personne : le miroir de son compte, sinon le nom venu de Twitch, sinon l'identifiant, comme `inspect`.
   // CDC §8 : l'auteur d'un compte supprimé n'a pas de nom, et se dit tel.
   const getProfile = async (keys: CanvasKeys, userId: string): Promise<Profile> => {
     if (isDeletedAuthor(userId))
       return { userId, login: "", displayName: "", hasAccount: false, isDeleted: true };
-    const [user, twitchUser] = await Promise.all([
+    const [user, twitchUser, badges] = await Promise.all([
       redis.hgetall(userKey(userId)),
       redis.hget(keys.twitchUsers, userId),
+      getBadgesOf(keys, userId),
     ]);
     const hasAccount = user.login !== undefined;
     const named = hasAccount ? user : twitchNameOf(twitchUser);
@@ -615,6 +673,7 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       login: named.login ?? userId,
       displayName: named.displayName ?? userId,
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      ...(badges.length > 0 ? { badges } : {}),
       hasAccount,
     };
   };
@@ -807,12 +866,16 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       if (isDeletedAuthor(userId))
         return { userId, login: "", displayName: "", isDeleted: true, colorIndex, placedAt, placementId };
       // Sans miroir, l'auteur garde au moins son identifiant : le miroir n'expire jamais, c'est un filet.
-      const user = await redis.hgetall(userKey(userId));
+      const [user, badges] = await Promise.all([
+        redis.hgetall(userKey(userId)),
+        getBadgesOf(buildCanvasKeys(canvasId), userId),
+      ]);
       return {
         userId,
         login: user.login ?? userId,
         displayName: user.displayName ?? userId,
         ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+        ...(badges.length > 0 ? { badges } : {}),
         colorIndex,
         placedAt,
         placementId,
@@ -1051,30 +1114,43 @@ export function createCanvasCore(redis: Redis, liveSubscriber: Redis): CanvasCor
       const userIds = flat.filter((_, index) => index % 2 === 0);
       return Promise.all(
         userIds.map(async (userId, index): Promise<ScoreboardEntry> => {
-          const { login, displayName, avatarUrl } = await getProfile(keys, userId);
+          const { login, displayName, avatarUrl, badges } = await getProfile(keys, userId);
           return {
             login,
             displayName,
             ...(avatarUrl ? { avatarUrl } : {}),
+            ...(badges ? { badges } : {}),
             pixels: toScorePixels(Number(flat[index * 2 + 1])),
           };
         }),
       );
     },
 
-    // Une lecture pour tous les joueurs demandés : le rang est celui du classement, sans les bannis.
+    // Une lecture pour tous les joueurs demandés : le rang est celui du classement, sans les bannis. Leurs badges (ceux de « ta place »)
+    // se lisent dans le même pipeline : un seul aller-retour vers Redis, quel que soit le nombre de viewers (JOURNAL 2026-11-03).
     async listScoreboardRanks(canvasId, userIds) {
       const ranks = new Map<string, ScoreboardRank>();
       if (userIds.length === 0) return ranks;
-      const { scoreboard } = buildCanvasKeys(canvasId);
+      const keys = buildCanvasKeys(canvasId);
       const pipeline = redis.pipeline();
-      for (const userId of userIds) pipeline.zrevrank(scoreboard, userId).zscore(scoreboard, userId);
+      for (const userId of userIds) {
+        pipeline.zrevrank(keys.scoreboard, userId).zscore(keys.scoreboard, userId);
+        queueBadgeReads(pipeline, keys, userId);
+      }
       const replies = (await pipeline.exec()) ?? [];
+      const nowMs = now();
+      const stride = 2 + BADGE_READS;
       userIds.forEach((userId, index) => {
-        const rank = unwrap(replies[index * 2]);
-        const score = unwrap(replies[index * 2 + 1]);
-        if (typeof rank === "number" && typeof score === "string")
-          ranks.set(userId, { rank: rank + 1, pixels: toScorePixels(Number(score)) });
+        const first = index * stride;
+        const rank = unwrap(replies[first]);
+        const score = unwrap(replies[first + 1]);
+        if (typeof rank !== "number" || typeof score !== "string") return;
+        const badges = composeBadgesFromReplies(replies, first + 2, nowMs);
+        ranks.set(userId, {
+          rank: rank + 1,
+          pixels: toScorePixels(Number(score)),
+          ...(badges.length > 0 ? { badges } : {}),
+        });
       });
       return ranks;
     },

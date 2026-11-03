@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badgeRank, ordinalSuffix, pixelsNumber, rankText, rowLabel } from "./scoreboard-texts";
+import { badgeRank, listRowLabel, ordinalSuffix, pixelsNumber, rankText, rowLabel } from "./scoreboard-texts";
 
 describe("the words of the scoreboard (JOURNAL 2026-10-06)", () => {
   // Dit le rang en français : 1er, puis 2e, 3e…, sans jamais de dièse
@@ -45,6 +45,26 @@ describe("the words of the scoreboard (JOURNAL 2026-10-06)", () => {
     expect(rowLabel({ rank: 1, pixels: 1, player, isMe: true }, "fr")).toBe("1er, Kalyss, 1 pixel");
     expect(rowLabel({ rank: 2, pixels: 1204, player, isMe: false }, "en")).toBe("2nd, Kalyss, 1,204 pixels");
     expect(rowLabel({ rank: 1, pixels: 1, player, isMe: true }, "en")).toBe("1st, Kalyss, 1 pixel");
+  });
+
+  // Le nom accessible de la ligne du PC (un bouton) inclut les badges, dans l'ordre du catalogue, un id inconnu ignoré
+  it("includes the badges in the name of a row, in catalogue order, and skips an unknown id", () => {
+    const player = {
+      login: "kalyss",
+      displayName: "Kalyss",
+      badges: ["support.pillar", "pixels.2", "moderator"],
+    };
+    const row = { rank: 1, pixels: 1, player, isMe: false };
+
+    expect(rowLabel(row, "fr")).toBe("1er, Kalyss, Modère cette fresque, Soutien · Pilier, 1 pixel");
+    expect(rowLabel(row, "en")).toBe("1st, Kalyss, Moderates this canvas, Supporter · Pillar, 1 pixel");
+  });
+
+  // Sur mobile, les badges sont des boutons qui se nomment eux-mêmes : la ligne de la liste ne les redit pas
+  it("leaves the badges out of the name of a mobile list row", () => {
+    const player = { login: "kalyss", displayName: "Kalyss", badges: ["moderator"] };
+
+    expect(listRowLabel({ rank: 1, pixels: 1, player, isMe: false }, "fr")).toBe("1er, Kalyss, 1 pixel");
   });
 
   // Écrit le nombre de pixels à la française, sans le mot, pour la ligne dépliée

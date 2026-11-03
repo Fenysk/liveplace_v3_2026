@@ -2,7 +2,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { generateLinkCode } from "@liveplace/domain";
-import { createDurableStore, createRecoveryStore } from "@liveplace/durable";
+import { createDonationStore, createDurableStore, createRecoveryStore } from "@liveplace/durable";
 import {
   createAccountList,
   createAccountPurge,
@@ -17,6 +17,7 @@ import {
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { createAvatarPhotos } from "../infra/avatar-photos";
+import { createKofiWebhook } from "../infra/kofi";
 import { createSessionSigner, createSessionVerifier } from "../infra/session";
 import {
   createTwitchAuth,
@@ -102,6 +103,9 @@ const buildServerDeps = () => {
     capacityWrites: createCapacityWrites(redis), // §16.3 : l'occupation du web, l'usage de Convex
     checkHealth: createHealthCheck(createHealthProbe(redis)), // JOURNAL 2026-11-03 : `GET /healthz`
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
+    // JOURNAL 2026-11-03 : un don Ko-fi arrive sur /kofi/webhook, vérifié par le jeton de Ko-fi.
+    kofiWebhook: createKofiWebhook(config.kofiSecret),
+    donations: createDonationStore(config.convexUrl, config.convexServiceKey),
     eventSub,
     accounts, // §10.4 : les comptes que le démarrage suit tous
     // §10.4 : le live des comptes, par EventSub, avec helix/streams en filet

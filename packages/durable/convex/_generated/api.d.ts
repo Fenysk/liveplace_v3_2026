@@ -10,6 +10,7 @@
 
 import type * as canvases from "../canvases.js";
 import type * as chunks from "../chunks.js";
+import type * as donations from "../donations.js";
 import type * as erasures from "../erasures.js";
 import type * as fingerprints from "../fingerprints.js";
 import type * as orphans from "../orphans.js";
@@ -27,6 +28,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   canvases: typeof canvases;
   chunks: typeof chunks;
+  donations: typeof donations;
   erasures: typeof erasures;
   fingerprints: typeof fingerprints;
   orphans: typeof orphans;

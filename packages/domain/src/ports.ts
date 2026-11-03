@@ -2,6 +2,7 @@
 
 import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
+import type { SupportMirror } from "./badges";
 import type { CapacityResourceId, GuardMinute, Saturation } from "./capacity";
 import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
@@ -182,9 +183,11 @@ export type CanvasRefusal = "canvas_not_found" | "canvas_archived";
 export interface CanvasCore {
   createCanvas(canvasId: string, meta: CanvasMeta): Promise<void>;
   // Le miroir `user:<userId>` (§5.1), réécrit à chaque connexion : le gateway n'a pas le droit d'aller dans Convex.
-  // §5.1 : `avatarUrl` aussi, quand Twitch en donne un.
+  // §5.1 : `avatarUrl` aussi, quand Twitch en donne un. `support` : le badge Soutien du compte, que le gateway compare à l'heure à
+  // chaque affichage (JOURNAL 2026-11-03) ; absent, le miroir garde celui qu'il avait.
   setUser(
     user: Pick<User, "userId" | "login" | "displayName"> & Partial<Pick<User, "avatarUrl">>,
+    support?: SupportMirror | null,
   ): Promise<void>;
   getCanvas(canvasId: string): Promise<CanvasMeta | null>; // `null` si absent ou pas prêt (§5.5).
   isModerator(canvasId: string, userId: string): Promise<boolean>; // §10.3 : `false` pour un banni
@@ -936,6 +939,60 @@ export type TwitchWebhookEvent =
 // `null` : pas signé par notre secret, ou plus vieux que 10 minutes. On n'en fait rien.
 export interface TwitchWebhook {
   read(message: TwitchWebhookMessage, nowMs: Timestamp): TwitchWebhookEvent | null;
+}
+
+// --- Ko-fi (JOURNAL 2026-11-03) : un don arrive par `POST /kofi/webhook`, le badge Soutien en découle ---
+
+// Un paiement que Ko-fi dit reçu et qui compte comme un don. Jamais le message du donateur, ni rien de ce que Ko-fi joint d'autre
+// (adresse postale, Discord, adresse de la page). `messageId` : Ko-fi le renvoie tant qu'il n'a pas son 200, c'est la clé du doublon ;
+// `transactionId` n'est pas unique, les envois de test de Ko-fi en partagent un seul.
+export type KofiDonation = {
+  messageId: string;
+  transactionId?: string;
+  amountCents: number; // tel quel, sans conversion de monnaie
+  currency: string;
+  donatedAt: Timestamp;
+  email?: string; // Convex le met en minuscules ; il ne reste qu'à un don non relié
+  kofiName?: string; // le nom Ko-fi, qui suit l'e-mail
+};
+
+// `ignored` : un type qui n'est pas un don (une commande, une boutique).
+export type KofiWebhookEvent = { kind: "donation"; donation: KofiDonation } | { kind: "ignored" };
+
+// `unconfigured` : pas de jeton posé, rien ne passe ; `unauthorized` : un autre jeton ; `invalid` : un corps illisible.
+export type KofiWebhookRefusal = "unconfigured" | "unauthorized" | "invalid";
+
+export interface KofiWebhook {
+  read(body: string, nowMs: Timestamp): Result<KofiWebhookEvent, KofiWebhookRefusal>;
+}
+
+// `linked` : un seul compte porte l'e-mail du don, qui part avec le nom Ko-fi ; le compte est rendu avec, pour que le web écrive
+// tout de suite son miroir. `duplicate` : ce message est déjà reçu ; son compte est rendu s'il était relié (Ko-fi renvoie tant
+// qu'il n'a pas son 200, et le renvoi réécrit le miroir).
+export type DonationOutcome =
+  | { kind: "linked"; user: User }
+  | { kind: "unlinked" }
+  | { kind: "duplicate"; user?: User };
+
+// Ce que le badge Soutien lit d'un compte : le cumul à vie de tous ses dons, et la date du dernier.
+export type SupportSummary = { lifetimeCents: number; lastDonatedAt: Timestamp };
+
+// Un don qui attend un compte, tel que le développeur le voit : jamais le montant. `donationId` est opaque.
+export type WaitingDonation = { donationId: string; donatedAt: Timestamp; email?: string; kofiName?: string };
+
+// `unknown_account` : aucun compte ne porte ce pseudo ; `already_linked` : le don a déjà son compte ; `unknown_donation` : plus de don.
+export type DonationLinkRefusal = "unknown_account" | "already_linked" | "unknown_donation";
+
+export interface DonationStore {
+  recordDonation(donation: KofiDonation): Promise<DonationOutcome>;
+  // `null` : aucun don relié à ce compte.
+  getSupport(userId: string): Promise<SupportSummary | null>;
+  // La date du dernier don de chaque compte relié dont ce dernier don est postérieur à `since` : de quoi compter les titulaires.
+  getLastDonationDates(since: Timestamp): Promise<Timestamp[]>;
+  // Les plus récents d'abord.
+  listWaitingDonations(): Promise<WaitingDonation[]>;
+  // Le compte se trouve par son pseudo ; il est rendu pour écrire son miroir. Rien ne change sur un refus.
+  linkDonation(donationId: string, login: string): Promise<Result<User, DonationLinkRefusal>>;
 }
 
 // §10.1 : les abonnements EventSub d'une chaîne, pris avec le jeton de l'application.

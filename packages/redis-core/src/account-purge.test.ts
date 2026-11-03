@@ -25,6 +25,8 @@ import {
   deletedAccountKey,
   ownerLockKey,
   REWRITE_AOF_KEY,
+  SUPPORT_ENDS_AT_FIELD,
+  SUPPORT_TITLE_FIELD,
   twitchLiveKey,
   userKey,
 } from "./keys";
@@ -206,7 +208,10 @@ const buildWorld = async () => {
   await twitchWrites.setTwitchUsers(active.canvasId, [
     { userId: viewer, login: "viewer", displayName: "Viewer" },
   ]);
-  await signIn.setUser({ userId: viewer, login: "viewer", displayName: "Viewer" });
+  await signIn.setUser(
+    { userId: viewer, login: "viewer", displayName: "Viewer" },
+    { title: "regular", endsAt: now + 365 * 24 * 60 * minute },
+  );
   await twitchLives.setTwitchLiveState(viewer, { twitchLive: { category: "Art" }, checkedAt: now });
 
   // Les signalements : le viewer signale une pose qui reste visible (seuil 2), une qu'il cache seul (seuil 1) ; un autre
@@ -303,6 +308,11 @@ describe("deleting a viewer: traces on other canvases (CDC §8, Supprimer son co
     expect(await redis.smembers(keys.mods)).toEqual([]);
     expect(await redis.hlen(keys.twitchUsers)).toBe(0);
     expect(await redis.exists(userKey(world.viewer), twitchLiveKey(world.viewer))).toBe(0);
+    // Son badge Soutien vivait dans le miroir : il part avec lui (JOURNAL 2026-11-03)
+    expect(await redis.hmget(userKey(world.viewer), SUPPORT_TITLE_FIELD, SUPPORT_ENDS_AT_FIELD)).toEqual([
+      null,
+      null,
+    ]);
   });
 
   // Ses bans reçus partent : revenu, il faut le bannir de nouveau

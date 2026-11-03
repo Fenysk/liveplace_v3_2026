@@ -3,6 +3,7 @@
 import { MAX_ARCHIVES } from "@liveplace/domain";
 import type {
   BudgetStore,
+  DonationStore,
   DurableStore,
   ErasureStore,
   HistoryStore,
@@ -370,6 +371,27 @@ export function createErasureStore(url: string, serviceKey: string): ErasureStor
     async discardFile(kind, storageId) {
       await convex.mutation(api.erasures.discardFile, named(kind, storageId));
     },
+  };
+}
+
+// Les dons Ko-fi (JOURNAL 2026-11-03) : tout le déploiement, sans scope. Le montant et la monnaie vont tels quels.
+export function createDonationStore(url: string, serviceKey: string): DonationStore {
+  const convex = new ConvexHttpClient(url);
+  return {
+    recordDonation: ({ messageId, transactionId, email, kofiName, ...donation }) =>
+      convex.mutation(api.donations.record, {
+        serviceKey,
+        kofiMessageId: messageId,
+        ...(transactionId ? { kofiTransactionId: transactionId } : {}),
+        ...(email ? { email } : {}),
+        ...(kofiName ? { kofiName } : {}),
+        ...donation,
+      }),
+    getSupport: (userId) => convex.query(api.donations.getSupport, { serviceKey, userId }),
+    getLastDonationDates: (since) => convex.query(api.donations.getLastDates, { serviceKey, since }),
+    listWaitingDonations: () => convex.query(api.donations.listUnlinked, { serviceKey }),
+    linkDonation: (donationId, login) =>
+      convex.mutation(api.donations.linkByLogin, { serviceKey, donationId, login }),
   };
 }
 

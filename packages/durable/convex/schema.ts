@@ -34,7 +34,27 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_login", ["login"])
-    .index("by_discoveredVia", ["discoveredViaUserId"]), // vider le lien d'un streamer supprimé, par lots (CDC §8)
+    .index("by_discoveredVia", ["discoveredViaUserId"]) // vider le lien d'un streamer supprimé, par lots (CDC §8)
+    .index("by_email", ["email"]), // relier un don Ko-fi : l'e-mail s'écrit en minuscules (JOURNAL 2026-11-03)
+
+  // CDC des badges §3 et §6 (JOURNAL 2026-11-03) : un paiement Ko-fi compté comme un don. `kofiMessageId` est unique : Ko-fi le
+  // renvoie tant qu'il n'a pas son 200. `kofiTransactionId` ne l'est pas, ses envois de test en partagent un seul. Le montant
+  // est tel quel, sans conversion de monnaie. L'e-mail (minuscules) et le nom Ko-fi n'existent que tant que le don n'est pas
+  // relié ; le message du donateur n'est jamais gardé.
+  donations: defineTable({
+    kofiMessageId: v.string(),
+    kofiTransactionId: v.optional(v.string()),
+    amountCents: v.number(),
+    currency: v.string(),
+    donatedAt: v.number(),
+    userId: v.optional(v.string()),
+    email: v.optional(v.string()),
+    kofiName: v.optional(v.string()),
+  })
+    .index("by_messageId", ["kofiMessageId"])
+    .index("by_userId", ["userId"]) // le cumul d'un compte, et ce que sa suppression efface
+    .index("by_email", ["email"]) // les dons non reliés d'une adresse, à la connexion de son compte
+    .index("by_donatedAt", ["donatedAt"]), // les comptes dont le Soutien court encore : les dons des 12 derniers mois seuls
 
   // CDC §8, Supprimer son compte (RGPD art. 5.2) : la preuve d'un effacement, sans nom, sans e-mail, sans identifiant. Une
   // ligne par effacement, nommée par un `runId` tiré au hasard ; écrite avec la ligne du compte, jamais seule.

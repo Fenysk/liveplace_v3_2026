@@ -1,6 +1,7 @@
 // Mon compte et la suppression du compte (CDC §8) : la vraie fenêtre de Mon compte avec sa ligne sous filet, et la vraie petite
 // fenêtre de confirmation, avec des props d'exemple. Rien ne s'efface : la confirmation montre son verrou, puis se ferme.
 
+import type { SupportTitle } from "@liveplace/domain/support";
 import { useState } from "react";
 import { AccountWindow } from "../account/account-window";
 import { DeleteAccountWindow, type DeleteAccountWindowProps } from "../account/delete-account-window";
@@ -49,10 +50,12 @@ const AccountWithDeletion = ({
   isOwner,
   isOpen,
   close,
+  supportTitle,
 }: {
   isOwner: boolean;
   isOpen: boolean;
   close: () => void;
+  supportTitle?: SupportTitle;
 }) => {
   const appearanceChoice = useAppearanceChoice();
   const confirmation = useConfirmation({ status: "idle", failure: null });
@@ -64,6 +67,7 @@ const AccountWithDeletion = ({
         onSelect={noop}
         onClose={close}
         user={SAMPLE_OWNER}
+        supportTitle={supportTitle}
         signOutHref="#"
         appearanceChoice={appearanceChoice}
         onPickAppearance={pickAppearance}
@@ -95,6 +99,16 @@ export const AccountWindowEntry = () => (
       >
         <OpenWindow>
           {({ isOpen, close }) => <AccountWithDeletion isOwner={false} isOpen={isOpen} close={close} />}
+        </OpenWindow>
+      </StateRow>
+      <StateRow
+        name="Un viewer qui a fait un don : la rangée Badges"
+        detail="Le cœur du badge Soutien dans le rond d'un avatar, et son titre, « Soutien · Fidèle » ; « Soutien » seul au premier palier. Aucune date. Un Soutien expiré s'y montre à l'identique : il n'est masqué qu'en public. Sans aucun don, la rangée n'existe pas (les deux états du dessus)."
+      >
+        <OpenWindow>
+          {({ isOpen, close }) => (
+            <AccountWithDeletion isOwner={false} isOpen={isOpen} close={close} supportTitle="regular" />
+          )}
         </OpenWindow>
       </StateRow>
     </Block>

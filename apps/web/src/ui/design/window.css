@@ -222,6 +222,23 @@
   flex: 1 1 14em;
 }
 
+/* Relier un don (section Badges) : le champ, le bouton et le message passent sur la ligne de dessous, à la largeur de la ligne */
+.lp-window-row .lp-link-form {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.lp-link-form .lp-field {
+  flex: 1 1 14em;
+}
+
+.lp-link-form-failure {
+  flex: 1 0 100%;
+}
+
 /* Un signalement (JOURNAL 2026-09-28) : l'aperçu de la pose à gauche, qui, combien et les décisions à droite */
 .lp-report {
   display: flex;

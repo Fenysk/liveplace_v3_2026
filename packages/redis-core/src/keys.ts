@@ -111,6 +111,11 @@ export function userKey(userId: string): string {
   return `user:${userId}`;
 }
 
+// Le badge Soutien dans ce miroir (JOURNAL 2026-11-03) : le titre, et l'instant où le badge s'éteint. Le web les écrit à la connexion,
+// le gateway les compare à l'heure à chaque affichage ; supprimer le compte efface le miroir entier, donc eux aussi.
+export const SUPPORT_TITLE_FIELD = "supportTitle";
+export const SUPPORT_ENDS_AT_FIELD = "supportEndsAt";
+
 // §10.4 : le live Twitch d'un compte, un HASH `checkedAt` et, en live seulement, `category`.
 // Sans EXPIRE : « hors live » est un état connu, et le web revérifie celui qui date.
 export function twitchLiveKey(userId: string): string {

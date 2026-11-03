@@ -237,6 +237,57 @@ describe("la section Supprimer ton compte de la page Confidentialité (CDC §8, 
   });
 });
 
+describe("la section Tes dons de la page Confidentialité (CDC des badges §6, JOURNAL 2026-11-03)", () => {
+  // La deuxième section : la première est Supprimer ton compte
+  const donationsOf = (html: string): string =>
+    /<section[^>]*>.*?<\/section>.*?<section[^>]*>(.*?)<\/section>/s.exec(html)?.[1] ?? "";
+
+  // Ce que LivePlace garde d'un don, en français : le montant et la date, l'e-mail et le nom Ko-fi le temps de relier, jamais le message
+  it("says in French what is kept of a donation, and that the message never is", () => {
+    const section = donationsOf(inLocale("fr"));
+
+    expect(section).toMatch(/<h2[^>]*>Tes dons<\/h2>/);
+    expect(section).toContain(
+      "Pour un don sur Ko-fi, on garde le montant et la date : ils donnent le titre et la durée de ton badge Soutien.",
+    );
+    expect(section).toContain(
+      "On garde l&#x27;e-mail et le nom Ko-fi seulement tant que le don n&#x27;est pas relié à un compte, puis on les efface.",
+    );
+    expect(section).toContain("On ne garde jamais ton message.");
+    expect(section).toContain("Supprimer ton compte efface tes dons.");
+  });
+
+  // En anglais, sans un mot de français
+  it("says it in English too, with no French left", () => {
+    const section = donationsOf(inLocale("en"));
+
+    expect(section).toMatch(/<h2[^>]*>Your donations<\/h2>/);
+    expect(section).toContain(
+      "For a Ko-fi donation, we keep the amount and the date: they set the title and the length of your Supporter badge.",
+    );
+    expect(section).toContain(
+      "We keep the Ko-fi email and name only until the donation is linked to an account, then we erase them.",
+    );
+    expect(section).toContain("We never keep your message.");
+    expect(section).toContain("Deleting your account erases your donations.");
+    expect(section).not.toMatch(/Soutien|compte|garde|message ?:|Ko-fi,/);
+  });
+
+  // Une section de plus dans la liste : le sommaire la lit, une quatrième phrase par langue, aucun lien ni texte provisoire
+  it("is one more section of the list, with a title and four sentences and no link", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const section = donationsOf(inLocale(locale));
+
+      expect(privacySections(PRIVACY_TEXTS[locale]).map(({ id }) => id)).toEqual([
+        "privacy-delete-account",
+        "privacy-donations",
+      ]);
+      expect(section.match(/<p /g)).toHaveLength(4);
+      expect(section).not.toMatch(/<a /);
+    }
+  });
+});
+
 describe("la page Confidentialité en deux colonnes, sommaire à gauche (variante A, JOURNAL 2026-11-02)", () => {
   const privacyCss = readFileSync(join(import.meta.dirname, "privacy.css"), "utf8");
   // Ce que la feuille écrit dans un bloc `@container lp-home (min-width: 1100px) { … }`, et hors de lui
@@ -269,6 +320,8 @@ describe("la page Confidentialité en deux colonnes, sommaire à gauche (variant
         "deleteAccountSentences",
         "deleteAccountTitle",
         "documentTitle",
+        "donationsSentences",
+        "donationsTitle",
         "title",
         "underConstruction",
       ].sort(),

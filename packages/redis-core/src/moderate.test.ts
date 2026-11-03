@@ -492,6 +492,7 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
         login: "moda",
         displayName: "ModA",
         avatarUrl: "https://a/m.png",
+        badges: ["moderator"], // chaque modérateur listé porte le sien (JOURNAL 2026-11-03)
         isFromTwitch: false,
         isNamedHere: true,
         hasAccount: true,
@@ -500,6 +501,7 @@ describe("moderators and their origin (JOURNAL 2026-09-27)", () => {
         userId: withoutAccount,
         login: "modb",
         displayName: "ModB",
+        badges: ["moderator"],
         isFromTwitch: true,
         isNamedHere: false,
         hasAccount: false,

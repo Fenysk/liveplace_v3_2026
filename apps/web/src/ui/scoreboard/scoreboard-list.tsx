@@ -4,10 +4,11 @@
 import type { ScoreboardRow, ScoreboardRows } from "../../state/scoreboard";
 import { classNames } from "../design/class-names";
 import { RollingNumber } from "../design/rolling-number";
+import { UserBadges } from "../design/user-badge";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
 import { RankAvatar } from "./rank-avatar";
-import { ordinalSuffix, rowLabel, SCOREBOARD_TEXTS } from "./scoreboard-texts";
+import { listRowLabel, ordinalSuffix, SCOREBOARD_TEXTS } from "./scoreboard-texts";
 
 type ScoreboardListProps = { rows: ScoreboardRows };
 
@@ -21,12 +22,15 @@ const ListRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolean })
       aria-current={isMe ? "true" : undefined}
     >
       {/* Lu d'un trait : l'avatar, le nom et le détail à l'écran, découpés, se liraient mal. */}
-      <span className="lp-visually-hidden">{rowLabel(row, locale)}</span>
+      <span className="lp-visually-hidden">{listRowLabel(row, locale)}</span>
       <span className="lp-scoreboard-avatar" aria-hidden="true">
         <RankAvatar player={player} rank={rank} />
       </span>
-      <span className="lp-scoreboard-name lp-type-body" aria-hidden="true">
-        {player.displayName}
+      <span className="lp-rank-line">
+        <span className="lp-scoreboard-name lp-type-body" aria-hidden="true">
+          {player.displayName}
+        </span>
+        <UserBadges ids={player.badges} />
       </span>
       <span className="lp-scoreboard-meta lp-type-caption lp-muted" aria-hidden="true">
         {rank}

@@ -11,6 +11,7 @@ import { Button } from "../design/button";
 import { classNames } from "../design/class-names";
 import { Pill, type PillDock } from "../design/pill";
 import { RollingNumber } from "../design/rolling-number";
+import { UserBadges } from "../design/user-badge";
 import { useShownWhileClosing } from "../design/window";
 import { useLocale, useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -56,7 +57,10 @@ const ExpandedRow = ({ row, isOutside }: { row: ScoreboardRow; isOutside: boolea
   return (
     <>
       <span className="lp-rank-text" aria-hidden="true">
-        <span className="lp-rank-name lp-type-body">{row.player.displayName}</span>
+        <span className="lp-rank-line">
+          <span className="lp-rank-name lp-type-body">{row.player.displayName}</span>
+          <UserBadges ids={row.player.badges} isMarker />
+        </span>
         {isOutside && (
           <span className="lp-type-numeric lp-muted">
             <Ordinal rank={row.rank} />
@@ -98,7 +102,10 @@ const RankItem = ({ row, isCollapsed, isFirst, isOutside }: RankItemProps) => {
       </button>
       {isCollapsed && (
         <span className="lp-rank-tip" aria-hidden="true">
-          <span className="lp-rank-tip-name lp-type-body">{player.displayName}</span>
+          <span className="lp-rank-line">
+            <span className="lp-rank-tip-name lp-type-body">{player.displayName}</span>
+            <UserBadges ids={player.badges} isMarker />
+          </span>
           <span className="lp-rank-tip-meta lp-type-caption lp-muted">
             <Ordinal rank={rank} /> · <RollingNumber value={moderation.pixelCount(pixels)} />
           </span>

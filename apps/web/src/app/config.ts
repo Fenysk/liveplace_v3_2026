@@ -38,6 +38,9 @@ const WebEnvSchema = z.object({
   CONVEX_SERVICE_KEY: z.string().min(1),
   REDIS_URL: z.string().min(1),
   TWITCH_EVENTSUB_SECRET: z.string().min(10).max(100), // JOURNAL 2026-09-27 : les bornes de Twitch
+  // JOURNAL 2026-11-03 : le jeton de vérification de Ko-fi. Facultatif : le compose la passe toujours, vide ou non, et sans elle
+  // `/kofi/webhook` répond 503 (défaut fermé).
+  KOFI_VERIFICATION_TOKEN: z.string().optional(),
   BETA_LABEL: z.string().optional(), // §11.1 : vide en production, le compose la passe toujours
   // §7.5 : le nom de l'environnement de sauvegarde, celui du worker. Absente, vide ou `off` : la
   // connexion crée le canvas comme avant, sans demander à Convex s'il en garde une sauvegarde.
@@ -61,6 +64,7 @@ export type WebConfig = {
   convexServiceKey: string;
   redisUrl: string;
   twitchEventSubSecret: string;
+  kofiSecret: string | null; // `null` : pas de jeton Ko-fi posé, le webhook répond 503
   betaLabel: string | null;
   convexUsageDeployments: ConvexDeployment[]; // aucun : Convex n'est pas configuré
   durableScope: string | null; // `null` : pas de sauvegarde ici, la connexion ne demande rien à Convex
@@ -78,6 +82,7 @@ export function parseWebConfig(env: unknown): WebConfig {
     convexServiceKey: parsed.CONVEX_SERVICE_KEY,
     redisUrl: parsed.REDIS_URL,
     twitchEventSubSecret: parsed.TWITCH_EVENTSUB_SECRET,
+    kofiSecret: parsed.KOFI_VERIFICATION_TOKEN?.trim() || null,
     betaLabel: parsed.BETA_LABEL || null,
     convexUsageDeployments: toConvexDeployments(parsed.CONVEX_USAGE_DEPLOYMENTS ?? "") ?? [],
     durableScope: parsed.DURABLE_SCOPE && parsed.DURABLE_SCOPE !== "off" ? parsed.DURABLE_SCOPE : null,

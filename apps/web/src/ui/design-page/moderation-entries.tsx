@@ -93,6 +93,23 @@ const FOR_ALL = (nowMs: number): readonly InspectionScene[] => [
     },
   },
   {
+    name: "Un auteur avec ses badges",
+    detail: "Après le pseudo, avant le bouton Twitch : Modérateur, puis Soutien.",
+    inspection: {
+      status: "found",
+      x: 12,
+      y: 40,
+      entry: {
+        userId: "1",
+        ...SAMPLE_OWNER,
+        badges: ["moderator", "support.pillar"],
+        colorIndex: 28,
+        placedAt: nowMs - 3 * HOUR_MS,
+        placementId: "pdemo0001",
+      },
+    },
+  },
+  {
     name: "Un auteur sans photo, une case gommée",
     inspection: {
       status: "found",
