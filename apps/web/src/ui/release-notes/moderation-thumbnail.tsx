@@ -1,5 +1,5 @@
-// « Modération facile » : la vraie pill Compte, en haut à droite d'une mini-fresque (le bouclier de Modération, Nouveautés, la
-// photo). Un point rouge paraît sur le bouclier, un curseur vient le cliquer, la liste des signalements s'ouvre dessous. L'image fixe :
+// « Modération facile » : la vraie pill Compte, en haut à droite d'une mini-fresque (le bouclier de Modération, la
+// photo, Nouveautés). Un point rouge paraît sur le bouclier, un curseur vient le cliquer, la liste des signalements s'ouvre dessous. L'image fixe :
 // le point rouge sur le bouclier.
 
 import { MousePointer2, Shield, Sparkles } from "lucide-react";
@@ -37,8 +37,8 @@ export const ModerationThumbnail = () => {
       <span className="lp-pill lp-release-pill lp-release-pill--top-right">
         <span className="lp-pill-content">
           <PillTool icon={Shield} hasDot className="lp-release-shield" />
-          <PillTool icon={Sparkles} />
           <Avatar displayName="Ana" />
+          <PillTool icon={Sparkles} />
         </span>
       </span>
       <span className="lp-pill lp-release-pill lp-release-sheet">

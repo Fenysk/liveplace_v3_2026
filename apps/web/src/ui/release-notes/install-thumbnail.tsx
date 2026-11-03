@@ -91,8 +91,8 @@ export const InstallThumbnail = () => {
             </svg>
             <span className="lp-pill lp-release-pill lp-release-phone-pill lp-release-phone-pill--top">
               <span className="lp-pill-content">
-                <PillTool icon={Sparkles} />
                 <Avatar displayName={VIEWER} />
+                <PillTool icon={Sparkles} />
                 <PillTool icon={SunMoon} />
               </span>
             </span>

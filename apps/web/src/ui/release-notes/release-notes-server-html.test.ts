@@ -297,7 +297,7 @@ describe("the thumbnails of a pill (server HTML, still image)", () => {
   const still = (kind: keyof typeof THUMBNAILS, locale: "fr" | "en" = "fr"): string =>
     inLocale(locale, createElement(THUMBNAILS[kind]));
 
-  // La Modération : la pill Compte (bouclier avec son point rouge, Nouveautés, la photo), en haut à droite d'une mini-fresque, et la liste fermée
+  // La Modération : la pill Compte (bouclier avec son point rouge, la photo, Nouveautés), en haut à droite d'une mini-fresque, et la liste fermée
   it("shows the account pill with the red dot on the shield, in the top right of a mini canvas", () => {
     const html = still("moderation");
 

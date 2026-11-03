@@ -264,7 +264,7 @@ describe("la disposition de la pill Compte (§9.9)", () => {
   });
 });
 
-// Nouveautés : un bouton fantôme pour tout le monde, après les boutons de rôle et à gauche de la photo.
+// Nouveautés : un bouton fantôme pour tout le monde, à droite de la photo d'un compte connecté et avant l'apparence.
 const NEWS = "Nouveautés";
 const ORDER_TITLES = [...ALL_TITLES, NEWS];
 const withNews = { onOpenReleaseNotes: doNothing } as const;
@@ -280,28 +280,28 @@ const newsButtonOf = (markup: string): string =>
   markup.match(/<button[^>]*title="Nouveautés"[^>]*>.*?<\/button>/s)?.[0] ?? "";
 
 describe("le bouton Nouveautés de la pill Compte", () => {
-  // Quand le compte est connu, le bouton Nouveautés est là pour tout le monde, après les boutons de rôle et avant la photo
-  it("stands after the role buttons and before the photo, for every role", () => {
+  // Quand le compte est connu, le bouton Nouveautés est là pour tout le monde, après la photo et avant l'apparence
+  it("stands right of the photo and before the appearance, for every role", () => {
     expect(orderWithNews(render({ ...withNews, onOpenSettings: doNothing }))).toEqual([
       "Réglages",
-      NEWS,
       "Mon compte",
+      NEWS,
       "Apparence : Auto",
     ]);
     expect(orderWithNews(render({ ...withNews, onOpenModeration: doNothing }))).toEqual([
       "Modération",
-      NEWS,
       "Mon compte",
+      NEWS,
       "Apparence : Auto",
     ]);
     expect(
       orderWithNews(render({ ...withNews, onOpenDeveloper: doNothing, onOpenSettings: doNothing })),
-    ).toEqual(["Développeur", "Réglages", NEWS, "Mon compte", "Apparence : Auto"]);
+    ).toEqual(["Développeur", "Réglages", "Mon compte", NEWS, "Apparence : Auto"]);
   });
 
-  // Un viewer connecté : Nouveautés, sa photo, puis l'apparence, comme avec les boutons de rôle
-  it("puts it before the photo of a signed-in viewer, with the appearance after the photo", () => {
-    expect(orderWithNews(render(withNews))).toEqual([NEWS, "Mon compte", "Apparence : Auto"]);
+  // Un viewer connecté : sa photo, Nouveautés, puis l'apparence
+  it("puts it after the photo of a signed-in viewer, before the appearance", () => {
+    expect(orderWithNews(render(withNews))).toEqual(["Mon compte", NEWS, "Apparence : Auto"]);
   });
 
   // Un invité l'a aussi : avant l'apparence et Se connecter, qui gardent leur ordre
@@ -341,7 +341,8 @@ describe("le point de Nouveautés", () => {
     expect(markup.match(/lp-avatar-dot/g)).toHaveLength(1);
     expect(newsButtonOf(markup)).toContain("lp-avatar-dot");
     expect(newsButtonOf(markup)).toContain("lp-btn--dot");
-    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Mon compte"));
+    expect(markup.indexOf("lp-avatar-dot")).toBeGreaterThan(positionOf(markup, "Mon compte"));
+    expect(markup.indexOf("lp-avatar-dot")).toBeLessThan(positionOf(markup, "Apparence : Auto"));
   });
 
   // Tout est lu : pas de point
@@ -381,7 +382,7 @@ describe("le point de Nouveautés", () => {
   });
 });
 
-describe("la pill Compte de l'invité et du viewer sur mobile, avec Nouveautés", () => {
+describe("la pill Compte sur mobile, avec Nouveautés", () => {
   // Sur mobile, un invité garde une pill avec ce seul bouton : ni apparence, ni Se connecter (la barre du bas le dit)
   it("keeps a guest's pill with the Nouveautés button alone", () => {
     const markup = render({ ...guest, ...withNews, isCompact: true });
@@ -400,9 +401,18 @@ describe("la pill Compte de l'invité et du viewer sur mobile, avec Nouveautés"
     ]);
   });
 
-  // Un viewer connecté sur mobile : Nouveautés, puis sa photo, sans l'apparence
-  it("gives a signed-in viewer Nouveautés, then the photo, without the appearance", () => {
-    expect(orderWithNews(render({ ...withNews, isCompact: true }))).toEqual([NEWS, "Mon compte"]);
+  // Un viewer connecté sur mobile : sa photo, puis Nouveautés, sans l'apparence
+  it("gives a signed-in viewer the photo, then Nouveautés, without the appearance", () => {
+    expect(orderWithNews(render({ ...withNews, isCompact: true }))).toEqual(["Mon compte", NEWS]);
+  });
+
+  // Le streamer sur mobile : Réglages, sa photo, puis Nouveautés, sans l'apparence
+  it("gives the streamer Réglages, the photo, then Nouveautés, without the appearance", () => {
+    expect(orderWithNews(render({ ...withNews, isCompact: true, onOpenSettings: doNothing }))).toEqual([
+      "Réglages",
+      "Mon compte",
+      NEWS,
+    ]);
   });
 
   // Sans l'ouvreur, l'invité sur mobile n'a toujours rien : la pill s'efface comme avant

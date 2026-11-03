@@ -1,9 +1,9 @@
 // La pill Compte (CDC 2026), en haut à droite : Développeur (lui seul), Réglages (le streamer sur son canvas) ou
-// Modération (qui modère sans être le streamer), Nouveautés (pour tous), l'apparence, puis sa photo (Mon compte) ou
-// Se connecter. Avec l'un de ces boutons à gauche de sa photo, l'apparence passe à droite de la photo (§9.9). La langue
-// se choisit dans Mon compte, pas ici. Sur son canvas, c'est la seule pill du streamer. Sur mobile (§9.7),
-// ni l'apparence (elle est dans Mon compte) ni Se connecter (la barre du bas le dit) : l'invité
-// garde Nouveautés seul, et Se connecter sans barre du bas (une archive).
+// Modération (qui modère sans être le streamer), sa photo (Mon compte), Nouveautés (pour tous), puis l'apparence ;
+// l'invité a Nouveautés, l'apparence, puis Se connecter. L'apparence passe à droite de la photo dès que le compte a un
+// bouton de rôle ou Nouveautés (§9.9). La langue se choisit dans Mon compte, pas ici. Sur son canvas, c'est la seule
+// pill du streamer. Sur mobile (§9.7), ni l'apparence (elle est dans Mon compte) ni Se connecter (la barre du bas le
+// dit) : l'invité garde Nouveautés seul, et Se connecter sans barre du bas (une archive).
 
 import { Activity, Settings, Shield, Sparkles } from "lucide-react";
 import type { AppearanceChoice } from "../design/appearance";
@@ -53,7 +53,7 @@ type LayoutInput = Pick<
 // Ce que la pill montre, d'après qui regarde et ce qu'on lui donne à ouvrir.
 // Sur mobile, Se connecter ne reste que sans barre du bas ; sans lui, sans photo ni Nouveautés, il ne reste rien : la pill
 // s'efface et la pill Canvas prend la rangée (pill.css). Nouveautés manque tant que le gateway n'a pas répondu : le point dépend du rôle.
-// Avec un bouton à gauche de la photo (ceux du rôle, ou Nouveautés pour un compte connecté), l'apparence passe à sa droite (§9.9).
+// Avec un bouton de rôle à gauche de la photo, ou Nouveautés à sa droite pour un compte connecté, l'apparence passe à droite de la photo (§9.9).
 const layoutOf = ({ identity, isCompact, hasBottomBar, ...openers }: LayoutInput) => {
   const releaseNotes = identity.kind === "unknown" ? undefined : openers.onOpenReleaseNotes;
   const hasRoleButtons = Boolean(
@@ -63,7 +63,7 @@ const layoutOf = ({ identity, isCompact, hasBottomBar, ...openers }: LayoutInput
   return {
     releaseNotes,
     showsSignIn,
-    hasLeftIcons: hasRoleButtons || (identity.kind === "signedIn" && releaseNotes !== undefined),
+    isAppearanceAfterPhoto: hasRoleButtons || (identity.kind === "signedIn" && releaseNotes !== undefined),
     hasNothingToShow: isCompact && identity.kind !== "signedIn" && !showsSignIn && releaseNotes === undefined,
   };
 };
@@ -75,25 +75,18 @@ const useTitleWithReports = (): ((title: string, reports: number) => string) => 
   return (title, reports) => (reports > 0 ? t.withPending(title, moderation.reportCount(reports)) : title);
 };
 
-type RoleButtonsProps = Pick<
-  AccountPillProps,
-  "onOpenDeveloper" | "onOpenSettings" | "onOpenModeration" | "hasUnreadReleaseNotes"
-> & {
+type RoleButtonsProps = Pick<AccountPillProps, "onOpenDeveloper" | "onOpenSettings" | "onOpenModeration"> & {
   moderationReports: number;
-  onOpenReleaseNotes: (() => void) | undefined; // absent : pas de Nouveautés (le rôle n'est pas encore connu)
 };
 
-// Développeur, Réglages ou Modération : les boutons de rôle, puis Nouveautés, tous à gauche de la photo.
+// Développeur, Réglages ou Modération : les boutons de rôle, à gauche de la photo.
 const RoleButtons = ({
   onOpenDeveloper,
   onOpenSettings,
   onOpenModeration,
-  onOpenReleaseNotes,
-  hasUnreadReleaseNotes = false,
   moderationReports,
 }: RoleButtonsProps) => {
   const t = useTexts(ACCOUNT_TEXTS);
-  const releaseNotes = useTexts(RELEASE_NOTES_TEXTS);
   const titleWithReports = useTitleWithReports();
   return (
     <>
@@ -116,17 +109,17 @@ const RoleButtons = ({
           />
         </BubbleTarget>
       )}
-      {/* Le point est à Nouveautés, jamais à la photo : elle porte déjà celui des signalements. */}
-      {onOpenReleaseNotes && (
-        <Button
-          icon={Sparkles}
-          variant="ghost"
-          title={releaseNotes.title}
-          hasDot={hasUnreadReleaseNotes}
-          onPress={onOpenReleaseNotes}
-        />
-      )}
     </>
+  );
+};
+
+type ReleaseNotesButtonProps = { hasDot: boolean; onPress: () => void };
+
+// Le point est à Nouveautés, jamais à la photo : elle porte déjà celui des signalements.
+const ReleaseNotesButton = ({ hasDot, onPress }: ReleaseNotesButtonProps) => {
+  const releaseNotes = useTexts(RELEASE_NOTES_TEXTS);
+  return (
+    <Button icon={Sparkles} variant="ghost" title={releaseNotes.title} hasDot={hasDot} onPress={onPress} />
   );
 };
 
@@ -172,7 +165,7 @@ export const AccountPill = ({
 }: AccountPillProps) => {
   const t = useTexts(ACCOUNT_TEXTS);
   const appearance = !isCompact && <AppearanceButton choice={appearanceChoice} onPick={onPickAppearance} />;
-  const { releaseNotes, hasLeftIcons, showsSignIn, hasNothingToShow } = layoutOf({
+  const { releaseNotes, isAppearanceAfterPhoto, showsSignIn, hasNothingToShow } = layoutOf({
     identity,
     isCompact,
     hasBottomBar,
@@ -184,17 +177,21 @@ export const AccountPill = ({
   // Le point suit le bouton qui mène aux signalements : Modération pour le modérateur, sinon la photo (une seule pastille).
   // La bulle d'aide des signalements vise le même bouton (§9.11).
   const hasModeration = Boolean(onOpenModeration);
+  const isSignedIn = identity.kind === "signedIn";
+  // Nouveautés suit la photo d'un compte connecté ; l'invité l'a en premier.
+  const releaseNotesButton = releaseNotes && (
+    <ReleaseNotesButton hasDot={hasUnreadReleaseNotes} onPress={releaseNotes} />
+  );
   return (
     <Pill dock={isDocked ? DOCK : undefined} isVisible={isVisible && !hasNothingToShow}>
       <RoleButtons
         onOpenDeveloper={onOpenDeveloper}
         onOpenSettings={onOpenSettings}
         onOpenModeration={onOpenModeration}
-        onOpenReleaseNotes={releaseNotes}
-        hasUnreadReleaseNotes={hasUnreadReleaseNotes}
         moderationReports={hasModeration ? pendingReports : 0}
       />
-      {!hasLeftIcons && appearance}
+      {!isSignedIn && releaseNotesButton}
+      {!isAppearanceAfterPhoto && appearance}
       {showsSignIn && <SignInButton href={signInHref} label={t.signIn} onPress={onSignIn} />}
       {identity.kind === "signedIn" && (
         <AccountAvatar
@@ -204,7 +201,8 @@ export const AccountPill = ({
           onPress={onOpenAccount}
         />
       )}
-      {hasLeftIcons && appearance}
+      {isSignedIn && releaseNotesButton}
+      {isAppearanceAfterPhoto && appearance}
     </Pill>
   );
 };

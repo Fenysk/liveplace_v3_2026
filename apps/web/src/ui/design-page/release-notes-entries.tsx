@@ -82,7 +82,7 @@ const SHOTS = [
     kind: "launch",
     name: "Lancement de LivePlace (bêta)",
     detail:
-      "Animée, en boucle de 8,4 s : une mini-fresque et, en haut à droite, la pill Compte d'un invité (Nouveautés, l'apparence, et Se connecter aux couleurs de Twitch). Une souris clique Se connecter ; la pill devient celle du compte connecté (Nouveautés, la photo, l'apparence). La souris s'en va, puis trois dessins arrivent l'un après l'autre (un fantôme, un chat, un cœur), case après case en fondu, comme les dessins des autres viewers dans le jeu. Tout s'efface en fondu, l'invité revient. Fixe : le compte connecté et les trois dessins, sans souris.",
+      "Animée, en boucle de 8,4 s : une mini-fresque et, en haut à droite, la pill Compte d'un invité (Nouveautés, l'apparence, et Se connecter aux couleurs de Twitch). Une souris clique Se connecter ; la pill devient celle du compte connecté (la photo, Nouveautés, l'apparence). La souris s'en va, puis trois dessins arrivent l'un après l'autre (un fantôme, un chat, un cœur), case après case en fondu, comme les dessins des autres viewers dans le jeu. Tout s'efface en fondu, l'invité revient. Fixe : le compte connecté et les trois dessins, sans souris.",
   },
   {
     kind: "help",

@@ -1,5 +1,5 @@
 // « Lancement de LivePlace (bêta) » : une mini-fresque et, en haut à droite, la pill Compte d'un invité (Nouveautés, l'apparence, et Se
-// connecter aux couleurs de Twitch). Une souris clique Se connecter ; la pill devient celle du compte connecté (Nouveautés, la photo,
+// connecter aux couleurs de Twitch). Une souris clique Se connecter ; la pill devient celle du compte connecté (la photo, Nouveautés,
 // l'apparence). Puis trois dessins arrivent l'un après l'autre, case après case, comme ceux de trois viewers (launch-motion.ts).
 // L'image fixe : le compte connecté et les trois dessins, sans la souris.
 
@@ -71,8 +71,8 @@ export const LaunchThumbnail = () => {
       </span>
       <span className="lp-pill lp-release-pill lp-release-pill--top-right lp-release-account">
         <span className="lp-pill-content">
-          <PillTool icon={Sparkles} />
           <Avatar displayName={MEMBER} />
+          <PillTool icon={Sparkles} />
           <PillTool icon={SunMoon} />
         </span>
       </span>

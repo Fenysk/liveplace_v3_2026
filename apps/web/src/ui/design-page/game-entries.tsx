@@ -285,7 +285,7 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
     scenes: [
       {
         name: "Connecté",
-        detail: "Nouveautés avant sa photo, qui ouvre Mon compte ; l'apparence passe à droite.",
+        detail: "Sa photo, qui ouvre Mon compte, puis Nouveautés et l'apparence.",
         identity: SIGNED_IN,
       },
       {
@@ -365,7 +365,7 @@ const ACCOUNT_BLOCKS: readonly { title: string; scenes: readonly AccountScene[] 
         isCompact: true,
         hasBottomBar: false,
       },
-      { name: "Connecté", detail: "Nouveautés, puis sa photo.", identity: SIGNED_IN, isCompact: true },
+      { name: "Connecté", detail: "Sa photo, puis Nouveautés.", identity: SIGNED_IN, isCompact: true },
       {
         name: "Connecté, une nouveauté à lire",
         identity: SIGNED_IN,
@@ -430,7 +430,7 @@ export const AccountPillEntry = () => (
     slug="pill-compte"
     components={["AccountPill"]}
     file="ui/account/account-pill.tsx"
-    note="Le streamer sur sa fresque n'a que la pill Compte. Nouveautés est là pour tout le monde, après Développeur, Réglages ou Modération, avant la photo : avec l'un d'eux, l'apparence passe à droite de la photo. Sur mobile, elle n'a ni l'apparence ni Se connecter."
+    note="Le streamer sur sa fresque n'a que la pill Compte. Nouveautés est là pour tout le monde : l'invité l'a en premier, un compte connecté à droite de sa photo, avant l'apparence, qui passe à droite de la photo avec Développeur, Réglages ou Modération. Sur mobile, elle n'a ni l'apparence ni Se connecter."
     where="En haut à droite"
   >
     {ACCOUNT_BLOCKS.map(({ title, scenes }) => (
