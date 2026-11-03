@@ -5,6 +5,7 @@ import { Children, type ReactNode, useState } from "react";
 import { Badge } from "../design/badge";
 import { Button } from "../design/button";
 import { classNames } from "../design/class-names";
+import { SupportButton, useSupportWindow } from "../design/support";
 import { DESIGN_CHAPTERS, DESIGN_ENTRIES, type EntrySlug } from "./design-entries";
 
 type EntryProps = {
@@ -189,6 +190,17 @@ export const OpenWindow = ({ label = "Ouvrir la fenêtre", onOpen, children }: O
         }}
       />
       {children({ isOpen, close: () => setIsOpen(false) })}
+    </>
+  );
+};
+
+// Le bouton Soutenir LivePlace d'une ligne et sa fenêtre : sur la vraie page, la page porte la fenêtre (`useSupportWindow`).
+export const SupportButtonDemo = ({ hasLabel = true }: { hasLabel?: boolean }) => {
+  const { open, supportWindow } = useSupportWindow();
+  return (
+    <>
+      <SupportButton hasLabel={hasLabel} onOpen={open} />
+      {supportWindow}
     </>
   );
 };

@@ -848,6 +848,9 @@ describe("the Nouveautés link of the home page", () => {
     expect(html.indexOf('href="/nouveautes"')).toBeLessThan(html.indexOf('role="radiogroup"'));
     expect(html).not.toContain("lp-avatar-dot");
     expect(html).not.toMatch(INLINE_STYLE);
+    // Soutenir LivePlace reste sur l'accueil seul : `/nouveautes` et `/confidentialite` reprennent ces réglages sans lui
+    expect(html).not.toContain("lp-btn--support");
+    expect(html).not.toContain("<dialog");
   });
 
   // Les boutons de la langue et de l'apparence ne changent pas : deux boutons, le lien n'en est pas un

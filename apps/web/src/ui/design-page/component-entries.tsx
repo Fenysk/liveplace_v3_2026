@@ -81,6 +81,7 @@ import {
   InSmallWindow,
   InWindow,
   StateRow,
+  SupportButtonDemo,
   useNowMs,
   WithValue,
 } from "./entry-layout";
@@ -369,6 +370,12 @@ export const ButtonEntry = () => (
           <Button {...props} />
         </StateRow>
       ))}
+      <StateRow
+        name="Soutenir LivePlace"
+        detail="Rose clair, ouvre la fenêtre Soutenir LivePlace (entrée Soutenir)."
+      >
+        <SupportButtonDemo />
+      </StateRow>
     </Block>
     <Block title="Icône seule">
       {ICON_BUTTONS.map(({ name, props }) => (
@@ -376,6 +383,9 @@ export const ButtonEntry = () => (
           <Button {...props} />
         </StateRow>
       ))}
+      <StateRow name="Soutenir LivePlace" detail="Le cœur seul, rose clair : son titre le nomme.">
+        <SupportButtonDemo hasLabel={false} />
+      </StateRow>
     </Block>
     <MorphingScenes />
   </Entry>

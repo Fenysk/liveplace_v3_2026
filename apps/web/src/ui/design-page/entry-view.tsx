@@ -42,6 +42,8 @@ import {
   CanvasPillEntry,
   DraftPillEntry,
   NoticeEntry,
+  SupportPillEntry,
+  SupportWindowEntry,
   ThemePillEntry,
   ViewportPillEntry,
 } from "./game-entries";
@@ -92,6 +94,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   inspection: InspectionEntry,
   dessin: DraftPillEntry,
   pratique: ViewportPillEntry,
+  "pill-soutenir": SupportPillEntry,
   "message-seul": NoticeEntry,
 
   "fenetre-canvas": CanvasSettingsEntry,
@@ -111,6 +114,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "supprimer-une-archive": DiscardWindowEntry,
   "supprimer-son-compte": DeleteAccountWindowEntry,
   "telecharger-en-png": DownloadWindowEntry,
+  "soutenir-liveplace": SupportWindowEntry,
 
   accueil: HomeEntry,
 };

@@ -56,6 +56,7 @@ const ENTRIES_BY_SLUG = {
   inspection: { title: "Inspection", chapterId: "game", place: "centre droite" },
   dessin: { title: "Dessin", chapterId: "game", place: "bas centre" },
   pratique: { title: "Pratique", chapterId: "game", place: "bas droite" },
+  "pill-soutenir": { title: "Soutenir", chapterId: "game", place: "bas gauche" },
   "message-seul": { title: "Message seul", chapterId: "game", place: "centre" },
 
   "fenetre-canvas": { title: "Fresque", chapterId: "window" },
@@ -75,6 +76,7 @@ const ENTRIES_BY_SLUG = {
   "supprimer-une-archive": { title: "Supprimer une archive", chapterId: "dialogs" },
   "supprimer-son-compte": { title: "Supprimer son compte", chapterId: "dialogs" },
   "telecharger-en-png": { title: "Télécharger en PNG", chapterId: "dialogs" },
+  "soutenir-liveplace": { title: "Soutenir LivePlace", chapterId: "dialogs" },
 
   accueil: { title: "Accueil", chapterId: "pages" },
 } as const satisfies Record<string, Omit<DesignEntry, "slug">>;

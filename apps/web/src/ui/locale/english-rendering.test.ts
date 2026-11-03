@@ -20,6 +20,7 @@ import { ViewportPill } from "../canvas/viewport-pill";
 import { ClaimButton } from "../design/gauge";
 import { Palette } from "../design/palette";
 import { Profile, type ProfileUser } from "../design/profile";
+import { SupportButton, SupportPill, SupportWindow } from "../design/support";
 import { ThemePill } from "../design/theme-pill";
 import { SignInNote } from "../design/twitch";
 import { DraftPill, type DraftPillActions, type DraftPillState } from "../draft/draft-pill";
@@ -450,6 +451,33 @@ describe("the canvas settings and the archives in English (§9.9)", () => {
     expect(markup).toContain('title="Zoom out"');
     expect(markup).toContain('title="Recenter the view"');
     expect(markup).not.toContain("%");
+  });
+
+  // CDC 2026, Soutenir LivePlace : la pill, et le cœur seul de l'accueil, disent la même chose en anglais
+  it("says the Support pill and its heart alone in English", () => {
+    const pill = inEnglish(createElement(SupportPill, { isDocked: false }));
+    const heart = inEnglish(createElement(SupportButton, { hasLabel: false, onOpen: () => undefined }));
+
+    expect(pill).toContain("<span>Support LivePlace</span>");
+    expect(heart).toContain('title="Support LivePlace"');
+    expect(heart).toContain('aria-label="Support LivePlace"');
+    expect(`${pill}${heart}`).not.toMatch(/Soutenir/);
+  });
+
+  // La fenêtre que le bouton ouvre : son titre, ses phrases, sa signature et ses boutons, sans un mot de français
+  it("says the Support window in English, from its title to its Donate button", () => {
+    const html = inEnglish(createElement(SupportWindow, { isOpen: true, onClose: () => undefined }));
+
+    expect(html).toContain(">Support LivePlace</h2>");
+    expect(html).toContain("LivePlace is free, for everyone.");
+    expect(html).toContain("Your support pays for what keeps it running:");
+    expect(html).toContain("<li>a server that handles every pixel live</li>");
+    expect(html).toContain("<li>room to keep the canvases</li>");
+    expect(html).toContain("<li>my evenings spent developing it</li>");
+    expect(html).toContain("No big company behind it, just me.");
+    expect(html).toContain("<span>Donate</span>");
+    expect(html).toContain("<span>Close</span>");
+    expect(html).not.toMatch(/Soutenir|gratuit|Faire un don|Fermer|Échap|boîte|soirées/);
   });
 
   // La section Archives : le canvas en cours, ses dates, la ligne d'une archive

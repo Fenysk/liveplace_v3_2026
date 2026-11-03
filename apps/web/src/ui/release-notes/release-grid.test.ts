@@ -111,14 +111,15 @@ describe("les cartes de la page des Nouveautés (CSS)", () => {
     );
   });
 
-  // Soutenir LivePlace n'est pas dans les Nouveautés : ni la règle de son bouton, ni ses jetons, ni son rose, nulle part dans ces feuilles
+  // Soutenir LivePlace n'est pas dans les Nouveautés : ni la règle de son bouton, ni ses jetons, ni son rose, nulle part dans cette
+  // feuille. Ses jetons vivent dans tokens.css, pour le bouton lui-même.
   it("holds no rule and no token of the support button", () => {
     expect(css).not.toContain(".lp-release-support");
     expect(css).not.toContain(".lp-btn--support");
     expect(css).not.toContain("--lp-release-beat");
-    expect(tokens).not.toContain("--support:");
-    expect(tokens).not.toContain("--support-bg");
-    expect(tokens).not.toContain("--support-ink");
+    expect(css).not.toContain("var(--support");
+    expect(css).not.toContain("--support-ink");
+    expect(css).not.toContain("#e0529c");
   });
 
   // Aucune icône d'agrandissement : la vignette est le bouton, sa loupe au survol, l'anneau du survol et celui du focus sont ses repères

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -120,7 +122,104 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
       expect(settings).toContain(`<span>${words.code}</span>`);
       expect(settings).toContain(`title="${words.appearance}"`);
       expect(settings.match(/<button/g)).toHaveLength(2);
+      // Soutenir est à gauche, avec le mot-symbole : les réglages n'ont ni son bouton ni sa fenêtre
+      expect(settings).not.toMatch(/lp-btn--support|lp-home-support|<dialog/);
     }
+  });
+
+  // CDC 2026, Soutenir LivePlace : à gauche, juste après le mot-symbole et avant les réglages, un bouton qui ouvre la fenêtre (vide
+  // tant qu'elle est fermée : aucun lien vers Ko-fi dans la page). Le nom est écrit à côté : le texte dit « Soutenir ». Le serveur
+  // écrit les deux formes (le texte et le cœur seul), home.css montre celle qui tient sur un téléphone.
+  it("writes Support right after the wordmark, before the settings, a button that opens its window, in both forms", () => {
+    for (const [locale, short, full] of [
+      ["fr", "Soutenir", "Soutenir LivePlace"],
+      ["en", "Support", "Support LivePlace"],
+    ] as const) {
+      const html = serverHtml(locale);
+      const header = html.slice(html.indexOf('<div class="lp-home-header">'), html.indexOf("<h1"));
+      const brand = header.slice(
+        header.indexOf('<div class="lp-home-brand">'),
+        header.indexOf('<div class="lp-home-settings">'),
+      );
+      const formOf = (form: string): string => {
+        const start = brand.indexOf(`<div class="lp-home-support lp-home-support--${form}">`);
+        return brand.slice(start, brand.indexOf("</div>", start));
+      };
+      const label = formOf("label");
+      const icon = formOf("icon");
+      const buttons = brand.match(/<button [^>]*lp-btn--support[^>]*>/g) ?? [];
+
+      // Le mot-symbole, puis le texte, le cœur seul et la fenêtre dans le même groupe, puis les réglages
+      expect(header).toMatch(
+        /^<div class="lp-home-header"><div class="lp-home-brand"><p class="lp-type-display lp-wordmark">LivePlace<\/p><div class="lp-home-support lp-home-support--label">/,
+      );
+      expect(brand).toMatch(/<\/dialog><\/div>$/);
+      expect(header.indexOf("lp-wordmark")).toBeLessThan(header.indexOf("lp-home-support--label"));
+      expect(header.indexOf("lp-home-support--label")).toBeLessThan(header.indexOf("lp-home-support--icon"));
+      expect(header.indexOf("lp-home-support--icon")).toBeLessThan(header.indexOf("<dialog"));
+      expect(header.indexOf("<dialog")).toBeLessThan(header.indexOf("lp-home-settings"));
+      expect(buttons).toHaveLength(2);
+      for (const button of buttons) expect(button).toContain('type="button"');
+      // Le seul lien de l'en-tête est celui des Nouveautés : Ko-fi ne s'ouvre que depuis la fenêtre
+      expect(header.match(/<a [^>]*>/g) ?? []).toEqual([expect.stringContaining('href="/nouveautes"')]);
+      expect(header).not.toMatch(/ko-fi\.com|target=/);
+      // Une seule fenêtre, hors des deux formes dont le CSS cache l'une : ouverte puis cachée au passage de 640 px, elle disparaîtrait
+      // en laissant la page inerte
+      expect(header.match(/<dialog [^>]*><\/dialog>/g)).toHaveLength(1);
+      expect(header.match(/<dialog/g)).toHaveLength(1);
+      for (const form of [label, icon]) {
+        expect(form).toContain("<button");
+        expect(form).not.toContain("<dialog");
+      }
+      // Le texte dit « Soutenir » et se nomme par ce texte ; le cœur seul garde le nom complet, en titre et en nom accessible
+      expect(label).toContain(`<span>${short}</span>`);
+      expect(label).not.toMatch(/\stitle=|aria-label|LivePlace/);
+      expect(icon).not.toContain("<span>");
+      expect(icon).toMatch(
+        new RegExp(`title="${full}"[^>]*aria-label="${full}"|aria-label="${full}"[^>]*title="${full}"`),
+      );
+      expect(header.match(new RegExp(full, "g"))).toHaveLength(2);
+    }
+    expect(serverHtml("en")).not.toMatch(/Soutenir/);
+  });
+
+  // Le groupe de gauche : le mot-symbole et Soutenir côte à côte, centrés sur la ligne, qui peut rétrécir
+  it("lines up the wordmark and Support on the left, centred, in a group that can shrink", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(
+      ".lp-home-brand { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }",
+    );
+  });
+
+  // Sous 400 px de large (un téléphone de 360 px : 328 px), le mot-symbole passe à 24 px par les jetons de la taille « display » et le
+  // groupe se resserre ; sans cela, Soutenir et les trois réglages font une page de 376 px
+  it("brings the wordmark to 24 px through the display tokens and tightens the left group under 400 px", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(
+      "@container lp-home (max-width: 400px) { .lp-home-brand { gap: var(--space-2); } .lp-home-brand .lp-wordmark { --type-display-size: 24px; --type-display-line: 28px; } }",
+    );
+    expect(css).not.toMatch(/\.lp-home-brand[^}]*font-size/);
+  });
+
+  // Sur un téléphone, le cœur seul : home.css cache le texte et montre le cœur dans la même requête que la langue
+  it("shows only the heart on a phone, with the same container query as the language", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(".lp-home-locale--cycle, .lp-home-support--icon { display: none; }");
+    expect(css).toContain(
+      "@container lp-home (max-width: 640px) { .lp-home-locale--choices, .lp-home-support--label { display: none; } .lp-home-locale--cycle, .lp-home-support--icon { display: block; } }",
+    );
+  });
+
+  // À 320 px, le mot-symbole et trois contrôles de 44 px ne tiennent sur une ligne que si les réglages se rapprochent
+  it("brings the three controls closer on a 320 px phone, so the wordmark and they fit on one line", () => {
+    const css = readFileSync(join(import.meta.dirname, "home.css"), "utf8").replace(/\s+/g, " ");
+
+    expect(css).toContain(
+      "@container lp-home (max-width: 320px) { .lp-home-settings { gap: var(--space-1); } }",
+    );
   });
 
   // Le lecteur : un fond uni et un streamer filmé en silhouette, une tête ronde et des épaules, rien d'autre (ni décor, ni visage)

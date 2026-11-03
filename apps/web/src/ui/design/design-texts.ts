@@ -55,6 +55,34 @@ export const DESIGN_TEXTS = defineTexts({
   signInNote: { fr: "En te connectant, tu acceptes la ", en: "By signing in, you accept the " },
   privacyPolicy: { fr: "politique de confidentialité", en: "privacy policy" },
 
+  // Soutenir LivePlace (CDC 2026) : le bouton, qui ouvre une petite fenêtre, et sa pill. La fenêtre dit à quoi sert le don : aucun
+  // montant, aucune promesse, aucun badge. Le lien vers la page de dons est son bouton « Faire un don ».
+  supportLiveplace: { fr: "Soutenir LivePlace", en: "Support LivePlace" },
+  // Sur l'accueil, le mot-symbole est juste à côté : le bouton à texte n'écrit pas le nom une seconde fois.
+  supportShort: { fr: "Soutenir", en: "Support" },
+  supportFree: { fr: "LivePlace est gratuit, pour tous.", en: "LivePlace is free, for everyone." },
+  supportPays: {
+    fr: "Ton soutien paie ce qui le fait tourner :",
+    en: "Your support pays for what keeps it running:",
+  },
+  supportReasons: localized<readonly string[]>({
+    fr: [
+      "un serveur qui tient le live",
+      "de la place pour conserver les fresques",
+      "mes soirées de développement",
+    ],
+    en: [
+      "a server that handles every pixel live",
+      "room to keep the canvases",
+      "my evenings spent developing it",
+    ],
+  }),
+  supportSignature: {
+    fr: "Pas de grosse boîte derrière, juste moi.",
+    en: "No big company behind it, just me.",
+  },
+  supportDonate: { fr: "Faire un don", en: "Donate" },
+
   copy: localized({ fr: (value: string) => `Copier ${value}`, en: (value) => `Copy ${value}` }),
   copyAction: { fr: "Copier", en: "Copy" },
   copied: { fr: "Copié", en: "Copied" },

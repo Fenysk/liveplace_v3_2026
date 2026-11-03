@@ -1,7 +1,7 @@
-// La page d'accueil `/` (§9.10) : « LivePlace » en haut à gauche et les réglages (langue, apparence) en haut
+// La page d'accueil `/` (§9.10) : « LivePlace » et Soutenir en haut à gauche, les réglages (Nouveautés, langue, apparence) en haut
 // à droite, puis à gauche une phrase et « Lancer ma fresque avec Twitch », à droite la scène. Sur un écran étroit, la phrase et le
-// bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, les réglages, la phrase, le bouton et le
-// stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
+// bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, Soutenir, les réglages, la phrase, le
+// bouton et le stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
 
 import { AccountDeletedToast } from "../account/account-deleted-toast";
 import { ToastProvider } from "../design/toast";
@@ -11,6 +11,7 @@ import { Wordmark } from "../design/wordmark";
 import { useTexts } from "../locale/use-locale";
 import { HomeScene } from "./home-scene";
 import { HomeSettings } from "./home-settings";
+import { HomeSupport } from "./home-support";
 import { HOME_TEXTS } from "./home-texts";
 import { useHomeHead } from "./use-home-head";
 
@@ -35,7 +36,10 @@ export const HomeContent = ({ isMotionReduced }: { isMotionReduced?: boolean }) 
   return (
     <div className="lp-home">
       <div className="lp-home-header">
-        <Wordmark />
+        <div className="lp-home-brand">
+          <Wordmark />
+          <HomeSupport />
+        </div>
         <HomeSettings />
       </div>
       <div className="lp-home-layout">
