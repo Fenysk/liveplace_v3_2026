@@ -9,6 +9,7 @@ import {
   createArchiveWrites,
   createCapacityWrites,
   createDeletedAccounts,
+  createHealthProbe,
   createRecoveryMarks,
   createSignInWrites,
   createTwitchLiveStore,
@@ -25,6 +26,7 @@ import {
 } from "../infra/twitch";
 import { createBackgroundImages } from "../usecase/background-images";
 import { createCanvasPreviews } from "../usecase/canvas-preview";
+import { createHealthCheck } from "../usecase/check-health";
 import {
   beginAccountDeletion,
   type DeleteAccountDeps,
@@ -98,6 +100,7 @@ const buildServerDeps = () => {
     // Le bouton de Mon compte et l'accès retiré chez Twitch inscrivent l'effacement, puis la routine finit seule (CDC §8).
     beginDeletion: (request: DeleteAccountRequest) => beginAccountDeletion(accountDeletion, request),
     capacityWrites: createCapacityWrites(redis), // §16.3 : l'occupation du web, l'usage de Convex
+    checkHealth: createHealthCheck(createHealthProbe(redis)), // JOURNAL 2026-11-03 : `GET /healthz`
     webhook: createTwitchWebhook(config.twitchEventSubSecret),
     eventSub,
     accounts, // §10.4 : les comptes que le démarrage suit tous

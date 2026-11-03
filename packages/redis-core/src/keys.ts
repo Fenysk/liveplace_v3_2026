@@ -27,6 +27,12 @@ export const TWITCH_COMMANDS_MAXLEN = 10_000; // `MAXLEN ~` : une action acquitt
 export const TWITCH_COMMANDS_READER = "gateway";
 export const TWITCH_COMMANDS_CONSUMER = "gateway"; // un seul gateway : au redémarrage, il retrouve ce qu'il n'a pas fini
 
+// JOURNAL 2026-11-03 : le battement de chaque service, lu par `/healthz` du web. Le worker l'écrit avec son bail (§7.5), le gateway
+// toutes les 10 s ; l'un comme l'autre expire en 30 s, et une clé absente dit que le service ne bat plus.
+export const WORKER_HEARTBEAT_KEY = "worker:heartbeat";
+export const GATEWAY_HEARTBEAT_KEY = "gateway:heartbeat";
+export const HEARTBEAT_TTL_SECONDS = 30;
+
 // §10.1 : un message EventSub déjà reçu, retenu 10 minutes (la fraîcheur que le web accepte) + 1 de marge.
 export const TWITCH_MESSAGE_TTL_SECONDS = 11 * 60;
 

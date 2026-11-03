@@ -1,7 +1,8 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { WORKER_HEARTBEAT_KEY } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from "vitest";
-import { createPresence, HEARTBEAT_KEY, LEASE_KEY, LEASE_TTL_MS } from "./presence";
+import { createPresence, LEASE_KEY, LEASE_TTL_MS } from "./presence";
 
 // Le Redis de ce lancement (redis-core/src/test-global-setup.ts), base 14 : la 15 est celle de redis-core. 127.0.0.1 : `localhost` peut tomber sur wslrelay en IPv6.
 const redis = new Redis({
@@ -21,11 +22,11 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await redis.del(LEASE_KEY, HEARTBEAT_KEY);
+  await redis.del(LEASE_KEY, WORKER_HEARTBEAT_KEY);
 });
 
 afterAll(async () => {
-  await redis.del(LEASE_KEY, HEARTBEAT_KEY);
+  await redis.del(LEASE_KEY, WORKER_HEARTBEAT_KEY);
   await redis.quit();
 });
 
@@ -49,8 +50,8 @@ describe("the worker presence (§7.5)", () => {
     expect(await worker.keep(now)).toBe(true);
 
     expect(await redis.pttl(LEASE_KEY)).toBeGreaterThan(LEASE_TTL_MS - 2_000);
-    expect(await redis.get(HEARTBEAT_KEY)).toBe(String(now));
-    expect(await redis.ttl(HEARTBEAT_KEY)).toBeGreaterThan(0);
+    expect(await redis.get(WORKER_HEARTBEAT_KEY)).toBe(String(now));
+    expect(await redis.ttl(WORKER_HEARTBEAT_KEY)).toBeGreaterThan(0);
   });
 
   // Un worker qui a perdu son bail le sait, et ne pose aucun battement : il ne se fait pas passer pour vivant
@@ -63,7 +64,7 @@ describe("the worker presence (§7.5)", () => {
 
     expect(await worker.keep(now)).toBe(false);
 
-    expect(await redis.get(HEARTBEAT_KEY)).toBeNull();
+    expect(await redis.get(WORKER_HEARTBEAT_KEY)).toBeNull();
     expect(await redis.get(LEASE_KEY)).toBe("worker-b");
   });
 
@@ -77,7 +78,7 @@ describe("the worker presence (§7.5)", () => {
 
     expect(await redis.get(LEASE_KEY)).toBe("worker-a");
     expect(await redis.pttl(LEASE_KEY)).toBeGreaterThan(LEASE_TTL_MS - 2_000);
-    expect(await redis.get(HEARTBEAT_KEY)).toBe(String(now));
+    expect(await redis.get(WORKER_HEARTBEAT_KEY)).toBe(String(now));
   });
 
   // En partant, le worker rend son bail pour que le suivant démarre aussitôt, mais ne touche jamais celui d'un autre

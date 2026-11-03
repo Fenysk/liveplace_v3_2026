@@ -48,6 +48,12 @@ Tout y est absorbé par le plan d'architecture du bloc 3, qui fait foi.
 
 ---
 
+## 2026-11-03 — `GET /healthz` sur l'hôte public : 200 `ok` seulement si Redis, le gateway et le worker battent ; le gateway écrit un battement comme le worker
+
+**Contexte.** Un service de surveillance hors du VPS interroge LivePlace chaque minute et prévient après 2 échecs. Depuis Internet, seule la page web répond : le `/healthz` du gateway est interne (Traefik ne route que `Path(/ws)`), et le web ne peut pas l'appeler par son nom, car `gateway` désigne aussi ceux des autres Compose sur `dokploy-network`.
+**Décision.** Le web sert `GET /healthz` : 200 `ok` si Redis répond au `PING` et si `gateway:heartbeat` et `worker:heartbeat` existent, sinon 503 avec les noms des parties en échec (`redis`, `gateway`, `worker`) séparés par une virgule, rien d'autre. Chaque sonde a 2 s, `Cache-Control: no-store`, `X-Robots-Tag: noindex`. Le gateway écrit `gateway:heartbeat` (TTL 30 s) toutes les 10 s une fois son serveur ouvert ; les deux clés vivent dans `redis-core`, le worker y prend la sienne. Avec `DURABLE_SCOPE=off` le worker bat quand même : une bêta n'est pas en échec pour autant.
+**Renoncement.** Un appel HTTP du web au gateway par son nom. La capacité du gateway (`capacity:minute`) : écrite à la minute close, donc 70 à 130 s de retard, et un trou égal à l'arrêt plus 70 s après chaque redémarrage, soit un faux 503 après chaque déploiement.
+
 ## 2026-11-02 — `/confidentialite` passe en deux colonnes au PC, avec un sommaire collant qui suit la section lue (variante A, décision d'Alexis)
 
 **Contexte.** Le texte complet de la politique ajoutera des sections, et la page n'était qu'une pill de 280 px sans réglages. Alexis a choisi la variante A de la maquette du 02/11 : deux colonnes au PC, le sommaire à gauche, le texte sur 720 px à droite.

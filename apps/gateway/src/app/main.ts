@@ -6,6 +6,7 @@ import {
   createCanvasCore,
   createCapacityStore,
   createDeletedAccounts,
+  createGatewayHeartbeat,
   createTwitchCommandQueue,
   revokeBannedModerators,
   watchDeletedAccounts,
@@ -25,6 +26,7 @@ import { parseGatewayConfig } from "./config";
 
 const CLOSE_RESTART = 1012; // §6.3 : les pages se reconnectent, un redéploiement coûte une seconde de blanc
 const SHUTDOWN_GRACE_MS = 2000; // une socket qui ne répond plus à la fermeture ne retient pas l'arrêt
+const HEARTBEAT_MS = 10_000; // le battement expire en 30 s : deux battements manqués sont tolérés
 
 // Fail-closed : sans une variable obligatoire, le process s'arrête ici en la nommant (§11.5).
 const config = parseGatewayConfig(process.env);
@@ -113,6 +115,14 @@ const server = startGatewayServer({
   onBytesSent: capacity.countBytes,
   onClosedBehind: capacity.countClosedConnection,
 });
+
+// JOURNAL 2026-11-03 : le battement que lit `/healthz` du web, une fois le serveur ouvert. Un gateway figé cesse de battre.
+const heartbeat = createGatewayHeartbeat(redis);
+const beat = (): void => {
+  heartbeat.beat(Date.now()).catch((error: unknown) => console.error("gateway: battement non écrit", error));
+};
+beat();
+setInterval(beat, HEARTBEAT_MS);
 
 const shutDown = (): void => {
   isRunning = false;

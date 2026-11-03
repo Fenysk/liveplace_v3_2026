@@ -1,11 +1,10 @@
 // Un seul worker, et sa santé (§7.5) : un bail dans Redis, et un battement.
 
+import { HEARTBEAT_TTL_SECONDS, WORKER_HEARTBEAT_KEY } from "@liveplace/redis-core";
 import type { Redis } from "ioredis";
 
 export const LEASE_KEY = "worker:lease";
-export const HEARTBEAT_KEY = "worker:heartbeat";
 export const LEASE_TTL_MS = 30_000; // un worker mort sans rendre son bail laisse la place au bout de ce temps
-const HEARTBEAT_TTL_SECONDS = 30;
 
 // Comparer puis agir, en un seul appel : un bail repris par un autre ne se prolonge ni ne se rend. Un bail que personne ne tient
 // (Redis a tout perdu) se reprend : le worker ne s'arrête pas au moment où il doit remettre les canvas.
@@ -25,7 +24,7 @@ export function createPresence(redis: Redis, owner: string) {
     // Prolonge le bail et prouve que la boucle tourne. Faux : le bail est perdu, ce worker doit s'arrêter.
     async keep(nowMs: number): Promise<boolean> {
       const isOwner = (await redis.eval(RENEW, 1, LEASE_KEY, owner, LEASE_TTL_MS)) === 1;
-      if (isOwner) await redis.set(HEARTBEAT_KEY, nowMs, "EX", HEARTBEAT_TTL_SECONDS);
+      if (isOwner) await redis.set(WORKER_HEARTBEAT_KEY, nowMs, "EX", HEARTBEAT_TTL_SECONDS);
       return isOwner;
     },
 

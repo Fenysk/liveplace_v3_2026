@@ -472,6 +472,14 @@ export interface SnapshotDelayWrites {
   storeSnapshotDelay(measure: SnapshotMeasure): Promise<void>;
 }
 
+// JOURNAL 2026-11-03 : ce que `/healthz` demande, une sonde par partie (le web, lui, répond ou non). Vrai : la partie répond.
+// Une sonde peut rejeter ou ne jamais répondre (Redis coupé) : le délai est à l'appelant.
+export interface HealthProbe {
+  redis(): Promise<boolean>;
+  gateway(): Promise<boolean>;
+  worker(): Promise<boolean>;
+}
+
 // Ce que le process mesure de sa machine et de lui-même, par `node:os` et `node:fs` : les chiffres de l'hôte, même
 // depuis un conteneur. Un pourcentage se compte depuis le dernier appel : le premier n'en a pas (`null`).
 export interface HostProbe {

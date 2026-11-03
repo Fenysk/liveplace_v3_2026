@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './../routes/$login'
 import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
+import { Route as HealthzRouteImport } from './../routes/healthz'
 import { Route as NouveautesRouteImport } from './../routes/nouveautes'
 import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './../routes/sitemap[.]xml'
@@ -52,6 +53,11 @@ const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
 const DesignRoute = DesignRouteImport.update({
   id: '/design',
   path: '/design',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthzRoute = HealthzRouteImport.update({
+  id: '/healthz',
+  path: '/healthz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NouveautesRoute = NouveautesRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/healthz': typeof HealthzRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/healthz': typeof HealthzRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/ads.txt': typeof AdsDottxtRoute
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
+  '/healthz': typeof HealthzRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/healthz'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/healthz'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/ads.txt'
     | '/confidentialite'
     | '/design'
+    | '/healthz'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   AdsDottxtRoute: typeof AdsDottxtRoute
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
+  HealthzRoute: typeof HealthzRoute
   NouveautesRoute: typeof NouveautesRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/design'
       fullPath: '/design'
       preLoaderRoute: typeof DesignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/healthz': {
+      id: '/healthz'
+      path: '/healthz'
+      fullPath: '/healthz'
+      preLoaderRoute: typeof HealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nouveautes': {
@@ -433,6 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdsDottxtRoute: AdsDottxtRoute,
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
+  HealthzRoute: HealthzRoute,
   NouveautesRoute: NouveautesRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

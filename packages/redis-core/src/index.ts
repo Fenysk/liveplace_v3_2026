@@ -5,6 +5,7 @@ export * from "./banned-moderators";
 export * from "./capacity";
 export * from "./client";
 export * from "./deleted-accounts";
+export * from "./health";
 export * from "./history";
 export * from "./keys";
 export * from "./recovery";
