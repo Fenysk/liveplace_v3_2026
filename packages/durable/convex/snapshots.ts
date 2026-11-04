@@ -5,7 +5,7 @@ import { requireServiceKey } from "../src/service-key";
 import { isOutdated, SNAPSHOTS_KEPT } from "../src/snapshot-order";
 import type { Doc } from "./_generated/dataModel";
 import { type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
-import { snapshotTier } from "./schema";
+import { snapshotFields, snapshotTier } from "./schema";
 import { addUsage, discardSnapshotRow, FILES_KEY, releaseFile } from "./usage";
 
 const BY_CANVAS_TIER = "by_scope_canvas_tier_takenAt";
@@ -38,18 +38,7 @@ export const generateUploadUrl = mutation({
 // Une mutation est une transaction : deux workers qui rangent le même canvas ne laissent pas trois lignes.
 // Refusé, le fichier envoyé part avec : rien n'y renvoie.
 export const record = mutation({
-  args: {
-    serviceKey: v.string(),
-    scope: v.string(),
-    canvasId: v.string(),
-    tier: snapshotTier,
-    version: v.number(),
-    takenAt: v.number(),
-    schemaVersion: v.number(),
-    size: v.number(),
-    storageId: v.id("_storage"),
-    accountsFilter: v.optional(v.string()),
-  },
+  args: { serviceKey: v.string(), ...snapshotFields },
   handler: async (ctx, { serviceKey, ...incoming }) => {
     requireServiceKey(serviceKey);
     const known = await ctx.db

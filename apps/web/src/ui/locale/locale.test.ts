@@ -138,17 +138,19 @@ describe("la langue d'une requête et d'une page déjà rendue (§9.9)", () => {
 });
 
 describe("le choix de la langue retenu dans le navigateur (§9.9)", () => {
-  // Le cookie dure un an, couvre tout le site, ne part pas d'un autre site, et reste lisible par la page
-  it("writes a cookie of one year for the whole site, SameSite=Lax, that the page can read", () => {
+  // Le cookie dure un an (13 mois au plus chez Twitch), couvre tout le site, ne part pas d'un autre site, et la page ne le lit pas
+  it("writes a cookie of one year for the whole site, SameSite=Lax and HttpOnly", () => {
     const cookie = localeCookie("en", false);
 
-    expect(cookie).toBe("lp_locale=en; Path=/; Max-Age=31536000; SameSite=Lax");
-    expect(cookie).not.toContain("HttpOnly");
+    expect(cookie).toBe("lp_locale=en; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax");
+    expect(Number(/Max-Age=(\d+)/.exec(cookie)?.[1])).toBeLessThanOrEqual(13 * 31 * 24 * 60 * 60);
   });
 
   // En https, le cookie est Secure
   it("adds Secure over https", () => {
-    expect(localeCookie("fr", true)).toBe("lp_locale=fr; Path=/; Max-Age=31536000; SameSite=Lax; Secure");
+    expect(localeCookie("fr", true)).toBe(
+      "lp_locale=fr; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax; Secure",
+    );
   });
 
   // Le cookie écrit se relit : la page suivante, rendue par le serveur, a la même langue

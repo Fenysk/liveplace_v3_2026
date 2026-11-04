@@ -1,8 +1,7 @@
 // §9.9 : la langue de la page, partagée par tous ceux qui l'affichent. Le serveur la rend
-// d'après le cookie ou `Accept-Language` (`initial`) ; un choix écrit le cookie et change la page sans la recharger.
-// Hors d'un `LocaleProvider` (un test, un composant seul), la langue est le français.
+// d'après le cookie ou `Accept-Language` (`initial`) ; un choix change la page sans la recharger, et le serveur le retient dans le
+// cookie (`locale-request.ts`). Hors d'un `LocaleProvider` (un test, un composant seul), la langue est le français.
 
-import { cookieValue } from "@liveplace/shared";
 import {
   createContext,
   type PropsWithChildren,
@@ -10,9 +9,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, type Locale, localeCookie, toLocale } from "./locale";
+import { DEFAULT_LOCALE, type Locale } from "./locale";
+import { getSavedLocale, saveLocale } from "./locale-request";
 import type { Localized } from "./texts";
 
 type LocaleState = { locale: Locale; pick: (locale: Locale) => void };
@@ -21,40 +22,43 @@ const doNothing = (): void => undefined;
 
 const LocaleContext = createContext<LocaleState>({ locale: DEFAULT_LOCALE, pick: doNothing });
 
-export const writeLocaleCookie = (locale: Locale): void => {
-  try {
-    document.cookie = localeCookie(locale, window.location.protocol === "https:");
-  } catch (error) {
-    console.warn("use-locale : cookie refusé, la langue tient pour cette page seulement", error);
-  }
+// Un retour arrière peut reprendre le HTML du cache, rendu avant le dernier choix.
+const isHistoryVisit = (): boolean => {
+  const [entry] = performance.getEntriesByType("navigation");
+  return entry !== undefined && "type" in entry && entry.type === "back_forward";
 };
 
-export const getLocaleCookie = (): Locale | undefined => {
-  try {
-    return toLocale(cookieValue(document.cookie, LOCALE_COOKIE));
-  } catch (error) {
-    console.warn("use-locale : cookie illisible, la page garde sa langue", error);
-    return undefined;
-  }
-};
-
-// Le cookie fait foi : le HTML repris du cache au retour arrière, ou une page sortie du bfcache, date d'avant le dernier choix.
-export const followLocaleCookie = (onLocale: (locale: Locale) => void): (() => void) => {
+// Le cookie fait foi, et seul le serveur le lit : une page reprise du cache au retour arrière, ou sortie du bfcache, date d'avant le
+// dernier choix. Une visite ordinaire n'interroge pas le serveur : son HTML vient d'être rendu d'après le cookie.
+export const followSavedLocale = (onLocale: (locale: Locale) => void): (() => void) => {
   const follow = () => {
-    const stored = getLocaleCookie();
-    if (stored) onLocale(stored);
+    void getSavedLocale().then((saved) => {
+      if (saved) onLocale(saved);
+    });
   };
-  follow();
-  window.addEventListener("pageshow", follow);
-  return () => window.removeEventListener("pageshow", follow);
+  if (isHistoryVisit()) follow();
+  const followRestoredPage = (event: PageTransitionEvent) => {
+    if (event.persisted) follow();
+  };
+  window.addEventListener("pageshow", followRestoredPage);
+  return () => window.removeEventListener("pageshow", followRestoredPage);
 };
 
 export const LocaleProvider = ({ initial, children }: PropsWithChildren<{ initial: Locale }>) => {
   const [locale, setLocale] = useState(initial);
-  useEffect(() => followLocaleCookie(setLocale), []);
+  const hasPicked = useRef(false);
+  // Un choix fait pendant que la réponse du serveur voyage l'emporte sur elle.
+  useEffect(
+    () =>
+      followSavedLocale((saved) => {
+        if (!hasPicked.current) setLocale(saved);
+      }),
+    [],
+  );
   const pick = useCallback((next: Locale) => {
-    writeLocaleCookie(next);
+    hasPicked.current = true;
     setLocale(next);
+    void saveLocale(next);
   }, []);
   const state = useMemo(() => ({ locale, pick }), [locale, pick]);
   return <LocaleContext.Provider value={state}>{children}</LocaleContext.Provider>;

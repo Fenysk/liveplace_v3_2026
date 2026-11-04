@@ -3,6 +3,7 @@
 
 import { HOUR_MS, type Timestamp } from "./index";
 import type { SnapshotTier } from "./snapshot";
+import { daysInMonth } from "./support";
 
 export const DAY_MS = 24 * HOUR_MS;
 export const WEEK_MS = 7 * DAY_MS;
@@ -125,6 +126,34 @@ export function planRetention(rows: readonly TierRow[], nowMs: Timestamp): Reten
 // CDC §8 (JOURNAL 2026-11-02) : un fichier sans ligne n'est retiré qu'après ce délai. L'adresse d'envoi de Convex vit une heure :
 // plus vieux, aucun enregistrement n'est en cours.
 export const ORPHAN_GRACE_MS = HOUR_MS;
+
+// La politique de confidentialité (JOURNAL 2026-11-04) : un don jamais relié à un compte s'efface 12 mois après sa date, la preuve
+// d'un effacement de compte 5 ans après lui. Des mois calendaires, comme la fin du badge Soutien.
+export const UNLINKED_DONATION_KEPT_MONTHS = 12;
+export const DELETION_PROOF_KEPT_MONTHS = 5 * 12;
+
+// Le même instant `months` mois plus tôt, en UTC : le 31 mars moins un mois est le dernier jour de février.
+export function monthsBefore(nowMs: Timestamp, months: number): Timestamp {
+  const now = new Date(nowMs);
+  const monthIndex = now.getUTCFullYear() * 12 + now.getUTCMonth() - months;
+  const year = Math.floor(monthIndex / 12);
+  const month = monthIndex - year * 12;
+  return Date.UTC(
+    year,
+    month,
+    Math.min(now.getUTCDate(), daysInMonth(year, month)),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds(),
+    now.getUTCMilliseconds(),
+  );
+}
+
+// Ce qui est daté strictement avant cet instant a plus de 12 mois (5 ans pour la preuve) : à l'instant même, rien ne part encore.
+export const unlinkedDonationCutoff = (nowMs: Timestamp): Timestamp =>
+  monthsBefore(nowMs, UNLINKED_DONATION_KEPT_MONTHS);
+export const deletionProofCutoff = (nowMs: Timestamp): Timestamp =>
+  monthsBefore(nowMs, DELETION_PROOF_KEPT_MONTHS);
 
 // Le budget des chunks d'un scope : 700 Mo en production, 50 Mo ailleurs (décision du 08/10).
 export const HISTORY_BUDGET_PROD_BYTES = 700 * 1024 * 1024;

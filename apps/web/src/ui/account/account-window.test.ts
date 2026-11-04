@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BubbleTargetsContext, createBubbleTargets } from "../help/bubble-target";
+import { LocaleProvider } from "../locale/use-locale";
 import { AccountWindow, SETTINGS_SECTION } from "./account-window";
 
 const doNothing = (): void => undefined;
@@ -192,6 +193,51 @@ describe("« Supprimer mon compte » dans Mon compte (CDC §8)", () => {
     expect(renderWindow({ ...OWNER_TABS, sectionId: "obs" })).not.toContain("Supprimer mon compte");
     expect(renderWindow()).toContain("Supprimer mon compte");
     expect(renderWindow({ ...OWNER_TABS, sectionId: "account" })).toContain("Supprimer mon compte");
+  });
+});
+
+// Deux liens discrets dans Mon compte : la confidentialité et les mentions légales, avant le filet de Supprimer mon compte
+describe("les liens vers la confidentialité et les mentions légales dans Mon compte", () => {
+  const LINKS = (label: string, other: string) =>
+    `<p class="lp-sign-in-note lp-type-caption lp-muted"><a href="/confidentialite">${label}</a><span aria-hidden="true"> · </span><a href="/mentions-legales">${other}</a></p>`;
+  const inEnglish = (props: Partial<WindowProps> = {}): string =>
+    renderToStaticMarkup(
+      createElement(LocaleProvider, { initial: "en" }, createElement(AccountWindow, windowProps(props))),
+    );
+
+  // Les deux liens, dans la langue du visiteur, juste avant la ligne sous filet, après le tutoriel
+  it("writes the two links just before the ruled row of Supprimer mon compte, after the tutorial", () => {
+    const french = renderWindow();
+    const english = inEnglish();
+    const ruled = 'class="lp-window-row lp-type-body lp-row--ruled"';
+
+    expect(french).toContain(LINKS("Confidentialité", "Mentions légales"));
+    expect(english).toContain(LINKS("Privacy", "Legal notice"));
+    for (const [markup, tutorial] of [
+      [french, "Revoir le tuto"],
+      [english, "Replay the tutorial"],
+    ] as const) {
+      const links = markup.indexOf('<p class="lp-sign-in-note');
+
+      expect(markup.indexOf(tutorial)).toBeGreaterThan(-1);
+      expect(links).toBeGreaterThan(markup.indexOf(tutorial));
+      expect(markup.indexOf("</p>", links) + "</p>".length).toBe(
+        markup.lastIndexOf("<div", markup.indexOf(ruled)),
+      );
+    }
+  });
+
+  // Dans Mon compte seulement : les autres sections de la fenêtre ne les portent pas
+  it("is in the Mon compte section alone", () => {
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "canvas" })).not.toContain("/confidentialite");
+    expect(renderWindow({ ...OWNER_TABS, sectionId: "obs" })).not.toContain("/mentions-legales");
+  });
+
+  // Les liens s'ouvrent dans l'onglet de la page : le brouillon survit dans `localStorage`
+  it("opens both links in the tab of the page", () => {
+    expect(renderWindow()).not.toMatch(
+      /<a href="\/(?:confidentialite|mentions-legales)"[^>]*(?:target|rel)=/,
+    );
   });
 });
 

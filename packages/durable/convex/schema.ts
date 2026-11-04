@@ -19,6 +19,39 @@ export const accountDeletionTrigger = v.union(
   v.literal("inactivity"),
 );
 
+// Les champs d'une ligne de `snapshots` que `snapshots.record` reçoit tels quels (JOURNAL 2026-11-04 : une seule liste).
+export const snapshotFields = {
+  scope: v.string(),
+  canvasId: v.string(),
+  tier: snapshotTier,
+  version: v.number(),
+  takenAt: v.number(),
+  schemaVersion: v.number(),
+  size: v.number(), // octets du fichier
+  storageId: v.id("_storage"),
+  // CDC §8 : les comptes que le fichier nomme, en filtre de Bloom (`createAccountsFilter`). Absent : une sauvegarde d'avant, que
+  // la première suppression lit une fois et marque.
+  accountsFilter: v.optional(v.string()),
+};
+
+// Les champs d'une ligne de `chunks`, que `chunks.record` reçoit tels quels (JOURNAL 2026-11-04 : une seule liste).
+export const chunkFields = {
+  scope: v.string(),
+  canvasId: v.string(),
+  fromVersion: v.number(),
+  toVersion: v.number(),
+  fromTs: v.number(),
+  toTs: v.number(),
+  count: v.number(),
+  schemaVersion: v.number(),
+  size: v.number(), // octets du fichier
+  storageId: v.id("_storage"),
+  gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))), // des versions perdues
+  resizedAt: v.optional(v.number()), // la version sans événement d'un changement de taille
+  recoveredAt: v.optional(v.number()), // la date d'une récupération : posé par l'étape E, jamais par le worker
+  accountsFilter: v.optional(v.string()), // comme pour un snapshot
+};
+
 export default defineSchema({
   // Le pseudo n'est jamais un identifiant : il peut changer chez Twitch.
   users: defineTable({
@@ -64,7 +97,9 @@ export default defineSchema({
     trigger: accountDeletionTrigger,
     // Ce qui est parti en plus de la ligne du compte, de ses traces sur les fresques des autres et de ses clés Redis.
     erased: v.object({ hasEmail: v.boolean(), ownedCanvases: v.number() }),
-  }).index("by_runId", ["runId"]),
+  })
+    .index("by_runId", ["runId"])
+    .index("by_deletedAt", ["deletedAt"]), // la preuve part 5 ans après l'effacement (JOURNAL 2026-11-04)
 
   // CDC §8, Supprimer son compte (JOURNAL 2026-11-02) : l'empreinte HMAC de la session d'un compte supprimé, gardée 31 jours pour que
   // le web la remette dans Redis si celui-ci la perd. Jamais l'identifiant : sans `SESSION_SECRET`, rien n'y mène.
@@ -102,20 +137,10 @@ export default defineSchema({
   // Une ligne par snapshot : le contenu est un fichier (§8.1). `scope` nomme l'environnement :
   // le poste et les bêtas partagent ce déploiement, et un même `canvasId` existe dans plusieurs Redis.
   snapshots: defineTable({
-    scope: v.string(),
-    canvasId: v.string(),
-    tier: snapshotTier,
-    version: v.number(),
-    takenAt: v.number(),
-    schemaVersion: v.number(),
-    size: v.number(), // octets du fichier
-    storageId: v.id("_storage"),
+    ...snapshotFields,
     // §7.3 : le dessin seul, sans auteurs. Absent : une sauvegarde complète. Un fichier peut servir
     // plusieurs lignes (une promotion en ajoute une sans le copier) : `by_storage` compte ses références.
     isStateOnly: v.optional(v.boolean()),
-    // CDC §8 : les comptes que le fichier nomme, en filtre de Bloom (`createAccountsFilter`). Absent : une sauvegarde d'avant, que
-    // la première suppression lit une fois et marque.
-    accountsFilter: v.optional(v.string()),
   })
     .index("by_scope_canvas_tier_takenAt", ["scope", "canvasId", "tier", "takenAt"])
     .index("by_canvas", ["canvasId"]) // le ménage d'un canvas supprimé, tous scopes (JOURNAL 2026-10-08)
@@ -123,22 +148,7 @@ export default defineSchema({
 
   // Une ligne par chunk de l'historique : les entrées du flux sont dans le fichier (§7.1). Les
   // chunks d'un canvas se suivent sans se recouvrir, des trous permis.
-  chunks: defineTable({
-    scope: v.string(),
-    canvasId: v.string(),
-    fromVersion: v.number(),
-    toVersion: v.number(),
-    fromTs: v.number(),
-    toTs: v.number(),
-    count: v.number(),
-    schemaVersion: v.number(),
-    size: v.number(), // octets du fichier
-    storageId: v.id("_storage"),
-    gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))), // des versions perdues
-    resizedAt: v.optional(v.number()), // la version sans événement d'un changement de taille
-    recoveredAt: v.optional(v.number()), // la date d'une récupération : posé par l'étape E, jamais par le worker
-    accountsFilter: v.optional(v.string()), // comme pour un snapshot
-  })
+  chunks: defineTable(chunkFields)
     .index("by_scope_canvas_version", ["scope", "canvasId", "fromVersion"])
     .index("by_scope_toTs", ["scope", "toTs"]) // le budget retire le plus ancien d'abord, canvas confondus
     .index("by_canvas", ["canvasId"])

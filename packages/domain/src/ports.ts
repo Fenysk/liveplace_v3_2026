@@ -817,6 +817,17 @@ export interface OrphanStore {
   ): Promise<{ next: number; deleted: number; isDone: boolean }>;
 }
 
+// Ce que la politique de confidentialité ne laisse pas vivre plus longtemps (JOURNAL 2026-11-04), pour tout le déploiement. Chaque
+// appel efface au plus un lot de lignes ; `isDone` : il n'en reste plus d'assez vieilles, sinon le worker rappelle.
+export type ExpiryPage = { purged: number; isDone: boolean };
+
+export interface ExpiryStore {
+  // Les dons sans compte dont la date précède `before` partent en entier (montant, e-mail, nom et identifiants Ko-fi) ; un don relié reste.
+  purgeUnlinkedDonations(before: Timestamp): Promise<ExpiryPage>;
+  // Les preuves d'un effacement de compte dont la date précède `before`.
+  purgeDeletionProofs(before: Timestamp): Promise<ExpiryPage>;
+}
+
 // Un fichier de Convex qui peut nommer un compte : un snapshot complet ou un chunk. Un fichier que plusieurs lignes partagent
 // (une promotion) ne figure qu'une fois.
 export type StoredFileKind = "snapshot" | "chunk";

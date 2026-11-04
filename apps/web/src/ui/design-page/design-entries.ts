@@ -44,6 +44,7 @@ const ENTRIES_BY_SLUG = {
   fenetre: { title: "Fenêtre", chapterId: "components" },
   jauge: { title: "Jauge", chapterId: "components" },
   palette: { title: "Palette", chapterId: "components" },
+  pastille: { title: "Pastille", chapterId: "components" },
   pill: { title: "Pill", chapterId: "components" },
   "se-connecter": { title: "Se connecter avec Twitch", chapterId: "components" },
   squelette: { title: "Squelette", chapterId: "components" },

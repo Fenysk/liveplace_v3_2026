@@ -1,6 +1,6 @@
-// §9.9 : la langue de l'interface, `fr` ou `en`, retenue dans le cookie `lp_locale`.
+// §9.9 : la langue de l'interface, `fr` ou `en`, retenue dans le cookie `lp_locale`, que le serveur seul lit et écrit.
 
-import { cookieValue } from "@liveplace/shared";
+import { cookieValue, serializeCookie } from "@liveplace/shared";
 
 export const LOCALES = ["fr", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -86,15 +86,10 @@ export const localeOfMatches = (matches: readonly { loaderData?: unknown }[]): L
 export const nextLocale = (locale: Locale): Locale =>
   LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length] ?? DEFAULT_LOCALE;
 
-// Écrit par la page, donc sans `HttpOnly` : un cookie `HttpOnly` posé par `document.cookie` est ignoré.
+// Posé par le serveur (`POST /auth/locale`), jamais par la page : un cookie `HttpOnly` écrit par `document.cookie` est ignoré
+// (JOURNAL 2026-11-04). 1 an, sous les 13 mois que le contrat développeur de Twitch laisse à un cookie.
 export const localeCookie = (locale: Locale, isSecure: boolean): string =>
-  [
-    `${LOCALE_COOKIE}=${locale}`,
-    "Path=/",
-    `Max-Age=${ONE_YEAR_S}`,
-    "SameSite=Lax",
-    ...(isSecure ? ["Secure"] : []),
-  ].join("; ");
+  serializeCookie(LOCALE_COOKIE, locale, ONE_YEAR_S, isSecure);
 
 export const formatNumber = (value: number, locale: Locale): string =>
   value.toLocaleString(INTL_TAGS[locale]);

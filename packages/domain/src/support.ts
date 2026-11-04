@@ -22,7 +22,7 @@ export function supportTitle(lifetimeCents: number): SupportTitle | null {
   return reached;
 }
 
-const daysInMonth = (year: number, month: number): number =>
+export const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
 // Le badge reste 12 mois calendaires après le dernier don, en UTC : le 29 février devient le 28 de l'année suivante.

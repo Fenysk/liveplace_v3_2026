@@ -1,0 +1,34 @@
+/* La pastille (chip.tsx) : le nom d'un bouton cité dans une phrase. Plate, arrondie, sur le fond des contrôles, en gras ; sans survol, sans
+   curseur de lien, sans focus : ce n'est pas un contrôle. Elle suit la police de la phrase et ne se coupe pas en fin de ligne. */
+
+/* En ligne, pas en bloc en ligne : une pastille en bloc en ligne s'accroche aux mots d'à côté, et la phrase peut se couper entre
+   l'apostrophe de « l'Inspection » et la pastille */
+.lp-chip {
+  display: inline;
+  padding: 0 0.5em;
+  border-radius: var(--radius-pill);
+  background: var(--chip);
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: inherit;
+}
+
+/* L'icône du bouton, à gauche du nom, à la hauteur du texte */
+.lp-chip svg {
+  width: 1.15em;
+  height: 1.15em;
+  margin-inline-end: 0.35em;
+  vertical-align: -0.2em;
+}
+
+/* Supprimer mon compte : le rouge du bouton */
+.lp-chip--danger {
+  color: var(--danger);
+}
+
+/* Synchroniser avec Twitch : l'encre violette sur le fond teinté du bouton live, plutôt que le violet plein */
+.lp-chip--twitch {
+  background: var(--twitch-live-bg);
+  color: var(--twitch-live-ink);
+}

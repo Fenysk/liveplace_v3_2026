@@ -53,6 +53,23 @@ describe("the HTML the server writes for the home page (CSP of production)", () 
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
+  // Tout en bas de l'accueil, après la phrase et la scène : deux liens discrets, la confidentialité et les mentions légales
+  it("ends the page with two discreet links, the privacy policy and the legal notice", () => {
+    for (const [locale, privacy, legal] of [
+      ["fr", "Confidentialité", "Mentions légales"],
+      ["en", "Privacy", "Legal notice"],
+    ] as const) {
+      const html = serverHtml(locale);
+      const links = `<p class="lp-sign-in-note lp-type-caption lp-muted"><a href="/confidentialite">${privacy}</a><span aria-hidden="true"> · </span><a href="/mentions-legales">${legal}</a></p>`;
+
+      expect(html).toContain(links);
+      // Après la scène, juste avant la fin du bloc de l'accueil
+      expect(html.indexOf(links)).toBeGreaterThan(html.indexOf("lp-home-scene"));
+      expect(html.indexOf(links) + links.length).toBe(html.indexOf("</div>", html.indexOf(links)));
+      expect(html.match(/href="\/mentions-legales"/g)).toHaveLength(1);
+    }
+  });
+
   // §9.10 : le bouton dit qu'il va chez Twitch, et son nom accessible est son texte visible, sans `title` qui le contredise
   it("names the sign-in button by its visible text alone, and opens the privacy policy in the same tab", () => {
     for (const [locale, text] of [

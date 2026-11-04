@@ -1,6 +1,7 @@
 // Twitch dans le design system : son logo (le « glitch »), et le bouton de connexion à ses couleurs.
 // Le tracé vient de Simple Icons (CC0). Les couleurs de marque sont des tokens : --twitch, --on-twitch.
 
+import { DOCUMENT_PATHS } from "../document/document-sections";
 import { useTexts } from "../locale/use-locale";
 import { Button } from "./button";
 import { DESIGN_TEXTS } from "./design-texts";
@@ -44,9 +45,6 @@ export const SignInButton = ({ href, label, onPress }: SignInButtonProps) => {
   );
 };
 
-// La page de confidentialité, provisoire (JOURNAL 2026-09-27).
-const PRIVACY_PATH = "/confidentialite";
-
 // Sous chaque bouton Se connecter (CDC 2026, Profils) : une ligne discrète, sans le mot e-mail.
 // §9.10 : le lien s'ouvre dans l'onglet de la page, le brouillon survit dans `localStorage`.
 export const SignInNote = () => {
@@ -54,7 +52,7 @@ export const SignInNote = () => {
   return (
     <p className="lp-sign-in-note lp-type-caption lp-muted">
       {t.signInNote}
-      <a href={PRIVACY_PATH}>{t.privacyPolicy}</a>
+      <a href={DOCUMENT_PATHS.privacy}>{t.privacyPolicy}</a>
     </p>
   );
 };

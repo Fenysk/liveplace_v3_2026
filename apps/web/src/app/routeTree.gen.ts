@@ -15,6 +15,7 @@ import { Route as AdsDottxtRouteImport } from './../routes/ads[.]txt'
 import { Route as ConfidentialiteRouteImport } from './../routes/confidentialite'
 import { Route as DesignRouteImport } from './../routes/design'
 import { Route as HealthzRouteImport } from './../routes/healthz'
+import { Route as MentionsLegalesRouteImport } from './../routes/mentions-legales'
 import { Route as NouveautesRouteImport } from './../routes/nouveautes'
 import { Route as RobotsDottxtRouteImport } from './../routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './../routes/sitemap[.]xml'
@@ -24,6 +25,7 @@ import { Route as LoginObsRouteImport } from './../routes/$login_.obs'
 import { Route as LoginPreviewDotpngRouteImport } from './../routes/$login_.preview[.]png'
 import { Route as AuthDeleteAccountRouteImport } from './../routes/auth/delete-account'
 import { Route as AuthExpiredRouteImport } from './../routes/auth/expired'
+import { Route as AuthLocaleRouteImport } from './../routes/auth/locale'
 import { Route as AuthSignoutRouteImport } from './../routes/auth/signout'
 import { Route as AuthTwitchRouteImport } from './../routes/auth/twitch'
 import { Route as KofiWebhookRouteImport } from './../routes/kofi/webhook'
@@ -59,6 +61,11 @@ const DesignRoute = DesignRouteImport.update({
 const HealthzRoute = HealthzRouteImport.update({
   id: '/healthz',
   path: '/healthz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MentionsLegalesRoute = MentionsLegalesRouteImport.update({
+  id: '/mentions-legales',
+  path: '/mentions-legales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NouveautesRoute = NouveautesRouteImport.update({
@@ -107,6 +114,11 @@ const AuthExpiredRoute = AuthExpiredRouteImport.update({
   path: '/auth/expired',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthLocaleRoute = AuthLocaleRouteImport.update({
+  id: '/auth/locale',
+  path: '/auth/locale',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthSignoutRoute = AuthSignoutRouteImport.update({
   id: '/auth/signout',
   path: '/auth/signout',
@@ -145,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/healthz': typeof HealthzRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -154,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
   '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
+  '/auth/locale': typeof AuthLocaleRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/kofi/webhook': typeof KofiWebhookRoute
@@ -168,6 +182,7 @@ export interface FileRoutesByTo {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/healthz': typeof HealthzRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -177,6 +192,7 @@ export interface FileRoutesByTo {
   '/$login/preview.png': typeof LoginPreviewDotpngRoute
   '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
+  '/auth/locale': typeof AuthLocaleRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/kofi/webhook': typeof KofiWebhookRoute
@@ -192,6 +208,7 @@ export interface FileRoutesById {
   '/confidentialite': typeof ConfidentialiteRoute
   '/design': typeof DesignRoute
   '/healthz': typeof HealthzRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
   '/nouveautes': typeof NouveautesRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -201,6 +218,7 @@ export interface FileRoutesById {
   '/$login_/preview.png': typeof LoginPreviewDotpngRoute
   '/auth/delete-account': typeof AuthDeleteAccountRoute
   '/auth/expired': typeof AuthExpiredRoute
+  '/auth/locale': typeof AuthLocaleRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/auth/twitch': typeof AuthTwitchRouteWithChildren
   '/kofi/webhook': typeof KofiWebhookRoute
@@ -217,6 +235,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/healthz'
+    | '/mentions-legales'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -226,6 +245,7 @@ export interface FileRouteTypes {
     | '/$login/preview.png'
     | '/auth/delete-account'
     | '/auth/expired'
+    | '/auth/locale'
     | '/auth/signout'
     | '/auth/twitch'
     | '/kofi/webhook'
@@ -240,6 +260,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/healthz'
+    | '/mentions-legales'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -249,6 +270,7 @@ export interface FileRouteTypes {
     | '/$login/preview.png'
     | '/auth/delete-account'
     | '/auth/expired'
+    | '/auth/locale'
     | '/auth/signout'
     | '/auth/twitch'
     | '/kofi/webhook'
@@ -263,6 +285,7 @@ export interface FileRouteTypes {
     | '/confidentialite'
     | '/design'
     | '/healthz'
+    | '/mentions-legales'
     | '/nouveautes'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -272,6 +295,7 @@ export interface FileRouteTypes {
     | '/$login_/preview.png'
     | '/auth/delete-account'
     | '/auth/expired'
+    | '/auth/locale'
     | '/auth/signout'
     | '/auth/twitch'
     | '/kofi/webhook'
@@ -287,6 +311,7 @@ export interface RootRouteChildren {
   ConfidentialiteRoute: typeof ConfidentialiteRoute
   DesignRoute: typeof DesignRoute
   HealthzRoute: typeof HealthzRoute
+  MentionsLegalesRoute: typeof MentionsLegalesRoute
   NouveautesRoute: typeof NouveautesRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -296,6 +321,7 @@ export interface RootRouteChildren {
   LoginPreviewDotpngRoute: typeof LoginPreviewDotpngRoute
   AuthDeleteAccountRoute: typeof AuthDeleteAccountRoute
   AuthExpiredRoute: typeof AuthExpiredRoute
+  AuthLocaleRoute: typeof AuthLocaleRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   AuthTwitchRoute: typeof AuthTwitchRouteWithChildren
   KofiWebhookRoute: typeof KofiWebhookRoute
@@ -345,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/healthz'
       fullPath: '/healthz'
       preLoaderRoute: typeof HealthzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mentions-legales': {
+      id: '/mentions-legales'
+      path: '/mentions-legales'
+      fullPath: '/mentions-legales'
+      preLoaderRoute: typeof MentionsLegalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nouveautes': {
@@ -408,6 +441,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/expired'
       fullPath: '/auth/expired'
       preLoaderRoute: typeof AuthExpiredRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/locale': {
+      id: '/auth/locale'
+      path: '/auth/locale'
+      fullPath: '/auth/locale'
+      preLoaderRoute: typeof AuthLocaleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/signout': {
@@ -474,6 +514,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfidentialiteRoute: ConfidentialiteRoute,
   DesignRoute: DesignRoute,
   HealthzRoute: HealthzRoute,
+  MentionsLegalesRoute: MentionsLegalesRoute,
   NouveautesRoute: NouveautesRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -483,6 +524,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginPreviewDotpngRoute: LoginPreviewDotpngRoute,
   AuthDeleteAccountRoute: AuthDeleteAccountRoute,
   AuthExpiredRoute: AuthExpiredRoute,
+  AuthLocaleRoute: AuthLocaleRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   AuthTwitchRoute: AuthTwitchRouteWithChildren,
   KofiWebhookRoute: KofiWebhookRoute,

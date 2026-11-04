@@ -6,6 +6,7 @@ import { historyBudgetBytes } from "@liveplace/domain/retention";
 import {
   createBudgetStore,
   createErasureStore,
+  createExpiryStore,
   createHistoryStore,
   createOrphanStore,
   createRecoveryStore,
@@ -25,6 +26,7 @@ import { createPresence } from "../infra/presence";
 import { decodeSnapshot, encodeSnapshot } from "../infra/snapshot-codec";
 import { createBudgetCycle } from "../usecase/budget-cycle";
 import { createErasureCycle } from "../usecase/erasure-cycle";
+import { createExpiryCycle } from "../usecase/expiry-cycle";
 import { createHistoryCycle } from "../usecase/history-cycle";
 import { createHistoryPlan } from "../usecase/history-plan";
 import { createOrphanCycle } from "../usecase/orphan-cycle";
@@ -143,6 +145,15 @@ const orphans =
         now: Date.now,
         log,
       });
+// La politique de confidentialité : un don jamais relié part 12 mois après sa date, la preuve d'un effacement 5 ans après lui.
+const expiry =
+  config.scope === null
+    ? null
+    : createExpiryCycle({
+        store: createExpiryStore(config.convexUrl, config.convexServiceKey),
+        now: Date.now,
+        log,
+      });
 const delayWrites = createSnapshotDelayWrites(redis);
 console.log(`worker: scope ${config.scope ?? "off"}`);
 
@@ -183,6 +194,7 @@ while (isRunning) {
   await budget?.tick();
   await erasure?.tick();
   await orphans?.tick();
+  await expiry?.tick();
   await delay(TICK_MS);
 }
 

@@ -110,6 +110,7 @@ describe("le fichier robots.txt", () => {
     expect(isAllowed(text, "Googlebot", "/fenysk/obs")).toBe(false);
     expect(isAllowed(text, "Googlebot", "/fenysk/preview.png")).toBe(false);
     expect(isAllowed(text, "Googlebot", "/confidentialite")).toBe(false);
+    expect(isAllowed(text, "Googlebot", "/mentions-legales")).toBe(false);
     expect(isAllowed(text, "Bingbot", "/fenysk")).toBe(false);
   });
 

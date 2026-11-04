@@ -1,7 +1,7 @@
 // La fenêtre (CDC 2026, Fenêtre), ouverte par la pill Compte (Mon compte, Nouveautés, ou Canvas par Réglages) : Canvas et Vue
 // OBS pour le streamer, Modération pour qui modère, Classement sur mobile, Mon compte pour qui est connecté : son profil,
-// l'apparence, la langue, Se déconnecter, et en bas, sous un filet, Supprimer mon compte (CDC §8). Nouveautés est la dernière
-// section, pour tous : un invité n'a que elle (et le Classement sur mobile).
+// l'apparence, la langue, Se déconnecter, les liens vers la confidentialité et les mentions légales, et en bas, sous un filet,
+// Supprimer mon compte (CDC §8). Nouveautés est la dernière section, pour tous : un invité n'a que elle (et le Classement sur mobile).
 
 import type { SupportTitle } from "@liveplace/domain/support";
 import {
@@ -26,6 +26,7 @@ import { LocalePicker } from "../design/locale-controls";
 import { Profile, type ProfileUser } from "../design/profile";
 import { useToast } from "../design/toast";
 import { Window, WindowRow } from "../design/window";
+import { DocumentLinks } from "../document/document-links";
 import { BubbleTarget, type BubbleTargetName } from "../help/bubble-target";
 import { useTexts } from "../locale/use-locale";
 import { RELEASE_NOTES_TEXTS } from "../release-notes/release-notes-texts";
@@ -89,7 +90,7 @@ type AccountWindowProps = {
   releaseNotesTab?: ReactNode | undefined; // les Nouveautés des publics du rôle ; absent : pas de section
 };
 
-// Mon compte : son profil, ses badges (Soutien, sans date), l'apparence, la langue, le tutoriel, Supprimer mon compte. Un invité n'a pas de compte, donc pas
+// Mon compte : son profil, ses badges (Soutien, sans date), l'apparence, la langue, le tutoriel, les liens discrets, Supprimer mon compte. Un invité n'a pas de compte, donc pas
 // cette section.
 type MyAccountProps = Pick<
   AccountWindowProps,
@@ -131,6 +132,7 @@ const MyAccount = ({
           }}
         />
       </WindowRow>
+      <DocumentLinks names={["privacy", "legal"]} />
       <WindowRow label={<span className="lp-muted">{deletion.rowHint}</span>} isRuled>
         <Button label={deletion.deleteAccount} icon={Trash2} variant="danger" onPress={onDeleteAccount} />
       </WindowRow>

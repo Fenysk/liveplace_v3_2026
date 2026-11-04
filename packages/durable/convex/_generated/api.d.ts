@@ -12,6 +12,7 @@ import type * as canvases from "../canvases.js";
 import type * as chunks from "../chunks.js";
 import type * as donations from "../donations.js";
 import type * as erasures from "../erasures.js";
+import type * as expiry from "../expiry.js";
 import type * as fingerprints from "../fingerprints.js";
 import type * as orphans from "../orphans.js";
 import type * as purge from "../purge.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   chunks: typeof chunks;
   donations: typeof donations;
   erasures: typeof erasures;
+  expiry: typeof expiry;
   fingerprints: typeof fingerprints;
   orphans: typeof orphans;
   purge: typeof purge;

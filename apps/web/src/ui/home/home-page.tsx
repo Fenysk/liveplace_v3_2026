@@ -1,13 +1,15 @@
 // La page d'accueil `/` (§9.10) : « LivePlace » et Soutenir en haut à gauche, les réglages (Nouveautés, langue, apparence) en haut
 // à droite, puis à gauche une phrase et « Lancer ma fresque avec Twitch », à droite la scène. Sur un écran étroit, la phrase et le
 // bouton, puis l'écran du stream, la fresque et la feuille. Le serveur écrit le mot-symbole, Soutenir, les réglages, la phrase, le
-// bouton et le stream ; le téléphone se monte dans le navigateur (phone-screen.tsx).
+// bouton et le stream ; le téléphone se monte dans le navigateur (phone-screen.tsx). Tout en bas, les liens vers la confidentialité et
+// les mentions légales.
 
 import { AccountDeletedToast } from "../account/account-deleted-toast";
 import { ToastProvider } from "../design/toast";
 import { SignInButton, SignInNote } from "../design/twitch";
 import { useMediaQuery } from "../design/use-media-query";
 import { Wordmark } from "../design/wordmark";
+import { DocumentLinks } from "../document/document-links";
 import { useTexts } from "../locale/use-locale";
 import { HomeScene } from "./home-scene";
 import { HomeSettings } from "./home-settings";
@@ -46,6 +48,7 @@ export const HomeContent = ({ isMotionReduced }: { isMotionReduced?: boolean }) 
         <HomeIntro />
         <HomeScene isMotionReduced={isMotionReduced ?? prefersReducedMotion} />
       </div>
+      <DocumentLinks names={["privacy", "legal"]} />
     </div>
   );
 };

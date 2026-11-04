@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { judgeChunk } from "../src/chunk-order";
 import { requireServiceKey } from "../src/service-key";
 import { mutation, query } from "./_generated/server";
+import { chunkFields } from "./schema";
 import { addUsage, chunksKey, discardChunkRow, FILES_KEY } from "./usage";
 
 const BY_CANVAS_VERSION = "by_scope_canvas_version";
@@ -12,23 +13,7 @@ const BY_CANVAS_VERSION = "by_scope_canvas_version";
 // Une mutation est une transaction : deux workers qui rangent le même intervalle ne le rangent pas deux fois. Refusé, le
 // fichier envoyé part avec : rien n'y renvoie.
 export const record = mutation({
-  args: {
-    serviceKey: v.string(),
-    scope: v.string(),
-    canvasId: v.string(),
-    fromVersion: v.number(),
-    toVersion: v.number(),
-    fromTs: v.number(),
-    toTs: v.number(),
-    count: v.number(),
-    schemaVersion: v.number(),
-    size: v.number(),
-    storageId: v.id("_storage"),
-    gaps: v.optional(v.array(v.object({ from: v.number(), to: v.number() }))),
-    resizedAt: v.optional(v.number()),
-    recoveredAt: v.optional(v.number()),
-    accountsFilter: v.optional(v.string()),
-  },
+  args: { serviceKey: v.string(), ...chunkFields },
   handler: async (ctx, { serviceKey, ...incoming }) => {
     requireServiceKey(serviceKey);
     const last = await ctx.db

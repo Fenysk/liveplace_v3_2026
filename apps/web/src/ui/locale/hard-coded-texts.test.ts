@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 
 const WEB_SOURCE = join(import.meta.dirname, "..", "..");
 
-// Restent en français, voulu : la fenêtre Développeur et ses composants, la page /design autour des composants, et
-// le mécanisme lui-même (le nom des langues s'écrit dans chacune).
+// Restent en français, voulu : la fenêtre Développeur et ses composants, la page /design autour des composants, le
+// mécanisme lui-même (le nom des langues s'écrit dans chacune), et les coordonnées d'Alexis (une adresse postale est du français
+// dans les deux langues : les mêmes données, écrites une seule fois).
 const FRENCH_BY_DESIGN = [
+  "ui/legal/legal-identity.ts",
   "ui/developer/",
   "ui/design-page/",
   "ui/locale/",

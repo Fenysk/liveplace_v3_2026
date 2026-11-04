@@ -13,6 +13,7 @@ import { Button, type ButtonProps } from "../design/button";
 import { CanvasActivityCard, CanvasActivityOwner, ConnectedAccounts } from "../design/canvas-activity-card";
 import { CapacityLinkRows, CapacityRow } from "../design/capacity-row";
 import { Checkbox } from "../design/checkbox";
+import { Chip } from "../design/chip";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
 import { DESIGN_TEXTS } from "../design/design-texts";
@@ -55,6 +56,8 @@ import {
 } from "../developer/activity-slots";
 import { formatRate, toGuardsRow, toRowState } from "../developer/capacity-labels";
 import { CAPACITY_LINES, toCapacitySlots } from "../developer/capacity-slots";
+import { sentenceChips } from "../document/document-chips";
+import type { ChipName } from "../document/document-sections";
 import { submitLabel } from "../draft/draft-labels";
 import { DRAFT_TEXTS } from "../draft/draft-texts";
 import {
@@ -250,6 +253,55 @@ export const BadgeEntry = () => (
     </Block>
   </Entry>
 );
+
+// Les six éléments d'interface qu'une phrase cite : le nom vient des textes du bouton, dans les deux langues (document-chips.ts).
+const CHIPS: readonly { name: ChipName; detail: string }[] = [
+  { name: "myAccount", detail: "L'icône Utilisateur de la section Mon compte, neutre." },
+  { name: "deleteAccount", detail: "L'icône et le rouge du bouton Supprimer mon compte." },
+  { name: "report", detail: "L'icône du bouton Signaler de la pill Inspection, neutre." },
+  {
+    name: "syncWithTwitch",
+    detail:
+      "Le logo Twitch, en encre violette sur le fond teinté du bouton live : pas le violet plein de Se connecter.",
+  },
+  { name: "inspection", detail: "Le nom de la pill, sans icône." },
+  { name: "scoreboard", detail: "Le nom du Classement, sans icône." },
+];
+
+export const ChipEntry = () => {
+  const french = sentenceChips("fr");
+  const english = sentenceChips("en");
+  return (
+    <Entry
+      slug="pastille"
+      components={["Chip"]}
+      file="ui/design/chip.tsx"
+      note="Un élément d'interface cité dans une phrase : plate, arrondie, en gras, sans survol ni focus. Elle reprend l'icône et la couleur du vrai bouton, s'il en a ; son nom est celui du bouton, dans la langue de la page."
+    >
+      <Block title="Les six pastilles">
+        {CHIPS.map(({ name, detail }) => (
+          <StateRow key={name} name={french[name].label} detail={detail}>
+            <p className="lp-type-body">
+              <Chip {...french[name]} /> <Chip {...english[name]} />
+            </p>
+          </StateRow>
+        ))}
+      </Block>
+      <Block title="Dans une phrase" hasCount={false}>
+        <StateRow
+          name="Plusieurs pastilles"
+          detail="Une pastille ne se coupe pas en fin de ligne : elle passe en entier à la suivante."
+        >
+          <InSmallWindow>
+            <p className="lp-type-body">
+              Connecte-toi, ouvre <Chip {...french.myAccount} />, clique <Chip {...french.deleteAccount} />.
+            </p>
+          </InSmallWindow>
+        </StateRow>
+      </Block>
+    </Entry>
+  );
+};
 
 export const UserBadgeEntry = () => (
   <Entry

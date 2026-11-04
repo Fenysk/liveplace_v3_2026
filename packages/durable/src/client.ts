@@ -6,6 +6,7 @@ import type {
   DonationStore,
   DurableStore,
   ErasureStore,
+  ExpiryStore,
   HistoryStore,
   OrphanStore,
   RecoveryStore,
@@ -392,6 +393,15 @@ export function createDonationStore(url: string, serviceKey: string): DonationSt
     listWaitingDonations: () => convex.query(api.donations.listUnlinked, { serviceKey }),
     linkDonation: (donationId, login) =>
       convex.mutation(api.donations.linkByLogin, { serviceKey, donationId, login }),
+  };
+}
+
+// Les dons jamais reliés et les preuves d'effacement qui ont fait leur temps, tout le déploiement (JOURNAL 2026-11-04).
+export function createExpiryStore(url: string, serviceKey: string): ExpiryStore {
+  const convex = new ConvexHttpClient(url);
+  return {
+    purgeUnlinkedDonations: (before) => convex.mutation(api.expiry.donations, { serviceKey, before }),
+    purgeDeletionProofs: (before) => convex.mutation(api.expiry.deletionProofs, { serviceKey, before }),
   };
 }
 

@@ -3,6 +3,8 @@
 import { defineTexts, localized } from "../locale/texts";
 
 export const INSPECTION_TEXTS = defineTexts({
+  // Le nom de la pill, tel qu'un document la cite (pastille, JOURNAL 2026-11-04)
+  title: { fr: "Inspection", en: "Inspection" },
   nobodyYet: { fr: "Personne n'a encore posé ici", en: "Nobody has placed here yet" },
   transparentEraser: { fr: "Transparent (gomme)", en: "Transparent (eraser)" },
   placedOn: localized({ fr: (date: string) => `Posé le ${date}`, en: (date) => `Placed on ${date}` }),

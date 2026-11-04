@@ -4,15 +4,20 @@ import {
   DAILY_FULL_MS,
   DAILY_KEPT_MS,
   DAY_MS,
+  DELETION_PROOF_KEPT_MONTHS,
+  deletionProofCutoff,
   HISTORY_BUDGET_OTHER_BYTES,
   HISTORY_BUDGET_PROD_BYTES,
   HISTORY_FLOOR_MS,
   HOURLY_KEPT_MS,
   historyBudgetBytes,
+  monthsBefore,
   planRetention,
   purgeableRanges,
   type RetentionAction,
   type TierRow,
+  UNLINKED_DONATION_KEPT_MONTHS,
+  unlinkedDonationCutoff,
   WEEK_MS,
 } from "./retention";
 
@@ -344,5 +349,34 @@ describe("the budget of the fine history (JOURNAL 2026-10-08)", () => {
       { canvasId: "a", beforeVersion: 101, beforeTs: daysAgo(20) + 1, chunks: 1, bytes: 10 },
     ]);
     expect(purgeableRanges(page, 1000, 1000, now)).toEqual([]);
+  });
+});
+
+describe("la limite des dons non reliés et des preuves d'effacement (JOURNAL 2026-11-04)", () => {
+  // La politique promet 12 mois pour un don jamais relié, 5 ans pour la preuve d'un effacement
+  it("keeps an unlinked donation 12 months and the proof of an erasure 5 years", () => {
+    expect(UNLINKED_DONATION_KEPT_MONTHS).toBe(12);
+    expect(DELETION_PROOF_KEPT_MONTHS).toBe(60);
+  });
+
+  // La limite est le même instant un an plus tôt, au jour et à la milliseconde près
+  it("puts the limit of a donation at the same instant one year earlier", () => {
+    const now = Date.UTC(2026, 10, 4, 21, 37, 49, 123);
+
+    expect(unlinkedDonationCutoff(now)).toBe(Date.UTC(2025, 10, 4, 21, 37, 49, 123));
+    expect(deletionProofCutoff(now)).toBe(Date.UTC(2021, 10, 4, 21, 37, 49, 123));
+  });
+
+  // Un mois plus court ramène au dernier jour du mois : le 29 février d'une année bissextile, un an plus tôt, est le 28
+  it("lands on the last day of a shorter month", () => {
+    expect(monthsBefore(Date.UTC(2025, 2, 31, 12), 1)).toBe(Date.UTC(2025, 1, 28, 12));
+    expect(monthsBefore(Date.UTC(2028, 1, 29, 8), 12)).toBe(Date.UTC(2027, 1, 28, 8));
+    expect(monthsBefore(Date.UTC(2028, 1, 29, 8), 48)).toBe(Date.UTC(2024, 1, 29, 8));
+  });
+
+  // Janvier remonte à l'année d'avant, sans mois négatif
+  it("crosses a year boundary", () => {
+    expect(monthsBefore(Date.UTC(2026, 0, 15), 2)).toBe(Date.UTC(2025, 10, 15));
+    expect(monthsBefore(Date.UTC(2026, 0, 15), 12)).toBe(Date.UTC(2025, 0, 15));
   });
 });
