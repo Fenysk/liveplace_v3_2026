@@ -12,6 +12,8 @@ local cellStride, by, isDynamic = tonumber(ARGV[7]), ARGV[8], ARGV[9] == "1"
 local expectedVersion, dx, dy, width, height =
   tonumber(ARGV[10]), tonumber(ARGV[11]), tonumber(ARGV[12]), tonumber(ARGV[13]), tonumber(ARGV[14])
 local resizePlanJson = ARGV[15]
+-- Le plan de 256 × 256 cases où vivent toutes les piles, cadre ou non : ce que `reframe` décale.
+local maxWidth, maxHeight = tonumber(ARGV[16]), tonumber(ARGV[17])
 
 -- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Une archive ne reçoit plus rien (§17.1).
 local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize", "originX", "originY")
@@ -42,6 +44,8 @@ local env = {
   cellStride = cellStride,
   width = oldWidth,
   height = oldHeight,
+  maxWidth = maxWidth,
+  maxHeight = maxHeight,
   originX = tonumber(meta[7]) or 0,
   originY = tonumber(meta[8]) or 0,
 }

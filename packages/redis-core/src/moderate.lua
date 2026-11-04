@@ -321,6 +321,8 @@ if meta[6] == "1" then
       cellStride = cellStride,
       width = width,
       height = height,
+      maxWidth = growthLimits.maxWidth,
+      maxHeight = growthLimits.maxHeight,
       originX = tonumber(meta[7]) or 0,
       originY = tonumber(meta[8]) or 0,
     }, left, top, grownWidth, grownHeight)

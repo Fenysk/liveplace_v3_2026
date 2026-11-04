@@ -68,6 +68,25 @@ describe("planDynamicSize : le resserrement à l'activation (§5.8)", () => {
   it("refuses a state that does not match the size", () => {
     expect(() => planDynamicSize(new Uint8Array(3), size(2, 2))).toThrow();
   });
+
+  // Les pixels hors du cadre (JOURNAL 2026-11-05) sont des dessins comme les autres : le resserrement les couvre et les ramène
+  it("tightens around the pixels outside the frame too, so all of them come back", () => {
+    const from = size(50, 50);
+    const cut = [
+      { x: 50, y: 40, colorIndex: 1 },
+      { x: 55, y: 49, colorIndex: 1 },
+    ];
+    const plan = planDynamicSize(stateWith(from, 40, 49, 40, 49), from, cut);
+    // x de 40 à 55 (16 cases, 22 avec les marges), y de 40 à 49 (10 cases, 16 avec les marges)
+    expect(plan).toEqual({ width: 22, height: 16, dx: 3 - 40, dy: 3 - 40 });
+  });
+
+  // Une case sans couleur hors du cadre n'est pas un dessin
+  it("ignores a cell outside the frame that has no color", () => {
+    const from = size(50, 50);
+    const plan = planDynamicSize(stateWith(from, 20, 23, 30, 33), from, [{ x: 200, y: 200, colorIndex: 0 }]);
+    expect(plan).toEqual({ width: 10, height: 10, dx: 3 - 20, dy: 3 - 30 });
+  });
 });
 
 describe("planGrowth : de combien la fresque grandit à une pose (§9.3)", () => {

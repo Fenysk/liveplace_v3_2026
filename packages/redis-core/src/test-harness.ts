@@ -1,10 +1,44 @@
 import { randomUUID } from "node:crypto";
-import { type CanvasMeta, toStateOffset } from "@liveplace/domain";
+import { type CanvasMeta, CELL_STRIDE, toStateOffset } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, inject } from "vitest";
 import { createCanvasCore } from "./client";
 import { buildActivityKeys, buildCanvasKeys, buildCapacityKeys } from "./keys";
+
+// Un dessin plein : la couleur d'une case dit sa place dans le dessin, donc une déchirure se voit.
+export const patternAt = (dx: number, dy: number): number => 1 + ((dx + 7 * dy) % 40);
+
+export const drawing = (x0: number, y0: number, width: number, height: number): Pixel[] =>
+  Array.from({ length: width * height }, (_, index) => {
+    const [dx, dy] = [index % width, Math.floor(index / width)];
+    return { x: x0 + dx, y: y0 + dy, colorIndex: patternAt(dx, dy) };
+  });
+
+type Piles = Map<number, { author: string; colorIndex: number; depth: number }>;
+
+// Le `drawing` d'un auteur dans les piles : son coin haut gauche, ses cases colorées, et celles qui ne sont pas à leur place.
+export const locateIn = (piles: Piles, author: string, width: number, height: number) => {
+  const cells = [...piles]
+    .filter(([, pile]) => pile.author === author && pile.colorIndex !== 0)
+    .map(([cellKey, { colorIndex }]) => ({
+      x: cellKey % CELL_STRIDE,
+      y: Math.floor(cellKey / CELL_STRIDE),
+      colorIndex,
+    }));
+  const [x, y] = [Math.min(...cells.map((cell) => cell.x)), Math.min(...cells.map((cell) => cell.y))];
+  const isTorn = (cell: (typeof cells)[number]): boolean =>
+    cell.x - x >= width || cell.y - y >= height || cell.colorIndex !== patternAt(cell.x - x, cell.y - y);
+  return { x, y, count: cells.length, torn: cells.filter(isTorn).length };
+};
+
+// Un générateur à graine : le scénario est le même à chaque lancement.
+export const seeded = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let mixed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+  return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+};
 
 // Hors de `index.ts` : réservé aux tests. Une fabrique par fichier, jamais d'état de module : chaque fichier a son `runId`.
 export function createRedisHarness() {
@@ -87,6 +121,26 @@ export function createRedisHarness() {
     });
   };
 
+  // Toutes les piles d'un canvas, par case : la tête (auteur et couleur) et la profondeur, cadre et hors du cadre.
+  const listPiles = async (canvasId: string) => {
+    const { histPrefix } = buildCanvasKeys(canvasId);
+    const piles: Piles = new Map();
+    for await (const names of redis.scanStream({ match: `${histPrefix}*`, count: 1000 }))
+      for (const name of names) {
+        const entries = await redis.lrange(name, 0, -1);
+        const [author, colorIndex] = entries[0]?.split(":") ?? [];
+        piles.set(Number(name.slice(histPrefix.length)), {
+          author: author ?? "",
+          colorIndex: Number(colorIndex),
+          depth: entries.length,
+        });
+      }
+    return piles;
+  };
+
+  const locateDrawing = async (canvasId: string, author: string, width: number, height: number) =>
+    locateIn(await listPiles(canvasId), author, width, height);
+
   return {
     redis,
     core,
@@ -98,5 +152,7 @@ export function createRedisHarness() {
     readyCanvas,
     colorAt,
     placeInBatches,
+    listPiles,
+    locateDrawing,
   };
 }

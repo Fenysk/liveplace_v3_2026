@@ -123,6 +123,8 @@ if #accepted > 0 then
         cellStride = cellStride,
         width = width,
         height = height,
+        maxWidth = growthLimits.maxWidth,
+        maxHeight = growthLimits.maxHeight,
         originX = originX,
         originY = originY,
       }, left, top, grownWidth, grownHeight)

@@ -48,6 +48,7 @@ import type {
   Moderator,
   ModeratorOrigin,
   OffStreamCell,
+  Pixel,
   Placement,
   ReportedPlacement,
   ScoreboardEntry,
@@ -495,25 +496,50 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   };
 }
 
-// §5.8 : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle
-// taille. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
+const PILE_HEADS_PER_PIPELINE = 2048; // une tranche de têtes de pile par aller-retour : Redis reprend la main entre deux
+
+// Les pixels hors du cadre `from` (JOURNAL 2026-11-05) : la tête colorée de chaque pile du plan de 256 × 256 qui n'est pas dans le
+// cadre. Lus après la version de `getPlanInput` : une pose ou une modération entre-temps fait refuser le plan.
+const listPixelsOutsideFrame = async (redis: Redis, keys: CanvasKeys, from: CanvasSize): Promise<Pixel[]> => {
+  const cells: { x: number; y: number }[] = [];
+  for (let y = 0; y < CANVAS_HEIGHT; y++)
+    for (let x = y < from.height ? from.width : 0; x < CANVAS_WIDTH; x++) cells.push({ x, y });
+  const outside: Pixel[] = [];
+  for (let start = 0; start < cells.length; start += PILE_HEADS_PER_PIPELINE) {
+    const slice = cells.slice(start, start + PILE_HEADS_PER_PIPELINE);
+    const pipeline = redis.pipeline();
+    for (const { x, y } of slice) pipeline.lindex(keys.hist(toCellKey(x, y)), 0);
+    const replies = await pipeline.exec();
+    slice.forEach(({ x, y }, index) => {
+      const head = unwrap(replies?.[index]);
+      const colorIndex = typeof head === "string" ? parsePileEntry(head).colorIndex : TRANSPARENT_COLOR_INDEX;
+      if (colorIndex !== TRANSPARENT_COLOR_INDEX) outside.push({ x, y, colorIndex });
+    });
+  }
+  return outside;
+};
+
+// §5.8 : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle taille ; puis, si la fresque
+// a déjà changé de taille, ses pixels hors du cadre. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
 const getPlanInput = async (
   redis: Redis,
   keys: CanvasKeys,
   name: string,
-): Promise<{ version: number; input: { state: Buffer; from: CanvasSize } | null }> => {
+): Promise<{ version: number; input: { state: Buffer; from: CanvasSize; cut: Pixel[] } | null }> => {
   const results = await redis
     .multi()
     .getBuffer(keys.state)
     .get(keys.version)
-    .hmget(keys.meta, "width", "height")
+    .hmget(keys.meta, "width", "height", "resizedAtVersion")
     .exec();
   if (!results) throw new Error(`${name} ${keys.prefix} : transaction annulée`);
-  const [state, version, size] = results.map(unwrap);
-  const [width, height] = Array.isArray(size) ? size.map(Number) : [];
-  const from = width !== undefined && height !== undefined ? { width, height } : null;
+  const [state, version, fields] = results.map(unwrap);
+  const [width, height, resizedAtVersion] = Array.isArray(fields) ? fields : [];
+  const from = width != null && height != null ? { width: Number(width), height: Number(height) } : null;
   const isReadable = Buffer.isBuffer(state) && from !== null && state.length === from.width * from.height;
-  return { version: Number(version ?? 0), input: isReadable ? { state, from } : null };
+  if (!isReadable) return { version: Number(version ?? 0), input: null };
+  const cut = resizedAtVersion == null ? [] : await listPixelsOutsideFrame(redis, keys, from);
+  return { version: Number(version ?? 0), input: { state, from, cut } };
 };
 
 // Sans plan (`null`), la taille ne change pas : resize.lua le dit avant de le lire.
@@ -524,7 +550,7 @@ const getResizePlan = async (
 ): Promise<{ version: number; plan: ResizePlan | null }> => {
   const { version, input } = await getPlanInput(redis, keys, "resizeCanvas");
   const isChanging = input !== null && (input.from.width !== to.width || input.from.height !== to.height);
-  return { version, plan: input && isChanging ? planResize(input.state, input.from, to) : null };
+  return { version, plan: input && isChanging ? planResize(input.state, input.from, to, input.cut) : null };
 };
 
 // §5.8 : ce que change le réglage, du même état lu. Activé : le resserrement sur les dessins
@@ -539,7 +565,7 @@ const getDynamicPlan = async (
   const { version, input } = await getPlanInput(redis, keys, "setDynamicSize");
   if (!input) return { version, plan: null };
   if (isDynamicSize)
-    return { version, plan: { reframe: planDynamicSize(input.state, input.from), resize: null } };
+    return { version, plan: { reframe: planDynamicSize(input.state, input.from, input.cut), resize: null } };
   const isFixedDefaultSize =
     input.from.width === FIXED_DEFAULT_CANVAS_SIZE.width &&
     input.from.height === FIXED_DEFAULT_CANVAS_SIZE.height;
@@ -547,7 +573,9 @@ const getDynamicPlan = async (
     version,
     plan: {
       reframe: { ...FIXED_DEFAULT_CANVAS_SIZE, dx: 0, dy: 0 },
-      resize: isFixedDefaultSize ? null : planResize(input.state, input.from, FIXED_DEFAULT_CANVAS_SIZE),
+      resize: isFixedDefaultSize
+        ? null
+        : planResize(input.state, input.from, FIXED_DEFAULT_CANVAS_SIZE, input.cut),
     },
   };
 };
@@ -583,6 +611,8 @@ const tryDynamicSize = async (
     plan?.reframe.width ?? "",
     plan?.reframe.height ?? "",
     plan?.resize ? JSON.stringify(plan.resize) : "",
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
   );
   return status;
 };

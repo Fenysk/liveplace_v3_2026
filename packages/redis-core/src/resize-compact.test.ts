@@ -10,12 +10,12 @@ import {
 import type { Moderation, Pixel } from "@liveplace/domain/ports";
 import { describe, expect, it, vi } from "vitest";
 import { buildCanvasKeys } from "./keys";
-import { createRedisHarness } from "./test-harness";
+import { createRedisHarness, drawing, patternAt } from "./test-harness";
 
 // §5.8 : réduire une fresque rapproche ses dessins avant de couper. Les cas de `planResize` sont dans
 // le domain ; ici, ce que Redis en fait : les piles, les ensembles `cells:` et `clearing:`, `state`, `meta`.
 const harness = createRedisHarness();
-const { redis, core } = harness;
+const { redis, core, listPiles } = harness;
 
 const OWNER = "owner-1";
 const now = 1_700_000_000_000;
@@ -64,23 +64,6 @@ const moderateAll = async (canvasId: string, action: Moderation["action"]) => {
   const slices = [await slice("first")];
   while (!slices.at(-1)?.isDone) slices.push(await slice("next"));
   return slices;
-};
-
-// Toutes les piles d'un canvas, par case : la tête (auteur et couleur) et la profondeur.
-const listPiles = async (canvasId: string) => {
-  const { histPrefix } = buildCanvasKeys(canvasId);
-  const piles = new Map<number, { author: string; colorIndex: number; depth: number }>();
-  for await (const names of redis.scanStream({ match: `${histPrefix}*`, count: 1000 }))
-    for (const name of names) {
-      const entries = await redis.lrange(name, 0, -1);
-      const [author, colorIndex] = entries[0]?.split(":") ?? [];
-      piles.set(Number(name.slice(histPrefix.length)), {
-        author: author ?? "",
-        colorIndex: Number(colorIndex),
-        depth: entries.length,
-      });
-    }
-  return piles;
 };
 
 // Ce que tout rapprochement doit laisser vrai : `state` est la tête de chaque pile dans le cadre, et `cells:` est exactement les
@@ -407,6 +390,74 @@ describe("resizeCanvas keeps Redis consistent (§5.8)", () => {
       await expectConsistent(canvasId, authors);
     }
   }, 60_000);
+});
+
+const coloredCount = async (canvasId: string): Promise<number> =>
+  [...(await listPiles(canvasId)).values()].filter((pile) => pile.colorIndex !== 0).length;
+
+describe("resizeCanvas keeps the pixels outside the frame with their drawing (JOURNAL 2026-11-05)", () => {
+  // La deuxième réduction rapproche la partie visible : la partie hors du cadre la suit, et le dessin revient entier
+  it("brings the part of a drawing outside the frame along on a second shrink, and gives it back whole", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "author-a", drawing(25, 40, 60, 5));
+
+    await resize(canvasId, 50, 100); // 10 colonnes sortent à droite
+    await resize(canvasId, 50, 30); // le dessin monte de 15 lignes
+    await resize(canvasId, 100, 100);
+
+    expect(await harness.locateDrawing(canvasId, "author-a", 60, 5)).toEqual({
+      x: 0,
+      y: 25,
+      count: 300,
+      torn: 0,
+    });
+    expect(await coloredCount(canvasId)).toBe(300);
+    await expectConsistent(canvasId, ["author-a"]);
+  });
+
+  // Un dessin coupé par le bas, puis une réduction par bandes (elle ne tient pas d'un seul tenant) : les lignes hors du cadre suivent
+  it("moves the rows of a drawing cut at the bottom when the next shrink works band by band", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "author-d", drawing(10, 30, 10, 60), "pdrawingd1");
+    await placeAs(canvasId, "author-m", drawing(60, 0, 40, 6), "pdrawingm1");
+
+    await resize(canvasId, 100, 50); // 10 lignes de la colonne 10 à 19 sortent en bas
+    await resize(canvasId, 30, 50); // 49 colonnes vides seulement : la largeur se règle bande par bande
+    await resize(canvasId, 100, 100);
+
+    expect(await harness.locateDrawing(canvasId, "author-d", 10, 60)).toEqual({
+      x: 0,
+      y: 0,
+      count: 600,
+      torn: 0,
+    });
+    expect(await harness.locateDrawing(canvasId, "author-m", 40, 6)).toEqual({
+      x: 11,
+      y: 0,
+      count: 240,
+      torn: 0,
+    });
+    expect(await coloredCount(canvasId)).toBe(840);
+    await expectConsistent(canvasId, ["author-d", "author-m"]);
+  });
+
+  // Un dessin coupé à droite, puis une fresque plus large mais moins haute : la partie coupée entre dans le cadre à la bonne ligne
+  it("shows a drawing cut at the right whole when the frame gets wider but less tall", async () => {
+    const { canvasId } = await readyCanvas();
+    await placeAs(canvasId, "author-c", drawing(10, 30, 60, 20));
+
+    await resize(canvasId, 50, 100); // 10 colonnes sortent à droite
+    await resize(canvasId, 80, 40);
+
+    expect(await harness.locateDrawing(canvasId, "author-c", 60, 20)).toEqual({
+      x: 0,
+      y: 20,
+      count: 1200,
+      torn: 0,
+    });
+    expect(await harness.colorAt(canvasId, 55, 25, 80)).toBe(patternAt(55, 5));
+    await expectConsistent(canvasId, ["author-c"]);
+  });
 });
 
 describe("resizeCanvas speed (§5.8)", () => {

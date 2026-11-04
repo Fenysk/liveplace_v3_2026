@@ -12,7 +12,7 @@ import { planGrowth } from "@liveplace/domain/dynamic-size";
 import type { LiveMessage, Moderation, Pixel } from "@liveplace/domain/ports";
 import { describe, expect, it } from "vitest";
 import { buildCanvasKeys } from "./keys";
-import { createRedisHarness } from "./test-harness";
+import { createRedisHarness, drawing, locateIn, seeded } from "./test-harness";
 
 const harness = createRedisHarness();
 const { redis, core } = harness;
@@ -235,16 +235,42 @@ describe("la taille dynamique : grandir avec la pose (§5.8)", () => {
     expect(await core.listRecentEvents(canvasId, 0)).toEqual([expect.objectContaining({ version: 2 })]);
   });
 
-  // Une pile cachée d'un ancien rapprochement, dans la place qui s'ajoute, n'y reste pas
-  it("drops a stale pile left in the cells it adds", async () => {
+  // Une pile restée hors du cadre (données d'avant le correctif), dans la place qui s'ajoute : elle se montre, elle n'est pas effacée
+  it("shows a stale pile left in the cells it adds", async () => {
     const { canvasId, keys } = await dynamicCanvas(20, 20);
     await redis.rpush(keys.hist(toCellKey(21, 3)), "ghost:5:1:1:p1abcdefgh");
     await redis.sadd(keys.cells("ghost"), toCellKey(21, 3));
 
     await placeAs(canvasId, "author-a", [{ x: 18, y: 5, colorIndex: 5 }]);
 
-    expect(await redis.exists(keys.hist(toCellKey(21, 3)))).toBe(0);
-    expect(await redis.smembers(keys.cells("ghost"))).toEqual([]);
+    expect(await redis.exists(keys.hist(toCellKey(21, 3)))).toBe(1);
+    expect(await redis.smembers(keys.cells("ghost"))).toEqual([String(toCellKey(21, 3))]);
+    expect(await picture(canvasId)).toContainEqual({ x: 21, y: 3, colorIndex: 5 });
+  });
+
+  // À gauche et en haut, une pile restée hors du cadre se décale avec tout le reste, et son auteur la suit
+  it("shifts a stale pile outside the frame with the rest on a growth to the left and to the top", async () => {
+    const { canvasId, keys } = await dynamicCanvas(20, 20);
+    for (const [x, y] of [
+      [25, 3],
+      [3, 25],
+    ] as const) {
+      await redis.rpush(keys.hist(toCellKey(x, y)), "ghost:5:1:1:p1abcdefgh");
+      await redis.sadd(keys.cells("ghost"), toCellKey(x, y));
+    }
+
+    await placeAs(canvasId, "author-a", [{ x: 1, y: 1, colorIndex: 6 }]); // 2 colonnes et 2 lignes de plus : tout se décale de 2
+
+    expect(await canvasOf(canvasId)).toMatchObject({ width: 22, height: 22, origin: { x: 2, y: 2 } });
+    for (const [x, y] of [
+      [25, 3],
+      [3, 25],
+    ] as const)
+      expect(await redis.exists(keys.hist(toCellKey(x, y)))).toBe(0);
+    expect(sortedKeys(await redis.smembers(keys.cells("ghost")))).toEqual(
+      [toCellKey(5, 27), toCellKey(27, 5)].sort((a, b) => a - b),
+    );
+    expect(await redis.exists(keys.hist(toCellKey(27, 5)), keys.hist(toCellKey(5, 27)))).toBe(2);
   });
 });
 
@@ -671,6 +697,146 @@ describe("setDynamicSize : retirer le réglage ramène la fresque à 50 × 50 (�
     expect(await canvasOf(canvasId)).toMatchObject({ width: 60, height: 20, isDynamicSize: true });
     expect(await redis.get(keys.version)).toBe(String(version));
   });
+});
+
+// Une jauge qui ne limite pas les dessins pleins des tests ci-dessous.
+const richMeta = (width: number, height: number): CanvasMeta => ({
+  ...meta(width, height),
+  gaugeMaxStart: 100_000,
+  gaugeMaxCeiling: 100_000,
+});
+
+const placeAllAs = (canvasId: string, author: string, pixels: Pixel[]) =>
+  harness.placeInBatches(canvasId, author, `p${author.replaceAll("-", "")}`, pixels, now);
+
+// Les piles qui ne sont pas dans le cadre : cadre et plan de 256 × 256.
+const countOutsideFrame = async (canvasId: string): Promise<number> => {
+  const { width, height } = await canvasOf(canvasId);
+  return [...(await harness.listPiles(canvasId)).keys()].filter(
+    (cellKey) => cellKey % CELL_STRIDE >= width || Math.floor(cellKey / CELL_STRIDE) >= height,
+  ).length;
+};
+
+describe("setDynamicSize : les pixels hors du cadre font partie de la fresque (JOURNAL 2026-11-05)", () => {
+  // Un dessin de 60 × 8 dont une réduction à 50 × 50 coupe 10 colonnes à droite, et un petit dessin entier à côté
+  const cutScene = async () => {
+    const created = await harness.readyCanvas(richMeta(100, 100));
+    await placeAllAs(created.canvasId, "author-e", drawing(20, 40, 60, 8));
+    await placeAllAs(created.canvasId, "author-g", drawing(60, 20, 5, 5));
+    await core.resizeCanvas(created.canvasId, { by: OWNER, width: 50, height: 50 });
+    return created;
+  };
+
+  // L'activation se resserre sur tous les dessins : ce qui était coupé revient, à sa place relative, et rien ne reste hors du cadre
+  it("brings back what a shrink cut at the activation, whole and in place, with no pile left outside the frame", async () => {
+    const { canvasId } = await cutScene();
+    expect(await countOutsideFrame(canvasId)).toBe(80);
+
+    await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: true });
+
+    expect(await canvasOf(canvasId)).toMatchObject({ width: 66, height: 34 });
+    expect(await harness.locateDrawing(canvasId, "author-e", 60, 8)).toEqual({
+      x: 3,
+      y: 23,
+      count: 480,
+      torn: 0,
+    });
+    expect(await harness.locateDrawing(canvasId, "author-g", 5, 5)).toEqual({
+      x: 48,
+      y: 3,
+      count: 25,
+      torn: 0,
+    });
+    expect(await countOutsideFrame(canvasId)).toBe(0);
+    expect(await picture(canvasId)).toHaveLength(505);
+  });
+
+  // Une réduction qui coupe, l'activation, le retrait (retour à 50 × 50) puis l'agrandissement à 256 × 256 : le dessin est entier
+  it("keeps a cut drawing whole through the activation, the removal and a growth to 256×256", async () => {
+    const { canvasId } = await cutScene();
+
+    await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: true });
+    await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: false });
+    expect(await canvasOf(canvasId)).toMatchObject({ width: 50, height: 50 });
+    await core.resizeCanvas(canvasId, { by: OWNER, width: 256, height: 256 });
+
+    expect(await harness.locateDrawing(canvasId, "author-e", 60, 8)).toEqual({
+      x: 0,
+      y: 23,
+      count: 480,
+      torn: 0,
+    });
+    expect(await harness.locateDrawing(canvasId, "author-g", 5, 5)).toEqual({
+      x: 45,
+      y: 3,
+      count: 25,
+      torn: 0,
+    });
+    expect(await picture(canvasId)).toHaveLength(505);
+  });
+});
+
+describe("la taille fixe et la taille dynamique en série ne perdent aucun pixel (JOURNAL 2026-11-05)", () => {
+  // Des blocs pleins de 3 × 3 aux couleurs distinctes, puis des tailles, des activations, des retraits et des poses près d'un bord au
+  // hasard (graine fixe), puis tout le plan : chaque bloc revient entier.
+  it("keeps every 3×3 block whole through a seeded series of sizes, activations, removals and poses near an edge", async () => {
+    const next = seeded(20261105);
+    const { canvasId, keys } = await harness.readyCanvas(richMeta(100, 100));
+    const authors: string[] = [];
+    const addBlock = async (x: number, y: number) => {
+      authors.push(`block-${authors.length}`);
+      await placeAllAs(canvasId, authors.at(-1) ?? "", drawing(x, y, 3, 3));
+    };
+    // 4 × 4 blocs serrés au milieu : presque toute ligne de coupe en traverse un
+    for (let slot = 0; slot < 16; slot++) await addBlock(36 + (slot % 4) * 4, 36 + Math.floor(slot / 4) * 4);
+
+    // Un bloc près d'un bord de la fresque dynamique, sur des cases libres : elle grandit de ce côté
+    const addBlockNearAnEdge = async () => {
+      const { width, height } = await canvasOf(canvasId);
+      const [side, edge, rest] = [Math.floor(next() * 4), Math.floor(next() * 3), next()]; // edge : 0 à 2 cases du bord
+      const places: [number, number][] = [
+        [edge, Math.floor(rest * (height - 3))],
+        [width - 3 - edge, Math.floor(rest * (height - 3))],
+        [Math.floor(rest * (width - 3)), edge],
+        [Math.floor(rest * (width - 3)), height - 3 - edge],
+      ];
+      const [x, y] = places[side] ?? [0, 0];
+      const taken = await harness.listPiles(canvasId);
+      const isFree = drawing(x, y, 3, 3).every((pixel) => !taken.has(toCellKey(pixel.x, pixel.y)));
+      if (isFree) await addBlock(x, y);
+    };
+
+    let isDynamic = false;
+    for (let step = 0; step < 14; step++) {
+      const roll = next();
+      if (isDynamic && roll < 0.3) {
+        await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: false });
+        isDynamic = false;
+      } else if (isDynamic) {
+        await addBlockNearAnEdge();
+      } else if (roll < 0.3) {
+        await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: true });
+        isDynamic = true;
+      } else {
+        await core.resizeCanvas(canvasId, {
+          by: OWNER,
+          width: 8 + Math.floor(next() * 70),
+          height: 8 + Math.floor(next() * 70),
+        });
+      }
+    }
+    if (isDynamic) await core.setDynamicSize(canvasId, { by: OWNER, isDynamicSize: false });
+    await core.resizeCanvas(canvasId, { by: OWNER, width: 256, height: 256 });
+
+    const piles = await harness.listPiles(canvasId);
+    const found = authors.map((author) => locateIn(piles, author, 3, 3));
+    expect(found.map(({ count, torn }) => ({ count, torn }))).toEqual(
+      authors.map(() => ({ count: 9, torn: 0 })),
+    );
+    const state = (await redis.getBuffer(keys.state)) ?? Buffer.alloc(0);
+    expect(state.length).toBe(256 * 256);
+    expect(state.filter((colorIndex) => colorIndex !== 0)).toHaveLength(9 * authors.length);
+  }, 60_000);
 });
 
 describe("planGrowth du domaine : la même règle que reframe.lua (§9.3)", () => {
