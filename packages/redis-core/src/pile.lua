@@ -20,10 +20,27 @@ local function parseEntry(entry)
   }
 end
 
--- §5.3 : une case hors du cadre garde sa pile, mais ne s'écrit, ne s'émet ni ne se liste.
-local function isInside(cellKey, cellStride, width, height)
-  local key = tonumber(cellKey)
-  return key % cellStride < width and math.floor(key / cellStride) < height
+-- Le cadre posé sur la grille fixe (JOURNAL 2026-11-05) : sa case (x, y) est la case de grille (x + cornerX, y + cornerY), de clé
+-- `y * cellStride + x`. Une clé est signée : `%` ne décode pas un x négatif, d'où le décodage centré de `cellOf`.
+local function openWindow(cellStride, cornerX, cornerY, width, height)
+  local function keyOf(x, y)
+    return (y + cornerY) * cellStride + x + cornerX
+  end
+
+  -- La case du cadre d'une clé, qui peut en sortir (x ou y négatif, ou au-delà de `width` × `height`).
+  local function cellOf(cellKey)
+    local key = tonumber(cellKey)
+    local gridY = math.floor((key + cellStride / 2) / cellStride)
+    return key - gridY * cellStride - cornerX, gridY - cornerY
+  end
+
+  -- §5.3 : une case hors du cadre garde sa pile, mais ne s'écrit, ne s'émet ni ne se liste.
+  local function contains(cellKey)
+    local x, y = cellOf(cellKey)
+    return x >= 0 and x < width and y >= 0 and y < height
+  end
+
+  return { keyOf = keyOf, cellOf = cellOf, contains = contains }
 end
 
 local function toSet(members)
@@ -34,8 +51,8 @@ local function toSet(members)
   return set
 end
 
--- `keys` : cleared, clearedPlacements, clearedRanges, offStream, histPrefix, cellsPrefix, clearingPrefix, cellStride,
--- et la taille du canvas (width, height) pour qui liste des cases visibles.
+-- `keys` : cleared, clearedPlacements, clearedRanges, offStream, histPrefix, cellsPrefix, clearingPrefix,
+-- et le cadre du canvas (`window`, d'`openWindow`) pour qui liste des cases visibles.
 -- Chaque lecture est gardée le temps du script : l'ouvrir après avoir écrit une pierre tombale ou `offstream`.
 local function openPile(keys)
   local clearedVersions, clearedRanges = {}, {}
@@ -102,10 +119,10 @@ local function openPile(keys)
   end
 
   local function toCell(cellKey, head)
-    local key = tonumber(cellKey)
+    local x, y = keys.window.cellOf(cellKey)
     return {
-      x = key % keys.cellStride,
-      y = math.floor(key / keys.cellStride),
+      x = x,
+      y = y,
       colorIndex = head.colorIndex,
       previousColorIndex = head.colorIndex,
       placedAt = head.placedAt,
@@ -119,7 +136,7 @@ local function openPile(keys)
       local raw = redis.call("LINDEX", histKey, 0)
       local head = raw and parseEntry(raw)
       local isListed = head and head.author == author and not seen[cellKey]
-      if isListed and isInside(cellKey, keys.cellStride, keys.width, keys.height) and matches(head) then
+      if isListed and keys.window.contains(cellKey) and matches(head) then
         seen[cellKey] = true
         found[#found + 1] = { cell = toCell(cellKey, head), histKey = histKey }
       end

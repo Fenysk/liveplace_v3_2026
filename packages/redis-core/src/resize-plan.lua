@@ -1,14 +1,15 @@
 -- Appliquer un plan de `planResize` (domain) à un canvas : son nouvel `state`, ses piles et leurs auteurs, sa version et le `ctl`.
 -- Collé devant resize.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (JOURNAL 2026-09-29 ; §5.8).
 -- Le plan est supposé calculé sur la version actuelle : l'appelant a déjà relu `stale`. `env` : les clés et préfixes
--- du canvas, sa taille d'avant (`width`, `height`) et `cellStride`. `width` et `height` : la nouvelle taille. Le plan couvre l'étendue
--- (`plan.extent`) : le cadre d'avant et les piles qui en étaient sorties, qui se rapprochent avec leur dessin (JOURNAL 2026-11-05). Rend la version prise.
+-- du canvas, sa taille d'avant (`width`, `height`), `cellStride` et son coin (`cornerX`, `cornerY`). `width` et `height` : la nouvelle
+-- taille. Le plan est en coordonnées du cadre et couvre l'étendue (`plan.extent`) : le cadre d'avant et les piles qui en étaient sorties,
+-- qui se rapprochent avec leur dessin (JOURNAL 2026-11-05). Les clés suivent le coin, qui ne bouge pas. Rend la version prise.
 
 local function applyResizePlan(env, plan, width, height)
   local metaKey, stateKey, versionKey, liveChannel = env.metaKey, env.stateKey, env.versionKey, env.liveChannel
-  local histPrefix, cellsPrefix, clearingPrefix, cellStride =
-    env.histPrefix, env.cellsPrefix, env.clearingPrefix, env.cellStride
+  local histPrefix, cellsPrefix, clearingPrefix = env.histPrefix, env.cellsPrefix, env.clearingPrefix
   local oldWidth, oldHeight = env.width, env.height
+  local window = openWindow(env.cellStride, env.cornerX, env.cornerY, oldWidth, oldHeight)
   if plan.from.width ~= oldWidth or plan.from.height ~= oldHeight then
     error("resize : le plan ne part pas de la taille du canvas")
   end
@@ -39,7 +40,7 @@ local function applyResizePlan(env, plan, width, height)
 
   -- La couleur de la tête de la pile d'une case : 0 sans pile.
   local function headColor(x, y)
-    local raw = redis.call("LINDEX", histPrefix .. (y * cellStride + x), 0)
+    local raw = redis.call("LINDEX", histPrefix .. window.keyOf(x, y), 0)
     return raw and parseEntry(raw).colorIndex or 0
   end
 
@@ -78,11 +79,11 @@ local function applyResizePlan(env, plan, width, height)
     for x = 0, extentWidth - 1 do
       local movedX, movedY = target(x, y)
       if movedX ~= x or movedY ~= y then
-        local fromCellKey = y * cellStride + x
+        local fromCellKey = window.keyOf(x, y)
         local entries = redis.call("LRANGE", histPrefix .. fromCellKey, 0, -1)
         if #entries > 0 then
           if movedX then
-            local toCellKey = movedY * cellStride + movedX
+            local toCellKey = window.keyOf(movedX, movedY)
             if redis.call("RENAMENX", histPrefix .. fromCellKey, histPrefix .. toCellKey) == 0 then
               error("resize : la case " .. toCellKey .. " a déjà une pile")
             end

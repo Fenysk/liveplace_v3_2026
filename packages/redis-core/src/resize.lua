@@ -9,7 +9,7 @@ local cellsPrefix, clearingPrefix = ARGV[7], ARGV[8]
 local expectedVersion, planJson = tonumber(ARGV[9]), ARGV[10]
 
 -- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. §17.1 : une archive ne reçoit plus rien.
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize")
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize", "cornerX", "cornerY")
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
@@ -40,5 +40,7 @@ local version = applyResizePlan({
   cellStride = cellStride,
   width = oldWidth,
   height = oldHeight,
+  cornerX = tonumber(meta[7]) or 0,
+  cornerY = tonumber(meta[8]) or 0,
 }, cjson.decode(planJson), width, height)
 return { "resized", version }

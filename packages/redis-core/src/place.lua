@@ -1,5 +1,5 @@
--- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` vient de pile.lua, la jauge de gauge.lua,
--- `planGrowth` et `reframe` de reframe.lua (§5.8).
+-- Pose d'un lot de pixels (§5.3). Ordre des KEYS et ARGV : client.ts. `openPile` et `openWindow` viennent de pile.lua, la jauge de
+-- gauge.lua, `planGrowth` et `reframe` de reframe.lua (§5.8).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, gaugeKey, reqKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
@@ -15,11 +15,10 @@ local day, growthFactor, countedPixelsPerDay = ARGV[14], tonumber(ARGV[15]), ton
 -- §5.1 : le classement, et l'encodage de son score (keys.ts).
 local scoreboardKey = KEYS[13]
 local scoreTieSpan, scoreMaxPixels, transparentColorIndex = tonumber(ARGV[17]), tonumber(ARGV[18]), tonumber(ARGV[19])
--- §5.8 : l'origine des pixels de la page, ce que reframe.lua décale, et les bornes d'une taille dynamique.
+-- §5.8 : l'origine des pixels de la page, et les bornes d'une taille dynamique.
 local frameOriginX, frameOriginY = tonumber(ARGV[20]), tonumber(ARGV[21])
-local clearingPrefix, banPrefix, recentlyClearedPrefix = ARGV[22], ARGV[23], ARGV[24]
-local growthLimits = { margin = tonumber(ARGV[25]), maxWidth = tonumber(ARGV[26]), maxHeight = tonumber(ARGV[27]) }
-local firstPixelArg = 28
+local growthLimits = { margin = tonumber(ARGV[22]), maxWidth = tonumber(ARGV[23]), maxHeight = tonumber(ARGV[24]) }
+local firstPixelArg = 25
 local pixelCount = (#ARGV - firstPixelArg + 1) / 3
 
 -- cjson encode une table vide en `{}`, or `rejected` est un tableau.
@@ -41,7 +40,9 @@ local meta = redis.call(
   "archivedAt",
   "dynamicSize",
   "originX",
-  "originY"
+  "originY",
+  "cornerX",
+  "cornerY"
 )
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
@@ -56,6 +57,8 @@ local refillMs, refillCharges = tonumber(meta[6]), tonumber(meta[7])
 local originX, originY = tonumber(meta[10]) or 0, tonumber(meta[11]) or 0
 local shiftX = frameOriginX and originX - frameOriginX or 0
 local shiftY = frameOriginY and originY - frameOriginY or 0
+-- Le coin du cadre sur la grille des clés (JOURNAL 2026-11-05).
+local cornerX, cornerY = tonumber(meta[12]) or 0, tonumber(meta[13]) or 0
 
 -- 1. Idempotence.
 local stored = redis.call("GET", reqKey)
@@ -112,28 +115,22 @@ if #accepted > 0 then
         versionKey = versionKey,
         liveChannel = liveChannel,
         histPrefix = histPrefix,
-        cellsPrefix = cellsPrefix,
-        clearingPrefix = clearingPrefix,
-        banPrefix = banPrefix,
-        recentlyClearedPrefix = recentlyClearedPrefix,
-        bansKey = bansKey,
-        clearedKey = KEYS[8],
-        clearedPlacementsKey = KEYS[9],
-        clearedRangesKey = KEYS[10],
         cellStride = cellStride,
         width = width,
         height = height,
-        maxWidth = growthLimits.maxWidth,
-        maxHeight = growthLimits.maxHeight,
         originX = originX,
         originY = originY,
+        cornerX = cornerX,
+        cornerY = cornerY,
       }, left, top, grownWidth, grownHeight)
       width, height = grownWidth, grownHeight
+      cornerX, cornerY = cornerX - left, cornerY - top
       for _, pixel in ipairs(accepted) do
         pixel.x, pixel.y = pixel.x + left, pixel.y + top
       end
     end
   end
+  local window = openWindow(cellStride, cornerX, cornerY, width, height)
   -- 6. Version.
   version = redis.call("INCR", versionKey)
   -- §9.5 : sans pose cachée, aucune pile n'est relue en entier.
@@ -142,14 +139,13 @@ if #accepted > 0 then
     clearedPlacements = KEYS[9],
     clearedRanges = KEYS[10],
     offStream = KEYS[11],
-    cellStride = cellStride,
   })
 
-  -- 7. Écriture (D-15 : stateOffset pour `state`, cellKey pour tout le reste).
+  -- 7. Écriture (D-15 : stateOffset pour `state`, cellKey, celle de la grille, pour tout le reste).
   local cells = {}
   for i, pixel in ipairs(accepted) do
     local stateOffset = pixel.y * width + pixel.x
-    local cellKey = pixel.y * cellStride + pixel.x
+    local cellKey = window.keyOf(pixel.x, pixel.y)
     local histKey = histPrefix .. cellKey
     local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
     local before = pile.hasOffStream and redis.call("LRANGE", histKey, 0, -1) or nil

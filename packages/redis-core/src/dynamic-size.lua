@@ -5,18 +5,27 @@
 -- calculé sur une version, et ne s'applique que si elle n'a pas bougé.
 
 local metaKey, stateKey, versionKey = KEYS[1], KEYS[2], KEYS[3]
-local bansKey, clearedKey, clearedPlacementsKey, clearedRangesKey = KEYS[4], KEYS[5], KEYS[6], KEYS[7]
-local histPrefix, cellsPrefix, clearingPrefix, banPrefix, recentlyClearedPrefix, liveChannel =
-  ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
-local cellStride, by, isDynamic = tonumber(ARGV[7]), ARGV[8], ARGV[9] == "1"
+local histPrefix, cellsPrefix, clearingPrefix, liveChannel = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
+local cellStride, by, isDynamic = tonumber(ARGV[5]), ARGV[6], ARGV[7] == "1"
 local expectedVersion, dx, dy, width, height =
-  tonumber(ARGV[10]), tonumber(ARGV[11]), tonumber(ARGV[12]), tonumber(ARGV[13]), tonumber(ARGV[14])
-local resizePlanJson = ARGV[15]
--- Le plan de 256 × 256 cases où vivent toutes les piles, cadre ou non : ce que `reframe` décale.
-local maxWidth, maxHeight = tonumber(ARGV[16]), tonumber(ARGV[17])
+  tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10]), tonumber(ARGV[11]), tonumber(ARGV[12])
+local resizePlanJson = ARGV[13]
 
 -- 0. Canvas prêt, et le streamer seul. Le gateway vérifie aussi. Une archive ne reçoit plus rien (§17.1).
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "dynamicSize", "originX", "originY")
+local meta = redis.call(
+  "HMGET",
+  metaKey,
+  "ready",
+  "ownerId",
+  "width",
+  "height",
+  "archivedAt",
+  "dynamicSize",
+  "originX",
+  "originY",
+  "cornerX",
+  "cornerY"
+)
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
@@ -35,19 +44,13 @@ local env = {
   histPrefix = histPrefix,
   cellsPrefix = cellsPrefix,
   clearingPrefix = clearingPrefix,
-  banPrefix = banPrefix,
-  recentlyClearedPrefix = recentlyClearedPrefix,
-  bansKey = bansKey,
-  clearedKey = clearedKey,
-  clearedPlacementsKey = clearedPlacementsKey,
-  clearedRangesKey = clearedRangesKey,
   cellStride = cellStride,
   width = oldWidth,
   height = oldHeight,
-  maxWidth = maxWidth,
-  maxHeight = maxHeight,
   originX = tonumber(meta[7]) or 0,
   originY = tonumber(meta[8]) or 0,
+  cornerX = tonumber(meta[9]) or 0,
+  cornerY = tonumber(meta[10]) or 0,
 }
 
 -- 1. Déjà dans l'état demandé : rien à faire.

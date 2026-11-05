@@ -1,6 +1,6 @@
 // Le snapshot complet d'un canvas : de quoi le rendre à son streamer après une perte totale (§7.2).
 
-import { type CanvasSize, CELL_STRIDE, type Timestamp, toStateOffset } from "./index";
+import { type CanvasCorner, type CanvasSize, cellAt, cornerOf, type Timestamp, toStateOffset } from "./index";
 
 export const SNAPSHOT_SCHEMA_VERSION = 1;
 
@@ -77,7 +77,14 @@ export type SnapshotImage = {
 export function toSnapshotImage(snapshot: CanvasSnapshot): SnapshotImage {
   const size = { width: Number(snapshot.meta.width), height: Number(snapshot.meta.height) };
   const { schemaVersion, canvasId, version, takenAt } = snapshot;
-  return { schemaVersion, canvasId, version, takenAt, ...size, state: restoreState(size, snapshot.cells) };
+  return {
+    schemaVersion,
+    canvasId,
+    version,
+    takenAt,
+    ...size,
+    state: restoreState(size, snapshot.cells, cornerOf(snapshot.meta)),
+  };
 }
 
 // Les pierres tombales (D-16) lues dans `cleared`, `cleared:placements` et `cleared:ranges`.
@@ -96,13 +103,17 @@ export function isCovered(entry: PileEntry, placementKey: string, tombstones: To
   return ranges.some(([from, to]) => entry.placedAt >= from && entry.placedAt <= to);
 }
 
-// Le `state` refait des cases visibles : une case hors du cadre n'y entre pas (§5.7), elle garde sa pile ailleurs.
-export function restoreState({ width, height }: CanvasSize, cells: readonly SnapshotCell[]): Uint8Array {
+// Le `state` refait des cases visibles : une case hors du cadre n'y entre pas (§5.7), elle garde sa pile ailleurs. Les clés sont celles
+// de la grille, le coin du canvas les ramène au cadre.
+export function restoreState(
+  { width, height }: CanvasSize,
+  cells: readonly SnapshotCell[],
+  corner: CanvasCorner = cornerOf({}),
+): Uint8Array {
   const state = new Uint8Array(width * height);
   for (const [cellKey, , , colorIndex] of cells) {
-    const x = cellKey % CELL_STRIDE;
-    const y = Math.floor(cellKey / CELL_STRIDE);
-    if (x < width && y < height) state[toStateOffset(x, y, width)] = colorIndex;
+    const { x, y } = cellAt(corner, cellKey);
+    if (x >= 0 && x < width && y >= 0 && y < height) state[toStateOffset(x, y, width)] = colorIndex;
   }
   return state;
 }

@@ -76,6 +76,16 @@ describe("restoreState", () => {
     expect(Array.from(state)).toEqual([7, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 9]);
   });
 
+  // Les clés sont celles de la grille : le coin du canvas les ramène au cadre, même à gauche du plan
+  it("reads the cells of the grid through the corner of the canvas", () => {
+    const state = restoreState({ width: 4, height: 3 }, [cell(-30, 5, 7), cell(-27, 7, 9), cell(-31, 5, 2)], {
+      x: -30,
+      y: 5,
+    });
+
+    expect(Array.from(state)).toEqual([7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9]);
+  });
+
   // Une case hors du cadre garde sa pile mais n'entre pas dans le state
   it("leaves out a cell outside the frame", () => {
     const state = restoreState({ width: 2, height: 2 }, [cell(1, 1, 3), cell(2, 0, 4), cell(0, 2, 5)]);

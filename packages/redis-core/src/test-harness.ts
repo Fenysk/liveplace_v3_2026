@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type CanvasMeta, CELL_STRIDE, toStateOffset } from "@liveplace/domain";
+import { type CanvasCorner, type CanvasMeta, cellAt, cornerOf, toStateOffset } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, inject } from "vitest";
@@ -18,14 +18,16 @@ export const drawing = (x0: number, y0: number, width: number, height: number): 
 type Piles = Map<number, { author: string; colorIndex: number; depth: number }>;
 
 // Le `drawing` d'un auteur dans les piles : son coin haut gauche, ses cases colorées, et celles qui ne sont pas à leur place.
-export const locateIn = (piles: Piles, author: string, width: number, height: number) => {
+export const locateIn = (
+  piles: Piles,
+  author: string,
+  width: number,
+  height: number,
+  corner: CanvasCorner = cornerOf({}),
+) => {
   const cells = [...piles]
     .filter(([, pile]) => pile.author === author && pile.colorIndex !== 0)
-    .map(([cellKey, { colorIndex }]) => ({
-      x: cellKey % CELL_STRIDE,
-      y: Math.floor(cellKey / CELL_STRIDE),
-      colorIndex,
-    }));
+    .map(([cellKey, { colorIndex }]) => ({ ...cellAt(corner, cellKey), colorIndex }));
   const [x, y] = [Math.min(...cells.map((cell) => cell.x)), Math.min(...cells.map((cell) => cell.y))];
   const isTorn = (cell: (typeof cells)[number]): boolean =>
     cell.x - x >= width || cell.y - y >= height || cell.colorIndex !== patternAt(cell.x - x, cell.y - y);
@@ -138,8 +140,15 @@ export function createRedisHarness() {
     return piles;
   };
 
+  // En coordonnées du cadre : les clés des piles sont celles de la grille, que le coin ramène au cadre.
   const locateDrawing = async (canvasId: string, author: string, width: number, height: number) =>
-    locateIn(await listPiles(canvasId), author, width, height);
+    locateIn(
+      await listPiles(canvasId),
+      author,
+      width,
+      height,
+      cornerOf(await redis.hgetall(buildCanvasKeys(canvasId).meta)),
+    );
 
   return {
     redis,
