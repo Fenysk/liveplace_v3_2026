@@ -48,6 +48,12 @@ Tout y est absorbé par le plan d'architecture du bloc 3, qui fait foi.
 
 ---
 
+## 2026-11-11 — Le lint ne lit plus `.claude/settings.local.json`
+
+**Contexte.** Ce fichier de Claude Code est propre au poste, hors du dépôt (gitignore global), et Claude Code l'écrit dans son propre format : le 11/11, le gate du dossier principal a échoué au lint sur son seul formatage, alors que le même arbre passait dans un worktree.
+**Décision.** `biome.json` l'exclut (`files.includes`), comme `.claude/worktrees` ; aucune règle ne change, et `.claude/launch.json`, suivi par git, reste lu.
+**Renoncement.** Exclure tout `.claude/` : `launch.json` ne serait plus vérifié. Reformater le fichier à la main : Claude Code le réécrirait au prochain réglage.
+
 ## 2026-11-05 — Les cases vivent sur une grille fixe, le cadre est une fenêtre posée dessus : grandir ou se resserrer ne déplace plus aucune pile
 
 **Contexte.** L'entrée ci-dessous faisait suivre aux piles chaque décalage du cadre : `reframe.lua` parcourait les 65 536 cases du plan à chaque croissance (~55 ms, quelle que soit la taille de la fresque), et une pile au bord de la grille 256×256 en sortait et se perdait. C'est la clé d'une case (`cellKey`) qui portait le défaut : elle était en coordonnées du cadre, donc `hist:`, `cells:`, `clearing:`, les preuves de ban et `cleared:recent:` devaient tous suivre.

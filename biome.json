@@ -8,6 +8,7 @@
       "!**/node_modules",
       "!.agent",
       "!.claude/worktrees",
+      "!.claude/settings.local.json",
       "!**/dist",
       "!**/.output",
       "!**/_generated",
