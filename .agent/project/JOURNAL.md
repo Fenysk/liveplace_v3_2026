@@ -48,6 +48,12 @@ Tout y est absorbé par le plan d'architecture du bloc 3, qui fait foi.
 
 ---
 
+## 2026-11-11 — Deux lancements de tests ne tournent plus en même temps : un verrou commun à la machine
+
+**Contexte.** Amende l'entrée du 2026-10-11 : un Redis par lancement n'empêchait pas deux lancements de Vitest de tourner ensemble, et la machine saturait quand même. Le 11/11, deux tests de `redis-core` (`resize-compact`, `dynamic-size`, 5 s) puis `account-erasure-parity` (30 s) ont dépassé leur délai alors que le code était bon.
+**Décision.** Le `globalSetup` prend d'abord un verrou hors du dépôt, `liveplace-test-run.lock` dans `os.tmpdir()` (pid, heure, dossier), créé d'un coup (`wx`) : un lancement qui le trouve tenu attend en sondant chaque seconde, le dit une fois sur stderr, et échoue après 15 min en nommant le pid et le dossier. Un verrou dont le titulaire est mort, ou de plus de 30 min (même règle que les orphelins), est repris ; le teardown et `exit` le rendent, seulement s'il porte encore leur pid.
+**Renoncement.** Un verrou dans `gate.mjs` : socle protégé, et il ne couvrirait pas un `vitest run` lancé seul. Un service de verrouillage du système : la reprise d'un verrou mort garde une course de quelques microsecondes entre deux repreneurs. Un délai relevé ou moins de workers : le code était bon, seule la charge était en cause.
+
 ## 2026-11-11 — Le lint ne lit plus `.claude/settings.local.json`
 
 **Contexte.** Ce fichier de Claude Code est propre au poste, hors du dépôt (gitignore global), et Claude Code l'écrit dans son propre format : le 11/11, le gate du dossier principal a échoué au lint sur son seul formatage, alors que le même arbre passait dans un worktree.
