@@ -1,10 +1,10 @@
 // Le bouton du GIF timelapse et sa fenêtre (JOURNAL 2026-11-11) : le web les montre au développeur seul (le serveur le vérifie
-// aussi). Ouvrir la fenêtre lance la génération, la fermer ou réessayer l'arrête.
+// aussi). Ouvrir la fenêtre lance la génération, la fermer ou réessayer l'arrête (la requête est annulée).
 
 import { isDeveloper } from "@liveplace/domain";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
-import { startTimelapse, type TimelapseState } from "./timelapse-run";
+import { startTimelapse, TIMELAPSE_START, type TimelapseState } from "./timelapse-run";
 
 // Sans store (la page ouvre sa socket après le rendu serveur), personne n'est connu : pas de bouton.
 const ignoreSubscription = (): (() => void) => () => undefined;
@@ -17,10 +17,10 @@ export function useTimelapse(canvas: CanvasStore | undefined, canvasId: string, 
   const isShown = isDeveloper(userId);
   // `null` : la fenêtre est fermée ; sinon le numéro de la génération, que Réessayer change.
   const [run, setRun] = useState<number | null>(null);
-  const [state, setState] = useState<TimelapseState>({ kind: "reading" });
+  const [state, setState] = useState<TimelapseState>(TIMELAPSE_START);
   useEffect(() => {
     if (!isShown || run === null) return;
-    setState({ kind: "reading" });
+    setState(TIMELAPSE_START);
     return startTimelapse(canvasId, login, setState);
   }, [isShown, run, canvasId, login]);
   return {

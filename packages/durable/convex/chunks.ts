@@ -79,7 +79,8 @@ export const listOldest = query({
 });
 
 // Les chunks d'un canvas pour un scope, du plus ancien au plus récent, une page à la fois, chacun avec l'adresse de son fichier :
-// le GIF timelapse du développeur les télécharge un à un (JOURNAL 2026-11-11).
+// le GIF timelapse du développeur les télécharge (JOURNAL 2026-11-11). `beforeVersion` (optionnel, le web de prod l'appelle encore
+// sans) ne garde que ceux qui commencent avant elle, exclue.
 export const listCanvasFiles = query({
   args: {
     serviceKey: v.string(),
@@ -87,12 +88,16 @@ export const listCanvasFiles = query({
     canvasId: v.string(),
     cursor: v.union(v.string(), v.null()),
     numItems: v.number(),
+    beforeVersion: v.optional(v.number()),
   },
-  handler: async (ctx, { serviceKey, scope, canvasId, cursor, numItems }) => {
+  handler: async (ctx, { serviceKey, scope, canvasId, cursor, numItems, beforeVersion }) => {
     requireServiceKey(serviceKey);
     const { page, isDone, continueCursor } = await ctx.db
       .query("chunks")
-      .withIndex(BY_CANVAS_VERSION, (q) => q.eq("scope", scope).eq("canvasId", canvasId))
+      .withIndex(BY_CANVAS_VERSION, (q) => {
+        const ofCanvas = q.eq("scope", scope).eq("canvasId", canvasId);
+        return beforeVersion === undefined ? ofCanvas : ofCanvas.lt("fromVersion", beforeVersion);
+      })
       .paginate({ numItems: Math.min(numItems, FILES_PER_PAGE_MAX), cursor });
     const files = await Promise.all(
       page.map(async ({ fromVersion, toVersion, storageId }) => ({

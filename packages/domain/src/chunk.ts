@@ -39,6 +39,15 @@ export type ChunkIndex = {
 
 export type ChunkFile = ChunkIndex & { payload: Uint8Array };
 
+// Un fichier de l'historique (`what` le nomme) n'a pas répondu dans le délai, deux fois de suite (JOURNAL 2026-11-11) : jamais un
+// trou silencieux dans le GIF.
+export class HistoryTimeoutError extends Error {
+  constructor(readonly what: string) {
+    super(`history_timeout : ${what}`);
+    this.name = "HistoryTimeoutError";
+  }
+}
+
 export type GapNotes = Pick<ChunkIndex, "gaps" | "resizedAt">;
 
 // La dernière récupération d'un canvas : sa date, la version où il reprend (au-dessus de sa sauvegarde et du curseur

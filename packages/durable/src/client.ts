@@ -1,11 +1,11 @@
 // Le client typé du stockage durable (§8.2) : appelé depuis Node, jamais depuis un navigateur (§8.3).
 
 import { MAX_ARCHIVES } from "@liveplace/domain";
-import type { Chunk } from "@liveplace/domain/chunk";
 import type {
   BudgetStore,
   ChunkReader,
   DonationStore,
+  DownloadedChunk,
   DurableStore,
   ErasureStore,
   ExpiryStore,
@@ -20,6 +20,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { decodeChunk } from "./chunk-codec";
+import { CHUNK_FILES_PER_PAGE, type ChunkFileUrl, createChunkListing } from "./chunk-reader";
 
 // Le fichier part à l'adresse d'envoi de Convex, qui répond le `storageId` à ranger dans l'index.
 async function uploadFile(uploadUrl: string, bytes: Uint8Array): Promise<Id<"_storage">> {
@@ -36,9 +37,9 @@ async function uploadFile(uploadUrl: string, bytes: Uint8Array): Promise<Id<"_st
   return storageId as Id<"_storage">; // l'identifiant d'un fichier que Convex vient de ranger
 }
 
-// Un fichier de Convex, lu d'un coup : `what` nomme ce qu'on lit, pour le message d'un refus.
-async function downloadFile(fileUrl: string, what: string): Promise<Uint8Array> {
-  const response = await fetch(fileUrl);
+// Un fichier de Convex, lu d'un coup : `what` nomme ce qu'on lit, pour le message d'un refus. `signal` l'arrête (le worker n'en passe pas).
+async function downloadFile(fileUrl: string, what: string, signal?: AbortSignal): Promise<Uint8Array> {
+  const response = await fetch(fileUrl, signal ? { signal } : {});
   if (!response.ok) throw new Error(`lecture de ${what} refusée par Convex (${response.status})`);
   return new Uint8Array(await response.arrayBuffer());
 }
@@ -198,46 +199,41 @@ export function createHistoryStore(url: string, serviceKey: string, scope: strin
   };
 }
 
-const CHUNK_FILES_PER_PAGE = 20; // des chunks de quelques centaines de Ko chacun : une page se télécharge un fichier après l'autre
-
-type ChunkFileUrl = { url: string | null; fromVersion: number; toVersion: number };
-type ChunkFilesPage = { files: ChunkFileUrl[]; next: string | null };
-
 // Un chunk téléchargé et décodé. Illisible, il n'est qu'un trou de l'historique : journalisé, pas la fin du GIF.
 async function getChunk(
   canvasId: string,
   { url: fileUrl, fromVersion, toVersion }: ChunkFileUrl,
-): Promise<Chunk | null> {
-  if (fileUrl === null) return null;
-  const decoded = await decodeChunk(await downloadFile(fileUrl, `le chunk ${fromVersion}-${toVersion}`));
-  if (decoded.ok) return decoded.value;
+  signal: AbortSignal,
+): Promise<DownloadedChunk> {
+  if (fileUrl === null) return { chunk: null, bytes: 0 };
+  const file = await downloadFile(fileUrl, `le chunk ${fromVersion}-${toVersion}`, signal);
+  const decoded = await decodeChunk(file);
+  if (decoded.ok) return { chunk: decoded.value, bytes: file.byteLength };
   console.error(`chunk ${canvasId} ${fromVersion}-${toVersion} illisible (${decoded.error}) : ignoré`);
-  return null;
+  return { chunk: null, bytes: file.byteLength };
 }
 
-// Les chunks d'un canvas, lus un par un (JOURNAL 2026-11-11) : l'adresse du fichier vient de Convex, jamais plus d'un fichier décodé
-// en mémoire.
+// Les chunks d'un canvas (JOURNAL 2026-11-11) : la liste complète d'abord, puis les fichiers six à la fois. L'adresse du fichier vient
+// de Convex ; `beforeVersion` borne la liste (le web de prod l'appelle encore sans, Convex est poussé avant lui).
 export function createChunkReader(url: string, serviceKey: string, scope: string): ChunkReader {
   const convex = new ConvexHttpClient(url);
   return {
-    async *listChunks(canvasId) {
-      let cursor: string | null = null;
-      for (;;) {
-        const page: ChunkFilesPage = await convex.query(api.chunks.listCanvasFiles, {
-          serviceKey,
-          scope,
-          canvasId,
-          cursor,
-          numItems: CHUNK_FILES_PER_PAGE,
-        });
-        for (const file of page.files) {
-          const chunk = await getChunk(canvasId, file);
-          if (chunk) yield chunk;
-        }
-        if (page.next === null) return;
-        cursor = page.next;
-      }
-    },
+    listChunks: (canvasId, options = {}) =>
+      createChunkListing(
+        {
+          listPage: (cursor, beforeVersion) =>
+            convex.query(api.chunks.listCanvasFiles, {
+              serviceKey,
+              scope,
+              canvasId,
+              cursor,
+              numItems: CHUNK_FILES_PER_PAGE,
+              ...(beforeVersion === undefined ? {} : { beforeVersion }),
+            }),
+          getChunk: (file, signal) => getChunk(canvasId, file, signal),
+        },
+        options,
+      ),
   };
 }
 

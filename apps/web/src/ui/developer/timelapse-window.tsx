@@ -7,7 +7,7 @@ import { ProgressBar } from "../design/progress-bar";
 import { Window, WindowRow, type WindowSection } from "../design/window";
 import { FixedLocale } from "../locale/use-locale";
 import type { TimelapseState } from "./timelapse-run";
-import { TIMELAPSE_TEXTS } from "./timelapse-summary";
+import { canRetry, TIMELAPSE_TEXTS } from "./timelapse-summary";
 import type { Timelapse } from "./use-timelapse";
 
 const doNothing = (): void => undefined;
@@ -17,35 +17,56 @@ const SECTIONS = [
   { id: "gif", label: TIMELAPSE_TEXTS.title, icon: Clapperboard },
 ] as const satisfies readonly WindowSection<"gif">[];
 
-const Progress = ({ line, value, max }: { line: string; value?: number; max?: number }) => (
+// `previous` : la ligne de l'étape finie, gardée au-dessus de l'étape en cours. Les secondes restent hors de la zone annoncée : une annonce par seconde noierait le reste.
+type ProgressProps = { line: string; previous?: string; value?: number; max?: number; seconds: number };
+
+const Progress = ({ line, previous, value, max, seconds }: ProgressProps) => (
   <>
     <ProgressBar
       label={line}
       {...(value === undefined ? {} : { value })}
       {...(max === undefined ? {} : { max })}
     />
-    <p className="lp-type-body lp-muted" role="status">
-      {line}
-    </p>
+    <div role="status">
+      {previous && <p className="lp-type-body lp-muted">{previous}</p>}
+      <p className="lp-type-body lp-muted">{line}</p>
+    </div>
+    <p className="lp-type-body lp-muted">{TIMELAPSE_TEXTS.seconds(seconds)}</p>
   </>
 );
 
 type BodyProps = { state: TimelapseState; onRetry: () => void };
 
+// Rien lu : « Lecture… ». Le flux lu : ses poses. Les chunks de Convex : le flux reste au-dessus, la barre avance sur les chunks.
+const readingOf = ({
+  poses,
+  chunks,
+}: Extract<TimelapseState, { kind: "reading" }>): Omit<ProgressProps, "seconds"> => {
+  if (poses === null) return { line: TIMELAPSE_TEXTS.reading };
+  if (chunks === null) return { line: TIMELAPSE_TEXTS.stream(poses) };
+  return {
+    previous: TIMELAPSE_TEXTS.stream(poses),
+    line: TIMELAPSE_TEXTS.chunks(chunks.done, chunks.total),
+    value: chunks.done,
+    max: chunks.total,
+  };
+};
+
 export const TimelapseBody = ({ state, onRetry }: BodyProps) => {
-  if (state.kind === "reading") return <Progress line={TIMELAPSE_TEXTS.reading} />;
+  if (state.kind === "reading") return <Progress {...readingOf(state)} seconds={state.seconds} />;
   if (state.kind === "drawing")
     return (
       <Progress
         line={TIMELAPSE_TEXTS.drawing(state.done, state.total)}
         value={state.done}
         max={state.total}
+        seconds={state.seconds}
       />
     );
   if (state.kind === "failed")
     return (
       <WindowRow label={TIMELAPSE_TEXTS.failures[state.reason]} isFailed>
-        {state.reason === "failed" && <Button label={TIMELAPSE_TEXTS.retry} onPress={onRetry} />}
+        {canRetry(state.reason) && <Button label={TIMELAPSE_TEXTS.retry} onPress={onRetry} />}
       </WindowRow>
     );
   return (

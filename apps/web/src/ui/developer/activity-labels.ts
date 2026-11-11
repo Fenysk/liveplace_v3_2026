@@ -26,7 +26,7 @@ import type { StatTableCell, StatTableRow } from "../design/stat-table";
 export const formatCount = (count: number): string => count.toLocaleString("fr-FR");
 
 // En français, zéro et un s'accordent au singulier.
-const counted = (count: number, one: string, many: string): string =>
+export const counted = (count: number, one: string, many: string): string =>
   `${formatCount(count)} ${count <= 1 ? one : many}`;
 
 export const guestsNote = (guests: number): string =>

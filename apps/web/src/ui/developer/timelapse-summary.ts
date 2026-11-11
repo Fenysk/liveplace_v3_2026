@@ -1,8 +1,18 @@
 // Les textes et les mesures du GIF timelapse (JOURNAL 2026-11-11). Du français voulu, comme toute la fenêtre Développeur.
 
 import { type Timestamp, toParisDay } from "@liveplace/domain";
+import { counted, formatCount } from "./activity-labels";
 
-export type TimelapseFailure = "noChanges" | "tooManyChanges" | "failed";
+// Sans un octet du serveur pendant ce délai, la lecture est annulée.
+export const TIMELAPSE_SILENCE_MS = 60_000;
+
+export type TimelapseFailure =
+  | "noChanges"
+  | "tooManyChanges"
+  | "historyTimeout"
+  | "disconnected"
+  | "silent"
+  | "failed";
 
 export const TIMELAPSE_TEXTS = {
   button: "Créer le GIF de la fresque",
@@ -11,20 +21,32 @@ export const TIMELAPSE_TEXTS = {
   preview: "Aperçu du GIF de la fresque",
   download: "Télécharger",
   retry: "Réessayer",
+  stream: (poses: number): string => `Flux Redis : ${counted(poses, "pose", "poses")}`,
+  chunks: (done: number, total: number): string =>
+    `Chunks Convex : ${formatCount(done)} sur ${formatCount(total)}`,
+  seconds: (seconds: number): string => `${seconds} s`,
   drawing: (done: number, total: number): string => `Image ${done} sur ${total}`,
   failures: {
     noChanges: "Cette fresque n'a encore aucun dessin à animer.",
     tooManyChanges: "Historique trop long pour un GIF.",
+    historyTimeout: "Un fichier de l'historique n'a pas répondu (2 essais de 20 s).",
+    disconnected: "La connexion au serveur a été coupée.",
+    silent: `Le serveur ne répond plus depuis ${TIMELAPSE_SILENCE_MS / 1000} s.`,
     failed: "Le GIF n'a pas pu être créé.",
   },
 } as const;
 
-// Ce que le serveur refuse hors des deux cas lisibles (session, droits, fresque absente) : un seul message.
+// Ce que le serveur refuse hors des cas lisibles (session, droits, fresque absente) : un seul message.
 export function failureOf(error: string): TimelapseFailure {
   if (error === "no_changes") return "noChanges";
   if (error === "too_many_changes") return "tooManyChanges";
+  if (error === "history_timeout") return "historyTimeout";
   return "failed";
 }
+
+// Recommencer n'y changerait rien pour une fresque vide ou trop longue ; le reste (réseau, fichier lent, panne) peut passer.
+export const canRetry = (reason: TimelapseFailure): boolean =>
+  reason !== "noChanges" && reason !== "tooManyChanges";
 
 export const timelapseFileName = (login: string, nowMs: Timestamp): string =>
   `liveplace-${login}-${toParisDay(nowMs)}.gif`;

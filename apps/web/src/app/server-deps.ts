@@ -48,9 +48,12 @@ import { createPreviewRenderer } from "./render-preview-png";
 const toChunkReader = (config: ReturnType<typeof parseWebConfig>): ChunkReader =>
   config.durableScope === null
     ? {
-        async *listChunks() {
-          yield* [];
-        },
+        listChunks: async () => ({
+          total: 0,
+          chunks: (async function* () {
+            yield* [];
+          })(),
+        }),
       }
     : createChunkReader(config.convexUrl, config.convexServiceKey, config.durableScope);
 

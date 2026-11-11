@@ -747,9 +747,20 @@ export interface TimelapseSource {
   listStreamEntries(canvasId: string, afterVersion: number): AsyncIterable<ChunkEntry>;
 }
 
-// Les chunks de Convex d'un canvas, un à la fois dans l'ordre des versions : la mémoire n'en garde qu'un.
+// Un chunk téléchargé et décodé, avec le poids de son fichier. `chunk` est `null` quand le fichier est illisible ou sans adresse :
+// journalisé, ignoré, mais il compte dans la progression.
+export type DownloadedChunk = { chunk: Chunk | null; bytes: number };
+
+// `total` : les chunks à télécharger, connu avant le premier téléchargement. `chunks` les rend dans l'ordre des versions, pas à pas.
+export type ChunkListing = { total: number; chunks: AsyncIterable<DownloadedChunk> };
+
+// Les chunks de Convex d'un canvas. `beforeVersion` : seulement ceux qui commencent avant elle (exclue). `signal` annulé : plus aucun
+// téléchargement ne part et ceux en vol s'arrêtent. Un fichier sans réponse dans le délai lève `HistoryTimeoutError`.
 export interface ChunkReader {
-  listChunks(canvasId: string): AsyncIterable<Chunk>;
+  listChunks(
+    canvasId: string,
+    options?: { beforeVersion?: number; signal?: AbortSignal },
+  ): Promise<ChunkListing>;
 }
 
 // L'historique d'un seul environnement (`DURABLE_SCOPE`), comme les snapshots.

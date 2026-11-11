@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ProgressBar } from "../design/progress-bar";
 import { createGifWriter, type Rgb } from "../developer/gif-writer";
 import { TimelapseButton } from "../developer/timelapse-button";
-import type { TimelapseState } from "../developer/timelapse-run";
+import { TIMELAPSE_START, type TimelapseState } from "../developer/timelapse-run";
 import { TimelapseBody } from "../developer/timelapse-window";
 import { noop } from "./design-fixtures";
 import { Block, Entry, InLargeWindow, StateRow } from "./entry-layout";
@@ -32,14 +32,26 @@ const sampleGifUrl = (): string => {
 const STATES: readonly { name: string; detail: string; state: (url: string) => TimelapseState }[] = [
   {
     name: "Lecture de l'historique",
-    detail: "Le serveur rejoue l'historique : une barre qui ne dit pas où elle en est.",
-    state: () => ({ kind: "reading" }),
+    detail:
+      "Avant la première ligne du serveur : une barre qui ne dit pas où elle en est, et les secondes qui courent.",
+    state: () => TIMELAPSE_START,
+  },
+  {
+    name: "Flux Redis",
+    detail: "Le flux est lu : ses poses, au format français. La barre ne dit toujours pas où elle en est.",
+    state: () => ({ kind: "reading", seconds: 3, poses: 1104, chunks: null }),
+  },
+  {
+    name: "Chunks Convex : 12 sur 140",
+    detail:
+      "Les chunks que le flux n'a plus : la ligne du flux reste au-dessus, la barre avance chunk après chunk.",
+    state: () => ({ kind: "reading", seconds: 12, poses: 1104, chunks: { done: 12, total: 140 } }),
   },
   {
     name: "Image 312 sur 840",
     detail:
-      "Le Web Worker dessine et encode : la barre avance image après image. Fermer la fenêtre l'arrête.",
-    state: () => ({ kind: "drawing", done: 312, total: 840 }),
+      "Le Web Worker dessine et encode : la barre avance image après image, les secondes continuent. Fermer la fenêtre arrête tout.",
+    state: () => ({ kind: "drawing", seconds: 45, done: 312, total: 840 }),
   },
   {
     name: "Aperçu",
@@ -61,6 +73,21 @@ const STATES: readonly { name: string; detail: string; state: (url: string) => T
     name: "Historique trop long",
     detail: "Plus de changements que la limite : pas de Réessayer.",
     state: () => ({ kind: "failed", reason: "tooManyChanges" }),
+  },
+  {
+    name: "Un fichier sans réponse",
+    detail: "Un fichier de l'historique n'a pas répondu deux fois : le message le dit, et Réessayer.",
+    state: () => ({ kind: "failed", reason: "historyTimeout" }),
+  },
+  {
+    name: "Connexion coupée",
+    detail: "Le flux s'est fermé avant la fin (réseau, serveur redémarré) : le message le dit, et Réessayer.",
+    state: () => ({ kind: "failed", reason: "disconnected" }),
+  },
+  {
+    name: "Serveur silencieux",
+    detail: "Aucun octet pendant 60 s : la requête est annulée, le message le dit, et Réessayer.",
+    state: () => ({ kind: "failed", reason: "silent" }),
   },
   {
     name: "Échec",

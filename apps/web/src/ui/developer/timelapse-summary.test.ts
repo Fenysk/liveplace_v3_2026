@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRetry,
   failureOf,
   formatBytes,
+  TIMELAPSE_SILENCE_MS,
   TIMELAPSE_TEXTS,
   timelapseFileName,
   timelapseSummary,
@@ -37,5 +39,35 @@ describe("les mesures du GIF timelapse (JOURNAL 2026-11-11)", () => {
     expect(TIMELAPSE_TEXTS.failures.noChanges).toBe("Cette fresque n'a encore aucun dessin à animer.");
     expect(TIMELAPSE_TEXTS.failures.tooManyChanges).toBe("Historique trop long pour un GIF.");
     expect(TIMELAPSE_TEXTS.failures.failed).toBe("Le GIF n'a pas pu être créé.");
+  });
+
+  // Quand un fichier de l'historique n'a pas répondu, alors `history_timeout` a son message, comme la connexion coupée et le silence.
+  it("has a message of its own for a file that did not answer, a cut connection and a silent server", () => {
+    expect(failureOf("history_timeout")).toBe("historyTimeout");
+    expect(TIMELAPSE_TEXTS.failures.historyTimeout).toBe(
+      "Un fichier de l'historique n'a pas répondu (2 essais de 20 s).",
+    );
+    expect(TIMELAPSE_TEXTS.failures.disconnected).toBe("La connexion au serveur a été coupée.");
+    expect(TIMELAPSE_TEXTS.failures.silent).toBe("Le serveur ne répond plus depuis 60 s.");
+    expect(TIMELAPSE_SILENCE_MS).toBe(60_000);
+  });
+
+  // Quand l'échec peut passer (réseau, fichier lent, panne), alors Réessayer ; quand recommencer n'y changerait rien, non.
+  it("offers a retry only for a failure that may pass", () => {
+    for (const reason of ["failed", "historyTimeout", "disconnected", "silent"] as const)
+      expect(canRetry(reason)).toBe(true);
+    expect(canRetry("noChanges")).toBe(false);
+    expect(canRetry("tooManyChanges")).toBe(false);
+  });
+
+  // Quand la lecture avance, alors les lignes disent le flux, les chunks et les secondes, les nombres au format français.
+  it("says the stream, the chunks and the seconds, with numbers in French format", () => {
+    expect(TIMELAPSE_TEXTS.stream(1104)).toBe(`Flux Redis : ${(1104).toLocaleString("fr-FR")} poses`);
+    expect(TIMELAPSE_TEXTS.stream(1)).toBe("Flux Redis : 1 pose");
+    expect(TIMELAPSE_TEXTS.chunks(12, 140)).toBe("Chunks Convex : 12 sur 140");
+    expect(TIMELAPSE_TEXTS.chunks(1200, 14_000)).toBe(
+      `Chunks Convex : ${(1200).toLocaleString("fr-FR")} sur ${(14_000).toLocaleString("fr-FR")}`,
+    );
+    expect(TIMELAPSE_TEXTS.seconds(12)).toBe("12 s");
   });
 });
