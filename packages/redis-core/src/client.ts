@@ -4,11 +4,15 @@ import { readFileSync } from "node:fs";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
+  type CanvasCorner,
   type CanvasMeta,
   type CanvasSize,
   CELL_STRIDE,
   COUNTED_PIXELS_PER_DAY,
+  cellAt,
+  cellKeyAt,
   claimableRewards,
+  cornerOf,
   DELETED_AUTHOR,
   DYNAMIC_SIZE_MARGIN,
   FIXED_DEFAULT_CANVAS_SIZE,
@@ -16,6 +20,7 @@ import {
   type GaugeLimits,
   isBackgroundImageOpacity,
   isDeletedAuthor,
+  listPlaneCells,
   OBS_BACKGROUND,
   OBS_BACKGROUNDS,
   PALETTE,
@@ -24,8 +29,6 @@ import {
   SCOREBOARD_SIZE,
   type Timestamp,
   TRANSPARENT_COLOR_INDEX,
-  toCell,
-  toCellKey,
   toParisDay,
 } from "@liveplace/domain";
 import {
@@ -48,6 +51,7 @@ import type {
   Moderator,
   ModeratorOrigin,
   OffStreamCell,
+  Pixel,
   Placement,
   ReportedPlacement,
   ScoreboardEntry,
@@ -495,25 +499,65 @@ export function createTwitchCommandQueue(redis: Redis): TwitchCommandQueue {
   };
 }
 
-// §5.8 : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle
-// taille. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
+const PILE_HEADS_PER_PIPELINE = 2048; // une tranche de têtes de pile par aller-retour : Redis reprend la main entre deux
+
+// Le coin du cadre sur la grille des clés (JOURNAL 2026-11-05) : absent de `meta`, (0, 0).
+export const getCorner = async (redis: Redis, keys: CanvasKeys): Promise<CanvasCorner> => {
+  const [cornerX, cornerY] = await redis.hmget(keys.meta, "cornerX", "cornerY");
+  return cornerOf({ cornerX, cornerY });
+};
+
+// Les pixels hors du cadre `from` (JOURNAL 2026-11-05), en coordonnées du cadre : la tête colorée de chaque pile du plan de grille qui
+// n'est pas dans le cadre. Ils restent à droite ou en bas du cadre : une pile à sa gauche ou au-dessus, rendue visible par une modération,
+// n'est pas lue. Lus après la version de `getPlanInput` : une pose ou une modération entre-temps fait refuser le plan.
+const listPixelsOutsideFrame = async (
+  redis: Redis,
+  keys: CanvasKeys,
+  from: CanvasSize,
+  corner: CanvasCorner,
+): Promise<Pixel[]> => {
+  const cells = listPlaneCells(corner)
+    .map(({ x, y }) => ({ x: x - corner.x, y: y - corner.y }))
+    .filter(({ x, y }) => x >= 0 && y >= 0 && (x >= from.width || y >= from.height));
+  const outside: Pixel[] = [];
+  for (let start = 0; start < cells.length; start += PILE_HEADS_PER_PIPELINE) {
+    const slice = cells.slice(start, start + PILE_HEADS_PER_PIPELINE);
+    const pipeline = redis.pipeline();
+    for (const { x, y } of slice) pipeline.lindex(keys.hist(cellKeyAt(corner, x, y)), 0);
+    const replies = await pipeline.exec();
+    slice.forEach(({ x, y }, index) => {
+      const head = unwrap(replies?.[index]);
+      const colorIndex = typeof head === "string" ? parsePileEntry(head).colorIndex : TRANSPARENT_COLOR_INDEX;
+      if (colorIndex !== TRANSPARENT_COLOR_INDEX) outside.push({ x, y, colorIndex });
+    });
+  }
+  return outside;
+};
+
+// §5.8 : `state`, la taille et la version lus d'un seul MULTI, de quoi calculer le plan d'une nouvelle taille ; puis, si la fresque
+// a déjà changé de taille, ses pixels hors du cadre. Sans `input`, le canvas n'est pas prêt : le script le dit avant de lire le plan.
 const getPlanInput = async (
   redis: Redis,
   keys: CanvasKeys,
   name: string,
-): Promise<{ version: number; input: { state: Buffer; from: CanvasSize } | null }> => {
+): Promise<{ version: number; input: { state: Buffer; from: CanvasSize; cut: Pixel[] } | null }> => {
   const results = await redis
     .multi()
     .getBuffer(keys.state)
     .get(keys.version)
-    .hmget(keys.meta, "width", "height")
+    .hmget(keys.meta, "width", "height", "resizedAtVersion", "cornerX", "cornerY")
     .exec();
   if (!results) throw new Error(`${name} ${keys.prefix} : transaction annulée`);
-  const [state, version, size] = results.map(unwrap);
-  const [width, height] = Array.isArray(size) ? size.map(Number) : [];
-  const from = width !== undefined && height !== undefined ? { width, height } : null;
+  const [state, version, fields] = results.map(unwrap);
+  const [width, height, resizedAtVersion, cornerX, cornerY] = Array.isArray(fields) ? fields : [];
+  const from = width != null && height != null ? { width: Number(width), height: Number(height) } : null;
   const isReadable = Buffer.isBuffer(state) && from !== null && state.length === from.width * from.height;
-  return { version: Number(version ?? 0), input: isReadable ? { state, from } : null };
+  if (!isReadable) return { version: Number(version ?? 0), input: null };
+  const cut =
+    resizedAtVersion == null
+      ? []
+      : await listPixelsOutsideFrame(redis, keys, from, cornerOf({ cornerX, cornerY }));
+  return { version: Number(version ?? 0), input: { state, from, cut } };
 };
 
 // Sans plan (`null`), la taille ne change pas : resize.lua le dit avant de le lire.
@@ -524,7 +568,7 @@ const getResizePlan = async (
 ): Promise<{ version: number; plan: ResizePlan | null }> => {
   const { version, input } = await getPlanInput(redis, keys, "resizeCanvas");
   const isChanging = input !== null && (input.from.width !== to.width || input.from.height !== to.height);
-  return { version, plan: input && isChanging ? planResize(input.state, input.from, to) : null };
+  return { version, plan: input && isChanging ? planResize(input.state, input.from, to, input.cut) : null };
 };
 
 // §5.8 : ce que change le réglage, du même état lu. Activé : le resserrement sur les dessins
@@ -539,7 +583,7 @@ const getDynamicPlan = async (
   const { version, input } = await getPlanInput(redis, keys, "setDynamicSize");
   if (!input) return { version, plan: null };
   if (isDynamicSize)
-    return { version, plan: { reframe: planDynamicSize(input.state, input.from), resize: null } };
+    return { version, plan: { reframe: planDynamicSize(input.state, input.from, input.cut), resize: null } };
   const isFixedDefaultSize =
     input.from.width === FIXED_DEFAULT_CANVAS_SIZE.width &&
     input.from.height === FIXED_DEFAULT_CANVAS_SIZE.height;
@@ -547,7 +591,9 @@ const getDynamicPlan = async (
     version,
     plan: {
       reframe: { ...FIXED_DEFAULT_CANVAS_SIZE, dx: 0, dy: 0 },
-      resize: isFixedDefaultSize ? null : planResize(input.state, input.from, FIXED_DEFAULT_CANVAS_SIZE),
+      resize: isFixedDefaultSize
+        ? null
+        : planResize(input.state, input.from, FIXED_DEFAULT_CANVAS_SIZE, input.cut),
     },
   };
 };
@@ -564,15 +610,9 @@ const tryDynamicSize = async (
     keys.meta,
     keys.state,
     keys.version,
-    keys.bans,
-    keys.cleared,
-    keys.clearedPlacements,
-    keys.clearedRanges,
     keys.histPrefix,
     keys.cellsPrefix,
     keys.clearingPrefix,
-    keys.banPrefix,
-    keys.recentlyClearedPrefix,
     keys.live,
     CELL_STRIDE,
     by,
@@ -625,7 +665,7 @@ export function createCanvasCore(
   // devant ceux qui agrandissent ou resserrent la fresque.
   const moves = `${pile}\n${scriptOf("pile-moves.lua")}`;
   const withResize = (name: string): string => `${moves}\n${scriptOf("resize-plan.lua")}\n${scriptOf(name)}`;
-  const withReframe = (name: string): string => `${moves}\n${scriptOf("reframe.lua")}\n${scriptOf(name)}`;
+  const withReframe = (name: string): string => `${pile}\n${scriptOf("reframe.lua")}\n${scriptOf(name)}`;
   redis.defineCommand("place", { numberOfKeys: 13, lua: `${gauge}\n${withReframe("place.lua")}` });
   redis.defineCommand("claim", { numberOfKeys: 5, lua: `${gauge}\n${scriptOf("claim.lua")}` });
   redis.defineCommand("moderate", { numberOfKeys: 20, lua: withReframe("moderate.lua") });
@@ -634,7 +674,7 @@ export function createCanvasCore(
   redis.defineCommand("streamView", { numberOfKeys: 5, lua: withPile("stream-view.lua") });
   redis.defineCommand("resize", { numberOfKeys: 3, lua: withResize("resize.lua") });
   redis.defineCommand("dynamicSize", {
-    numberOfKeys: 7,
+    numberOfKeys: 3,
     lua: `${moves}\n${scriptOf("resize-plan.lua")}\n${scriptOf("reframe.lua")}\n${scriptOf("dynamic-size.lua")}`,
   });
 
@@ -694,21 +734,22 @@ export function createCanvasCore(
   // Les cases dont il est l'auteur visible, retrait interrompu compris, lues à la tête de leur pile. §5.7 : dans le
   // cadre seulement.
   const listVisiblePixels = async (keys: CanvasKeys, userId: string): Promise<VisiblePixel[]> => {
-    const [cellKeys, [width, height]] = await Promise.all([
+    const [cellKeys, [width, height, cornerX, cornerY]] = await Promise.all([
       redis.sunion(keys.cells(userId), keys.clearing(userId)),
-      redis.hmget(keys.meta, "width", "height"),
+      redis.hmget(keys.meta, "width", "height", "cornerX", "cornerY"),
     ]);
+    const corner = cornerOf({ cornerX, cornerY });
     const cells = cellKeys
-      .map((cellKey) => toCell(Number(cellKey)))
-      .filter(({ x, y }) => x < Number(width) && y < Number(height));
+      .map((cellKey) => ({ cellKey, ...cellAt(corner, Number(cellKey)) }))
+      .filter(({ x, y }) => x >= 0 && x < Number(width) && y >= 0 && y < Number(height));
     const pipeline = redis.pipeline();
-    for (const { x, y } of cells) pipeline.lindex(keys.hist(toCellKey(x, y)), 0);
+    for (const { cellKey } of cells) pipeline.lindex(`${keys.histPrefix}${cellKey}`, 0);
     const heads = cells.length > 0 ? ((await pipeline.exec()) ?? []) : [];
-    return cells.flatMap((cell, index) => {
+    return cells.flatMap(({ x, y }, index) => {
       const head = unwrap(heads[index]);
       if (typeof head !== "string") return [];
       const { authorId, colorIndex, placedAt, placementId } = parseEntry(head);
-      return authorId === userId ? [{ ...cell, colorIndex, placedAt, placementId }] : [];
+      return authorId === userId ? [{ x, y, colorIndex, placedAt, placementId }] : [];
     });
   };
 
@@ -821,9 +862,6 @@ export function createCanvasCore(
         TRANSPARENT_COLOR_INDEX,
         origin?.x ?? "", // sans origine, les pixels sont déjà dans le repère de la fresque
         origin?.y ?? "",
-        keys.clearingPrefix,
-        keys.banPrefix,
-        keys.recentlyClearedPrefix,
         DYNAMIC_SIZE_MARGIN,
         CANVAS_WIDTH,
         CANVAS_HEIGHT,
@@ -859,17 +897,15 @@ export function createCanvasCore(
 
     // La tête de `hist:` est le pixel visible (§5.1).
     async inspect(canvasId: string, x: number, y: number): Promise<InspectEntry | null> {
-      const head = await redis.lindex(buildCanvasKeys(canvasId).hist(toCellKey(x, y)), 0);
+      const keys = buildCanvasKeys(canvasId);
+      const head = await redis.lindex(keys.hist(cellKeyAt(await getCorner(redis, keys), x, y)), 0);
       if (head === null) return null;
       const { authorId: userId, colorIndex, placedAt, placementId } = parseEntry(head);
       // CDC §8 : le pixel d'un compte supprimé garde sa couleur et sa date, jamais un nom.
       if (isDeletedAuthor(userId))
         return { userId, login: "", displayName: "", isDeleted: true, colorIndex, placedAt, placementId };
       // Sans miroir, l'auteur garde au moins son identifiant : le miroir n'expire jamais, c'est un filet.
-      const [user, badges] = await Promise.all([
-        redis.hgetall(userKey(userId)),
-        getBadgesOf(buildCanvasKeys(canvasId), userId),
-      ]);
+      const [user, badges] = await Promise.all([redis.hgetall(userKey(userId)), getBadgesOf(keys, userId)]);
       return {
         userId,
         login: user.login ?? userId,
@@ -929,8 +965,6 @@ export function createCanvasCore(
         keys.clearingPrefix,
         keys.reportsPrefix,
         RECENTLY_CLEARED_TTL_SECONDS,
-        keys.banPrefix,
-        keys.recentlyClearedPrefix,
         DYNAMIC_SIZE_MARGIN,
         CANVAS_WIDTH,
         CANVAS_HEIGHT,
@@ -948,9 +982,9 @@ export function createCanvasCore(
     async listPixels(canvasId: string, userId: string): Promise<AuthoredPixel[]> {
       const keys = buildCanvasKeys(canvasId);
       if (await isBanned(canvasId, userId)) {
-        const proof = await redis.hgetall(keys.ban(userId));
+        const [proof, corner] = await Promise.all([redis.hgetall(keys.ban(userId)), getCorner(redis, keys)]);
         return Object.entries(proof).map(([cellKey, colorIndex]) => ({
-          ...toCell(Number(cellKey)),
+          ...cellAt(corner, Number(cellKey)),
           colorIndex: Number(colorIndex),
         }));
       }
@@ -994,7 +1028,8 @@ export function createCanvasCore(
         keys.reportsPrefix,
         keys.live,
         reporterId,
-        toCellKey(x, y),
+        x,
+        y,
         placementId,
         threshold,
         nowMs,
@@ -1071,7 +1106,7 @@ export function createCanvasCore(
     // La pose se relit à la tête de la case : l'identifiant de l'auteur ne quitte jamais le serveur (JOURNAL 2026-09-29).
     async listAuthorPixels(canvasId, x, y, placementId) {
       const keys = buildCanvasKeys(canvasId);
-      const head = await redis.lindex(keys.hist(toCellKey(x, y)), 0);
+      const head = await redis.lindex(keys.hist(cellKeyAt(await getCorner(redis, keys), x, y)), 0);
       if (head === null) return null;
       const entry = parseEntry(head);
       return entry.placementId === placementId ? listVisiblePixels(keys, entry.authorId) : null;

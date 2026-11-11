@@ -141,6 +141,14 @@ export function originShift(from: CanvasOrigin, to: CanvasOrigin): CanvasOrigin 
   return { x: to.x - from.x, y: to.y - from.y };
 }
 
+// La case de la grille fixe où commence le cadre (JOURNAL 2026-11-05) : la case (x, y) du cadre est la case de grille (x + corner.x, y + corner.y).
+// Absent dans `meta`, le coin est (0, 0) : la grille d'une fresque d'avant vaut son cadre.
+export type CanvasCorner = { x: number; y: number };
+
+export function cornerOf(fields: Readonly<Record<string, string | null | undefined>>): CanvasCorner {
+  return { x: Number(fields.cornerX ?? 0), y: Number(fields.cornerY ?? 0) };
+}
+
 export function isCanvasSize({ width, height }: CanvasSize): boolean {
   return CANVAS_FORMATS.some(({ sizes }) =>
     sizes.some((each) => each.width === width && each.height === height),
@@ -151,13 +159,37 @@ export function toStateOffset(x: number, y: number, width: number): StateOffset 
   return (y * width + x) as StateOffset;
 }
 
+// La case (x, y) de la grille fixe : x et y peuvent être négatifs, x dans [-CELL_STRIDE / 2, CELL_STRIDE / 2).
 export function toCellKey(x: number, y: number): CellKey {
   return (y * CELL_STRIDE + x) as CellKey;
 }
 
-// L'inverse de `toCellKey` : une cellKey lue dans Redis redevient une case.
+// L'inverse de `toCellKey` : une cellKey lue dans Redis redevient une case. Centré : `%` ne rendrait pas un x négatif.
 export function toCell(cellKey: number): { x: number; y: number } {
-  return { x: cellKey % CELL_STRIDE, y: Math.floor(cellKey / CELL_STRIDE) };
+  const y = Math.floor((cellKey + CELL_STRIDE / 2) / CELL_STRIDE);
+  return { x: cellKey - y * CELL_STRIDE, y };
+}
+
+// La clé de la case (x, y) du cadre, et la case du cadre d'une clé : par le coin.
+export function cellKeyAt(corner: CanvasCorner, x: number, y: number): CellKey {
+  return toCellKey(x + corner.x, y + corner.y);
+}
+
+export function cellAt(corner: CanvasCorner, cellKey: number): { x: number; y: number } {
+  const cell = toCell(cellKey);
+  return { x: cell.x - corner.x, y: cell.y - corner.y };
+}
+
+// Les cases de grille où une pile peut vivre (JOURNAL 2026-11-05) : le plan [0, 256)² où elles vivaient avant la grille fixe, et la fenêtre
+// de 256 × 256 posée sur le coin, qui contient tout cadre. Chaque case une fois, ligne après ligne.
+export function listPlaneCells(corner: CanvasCorner): { x: number; y: number }[] {
+  const isInPlane = (x: number, y: number): boolean =>
+    x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT;
+  const cells: { x: number; y: number }[] = [];
+  for (let y = 0; y < CANVAS_HEIGHT; y++) for (let x = 0; x < CANVAS_WIDTH; x++) cells.push({ x, y });
+  for (let y = corner.y; y < corner.y + CANVAS_HEIGHT; y++)
+    for (let x = corner.x; x < corner.x + CANVAS_WIDTH; x++) if (!isInPlane(x, y)) cells.push({ x, y });
+  return cells;
 }
 
 // Jauge stockée (§5.1), pas la frame `gauge`.

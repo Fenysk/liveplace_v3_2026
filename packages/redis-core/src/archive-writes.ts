@@ -3,9 +3,10 @@
 // TypeScript, jamais un fichier `.lua` : rien ici ne les lit.
 
 import { randomUUID } from "node:crypto";
+import { CELL_STRIDE } from "@liveplace/domain";
 import type { ArchiveWrites, CanvasImage, LiveMessage } from "@liveplace/domain/ports";
 import type { Redis } from "ioredis";
-import { getCanvasMeta, toMetaFields } from "./client";
+import { getCanvasMeta, getCorner, toMetaFields } from "./client";
 import { buildCanvasKeys, OWNER_LOCK_TTL_MS, ownerLockKey } from "./keys";
 
 const SCAN_COUNT = 500;
@@ -73,6 +74,21 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
     await copies.exec();
   };
 
+  // La preuve d'un ban est en clés de la grille de son canvas : elle passe à l'autre en gardant les mêmes cases du cadre (JOURNAL 2026-11-05).
+  const copyBanProofs = async (fromCanvasId: string, toCanvasId: string): Promise<void> => {
+    const [from, to] = [canvasKeysOf(fromCanvasId), canvasKeysOf(toCanvasId)];
+    const [fromCorner, toCorner] = await Promise.all([getCorner(redis, from), getCorner(redis, to)]);
+    const shift = (toCorner.y - fromCorner.y) * CELL_STRIDE + (toCorner.x - fromCorner.x);
+    await unlinkAll(redis, await scanKeys(redis, `${to.prefix}ban:*`));
+    for (const key of await scanKeys(redis, `${from.prefix}ban:*`)) {
+      const proof = Object.entries(await redis.hgetall(key)).map(
+        ([cellKey, colorIndex]): [number, string] => [Number(cellKey) + shift, colorIndex],
+      );
+      if (proof.length > 0)
+        await redis.hset(`${to.prefix}${key.slice(from.prefix.length)}`, Object.fromEntries(proof));
+    }
+  };
+
   return {
     getCanvas: (canvasId) => getCanvasMeta(redis, canvasId),
 
@@ -118,7 +134,7 @@ export function createArchiveWrites(redis: Redis): ArchiveWrites {
       const [from, to] = [canvasKeysOf(fromCanvasId), canvasKeysOf(toCanvasId)];
       for (const key of ["bans", "bansTwitch", "mods", "modsTwitch", "modsLiveplace", "twitchUsers"] as const)
         await replaceKey(from[key], to[key]);
-      await replaceFamily(fromCanvasId, toCanvasId, "ban:"); // la preuve de chaque banni
+      await copyBanProofs(fromCanvasId, toCanvasId); // la preuve de chaque banni
       // §17.2 : les bannis de l'entrant ont changé, son classement les suit. Un canvas neuf n'a
       // pas de classement : rien à faire. Le sortant et son classement ne bougent pas.
       await redis.eval(FOLLOW_BANS, 3, to.bans, to.scoreboard, to.scoreboardBanned);

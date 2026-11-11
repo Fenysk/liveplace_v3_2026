@@ -1,6 +1,6 @@
 // Ce que le worker lit de Redis pour sauvegarder un canvas (§7.2).
 
-import { CANVAS_HEIGHT, CANVAS_WIDTH, type CellKey, toCellKey } from "@liveplace/domain";
+import { type CellKey, cellKeyAt, cornerOf, listPlaneCells, toCellKey } from "@liveplace/domain";
 import type { SnapshotSource } from "@liveplace/domain/ports";
 import {
   type CanvasSnapshot,
@@ -144,11 +144,15 @@ const tombstonesOf = ({ cleared, clearedPlacements, clearedRanges }: SmallParts)
 const placementKeyOf = (entry: PileEntry): string =>
   toPlacementKey({ authorId: entry.authorId, placementId: entry.placementId ?? String(entry.version) });
 
-// §5.3 : un canvas redimensionné garde des piles hors du cadre, jusqu'à la plus grande taille ; sinon son cadre suffit.
-const extentOf = (fields: Record<string, string>): { width: number; height: number } =>
-  fields.resizedAtVersion === undefined
-    ? { width: Number(fields.width), height: Number(fields.height) }
-    : { width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+// §5.3 : un canvas redimensionné garde des piles hors du cadre, dans tout le plan de la grille ; sinon son cadre suffit.
+const listPileCellKeys = (fields: Record<string, string>): CellKey[] => {
+  const corner = cornerOf(fields);
+  if (fields.resizedAtVersion !== undefined) return listPlaneCells(corner).map(({ x, y }) => toCellKey(x, y));
+  const [width, height] = [Number(fields.width), Number(fields.height)];
+  return Array.from({ length: width * height }, (_, index) =>
+    cellKeyAt(corner, index % width, Math.floor(index / width)),
+  );
+};
 
 // La tête de chaque pile de l'étendue : le pixel visible, ou rien. Lue avant les pierres tombales, jamais après : une
 // pierre tombale plus récente que la tête la couvre, l'inverse laisserait revenir un pixel retiré.
@@ -157,10 +161,7 @@ const listHeads = async (
   keys: CanvasKeys,
   fields: Record<string, string>,
 ): Promise<[CellKey, string][]> => {
-  const { width, height } = extentOf(fields);
-  const cellKeys = Array.from({ length: width * height }, (_, index) =>
-    toCellKey(index % width, Math.floor(index / width)),
-  );
+  const cellKeys = listPileCellKeys(fields);
   const heads: [CellKey, string][] = [];
   for (let start = 0; start < cellKeys.length; start += HEADS_PER_PIPELINE) {
     const slice = cellKeys.slice(start, start + HEADS_PER_PIPELINE);

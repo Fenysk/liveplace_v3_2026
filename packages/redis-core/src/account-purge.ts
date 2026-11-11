@@ -47,7 +47,7 @@ return 1`;
 // Une entrée du compte devient celle de `deleted` ; celle qu'une pierre tombale couvre part, sauf en tête de pile (le
 // pixel visible ne change pas). ARGV : le curseur, le compte, l'auteur qui le remplace, la taille d'une page, et en JSON
 // les pierres tombales du compte par préfixe de fresque (`{version?, ranges, placements}`). Le motif d'une entrée est
-// celui de pile.lua.
+// celui de pile.lua ; la clé d'une case est signée (JOURNAL 2026-11-05).
 const PURGE_PILES = `local cursor, userId, sentinel, count = ARGV[1], ARGV[2], ARGV[3], tonumber(ARGV[4])
 local tombstones = cjson.decode(ARGV[5])
 
@@ -78,7 +78,7 @@ end
 local reply = redis.call("SCAN", cursor, "MATCH", "cv:*:hist:*", "COUNT", count)
 local rewritten = 0
 for _, key in ipairs(reply[2]) do
-  local prefix = string.match(key, "^(cv:.*:)hist:%d+$")
+  local prefix = string.match(key, "^(cv:.*:)hist:%-?%d+$")
   local tombstone = prefix and tombstones[prefix]
   if tombstone then
     local kept, isChanged = {}, false
@@ -92,7 +92,7 @@ for _, key in ipairs(reply[2]) do
         kept[#kept + 1] = sentinel .. string.sub(entry, #userId + 1)
         isChanged = true
         if position == 1 then
-          redis.call("SADD", prefix .. "cells:" .. sentinel, string.match(key, "(%d+)$"))
+          redis.call("SADD", prefix .. "cells:" .. sentinel, string.match(key, "(%-?%d+)$"))
         end
       end
     end

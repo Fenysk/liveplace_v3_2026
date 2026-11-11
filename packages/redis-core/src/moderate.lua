@@ -1,5 +1,5 @@
 -- Modération d'un canvas (§5.4) : clearUser, clearPlacement, approvePlacement, ban, unban. Ordre des KEYS et ARGV :
--- client.ts. `openPile` et `parseEntry` viennent de pile.lua, `planGrowth` et `reframe` de reframe.lua (§5.8).
+-- client.ts. `openPile`, `openWindow` et `parseEntry` viennent de pile.lua, `planGrowth` et `reframe` de reframe.lua (§5.8).
 
 local metaKey, stateKey, versionKey, eventsKey, bansKey, modsKey, clearedKey, clearingKey, targetCellsKey, banKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8], KEYS[9], KEYS[10]
@@ -21,15 +21,27 @@ local source = ARGV[12]
 -- §5.4 : la pose visée et la plage d'heures qui l'étend, vides sinon.
 local placementId, rangeFrom, rangeTo = ARGV[13], tonumber(ARGV[14]), tonumber(ARGV[15])
 local clearingPrefix, reportsPrefix, recentlyClearedTtl = ARGV[16], ARGV[17], ARGV[18]
--- §5.8 : ce que reframe.lua décale, et les bornes d'une taille dynamique.
-local banPrefix, recentlyClearedPrefix = ARGV[19], ARGV[20]
-local growthLimits = { margin = tonumber(ARGV[21]), maxWidth = tonumber(ARGV[22]), maxHeight = tonumber(ARGV[23]) }
+-- §5.8 : les bornes d'une taille dynamique.
+local growthLimits = { margin = tonumber(ARGV[19]), maxWidth = tonumber(ARGV[20]), maxHeight = tonumber(ARGV[21]) }
 -- CDC §8 : l'auteur des pixels d'un compte supprimé.
-local deletedAuthor = ARGV[24]
+local deletedAuthor = ARGV[22]
 local placement = target .. ":" .. placementId
 
 -- 0. Canvas prêt. §5.5, comme place.lua. §17.1 : une archive ne reçoit plus rien.
-local meta = redis.call("HMGET", metaKey, "ready", "width", "ownerId", "height", "archivedAt", "dynamicSize", "originX", "originY")
+local meta = redis.call(
+  "HMGET",
+  metaKey,
+  "ready",
+  "width",
+  "ownerId",
+  "height",
+  "archivedAt",
+  "dynamicSize",
+  "originX",
+  "originY",
+  "cornerX",
+  "cornerY"
+)
 if meta[1] ~= "1" then
   return { "canvas_not_found" }
 end
@@ -37,6 +49,9 @@ if meta[5] then
   return { "canvas_archived" }
 end
 local width, ownerId, height = tonumber(meta[2]), meta[3], tonumber(meta[4])
+-- Le cadre sur la grille des clés (JOURNAL 2026-11-05) : ses cases sont celles du `state`, leurs clés celles des piles.
+local cornerX, cornerY = tonumber(meta[9]) or 0, tonumber(meta[10]) or 0
+local window = openWindow(cellStride, cornerX, cornerY, width, height)
 
 -- 1. Les droits : le propriétaire ou un modérateur, et jamais contre le propriétaire. Le gateway vérifie aussi.
 if (by ~= ownerId and redis.call("SISMEMBER", modsKey, by) == 0) or target == ownerId then
@@ -56,7 +71,8 @@ if target == deletedAuthor and (not (action == "clearPlacement" or action == "ap
 end
 
 local function stateOffsetOf(cellKey)
-  return math.floor(cellKey / cellStride) * width + cellKey % cellStride
+  local x, y = window.cellOf(cellKey)
+  return y * width + x
 end
 
 -- Chaque action est une version et entre dans le stream, ban et unban compris (§5.4).
@@ -93,9 +109,7 @@ local function openCanvasPile()
     histPrefix = histPrefix,
     cellsPrefix = cellsPrefix,
     clearingPrefix = clearingPrefix,
-    cellStride = cellStride,
-    width = width,
-    height = height,
+    window = window,
   })
 end
 
@@ -141,8 +155,8 @@ if action == "ban" then
     end
     redis.call("DEL", recentlyClearedKey)
     for _, cellKey in ipairs(redis.call("SUNION", targetCellsKey, clearingKey)) do
-      if isInside(cellKey, cellStride, width, height) then
-        local stateOffset = stateOffsetOf(tonumber(cellKey))
+      if window.contains(cellKey) then
+        local stateOffset = stateOffsetOf(cellKey)
         redis.call("HSET", banKey, cellKey, string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset)))
       end
     end
@@ -257,19 +271,19 @@ local function unstack(cellKey)
     redis.call("SADD", cellsPrefix .. head.author, cellKey)
   end
   -- §5.3 : hors du cadre, la pile change, la case ne s'écrit ni ne s'émet.
-  if not isInside(cellKey, cellStride, width, height) then
+  if not window.contains(cellKey) then
     return nil
   end
-  local stateOffset = stateOffsetOf(tonumber(cellKey))
+  local stateOffset = stateOffsetOf(cellKey)
   local previousColorIndex = string.byte(redis.call("GETRANGE", stateKey, stateOffset, stateOffset))
   if previousAuthor == target then
     redis.call("HSET", recentlyClearedKey, cellKey, previousColorIndex)
   end
   redis.call("SETRANGE", stateKey, stateOffset, string.char(colorIndex))
-  local key = tonumber(cellKey)
+  local x, y = window.cellOf(cellKey)
   local cell = {
-    x = key % cellStride,
-    y = math.floor(key / cellStride),
+    x = x,
+    y = y,
     colorIndex = colorIndex,
     previousColorIndex = previousColorIndex,
     placedAt = placedAt,
@@ -310,19 +324,13 @@ if meta[6] == "1" then
       versionKey = versionKey,
       liveChannel = liveChannel,
       histPrefix = histPrefix,
-      cellsPrefix = cellsPrefix,
-      clearingPrefix = clearingPrefix,
-      banPrefix = banPrefix,
-      recentlyClearedPrefix = recentlyClearedPrefix,
-      bansKey = bansKey,
-      clearedKey = clearedKey,
-      clearedPlacementsKey = clearedPlacementsKey,
-      clearedRangesKey = clearedRangesKey,
       cellStride = cellStride,
       width = width,
       height = height,
       originX = tonumber(meta[7]) or 0,
       originY = tonumber(meta[8]) or 0,
+      cornerX = cornerX,
+      cornerY = cornerY,
     }, left, top, grownWidth, grownHeight)
     for _, cell in ipairs(cells) do
       cell.x, cell.y = cell.x + left, cell.y + top

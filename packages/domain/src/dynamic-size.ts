@@ -9,6 +9,7 @@ import {
   DYNAMIC_SIZE_MIN,
   toStateOffset,
 } from "./index";
+import type { Pixel } from "./ports";
 
 // Le nouveau cadre : la case (x, y) d'avant devient la case (x + dx, y + dy) dans un cadre de `width` × `height`.
 export type Reframe = CanvasSize & { dx: number; dy: number };
@@ -22,21 +23,23 @@ function tightenAxis(first: number, last: number, max: number): { length: number
   return { length, shift: Math.floor((length - content) / 2) - first };
 }
 
-// `state` : un octet par case de `from` (D-15 : `stateOffset`). Seuls des bords vides partent : aucun pixel posé n'est perdu.
-export function planDynamicSize(state: Uint8Array, from: CanvasSize): Reframe {
+// `state` : un octet par case de `from` (D-15 : `stateOffset`). `cut` : les pixels hors du cadre (têtes de pile colorées) : le resserrement
+// couvre tous les dessins, et les ramène tous dans le cadre (JOURNAL 2026-11-05). Seuls des bords vides partent : aucun pixel posé n'est perdu.
+export function planDynamicSize(state: Uint8Array, from: CanvasSize, cut: readonly Pixel[] = []): Reframe {
   if (state.length !== from.width * from.height)
     throw new Error(
       `planDynamicSize : ${state.length} octets pour une fresque de ${from.width}×${from.height}`,
     );
   let [firstX, lastX, firstY, lastY] = [from.width, -1, from.height, -1];
+  const include = (x: number, y: number): void => {
+    firstX = Math.min(firstX, x);
+    lastX = Math.max(lastX, x);
+    firstY = Math.min(firstY, y);
+    lastY = Math.max(lastY, y);
+  };
   for (let y = 0; y < from.height; y++)
-    for (let x = 0; x < from.width; x++) {
-      if (state[toStateOffset(x, y, from.width)] === 0) continue;
-      firstX = Math.min(firstX, x);
-      lastX = Math.max(lastX, x);
-      firstY = Math.min(firstY, y);
-      lastY = Math.max(lastY, y);
-    }
+    for (let x = 0; x < from.width; x++) if (state[toStateOffset(x, y, from.width)] !== 0) include(x, y);
+  for (const { x, y, colorIndex } of cut) if (colorIndex !== 0) include(x, y);
   const horizontal = tightenAxis(firstX, lastX, CANVAS_WIDTH);
   const vertical = tightenAxis(firstY, lastY, CANVAS_HEIGHT);
   return { width: horizontal.length, height: vertical.length, dx: horizontal.shift, dy: vertical.shift };

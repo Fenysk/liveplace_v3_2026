@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type CanvasSize, toStateOffset } from "./index";
+import type { Pixel } from "./ports";
 import { listCutPixels, planResize, type ResizePlan, targetOf } from "./resize";
 
 // Un rectangle de pixels, bornes incluses : x puis y, comme les exemples validés le 22/10.
@@ -230,6 +231,52 @@ describe("planResize : les cas limites", () => {
   });
 });
 
+describe("planResize : les pixels hors du cadre (JOURNAL 2026-11-05)", () => {
+  const pixel = (x: number, y: number, colorIndex = 1): Pixel => ({ x, y, colorIndex });
+
+  // Un dessin à cheval sur le bord reste dans une bande : sa partie hors du cadre recule avec sa partie visible
+  it("brings a drawing across the edge of the frame closer as one, its part outside the frame included", () => {
+    const from = size(12, 1);
+    const state = stateOf(from, rect(8, 11, 0, 0, 1));
+    const plan = planResize(state, from, size(8, 1), [pixel(12, 0), pixel(13, 0)]);
+
+    expect(plan.extent).toEqual(size(14, 1));
+    expect([8, 11, 12, 13].map((x) => targetOf(plan, x, 0)?.x)).toEqual([4, 7, 8, 9]);
+    expect(listCutPixels(plan, state)).toEqual([]);
+    expect(plan.hasMovedPixels).toBe(true);
+  });
+
+  // Une ligne après la dernière occupée du cadre recule aussi : sinon elle tomberait sur la case d'un autre
+  it("moves a cell after the last occupied line back by the lines removed before it", () => {
+    const from = size(6, 1);
+    const state = stateOf(from, rect(0, 0, 0, 0, 1), rect(5, 5, 0, 0, 2));
+    const plan = planResize(state, from, size(3, 1), [pixel(7, 0)]);
+
+    expect([0, 5, 7].map((x) => targetOf(plan, x, 0)?.x)).toEqual([0, 2, 4]);
+  });
+
+  // Sans pixel hors du cadre, le plan est celui d'avant : l'étendue est le cadre
+  it("covers the frame alone when nothing is outside it", () => {
+    const from = size(12, 8);
+    const plan = planResize(stateOf(from, rect(0, 2, 0, 2, 1)), from, size(6, 4));
+
+    expect(plan.extent).toEqual(from);
+  });
+
+  // Un pixel hors du cadre est dans l'étendue, pas dans le cadre : un pixel dans le cadre est une erreur de l'appelant
+  it("refuses a pixel outside the frame that is inside it", () => {
+    expect(() => planResize(new Uint8Array(16), size(4, 4), size(2, 2), [pixel(3, 3)])).toThrow();
+  });
+
+  // Une case sans couleur hors du cadre ne compte pas : elle n'étend rien
+  it("ignores a cell outside the frame that has no color", () => {
+    const from = size(4, 4);
+    const plan = planResize(new Uint8Array(16), from, size(2, 2), [pixel(9, 9, 0)]);
+
+    expect(plan.extent).toEqual(from);
+  });
+});
+
 // Un générateur à graine : les fresques au hasard sont les mêmes à chaque lancement.
 const seeded = (seed: number) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
@@ -330,6 +377,95 @@ describe("planResize : les garanties, sur des fresques au hasard", () => {
           if (target?.x !== x || target.y !== y) hasMoved = true;
         }
       expect(plan.hasMovedPixels).toBe(hasMoved);
+    }
+  });
+});
+
+describe("planResize : les garanties avec des pixels hors du cadre, sur des fresques au hasard (JOURNAL 2026-11-05)", () => {
+  const next = seeded(20261105);
+  // Des blocs posés partout, bord du cadre compris : ce qui est dans le cadre va dans `state`, le reste dans `cut`.
+  const cases = Array.from({ length: 120 }, () => {
+    const from = size(2 + Math.floor(next() * 24), 2 + Math.floor(next() * 24));
+    const to = size(1 + Math.floor(next() * from.width), 1 + Math.floor(next() * from.height));
+    const state = new Uint8Array(from.width * from.height);
+    const cut: Pixel[] = [];
+    for (let block = 0; block < 1 + Math.floor(next() * 6); block++) {
+      const x0 = Math.floor(next() * (from.width + 8));
+      const y0 = Math.floor(next() * (from.height + 8));
+      const [w, h] = [1 + Math.floor(next() * 4), 1 + Math.floor(next() * 4)];
+      for (let y = y0; y < y0 + h; y++)
+        for (let x = x0; x < x0 + w; x++) {
+          if (x < from.width && y < from.height) state[toStateOffset(x, y, from.width)] = 1 + block;
+          else if (!cut.some((placed) => placed.x === x && placed.y === y))
+            cut.push({ x, y, colorIndex: 1 + block });
+        }
+    }
+    return { from, to, state, cut, plan: planResize(state, from, to, cut) };
+  });
+
+  // Tout pixel posé, dans le cadre ou hors du cadre, a une destination, et jamais plus loin de l'origine que sa case
+  it("gives every placed pixel a destination, never farther from the origin", () => {
+    for (const { from, state, cut, plan } of cases) {
+      const placed = [
+        ...cut,
+        ...Array.from(state, (colorIndex, index) => ({
+          x: index % from.width,
+          y: Math.floor(index / from.width),
+          colorIndex,
+        })).filter(({ colorIndex }) => colorIndex !== 0),
+      ];
+      for (const { x, y } of placed) {
+        const target = targetOf(plan, x, y);
+        expect(target).not.toBeNull();
+        expect(target?.x).toBeLessThanOrEqual(x);
+        expect(target?.y).toBeLessThanOrEqual(y);
+      }
+    }
+  });
+
+  // Deux cases de l'étendue n'arrivent jamais au même endroit : le déplacement des piles trouve sa cible libre
+  it("never sends two cells of the extent to the same place", () => {
+    for (const { plan } of cases) {
+      const seen = new Set<number>();
+      for (let y = 0; y < plan.extent.height; y++)
+        for (let x = 0; x < plan.extent.width; x++) {
+          const target = targetOf(plan, x, y);
+          if (!target) continue;
+          expect(seen.has(target.y * 1000 + target.x)).toBe(false);
+          seen.add(target.y * 1000 + target.x);
+        }
+    }
+  });
+
+  // Une réduction ne fait jamais réapparaître un pixel : celui qui est hors du cadre le reste
+  it("never brings a pixel outside the frame back into the smaller frame", () => {
+    for (const { to, cut, plan } of cases)
+      for (const { x, y } of cut) {
+        const target = targetOf(plan, x, y);
+        expect(target !== null && (target.x >= to.width || target.y >= to.height)).toBe(true);
+      }
+  });
+
+  // Un dessin n'est jamais déformé, partie hors du cadre comprise : deux pixels voisins le restent
+  it("keeps two neighboring pixels neighbors, across the edge of the frame", () => {
+    for (const { from, state, cut, plan } of cases) {
+      const isPlaced = (x: number, y: number): boolean =>
+        x < from.width && y < from.height
+          ? state[toStateOffset(x, y, from.width)] !== 0
+          : cut.some((placed) => placed.x === x && placed.y === y);
+      for (let y = 0; y < plan.extent.height; y++)
+        for (let x = 0; x < plan.extent.width; x++)
+          for (const [dx, dy] of [
+            [1, 0],
+            [0, 1],
+          ] as const) {
+            if (!isPlaced(x, y) || !isPlaced(x + dx, y + dy)) continue;
+            const here = targetOf(plan, x, y);
+            expect(targetOf(plan, x + dx, y + dy)).toEqual({
+              x: (here?.x ?? 0) + dx,
+              y: (here?.y ?? 0) + dy,
+            });
+          }
     }
   });
 });

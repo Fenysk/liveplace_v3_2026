@@ -2,7 +2,7 @@
 // le début (`ready` à 0), les gros morceaux en pipeline, puis `restore.lua` qui finit et pose `ready` en dernier.
 
 import { readFileSync } from "node:fs";
-import { toCell, toCellKey } from "@liveplace/domain";
+import { cornerOf, toCell, toCellKey } from "@liveplace/domain";
 import type { RecoveryMarks, RecoveryTarget, Restoration } from "@liveplace/domain/ports";
 import { type CanvasSnapshot, restoreState, type SnapshotCell } from "@liveplace/domain/snapshot";
 import type { Redis } from "ioredis";
@@ -174,7 +174,7 @@ export function createRecoveryTarget(redis: Redis): RecoveryTarget {
         keys.prefix,
         version,
         at,
-        Buffer.from(restoreState({ width, height }, snapshot.cells)),
+        Buffer.from(restoreState({ width, height }, snapshot.cells, cornerOf(snapshot.meta))),
         toPayload(snapshot),
         snapshot.version,
       );

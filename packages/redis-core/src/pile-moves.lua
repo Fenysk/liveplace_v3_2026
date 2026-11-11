@@ -1,4 +1,4 @@
--- Collé devant resize.lua et reframe.lua (JOURNAL 2026-10-28) : quand une pile change de case, les ensembles `cells:` et `clearing:`
+-- Collé devant resize-plan.lua (JOURNAL 2026-10-28) : quand une pile change de case, les ensembles `cells:` et `clearing:`
 -- de ses auteurs la suivent. `parseEntry` vient de pile.lua.
 -- `noteMove` et `noteDrop` retiennent, par auteur de la pile, la case quittée et celle d'arrivée ; `apply` les corrige ensuite par lots.
 -- Les déplacements se notent dans l'ordre où les piles bougent, une arrivée toujours avant le départ qui libère sa case.

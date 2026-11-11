@@ -1,16 +1,19 @@
 -- Appliquer un plan de `planResize` (domain) à un canvas : son nouvel `state`, ses piles et leurs auteurs, sa version et le `ctl`.
 -- Collé devant resize.lua et dynamic-size.lua, après pile.lua et pile-moves.lua (JOURNAL 2026-09-29 ; §5.8).
 -- Le plan est supposé calculé sur la version actuelle : l'appelant a déjà relu `stale`. `env` : les clés et préfixes
--- du canvas, sa taille d'avant (`width`, `height`) et `cellStride`. `width` et `height` : la nouvelle taille. Rend la version prise.
+-- du canvas, sa taille d'avant (`width`, `height`), `cellStride` et son coin (`cornerX`, `cornerY`). `width` et `height` : la nouvelle
+-- taille. Le plan est en coordonnées du cadre et couvre l'étendue (`plan.extent`) : le cadre d'avant et les piles qui en étaient sorties,
+-- qui se rapprochent avec leur dessin (JOURNAL 2026-11-05). Les clés suivent le coin, qui ne bouge pas. Rend la version prise.
 
 local function applyResizePlan(env, plan, width, height)
   local metaKey, stateKey, versionKey, liveChannel = env.metaKey, env.stateKey, env.versionKey, env.liveChannel
-  local histPrefix, cellsPrefix, clearingPrefix, cellStride =
-    env.histPrefix, env.cellsPrefix, env.clearingPrefix, env.cellStride
+  local histPrefix, cellsPrefix, clearingPrefix = env.histPrefix, env.cellsPrefix, env.clearingPrefix
   local oldWidth, oldHeight = env.width, env.height
+  local window = openWindow(env.cellStride, env.cornerX, env.cornerY, oldWidth, oldHeight)
   if plan.from.width ~= oldWidth or plan.from.height ~= oldHeight then
     error("resize : le plan ne part pas de la taille du canvas")
   end
+  local extentWidth, extentHeight = plan.extent.width, plan.extent.height
   local widthBands, widthMaps, heightBands, heightMaps =
     plan.width.bandOf, plan.width.maps, plan.height.bandOf, plan.height.maps
 
@@ -35,6 +38,12 @@ local function applyResizePlan(env, plan, width, height)
     return movedX, movedY
   end
 
+  -- La couleur de la tête de la pile d'une case : 0 sans pile.
+  local function headColor(x, y)
+    local raw = redis.call("LINDEX", histPrefix .. window.keyOf(x, y), 0)
+    return raw and parseEntry(raw).colorIndex or 0
+  end
+
   -- 2. Le nouveau `state`, d'après l'ancien et le plan, avant d'écrire quoi que ce soit : un pixel posé sans destination arrête tout.
   local oldState = redis.call("GET", stateKey) or ""
   local newColors = {}
@@ -53,19 +62,28 @@ local function applyResizePlan(env, plan, width, height)
     end
   end
 
+  -- Une pile hors du cadre à tête colorée est un pixel gardé : sans destination non plus, rien ne s'écrit.
+  for y = 0, extentHeight - 1 do
+    for x = (y < oldHeight) and oldWidth or 0, extentWidth - 1 do
+      if not target(x, y) and headColor(x, y) ~= 0 then
+        error("resize : le pixel (" .. x .. ", " .. y .. ") hors du cadre n'a pas de destination")
+      end
+    end
+  end
+
   -- 3. Les piles suivent leur case. Les déplacements vont tous vers l'origine : de gauche à droite, ligne après ligne, la cible
   -- d'une pile est libre quand son tour vient. Une case retirée est vide ; sa pile (une gomme) part avec elle. `cells:` et
   -- `clearing:` de chaque auteur de la pile suivent (pile-moves.lua).
   local moves = openMoves()
-  for y = 0, oldHeight - 1 do
-    for x = 0, oldWidth - 1 do
+  for y = 0, extentHeight - 1 do
+    for x = 0, extentWidth - 1 do
       local movedX, movedY = target(x, y)
       if movedX ~= x or movedY ~= y then
-        local fromCellKey = y * cellStride + x
+        local fromCellKey = window.keyOf(x, y)
         local entries = redis.call("LRANGE", histPrefix .. fromCellKey, 0, -1)
         if #entries > 0 then
           if movedX then
-            local toCellKey = movedY * cellStride + movedX
+            local toCellKey = window.keyOf(movedX, movedY)
             if redis.call("RENAMENX", histPrefix .. fromCellKey, histPrefix .. toCellKey) == 0 then
               error("resize : la case " .. toCellKey .. " a déjà une pile")
             end
@@ -81,11 +99,6 @@ local function applyResizePlan(env, plan, width, height)
   moves.apply(cellsPrefix, clearingPrefix)
 
   -- 4. `state` d'un coup, ligne par ligne : l'ancien là où il reste dans le cadre, les piles gardées ailleurs, comme avant.
-  local function headColor(x, y)
-    local raw = redis.call("LINDEX", histPrefix .. (y * cellStride + x), 0)
-    return raw and parseEntry(raw).colorIndex or 0
-  end
-
   local rows = {}
   for y = 0, height - 1 do
     local colors = {}

@@ -1,17 +1,18 @@
 -- Signalement d'une pose (JOURNAL 2026-09-28), et de ses voisines dans une plage d'heures (JOURNAL 2026-09-29).
--- Ordre des KEYS et ARGV : client.ts. `openPile` et `parseEntry` viennent de pile.lua.
+-- Ordre des KEYS et ARGV : client.ts. `openPile`, `openWindow` et `parseEntry` viennent de pile.lua.
 
 local metaKey, versionKey, eventsKey, bansKey, offStreamKey, reportedKey, approvedKey =
   KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7]
 local histPrefix, cellsPrefix, clearingPrefix, reportsPrefix, liveChannel =
   ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5]
-local reporterId, cellKey, placementId = ARGV[6], ARGV[7], ARGV[8]
-local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[9]), tonumber(ARGV[10]), tonumber(ARGV[11]), ARGV[12]
+-- La case du cadre que le signaleur a inspectée.
+local reporterId, x, y, placementId = ARGV[6], tonumber(ARGV[7]), tonumber(ARGV[8]), ARGV[9]
+local threshold, nowMs, cellStride, eventsMaxlen = tonumber(ARGV[10]), tonumber(ARGV[11]), tonumber(ARGV[12]), ARGV[13]
 -- Vides sans plage : la pose seule.
-local rangeFrom, rangeTo = tonumber(ARGV[13]), tonumber(ARGV[14])
+local rangeFrom, rangeTo = tonumber(ARGV[14]), tonumber(ARGV[15])
 
 -- 0. Canvas prêt, comme place.lua. §17.1 : une archive ne reçoit plus rien.
-local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt")
+local meta = redis.call("HMGET", metaKey, "ready", "ownerId", "width", "height", "archivedAt", "cornerX", "cornerY")
 if meta[1] ~= "1" then
   return "canvas_not_found"
 end
@@ -19,8 +20,16 @@ if meta[5] then
   return "canvas_archived"
 end
 
+local window = openWindow(
+  cellStride,
+  tonumber(meta[6]) or 0,
+  tonumber(meta[7]) or 0,
+  tonumber(meta[3]),
+  tonumber(meta[4])
+)
+
 -- 1. La case montre encore cette pose : le signaleur vise ce qu'il a inspecté, jamais ce qui l'a recouvert depuis.
-local head = redis.call("LINDEX", histPrefix .. cellKey, 0)
+local head = redis.call("LINDEX", histPrefix .. window.keyOf(x, y), 0)
 if not head then
   return "changed"
 end
@@ -38,7 +47,7 @@ if isRefused then
   return "forbidden"
 end
 -- CDC §8 : la pose d'un compte supprimé se signale seule. Sa plage réunirait les poses de tous les comptes supprimés.
-if rangeFrom and entry.author == ARGV[15] then
+if rangeFrom and entry.author == ARGV[16] then
   return "forbidden"
 end
 
@@ -83,9 +92,7 @@ if hidden > 0 then
     histPrefix = histPrefix,
     cellsPrefix = cellsPrefix,
     clearingPrefix = clearingPrefix,
-    cellStride = cellStride,
-    width = tonumber(meta[3]),
-    height = tonumber(meta[4]),
+    window = window,
   })
   local version = redis.call("INCR", versionKey)
   local event = cjson.encode({

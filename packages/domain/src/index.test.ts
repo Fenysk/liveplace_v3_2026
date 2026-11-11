@@ -13,7 +13,10 @@ import {
   CELL_STRIDE,
   type CellKey,
   canModerate,
+  cellAt,
+  cellKeyAt,
   claimableRewards,
+  cornerOf,
   DEVELOPER_USER_ID,
   DYNAMIC_BIRTH_CANVAS_SIZE,
   DYNAMIC_SIZE_MIN,
@@ -33,6 +36,7 @@ import {
   isObsDelayStep,
   LINK_CODE_ALPHABET,
   LINK_CODE_LENGTH,
+  listPlaneCells,
   MAX_ARCHIVES,
   MINUTE_MS,
   OBS_BACKGROUND,
@@ -204,6 +208,71 @@ describe("cell coordinates (D-15)", () => {
   it("keeps the two index types apart", () => {
     expectTypeOf(toCellKey(x, y)).not.toExtend<StateOffset>();
     expectTypeOf(toStateOffset(x, y, CANVAS_WIDTH)).not.toExtend<CellKey>();
+  });
+});
+
+describe("the fixed grid and the corner of the frame (JOURNAL 2026-11-05)", () => {
+  // Une clé de la grille est signée : x de -32768 à 32767, y négatif ou non
+  it("finds the cell back from its cellKey when x or y is negative", () => {
+    const cells = [
+      [-1, 0],
+      [0, -1],
+      [-1, -1],
+      [-30, -7],
+      [-CELL_STRIDE / 2, 4],
+      [CELL_STRIDE / 2 - 1, -4],
+      [255, 255],
+      [-32768, -32768],
+    ] as const;
+    for (const [x, y] of cells) expect(toCell(toCellKey(x, y))).toEqual({ x, y });
+  });
+
+  // Aucune donnée à migrer : une clé d'avant, y × 65 536 + x avec x et y de 0 à 255, se lit comme avant
+  it("reads an existing cellKey, a cell of the 256 × 256 plane, exactly as before", () => {
+    for (const [x, y] of [
+      [0, 0],
+      [255, 0],
+      [0, 255],
+      [255, 255],
+      [17, 42],
+    ] as const)
+      expect(toCell(y * CELL_STRIDE + x)).toEqual({ x, y });
+  });
+
+  // Deux cases distinctes n'ont jamais la même clé
+  it("never gives two cells the same cellKey over the window of the grid", () => {
+    const keys = new Set<number>();
+    for (let y = -300; y < 300; y += 7) for (let x = -300; x < 300; x += 5) keys.add(toCellKey(x, y));
+    expect(keys.size).toBe(Math.ceil(600 / 7) * Math.ceil(600 / 5));
+  });
+
+  // La case du cadre (x, y) est la case de grille (x + coin.x, y + coin.y), dans les deux sens
+  it("maps a cell of the frame to the grid and back through the corner", () => {
+    const corner = { x: -30, y: 12 };
+    expect(cellKeyAt(corner, 5, 3)).toBe(toCellKey(-25, 15));
+    expect(cellAt(corner, toCellKey(-25, 15))).toEqual({ x: 5, y: 3 });
+    expect(cellAt(corner, toCellKey(-31, 11))).toEqual({ x: -1, y: -1 });
+    expect(cellKeyAt(cornerOf({}), 7, 9)).toBe(toCellKey(7, 9));
+  });
+
+  // Absent de `meta`, le coin est (0, 0) : la grille d'une fresque d'avant vaut son cadre
+  it("reads the corner from meta, (0, 0) when it is absent", () => {
+    expect(cornerOf({ cornerX: "-12", cornerY: "40" })).toEqual({ x: -12, y: 40 });
+    expect(cornerOf({ width: "50" })).toEqual({ x: 0, y: 0 });
+    expect(cornerOf({ cornerX: null, cornerY: null })).toEqual({ x: 0, y: 0 });
+  });
+
+  // Les cases où une pile peut vivre : l'ancien plan et la fenêtre sur le coin, chacune une fois
+  it("lists the cells where a pile can live, the old plane and the window on the corner, each once", () => {
+    const keys = (corner: { x: number; y: number }) =>
+      listPlaneCells(corner).map(({ x, y }) => toCellKey(x, y));
+    expect(listPlaneCells({ x: 0, y: 0 })).toHaveLength(CANVAS_WIDTH * CANVAS_HEIGHT);
+    expect(new Set(keys({ x: -30, y: -4 })).size).toBe(keys({ x: -30, y: -4 }).length);
+    expect(keys({ x: -30, y: -4 })).toHaveLength(2 * CANVAS_WIDTH * CANVAS_HEIGHT - 226 * 252);
+    const far = keys({ x: 1000, y: 1000 });
+    expect(far).toHaveLength(2 * CANVAS_WIDTH * CANVAS_HEIGHT);
+    expect(far).toContain(toCellKey(1255, 1255));
+    expect(far).toContain(toCellKey(255, 255));
   });
 });
 
