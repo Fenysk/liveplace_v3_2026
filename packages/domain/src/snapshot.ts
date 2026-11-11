@@ -1,6 +1,14 @@
 // Le snapshot complet d'un canvas : de quoi le rendre à son streamer après une perte totale (§7.2).
 
-import { type CanvasCorner, type CanvasSize, cellAt, cornerOf, type Timestamp, toStateOffset } from "./index";
+import {
+  type CanvasCorner,
+  type CanvasSize,
+  cellAt,
+  cornerOf,
+  type StateOffset,
+  type Timestamp,
+  toStateOffset,
+} from "./index";
 
 export const SNAPSHOT_SCHEMA_VERSION = 1;
 
@@ -94,6 +102,10 @@ export type Tombstones = {
   clearedRanges: ReadonlyMap<string, readonly (readonly [from: Timestamp, to: Timestamp])[]>;
 };
 
+// La pose d'une entrée de pile : `<auteur>:<pose>`, la version tenant lieu de pose avant le protocole 6 (keys.ts, `toPlacementKey`).
+export const toEntryPlacementKey = ({ authorId, placementId, version }: PileEntry): string =>
+  `${authorId}:${placementId ?? version}`;
+
 // La règle de pile.lua : son auteur retiré jusqu'à une version, sa pose, ou une plage d'heures de son auteur.
 export function isCovered(entry: PileEntry, placementKey: string, tombstones: Tombstones): boolean {
   const clearedVersion = tombstones.clearedVersions.get(entry.authorId);
@@ -103,17 +115,25 @@ export function isCovered(entry: PileEntry, placementKey: string, tombstones: To
   return ranges.some(([from, to]) => entry.placedAt >= from && entry.placedAt <= to);
 }
 
+// Où la case (x, y) du cadre se montre dans `state`, `null` hors du cadre (§5.7) : le seul endroit qui la traduit en `stateOffset`.
+export function toFrameStateOffset(
+  { x, y }: { x: number; y: number },
+  { width, height }: CanvasSize,
+): StateOffset | null {
+  return x >= 0 && x < width && y >= 0 && y < height ? toStateOffset(x, y, width) : null;
+}
+
 // Le `state` refait des cases visibles : une case hors du cadre n'y entre pas (§5.7), elle garde sa pile ailleurs. Les clés sont celles
 // de la grille, le coin du canvas les ramène au cadre.
 export function restoreState(
-  { width, height }: CanvasSize,
+  size: CanvasSize,
   cells: readonly SnapshotCell[],
   corner: CanvasCorner = cornerOf({}),
 ): Uint8Array {
-  const state = new Uint8Array(width * height);
+  const state = new Uint8Array(size.width * size.height);
   for (const [cellKey, , , colorIndex] of cells) {
-    const { x, y } = cellAt(corner, cellKey);
-    if (x >= 0 && x < width && y >= 0 && y < height) state[toStateOffset(x, y, width)] = colorIndex;
+    const stateOffset = toFrameStateOffset(cellAt(corner, cellKey), size);
+    if (stateOffset !== null) state[stateOffset] = colorIndex;
   }
   return state;
 }

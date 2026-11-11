@@ -12,6 +12,7 @@ import { Button } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, type ProfileUser } from "../design/profile";
 import { SignInButton } from "../design/twitch";
+import { TimelapseButton } from "../developer/timelapse-button";
 import { BubbleTarget } from "../help/bubble-target";
 import { useTexts } from "../locale/use-locale";
 import { MODERATION_TEXTS } from "../moderation/moderation-texts";
@@ -35,6 +36,7 @@ export type AccountPillProps = {
   onOpenSettings?: (() => void) | undefined; // la fenêtre, sur Canvas ; absent : pas le streamer sur son canvas
   onOpenModeration?: (() => void) | undefined; // la fenêtre, sur Modération ; absent : pas modérateur sans être le streamer
   onOpenDeveloper?: (() => void) | undefined; // §10.3 : la fenêtre Développeur, pour lui seul
+  onOpenTimelapse?: (() => void) | undefined; // le GIF de la fresque, pour lui seul, sur sa propre fresque (ailleurs : la pill Canvas)
   onOpenReleaseNotes?: (() => void) | undefined; // la fenêtre, sur Nouveautés ; pour tous, une fois le rôle connu
   hasUnreadReleaseNotes?: boolean; // un point sur Nouveautés, jamais sur la photo (elle porte celui des signalements)
   pendingReports?: number; // pour qui modère : un point tant qu'il y en a, sur Modération s'il l'a, sinon sur sa photo (JOURNAL 2026-09-28)
@@ -75,13 +77,17 @@ const useTitleWithReports = (): ((title: string, reports: number) => string) => 
   return (title, reports) => (reports > 0 ? t.withPending(title, moderation.reportCount(reports)) : title);
 };
 
-type RoleButtonsProps = Pick<AccountPillProps, "onOpenDeveloper" | "onOpenSettings" | "onOpenModeration"> & {
+type RoleButtonsProps = Pick<
+  AccountPillProps,
+  "onOpenDeveloper" | "onOpenTimelapse" | "onOpenSettings" | "onOpenModeration"
+> & {
   moderationReports: number;
 };
 
 // Développeur, Réglages ou Modération : les boutons de rôle, à gauche de la photo.
 const RoleButtons = ({
   onOpenDeveloper,
+  onOpenTimelapse,
   onOpenSettings,
   onOpenModeration,
   moderationReports,
@@ -93,6 +99,7 @@ const RoleButtons = ({
       {onOpenDeveloper && (
         <Button icon={Activity} variant="ghost" title="Développeur" onPress={onOpenDeveloper} />
       )}
+      {onOpenTimelapse && <TimelapseButton onPress={onOpenTimelapse} />}
       {onOpenSettings && (
         <BubbleTarget name="settings">
           <Button icon={Settings} variant="ghost" title={t.settings} onPress={onOpenSettings} />
@@ -154,6 +161,7 @@ export const AccountPill = ({
   onOpenSettings,
   onOpenModeration,
   onOpenDeveloper,
+  onOpenTimelapse,
   onOpenReleaseNotes,
   hasUnreadReleaseNotes = false,
   pendingReports = 0,
@@ -186,6 +194,7 @@ export const AccountPill = ({
     <Pill dock={isDocked ? DOCK : undefined} isVisible={isVisible && !hasNothingToShow}>
       <RoleButtons
         onOpenDeveloper={onOpenDeveloper}
+        onOpenTimelapse={onOpenTimelapse}
         onOpenSettings={onOpenSettings}
         onOpenModeration={onOpenModeration}
         moderationReports={hasModeration ? pendingReports : 0}

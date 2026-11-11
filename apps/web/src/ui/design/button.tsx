@@ -16,8 +16,8 @@ type ButtonText = { label: string; title?: string } | { label?: never; title: st
 
 // Un lien (Se connecter, une chaîne Twitch) ou une action. Un lien peut prévenir de son clic : il part quand même.
 type ButtonAction =
-  | { href: string; isNewTab?: boolean; onPress?: () => void }
-  | { onPress: () => void; href?: never; isNewTab?: never };
+  | { href: string; download?: string; isNewTab?: boolean; onPress?: () => void } // `download` : le nom du fichier qu'il enregistre
+  | { onPress: () => void; href?: never; download?: never; isNewTab?: never };
 
 export type ButtonProps = ButtonText &
   ButtonAction & {
@@ -102,6 +102,7 @@ export const Button = (props: ButtonProps) => {
       <a
         className={className}
         href={props.href}
+        download={props.download}
         title={title}
         aria-label={accessibleName}
         onClick={props.onPress}

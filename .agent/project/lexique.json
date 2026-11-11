@@ -32,7 +32,7 @@
     { "canonical": "chunk",        "definition": "Le lot d'événements rangé dans Convex, dont le contenu compressé est le `payload`. Jamais une subdivision spatiale, jamais une `archive`.", "banned": [] },
     { "canonical": "payload",      "definition": "Le contenu compressé d'un `chunk`.",                                   "banned": [] },
     { "canonical": "tile",         "definition": "RÉSERVÉ, n'existe pas encore : une subdivision spatiale du canvas. Ne jamais appeler ça un `chunk`.", "banned": [] },
-    { "canonical": "still",        "definition": "RÉSERVÉ, n'existe pas encore : une image d'un timelapse. Ne jamais appeler ça une `frame`.", "banned": [] },
+    { "canonical": "still",        "definition": "Une image du timelapse GIF du développeur, planifiée par `planStills` (JOURNAL 2026-11-11). Ne jamais appeler ça une `frame`.", "banned": [] },
     { "canonical": "obsDelay",     "definition": "Le délai de la vue OBS, appliqué par le client (D-08). L'instant d'affichage d'une case est `showAt`.", "banned": ["buffer", "lag"] },
     { "canonical": "session",      "definition": "Le jeton du navigateur, cookie `lp_session` signé HS256. Le mot `token` est réservé au token Twitch, qu'on ne garde pas.", "banned": ["token"] },
     { "canonical": "locale",       "definition": "La langue de l'interface, `fr` ou `en`, gardée dans le cookie `lp_locale`. Jamais un pays ni un format de date.", "banned": ["lang", "language"] },

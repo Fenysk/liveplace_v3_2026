@@ -12,6 +12,8 @@ import {
   createRecoveryStore,
   createRetentionStore,
   createSnapshotStore,
+  decodeChunk,
+  encodeChunk,
 } from "@liveplace/durable";
 import {
   createHistorySource,
@@ -20,7 +22,6 @@ import {
   createSnapshotSource,
 } from "@liveplace/redis-core";
 import { Redis } from "ioredis";
-import { decodeChunk, encodeChunk } from "../infra/chunk-codec";
 import { encodeImage } from "../infra/image-codec";
 import { createPresence } from "../infra/presence";
 import { decodeSnapshot, encodeSnapshot } from "../infra/snapshot-codec";

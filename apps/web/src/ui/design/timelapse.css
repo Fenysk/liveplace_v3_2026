@@ -1,0 +1,42 @@
+/* La barre de progression (progress-bar.tsx) : une piste sur le fond des contrôles, la part faite à l'encre. */
+.lp-progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--chip);
+  color: var(--accent);
+}
+
+.lp-progress::-webkit-progress-bar {
+  background: var(--chip);
+}
+
+.lp-progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.lp-progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+/* La fenêtre du GIF de la fresque (developer/timelapse-window.tsx) : des lignes simples, l'aperçu au milieu */
+.lp-timelapse {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* L'aperçu : la fresque est faite de grands pixels, le navigateur ne les lisse pas, même réduits pour tenir dans la fenêtre */
+.lp-timelapse-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin-inline: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+}

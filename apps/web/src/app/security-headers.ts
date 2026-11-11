@@ -18,7 +18,8 @@ const contentSecurityPolicy = (nonce: string, publicUrl: URL): string => {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
-    `img-src 'self' data: ${TWITCH_AVATAR_ORIGIN}`,
+    // `blob:` : l'aperçu du GIF timelapse du développeur est une URL de blob (JOURNAL 2026-11-11).
+    `img-src 'self' data: blob: ${TWITCH_AVATAR_ORIGIN}`,
     `connect-src 'self' ${socketOrigin}`,
     "object-src 'none'",
     "base-uri 'none'",

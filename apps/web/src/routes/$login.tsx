@@ -32,7 +32,9 @@ import { ToastProvider } from "../ui/design/toast";
 import { COMPACT_SCREEN_QUERY, SIDE_COLUMN_QUERY, useMediaQuery } from "../ui/design/use-media-query";
 import { DeveloperContent } from "../ui/developer/developer-content";
 import { DeveloperWindow } from "../ui/developer/developer-window";
+import { TimelapseWindowFor } from "../ui/developer/timelapse-window";
 import { useDeveloperWindow } from "../ui/developer/use-developer-window";
+import { useTimelapse } from "../ui/developer/use-timelapse";
 import { browserClock, getBrowserStorage } from "../ui/draft/browser-draft";
 import { DraftPill, type DraftPillActions } from "../ui/draft/draft-pill";
 import { useDraftPillProps } from "../ui/draft/use-draft-pill";
@@ -132,6 +134,7 @@ const LivePills = ({
   const firstHint = useFirstHintProps(stores, help.isBusy); // §9.11 : le conseil de première visite
   const banned = useBannedWindowProps(stores.canvas);
   const developer = useDeveloperWindow(stores.canvas); // §10.3 : le développeur seul
+  const timelapse = useTimelapse(stores.canvas, stores.canvasId, login); // le GIF de la fresque : lui seul aussi
   const scoreboard = useScoreboardRows(stores.canvas);
   const scoreboardCollapse = useScoreboardCollapse();
   const ownerProfile = useOwnerProfile(stores.canvas, owner); // §10.4 : son live
@@ -151,7 +154,12 @@ const LivePills = ({
     <BubbleTargetsContext value={bubbleTargets}>
       {/* Sur son canvas, le streamer n'a qu'une pill : la pill Compte porte ses Réglages. */}
       {!isOwner && !isWaitingForOwner && (
-        <CanvasPill owner={ownerProfile} isCompact={isCompact} fold={canvasPillFold} />
+        <CanvasPill
+          owner={ownerProfile}
+          isCompact={isCompact}
+          fold={canvasPillFold}
+          onOpenTimelapse={timelapse.onOpen}
+        />
       )}
       <AccountPill
         {...account}
@@ -159,6 +167,7 @@ const LivePills = ({
         isVisible={!isWaitingForOwner}
         {...accountPillOpeners(role, account.pendingReports, openWindow)}
         onOpenDeveloper={developer.onOpen}
+        onOpenTimelapse={isOwner ? timelapse.onOpen : undefined}
         onSignIn={signingIn.onSignIn}
       />
       {developer.onOpen && (
@@ -178,6 +187,7 @@ const LivePills = ({
           </DeveloperWindow>
         </FixedLocale>
       )}
+      <TimelapseWindowFor timelapse={timelapse} />
       {/* Un invité a la fenêtre aussi : Nouveautés, et le Classement sur mobile. */}
       {account.identity.kind !== "unknown" && (
         <AccountWindow

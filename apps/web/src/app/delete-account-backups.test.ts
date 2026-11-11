@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, DELETED_AUTHOR, defaultCanvasMeta } from "@liveplace/domain";
 import type { DurableStore, ErasureStore, SnapshotStore } from "@liveplace/domain/ports";
 import { restoreState } from "@liveplace/domain/snapshot";
+import { decodeChunk, encodeChunk } from "@liveplace/durable";
 import {
   createAccountPurge,
   createArchiveWrites,
@@ -21,7 +22,6 @@ import { createMemoryDurable } from "../../../../packages/durable/src/memory-dur
 // Le harnais de test de Redis n'est pas dans l'index du package : il ne sert qu'aux tests (voir delete-account.test.ts).
 import type {} from "../../../../packages/redis-core/src/test-global-setup";
 import { createRedisHarness } from "../../../../packages/redis-core/src/test-harness";
-import { decodeChunk, encodeChunk } from "../../../worker/src/infra/chunk-codec";
 import { decodeImage, encodeImage } from "../../../worker/src/infra/image-codec";
 import { decodeSnapshot, encodeSnapshot } from "../../../worker/src/infra/snapshot-codec";
 import { createErasureCycle } from "../../../worker/src/usecase/erasure-cycle";

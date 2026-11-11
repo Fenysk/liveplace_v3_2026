@@ -4,7 +4,7 @@ import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { SupportMirror } from "./badges";
 import type { CapacityResourceId, GuardMinute, Saturation } from "./capacity";
-import type { ChunkEntry, ChunkFile, Recovered } from "./chunk";
+import type { Chunk, ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
   AccountDeletionTrigger,
   ActivityPeriod,
@@ -20,6 +20,7 @@ import type {
 } from "./index";
 import type { ChunkSize, TierRow } from "./retention";
 import type { CanvasSnapshot, SnapshotTier } from "./snapshot";
+import type { TimelapseFrame } from "./timelapse";
 
 // Un lot : `placementId` nomme la pose (le brouillon validé) dont il fait partie (JOURNAL 2026-09-28).
 // §5.8 : `origin`, le repère des pixels ; le script les traduit vers celui de la fresque. Absent : le même.
@@ -736,6 +737,19 @@ export interface HistorySource {
   // Les entrées après `afterVersion` (exclue), `maxCount` au plus : un XRANGE, aucun groupe de consommateurs.
   listHistory(canvasId: string, afterVersion: number, maxCount: number): Promise<HistoryRead>;
   watch(onActivity: (activity: CanvasActivity) => void): Promise<Unsubscribe>;
+}
+
+// JOURNAL 2026-11-11 : ce que le web lit de Redis pour rejouer l'historique d'une fresque en GIF (le développeur seul).
+export interface TimelapseSource {
+  // Le cadre, l'image, les piles et la modération d'un canvas. `null` : absent, ou pas prêt.
+  getFrame(canvasId: string): Promise<TimelapseFrame | null>;
+  // Les entrées du flux après `afterVersion` (exclue), dans l'ordre des versions, une page à la fois.
+  listStreamEntries(canvasId: string, afterVersion: number): AsyncIterable<ChunkEntry>;
+}
+
+// Les chunks de Convex d'un canvas, un à la fois dans l'ordre des versions : la mémoire n'en garde qu'un.
+export interface ChunkReader {
+  listChunks(canvasId: string): AsyncIterable<Chunk>;
 }
 
 // L'historique d'un seul environnement (`DURABLE_SCOPE`), comme les snapshots.

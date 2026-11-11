@@ -16,6 +16,8 @@
     "./retention": "./src/retention.ts",
     "./capacity": "./src/capacity.ts",
     "./support": "./src/support.ts",
-    "./badges": "./src/badges.ts"
+    "./badges": "./src/badges.ts",
+    "./timelapse": "./src/timelapse.ts",
+    "./timelapse-stills": "./src/timelapse-stills.ts"
   }
 }

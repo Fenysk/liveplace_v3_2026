@@ -2,7 +2,13 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { generateLinkCode } from "@liveplace/domain";
-import { createDonationStore, createDurableStore, createRecoveryStore } from "@liveplace/durable";
+import type { ChunkReader } from "@liveplace/domain/ports";
+import {
+  createChunkReader,
+  createDonationStore,
+  createDurableStore,
+  createRecoveryStore,
+} from "@liveplace/durable";
 import {
   createAccountList,
   createAccountPurge,
@@ -12,6 +18,7 @@ import {
   createHealthProbe,
   createRecoveryMarks,
   createSignInWrites,
+  createTimelapseSource,
   createTwitchLiveStore,
   createTwitchWrites,
 } from "@liveplace/redis-core";
@@ -37,6 +44,15 @@ import {
 import { createTwitchLiveTracker } from "../usecase/twitch-live";
 import { parseWebConfig } from "./config";
 import { createPreviewRenderer } from "./render-preview-png";
+
+const toChunkReader = (config: ReturnType<typeof parseWebConfig>): ChunkReader =>
+  config.durableScope === null
+    ? {
+        async *listChunks() {
+          yield* [];
+        },
+      }
+    : createChunkReader(config.convexUrl, config.convexServiceKey, config.durableScope);
 
 const buildServerDeps = () => {
   // Fail-closed (§11.5) : une variable manquante lève ici, en la nommant.
@@ -91,6 +107,9 @@ const buildServerDeps = () => {
         ? undefined
         : createRecoveryStore(config.convexUrl, config.convexServiceKey, config.durableScope),
     recoveryMarks: createRecoveryMarks(redis),
+    // JOURNAL 2026-11-11 : le GIF timelapse du développeur lit Redis, puis les chunks de Convex de son scope (aucun sans `DURABLE_SCOPE`).
+    timelapseSource: createTimelapseSource(redis),
+    chunkReader: toChunkReader(config),
     twitchWrites,
     archiveWrites,
     canvasPreviews,

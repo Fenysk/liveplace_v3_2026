@@ -69,6 +69,7 @@ const ENTRIES_BY_SLUG = {
   "mon-compte": { title: "Mon compte", chapterId: "window" },
   nouveautes: { title: "Nouveautés", chapterId: "window" },
   developpeur: { title: "Développeur", chapterId: "window" },
+  "gif-de-la-fresque": { title: "GIF de la fresque", chapterId: "window" },
 
   "taille-du-canvas": { title: "Taille de la fresque", chapterId: "dialogs" },
   "jauge-maximale": { title: "Jauge maximale", chapterId: "dialogs" },

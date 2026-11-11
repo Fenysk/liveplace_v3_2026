@@ -39,7 +39,7 @@ describe("securityHeaders (audit de sécurité §2)", () => {
   // La page ouvre son WebSocket sur l'hôte public et montre les avatars Twitch
   it("lets the page open its socket on the public host and show Twitch avatars", () => {
     expect(policyOf(production)).toContain("connect-src 'self' wss://liveplace.tv");
-    expect(policyOf(production)).toContain("img-src 'self' data: https://static-cdn.jtvnw.net");
+    expect(policyOf(production)).toContain("img-src 'self' data: blob: https://static-cdn.jtvnw.net");
     expect(policyOf({ ...production, publicUrl: "http://localhost:3000" })).toContain(
       "connect-src 'self' ws://localhost:3000",
     );

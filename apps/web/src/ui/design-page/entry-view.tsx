@@ -61,6 +61,7 @@ import {
 import { ReleaseNotesEntry } from "./release-notes-entries";
 import { ScoreboardListEntry, ScoreboardPillEntry } from "./scoreboard-entries";
 import { SkeletonEntry } from "./skeleton-entries";
+import { TimelapseEntry } from "./timelapse-entry";
 
 const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   couleurs: ColorTokensEntry,
@@ -109,6 +110,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "mon-compte": AccountWindowEntry,
   nouveautes: ReleaseNotesEntry,
   developpeur: DeveloperEntry,
+  "gif-de-la-fresque": TimelapseEntry,
 
   "taille-du-canvas": ResizeWindowEntry,
   "jauge-maximale": CeilingWindowEntry,

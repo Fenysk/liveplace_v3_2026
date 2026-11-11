@@ -21,6 +21,8 @@ import { PixelCanvas } from "../canvas/pixel-canvas";
 import { SupportPill } from "../design/support";
 import { ToastProvider, useToast } from "../design/toast";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import { TimelapseWindowFor } from "../developer/timelapse-window";
+import { useTimelapse } from "../developer/use-timelapse";
 import { browserClock, getBrowserStorage } from "../draft/browser-draft";
 import { restartDeviceTutorial } from "../help/tutorial";
 import { InspectionPill } from "../inspection/inspection-pill";
@@ -103,6 +105,7 @@ const ArchiveControls = ({ archive, stores, isCompact, deletion }: ArchiveContro
   const [background, setBackground] = useState<PngBackground | null>(null);
   const { owner, createdAt, archivedAt, theme } = archive;
   const ownerProfile = useOwnerProfile(stores?.canvas, owner); // §10.4 : son live
+  const timelapse = useTimelapse(stores?.canvas, archive.canvasId, owner.login); // le développeur seul
 
   // Le dessin visible, case par case : le même que celui de la page, agrandi sans lissage, sur le fond choisi.
   const download = async (choice: PngBackground): Promise<void> => {
@@ -143,8 +146,10 @@ const ArchiveControls = ({ archive, stores, isCompact, deletion }: ArchiveContro
         isDownloading={isDownloading || !stores}
         onCopyLink={() => copyLink(window.location.pathname)}
         onDownload={openChoice}
+        onOpenTimelapse={timelapse.onOpen}
         isCompact={isCompact}
       />
+      <TimelapseWindowFor timelapse={timelapse} />
       <DownloadWindow
         isOpen={isChoosing}
         background={background}

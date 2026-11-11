@@ -46,6 +46,7 @@
 @import "./capacity-row.css";
 @import "./skeleton.css";
 @import "./release-notes.css";
+@import "./timelapse.css";
 
 html,
 body {

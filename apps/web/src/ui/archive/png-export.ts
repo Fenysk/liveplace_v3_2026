@@ -13,7 +13,7 @@ export const pngScale = (width: number, height: number): number =>
 export const pngFileName = (login: string, archivedAt: Timestamp): string =>
   `liveplace-${login}-${toParisDay(archivedAt)}.png`;
 
-type Rgba = readonly [number, number, number, number];
+export type Rgba = readonly [number, number, number, number];
 
 // Le fond des cases transparentes, à choisir au téléchargement : le noir et le blanc sont purs, et opaques.
 export type PngBackground = "transparent" | "black" | "white";
@@ -25,7 +25,7 @@ const BACKGROUND_RGBA: Record<PngBackground, Rgba> = {
 };
 
 // Six ou huit chiffres hexadécimaux : la case transparente de la palette a un alpha nul.
-const toRgba = (color: string): Rgba => {
+export const toRgba = (color: string): Rgba => {
   const hex = color.replace("#", "");
   const channel = (index: number) => Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
   return [channel(0), channel(1), channel(2), hex.length >= 8 ? channel(3) : 255];

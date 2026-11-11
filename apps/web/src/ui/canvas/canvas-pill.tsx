@@ -3,6 +3,7 @@
 
 import { Pill, type PillDock } from "../design/pill";
 import { AvatarButton, Profile, type ProfileUser } from "../design/profile";
+import { TimelapseButton } from "../developer/timelapse-button";
 import { useTexts } from "../locale/use-locale";
 import { CANVAS_TEXTS } from "./canvas-texts";
 
@@ -16,11 +17,18 @@ type CanvasPillProps = {
   isCompact?: boolean;
   isDocked?: boolean;
   fold?: CanvasPillFold;
+  onOpenTimelapse?: (() => void) | undefined; // le GIF de la fresque, pour le développeur seul
 };
 
 // Sur mobile, la place manque : le nom sans l'icône Twitch (design system, CanvasPage), et la photo seule une fois repliée,
 // avec le rond du live. Le PC ne se replie jamais.
-export const CanvasPill = ({ owner, isCompact = false, isDocked = true, fold }: CanvasPillProps) => {
+export const CanvasPill = ({
+  owner,
+  isCompact = false,
+  isDocked = true,
+  fold,
+  onOpenTimelapse,
+}: CanvasPillProps) => {
   const t = useTexts(CANVAS_TEXTS);
   return (
     <Pill dock={isDocked ? DOCK : undefined}>
@@ -33,7 +41,10 @@ export const CanvasPill = ({ owner, isCompact = false, isDocked = true, fold }: 
           onPress={fold.onUnfold}
         />
       ) : (
-        <Profile user={owner} variant={isCompact ? "name" : "full"} />
+        <>
+          <Profile user={owner} variant={isCompact ? "name" : "full"} />
+          {onOpenTimelapse && <TimelapseButton onPress={onOpenTimelapse} />}
+        </>
       )}
     </Pill>
   );

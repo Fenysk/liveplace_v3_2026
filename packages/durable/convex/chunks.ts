@@ -9,6 +9,7 @@ import { chunkFields } from "./schema";
 import { addUsage, chunksKey, discardChunkRow, FILES_KEY } from "./usage";
 
 const BY_CANVAS_VERSION = "by_scope_canvas_version";
+const FILES_PER_PAGE_MAX = 100; // des adresses de fichiers par page : une transaction Convex lit au plus quelques centaines de lignes
 
 // Une mutation est une transaction : deux workers qui rangent le même intervalle ne le rangent pas deux fois. Refusé, le
 // fichier envoyé part avec : rien n'y renvoie.
@@ -74,6 +75,33 @@ export const listOldest = query({
       toTs,
       size,
     }));
+  },
+});
+
+// Les chunks d'un canvas pour un scope, du plus ancien au plus récent, une page à la fois, chacun avec l'adresse de son fichier :
+// le GIF timelapse du développeur les télécharge un à un (JOURNAL 2026-11-11).
+export const listCanvasFiles = query({
+  args: {
+    serviceKey: v.string(),
+    scope: v.string(),
+    canvasId: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  handler: async (ctx, { serviceKey, scope, canvasId, cursor, numItems }) => {
+    requireServiceKey(serviceKey);
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("chunks")
+      .withIndex(BY_CANVAS_VERSION, (q) => q.eq("scope", scope).eq("canvasId", canvasId))
+      .paginate({ numItems: Math.min(numItems, FILES_PER_PAGE_MAX), cursor });
+    const files = await Promise.all(
+      page.map(async ({ fromVersion, toVersion, storageId }) => ({
+        fromVersion,
+        toVersion,
+        url: await ctx.storage.getUrl(storageId),
+      })),
+    );
+    return { files, next: isDone ? null : continueCursor };
   },
 });
 

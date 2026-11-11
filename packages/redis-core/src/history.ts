@@ -16,7 +16,7 @@ const fieldOf = (flat: string[], name: string): string | undefined => {
 };
 
 // L'ID du flux est la version (§5.2).
-const entryOf = (id: string, flat: string[]): ChunkEntry => {
+export const entryOf = (id: string, flat: string[]): ChunkEntry => {
   const raw = fieldOf(flat, "e");
   if (raw === undefined) throw new Error(`entrée ${id} du flux sans événement`);
   const event: Event = JSON.parse(raw);

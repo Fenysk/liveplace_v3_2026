@@ -17,11 +17,17 @@ const live: ProfileUser = { ...owner, twitchLive: { category: "Art" } };
 const folded: CanvasPillFold = { isFolded: true, onUnfold: () => undefined };
 const unfolded: CanvasPillFold = { isFolded: false, onUnfold: () => undefined };
 
-type Rendering = { isCompact?: boolean; fold?: CanvasPillFold };
+type Rendering = { isCompact?: boolean; fold?: CanvasPillFold; hasTimelapse?: boolean };
 
-const render = (profile: ProfileUser, { isCompact = true, fold }: Rendering = {}) =>
+const render = (profile: ProfileUser, { isCompact = true, fold, hasTimelapse = false }: Rendering = {}) =>
   renderToString(
-    createElement(CanvasPill, { owner: profile, isCompact, isDocked: false, ...(fold ? { fold } : {}) }),
+    createElement(CanvasPill, {
+      owner: profile,
+      isCompact,
+      isDocked: false,
+      ...(fold ? { fold } : {}),
+      ...(hasTimelapse ? { onOpenTimelapse: () => undefined } : {}),
+    }),
   );
 
 describe("the Canvas pill, folded on a compact screen", () => {
@@ -198,5 +204,25 @@ describe("what folds the Canvas pill (§9.7)", () => {
   it("no longer folds on the raw contact, only on the gesture the tracker recognizes", () => {
     expect(scene()).toContain("if (movesViewport(gesture)) options.onGesture();");
     expect(scene()).not.toMatch(/"pointerdown",[\s\S]{0,300}options\.onGesture\(\)/);
+  });
+});
+
+describe("the Canvas pill and the timelapse button of the developer", () => {
+  // Quand le développeur regarde la fresque d'un autre, alors la pill a le bouton « Créer le GIF de la fresque ».
+  it("has the button when the page gives it an opener", () => {
+    expect(render(owner, { isCompact: false, hasTimelapse: true })).toContain(
+      'title="Créer le GIF de la fresque"',
+    );
+  });
+
+  // Quand personne ne l'ouvre (tout le monde sauf le développeur), alors la pill n'a pas le bouton.
+  it("has no button without an opener", () => {
+    expect(render(owner, { isCompact: false })).not.toContain("Créer le GIF");
+  });
+
+  // Quand la pill est repliée sur mobile, alors le bouton est caché avec le reste.
+  it("hides the button while the pill is folded on mobile", () => {
+    expect(render(owner, { fold: folded, hasTimelapse: true })).not.toContain("Créer le GIF");
+    expect(render(owner, { fold: unfolded, hasTimelapse: true })).toContain("Créer le GIF");
   });
 });

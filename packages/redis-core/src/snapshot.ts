@@ -9,43 +9,19 @@ import {
   SNAPSHOT_SCHEMA_VERSION,
   type SnapshotCell,
   type Tombstones,
+  toEntryPlacementKey,
 } from "@liveplace/domain/snapshot";
 import type { ChainableCommander, Redis } from "ioredis";
-import { buildCanvasKeys, toPlacementKey } from "./keys";
+import { buildCanvasKeys } from "./keys";
 import { watchLive } from "./live-watch";
 import { parsePileEntry } from "./pile-entry";
+import { escapeGlob, fieldsOf, scanNames, stringsOf, valuesOf } from "./replies";
 
 const HEADS_PER_PIPELINE = 2048; // une tranche de têtes de pile par aller-retour : Redis reprend la main entre deux
-const SCAN_COUNT = 1000;
 const META_KEY = /^cv:([^:]+):meta$/;
 const PROGRESS_KEY = /^cv:([^:]+):progress:(.+)$/;
 
 type CanvasKeys = ReturnType<typeof buildCanvasKeys>;
-type Replies = [Error | null, unknown][];
-
-// La réponse d'un pipeline ou d'un MULTI, une valeur par commande : une erreur de commande remonte.
-const valuesOf = (replies: Replies | null): unknown[] => {
-  if (!replies) throw new Error("transaction annulée");
-  return replies.map(([error, value]) => {
-    if (error) throw error;
-    return value;
-  });
-};
-
-const stringsOf = (reply: unknown): string[] => {
-  if (!Array.isArray(reply) || !reply.every((item) => typeof item === "string"))
-    throw new Error("réponse Redis : une liste de chaînes était attendue");
-  return reply;
-};
-
-const fieldsOf = (reply: unknown): Record<string, string> => {
-  const isHash =
-    typeof reply === "object" &&
-    reply !== null &&
-    Object.values(reply).every((value) => typeof value === "string");
-  if (!isHash) throw new Error("réponse Redis : un hash de chaînes était attendu");
-  return Object.fromEntries(Object.entries(reply));
-};
 
 // `ZRANGE … WITHSCORES` rend `[membre, score, membre, score…]`.
 const pairsOf = (reply: unknown): [member: string, score: string][] => {
@@ -135,14 +111,15 @@ const listSmallParts = async (redis: Redis, keys: CanvasKeys): Promise<SmallPart
 };
 
 // Une plage retirée, `[from, to]`, telle que moderate.lua l'écrit dans `cleared:ranges`.
-const tombstonesOf = ({ cleared, clearedPlacements, clearedRanges }: SmallParts): Tombstones => ({
+export const tombstonesOf = ({
+  cleared,
+  clearedPlacements,
+  clearedRanges,
+}: Pick<SmallParts, "cleared" | "clearedPlacements" | "clearedRanges">): Tombstones => ({
   clearedVersions: new Map(Object.entries(cleared).map(([author, version]) => [author, Number(version)])),
   clearedPlacements: new Set(clearedPlacements),
   clearedRanges: new Map(Object.entries(clearedRanges).map(([author, raw]) => [author, JSON.parse(raw)])),
 });
-
-const placementKeyOf = (entry: PileEntry): string =>
-  toPlacementKey({ authorId: entry.authorId, placementId: entry.placementId ?? String(entry.version) });
 
 // §5.3 : un canvas redimensionné garde des piles hors du cadre, dans tout le plan de la grille ; sinon son cadre suffit.
 const listPileCellKeys = (fields: Record<string, string>): CellKey[] => {
@@ -183,9 +160,9 @@ const visibleEntryOf = async (
   tombstones: Tombstones,
 ): Promise<PileEntry | null> => {
   const first = parsePileEntry(head);
-  if (!isCovered(first, placementKeyOf(first), tombstones)) return first;
+  if (!isCovered(first, toEntryPlacementKey(first), tombstones)) return first;
   const pile = (await redis.lrange(keys.hist(cellKey), 0, -1)).map(parsePileEntry);
-  return pile.find((entry) => !isCovered(entry, placementKeyOf(entry), tombstones)) ?? null;
+  return pile.find((entry) => !isCovered(entry, toEntryPlacementKey(entry), tombstones)) ?? null;
 };
 
 // Deux dictionnaires rendent un rang : un auteur ou une pose revient sur des centaines de cases.
@@ -250,14 +227,6 @@ const hashesByKey = (
       return hash && Object.keys(hash).length > 0 ? [[id, hash]] : [];
     }),
   );
-
-// Un identifiant de canvas n'est jamais un motif : les caractères de SCAN y perdent leur sens.
-const escapeGlob = (name: string): string => name.replace(/[\\*?[\]]/g, "\\$&");
-
-// Les clés qui correspondent au motif, sans jamais bloquer Redis : un curseur, quelques milliers de clés par tour.
-async function* scanNames(redis: Redis, match: string): AsyncGenerator<string> {
-  for await (const names of redis.scanStream({ match, count: SCAN_COUNT })) yield* names;
-}
 
 export function createSnapshotSource(redis: Redis, subscriber: Redis): SnapshotSource {
   return {

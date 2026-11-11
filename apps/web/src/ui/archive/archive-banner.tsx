@@ -6,6 +6,7 @@ import { Download, Link2 } from "lucide-react";
 import { Button, type ButtonIcon } from "../design/button";
 import { Pill, type PillDock } from "../design/pill";
 import { Profile, type ProfileUser } from "../design/profile";
+import { TimelapseButton } from "../developer/timelapse-button";
 import { useTexts } from "../locale/use-locale";
 import { ARCHIVE_TEXTS } from "./archive-texts";
 
@@ -30,6 +31,7 @@ type ArchiveBannerProps = {
   isDownloading: boolean; // le PNG se prépare : Télécharger attend
   onCopyLink: () => void;
   onDownload: () => void;
+  onOpenTimelapse?: (() => void) | undefined; // le GIF de l'archive, pour le développeur seul
   isCompact?: boolean;
   isDocked?: boolean;
 };
@@ -41,6 +43,7 @@ export const ArchiveBanner = ({
   isDownloading,
   onCopyLink,
   onDownload,
+  onOpenTimelapse,
   isCompact = false,
   isDocked = true,
 }: ArchiveBannerProps) => {
@@ -60,6 +63,7 @@ export const ArchiveBanner = ({
             isDisabled={isDownloading}
             onPress={onDownload}
           />
+          {onOpenTimelapse && <TimelapseButton onPress={onOpenTimelapse} />}
         </div>
       </div>
     </Pill>

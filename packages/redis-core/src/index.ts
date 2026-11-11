@@ -10,4 +10,5 @@ export * from "./history";
 export * from "./keys";
 export * from "./recovery";
 export * from "./snapshot";
+export * from "./timelapse";
 export * from "./twitch-live";
