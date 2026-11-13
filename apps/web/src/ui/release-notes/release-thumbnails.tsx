@@ -19,6 +19,7 @@ import { ClearThumbnail, ReportThumbnail } from "./inspection-thumbnails";
 import { InstallThumbnail } from "./install-thumbnail";
 import { KeyboardThumbnail } from "./keyboard-thumbnail";
 import { LaunchThumbnail } from "./launch-thumbnail";
+import { LiveOnlyThumbnail } from "./live-only-thumbnail";
 import { LiveThumbnail } from "./live-thumbnail";
 import { LocaleThumbnail } from "./locale-thumbnail";
 import { ModerationThumbnail } from "./moderation-thumbnail";
@@ -171,4 +172,5 @@ export const THUMBNAILS = {
   install: InstallThumbnail,
   live: LiveThumbnail,
   theme: ThemeThumbnail,
+  liveOnly: LiveOnlyThumbnail,
 } as const satisfies Record<ReleaseThumbnail, ComponentType>;

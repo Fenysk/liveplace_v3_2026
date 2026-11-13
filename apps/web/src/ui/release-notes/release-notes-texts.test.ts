@@ -17,9 +17,10 @@ describe("les publications des Nouveautés", () => {
     expect(new Set(dates).size).toBe(dates.length);
   });
 
-  // Cinq publications, la plus récente en haut, avec leurs 18 lignes dans l'ordre où Alexis les a validées ; chacune a sa vignette, une seule
-  it("holds the five releases of 1 November, 18 October, 11 October, 4 October and 27 September, with their 18 lines in order", () => {
+  // Six publications, la plus récente en haut, avec leurs 19 lignes dans l'ordre où Alexis les a validées ; chacune a sa vignette, une seule
+  it("holds the six releases of 13 November, 1 November, 18 October, 11 October, 4 October and 27 September, with their 19 lines in order", () => {
     expect(RELEASES.map(({ date }) => date)).toEqual([
+      "2026-11-13",
       "2026-11-01",
       "2026-10-18",
       "2026-10-11",
@@ -31,6 +32,7 @@ describe("les publications des Nouveautés", () => {
         lines.map(({ audience, texts, thumbnail }) => [audience, texts.fr.title, thumbnail]),
       ),
     ).toEqual([
+      [["owner", "Dessin pendant tes lives", "liveOnly"]],
       [
         ["viewer", "Annuler, refaire", "undo"],
         ["owner", "La fresque grandit seule", "growth"],
@@ -56,9 +58,9 @@ describe("les publications des Nouveautés", () => {
       ],
       [["viewer", "Lancement de LivePlace (bêta)", "launch"]],
     ]);
-    // Les dix-huit vignettes dessinées gardent leur ligne, chacune une fois
+    // Les dix-neuf vignettes dessinées gardent leur ligne, chacune une fois
     const lines = RELEASES.flatMap((release) => release.lines);
-    expect(lines).toHaveLength(18);
+    expect(lines).toHaveLength(19);
     expect(lines.flatMap(({ thumbnail }) => (thumbnail ? [thumbnail] : [])).sort()).toEqual([
       "archives",
       "backgrounds",
@@ -73,6 +75,7 @@ describe("les publications des Nouveautés", () => {
       "language",
       "launch",
       "live",
+      "liveOnly",
       "moderation",
       "report",
       "scoreboard",
@@ -96,14 +99,19 @@ describe("les publications des Nouveautés", () => {
     expect(HELLO_WORLD).toBe("Hello world!");
   });
 
-  // Les titres et les phrases des 18 lignes, mot pour mot, dans les deux langues : le français validé par Alexis, l'anglais avec les mots
+  // Les titres et les phrases des 19 lignes, mot pour mot, dans les deux langues : le français validé par Alexis, l'anglais avec les mots
   // de l'interface (eyedropper, cell, report, clear, canvas, viewer, gauge, theme, tutorial)
-  it("says the 18 lines in French and in English, word for word", () => {
+  it("says the 19 lines in French and in English, word for word", () => {
     const lines = RELEASES.flatMap(({ date, lines: releaseLines }) =>
       releaseLines.map(({ audience, texts }) => ({ date, audience, texts })),
     );
 
     expect(lines.map(({ date, texts }) => [date, texts.fr.title, texts.fr.sentence])).toEqual([
+      [
+        "2026-11-13",
+        "Dessin pendant tes lives",
+        `Dans Menu > Fresque, coche Dessin seulement pendant le live${NB}: tes viewers dessinent quand tu es en live.`,
+      ],
       [
         "2026-11-01",
         "Annuler, refaire",
@@ -193,6 +201,10 @@ describe("les publications des Nouveautés", () => {
     ]);
     expect(lines.map(({ texts }) => [texts.en.title, texts.en.sentence])).toEqual([
       [
+        "Drawing during your streams",
+        "In Menu > Canvas, tick Drawing only while live: your viewers draw while you're live.",
+      ],
+      [
         "Undo, redo",
         "In Draw, Ctrl+Z or the arrow undoes your last stroke, and the other arrow brings it back.",
       ],
@@ -225,8 +237,8 @@ describe("les publications des Nouveautés", () => {
     ]);
   });
 
-  // Un invité ou un viewer ne voit que les lignes qui s'adressent à tous (11, dans les cinq publications) ; le streamer voit les 18
-  it("shows a viewer the eleven lines for everyone, and the owner all eighteen", () => {
+  // Un invité ou un viewer ne voit que les lignes qui s'adressent à tous (11, dans les cinq publications qui leur parlent) ; le streamer voit les 19
+  it("shows a viewer the eleven lines for everyone, and the owner all nineteen", () => {
     const viewerReleases = shownReleases(RELEASES, ["viewer"]);
     const ownerReleases = shownReleases(RELEASES, AUDIENCES);
     const sizes = (shown: typeof viewerReleases) =>
@@ -244,6 +256,7 @@ describe("les publications des Nouveautés", () => {
     ]);
     // Dans l'ordre de l'écran : tous, les modérateurs, les streamers
     expect(sizes(ownerReleases)).toEqual([
+      ["2026-11-13", [["owner", 1]]],
       [
         "2026-11-01",
         [
@@ -274,7 +287,7 @@ describe("les publications des Nouveautés", () => {
       11,
     );
     expect(ownerReleases.flatMap(({ byAudience }) => byAudience.flatMap(({ lines }) => lines))).toHaveLength(
-      18,
+      19,
     );
   });
 });

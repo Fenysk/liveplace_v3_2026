@@ -1600,3 +1600,73 @@ describe("protocol 25: the badges next to a name", () => {
     expect(decodeServerFrame({ ...inspected, entry: { ...inspected.entry, badges: [1] } }).ok).toBe(false);
   });
 });
+
+// Protocole 26 (JOURNAL 2026-11-12) : le dessin seulement pendant le live
+describe("protocol 26: the drawing only while live", () => {
+  const welcome = {
+    t: "welcome",
+    canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+    params: {
+      gaugeMaxStart: 10,
+      gaugeMaxCeiling: 150,
+      refillMs: 10_000,
+      refillCharges: 1,
+      obsDelayMs: 5000,
+      obsBackground: "transparent",
+    },
+    palette: ["#00000000"],
+    version: 0,
+    you: { role: "viewer" },
+  };
+
+  // Passe au protocole 26 : une page en 25 se recharge
+  it("is protocol 26 or later: a page in 25 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(26);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 25, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Règle le dessin seulement pendant le live, allumé ou éteint, et rien d'autre dans la frame
+  it("takes setLiveOnly, on or off, and nothing else in it", () => {
+    const frame = { t: "setLiveOnly", requestId: "r", isLiveOnly: true };
+
+    expect(decodeClientFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeClientFrame({ ...frame, isLiveOnly: false }).ok).toBe(true);
+    expect(decodeClientFrame({ ...frame, isLiveOnly: "yes" }).ok).toBe(false);
+    expect(decodeClientFrame({ ...frame, width: 50 }).ok).toBe(false);
+    expect(decodeClientFrame({ t: "setLiveOnly", requestId: "r" }).ok).toBe(false);
+  });
+
+  // Garde le réglage dans les params et la fermeture dans le canvas du welcome, et accepte un welcome sans eux
+  it("keeps the setting in the params and the closing in the canvas of a welcome, and accepts a welcome without them", () => {
+    const closed = {
+      ...welcome,
+      canvas: { ...welcome.canvas, isDrawingClosed: true },
+      params: { ...welcome.params, isLiveOnly: true },
+    };
+
+    expect(decodeServerFrame(closed)).toEqual({ ok: true, value: closed });
+    expect(decodeServerFrame(welcome)).toEqual({ ok: true, value: welcome });
+    expect(decodeServerFrame({ ...closed, params: { ...closed.params, isLiveOnly: "yes" } }).ok).toBe(false);
+    expect(decodeServerFrame({ ...closed, canvas: { ...closed.canvas, isDrawingClosed: 1 } }).ok).toBe(false);
+  });
+
+  // Les deux frames du serveur disent un booléen, pas autre chose
+  it("takes the liveOnly and drawingClosed frames, with a boolean", () => {
+    for (const frame of [
+      { t: "liveOnly", isLiveOnly: true },
+      { t: "liveOnly", isLiveOnly: false },
+      { t: "drawingClosed", isClosed: true },
+      { t: "drawingClosed", isClosed: false },
+    ])
+      expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeServerFrame({ t: "liveOnly" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "drawingClosed", isClosed: "yes" }).ok).toBe(false);
+  });
+
+  // Une pose refusée parce que le dessin est fermé a son code, nommant sa requête
+  it("takes the drawing_closed error code, naming the request", () => {
+    const frame = { t: "error", code: "drawing_closed", requestId: "r" };
+
+    expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+  });
+});

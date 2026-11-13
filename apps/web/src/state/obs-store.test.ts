@@ -26,6 +26,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
   lastError: null,
   inspection: null,
   isBanned: false,
+  isDrawingClosed: false,
   isArchived: false,
   isDiscarded: false,
   isDynamicSize: false,

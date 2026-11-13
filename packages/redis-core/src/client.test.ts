@@ -1042,4 +1042,28 @@ describe("setObsDelay (JOURNAL 2026-09-25)", () => {
     await redis.hset(buildCanvasKeys(canvasId).meta, "backgroundImageOpacity", "45");
     expect((await core.getCanvas(canvasId))?.backgroundImageOpacity).toBeUndefined();
   });
+
+  // Écrit le dessin seulement pendant le live dans meta et prévient les pages, sans version ; retiré, le champ part (JOURNAL 2026-11-12)
+  it("writes the drawing only while live into meta and tells the pages, without a version; removed, the field goes", async () => {
+    const canvasId = uniqueCanvasId();
+    await core.createCanvas(canvasId, meta);
+    expect((await core.getCanvas(canvasId))?.isLiveOnly).toBeUndefined();
+    const received: LiveMessage[] = [];
+    const unsubscribe = await core.subscribe(canvasId, (message) => received.push(message));
+
+    await core.setLiveOnly(canvasId, true);
+    expect((await core.getCanvas(canvasId))?.isLiveOnly).toBe(true);
+    await core.setLiveOnly(canvasId, false);
+    await delay(100);
+    await unsubscribe();
+
+    const fields = await redis.hgetall(buildCanvasKeys(canvasId).meta);
+    expect(fields).not.toHaveProperty("liveOnly");
+    expect((await core.getCanvas(canvasId))?.isLiveOnly).toBeUndefined();
+    expect(received).toEqual([
+      { ctl: { t: "liveOnly", isLiveOnly: true } },
+      { ctl: { t: "liveOnly", isLiveOnly: false } },
+    ]);
+    expect(await redis.get(buildCanvasKeys(canvasId).version)).toBe("0");
+  });
 });

@@ -56,4 +56,12 @@ describe("ce que la pill Dessin dit aux bulles d'aide (§9.11)", () => {
     expect(toPillFacts({ kind: "guest", signInHref: "#" })).toEqual(none);
     expect(toPillFacts({ kind: "closed" })).toEqual(none);
   });
+
+  // Dessiner grisé hors du live : aucune bulle ne le montre
+  it("tells nothing of a Dessiner greyed outside the live", () => {
+    const none = { pill: undefined, charges: undefined, canClaim: false, isTouchTracing: false };
+    expect(toPillFacts({ kind: "view", gauge: gauge(5), canClaim: false, isDrawingClosed: true })).toEqual(
+      none,
+    );
+  });
 });

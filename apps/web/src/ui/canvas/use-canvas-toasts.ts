@@ -1,12 +1,13 @@
 // Les toasts de la page (CDC 2026, Toasts) : la connexion perdue puis revenue, les pixels
 // d'un envoi que le serveur a refusés, gardés dans le brouillon, le streamer qui change de canvas
-// (§17.1), et le brouillon effacé par une réduction qui rapproche les dessins (§5.8).
+// (§17.1), le brouillon effacé par une réduction qui rapproche les dessins (§5.8), et le Dessin fermé hors du live du streamer.
 
 import { useEffect, useRef } from "react";
 import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { OwnSwitchTracker } from "../archive/own-switch";
 import { useToast } from "../design/toast";
+import { DRAFT_TEXTS } from "../draft/draft-texts";
 import { useLocale } from "../locale/use-locale";
 import { CANVAS_TEXTS } from "./canvas-texts";
 import { connectionToast } from "./connection-toast";
@@ -49,15 +50,27 @@ export function useCanvasToasts(
     let wasSending = draft.getView().isSending;
     const onDraft = () => {
       const { isSending, draft: remaining } = draft.getView();
-      const { status: current, isBanned } = canvas.getView();
-      if (wasSending && !isSending && remaining.size > 0 && current === "live" && !isBanned)
+      const { status: current, isBanned, isDrawingClosed } = canvas.getView();
+      if (
+        wasSending &&
+        !isSending &&
+        remaining.size > 0 &&
+        current === "live" &&
+        !isBanned &&
+        !isDrawingClosed
+      )
         toast("error", CANVAS_TEXTS[locale].refused(remaining.size));
       wasSending = isSending;
     };
     const unsubscribeCanvas = canvas.subscribe(onCanvas);
     const unsubscribeDraft = draft.subscribe(onDraft);
     const unsubscribeWiped = draft.listenWiped(() => toast("success", CANVAS_TEXTS[locale].draftWiped));
+    // JOURNAL 2026-11-12 : fresque réservée au live, streamer hors live : Dessiner, un raccourci ou la fermeture sous un viewer le disent.
+    const unsubscribeClosed = draft.listenClosed(() =>
+      toast("error", DRAFT_TEXTS[locale].waitingForLive(ownerName)),
+    );
     return () => {
+      unsubscribeClosed();
       unsubscribeCanvas();
       unsubscribeDraft();
       unsubscribeWiped();

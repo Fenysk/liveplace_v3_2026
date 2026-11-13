@@ -18,6 +18,8 @@ export function toPillFacts(state: DraftPillState): PillFacts {
     case "reconnecting":
       return toPillFacts(state.shown);
     case "view":
+      // Dessiner grisé : aucune bulle ne montre un bouton qu'on ne peut pas encore presser.
+      if (state.isDrawingClosed) return WITHOUT_PILL;
       return { pill: "view", charges: state.gauge.charges, canClaim: state.canClaim, isTouchTracing: false };
     case "draft":
       return {

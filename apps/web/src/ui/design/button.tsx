@@ -27,6 +27,7 @@ export type ButtonProps = ButtonText &
     isPressed?: boolean; // un outil armé : gomme, tracé
     isExpanded?: boolean; // un contrôle qui replie ou déplie ce qu'il commande
     isDisabled?: boolean;
+    isInactive?: boolean; // grisé comme désactivé, mais le clic arrive : l'appelant dit pourquoi (un toast), `aria-disabled`
     hasDot?: boolean; // quelque chose attend : le point rouge de l'avatar (profile.css), dans l'angle du bouton
     hasMorphingLabel?: boolean; // son libellé change : la largeur glisse, le texte passe en fondu (use-label-morph.ts)
     labelLead?: string; // un mot devant le libellé (« Attendre » devant « 12 s »), qui cède quand la place manque (button.css)
@@ -72,18 +73,25 @@ const labelParts = ({ label, labelLead = "", reservedLabel, title }: ButtonProps
   return { lead: labelLead, whole, accessibleName: label ? (isNamedByLabel ? undefined : whole) : title };
 };
 
-export const Button = (props: ButtonProps) => {
-  const { label, title, icon: Icon, kbd, variant, isPressed, isExpanded, isDisabled, hasDot } = props;
-  const { lead, whole, accessibleName } = labelParts(props);
-  const hasMorphingLabel = props.hasMorphingLabel ?? false;
-  const morphingButton = useLabelMorph(whole, hasMorphingLabel);
-  const className = classNames(
+const classNameOf = (
+  { label, variant, hasDot, isInactive }: ButtonProps,
+  hasMorphingLabel: boolean,
+): string =>
+  classNames(
     "lp-btn lp-type-body",
     variant && `lp-btn--${variant}`,
     !label && "lp-btn--icon",
     hasDot && "lp-btn--dot",
+    isInactive && "lp-btn--inactive",
     hasMorphingLabel && "lp-btn--morph",
   );
+
+export const Button = (props: ButtonProps) => {
+  const { label, title, icon: Icon, kbd, isPressed, isExpanded, isDisabled, isInactive, hasDot } = props;
+  const { lead, whole, accessibleName } = labelParts(props);
+  const hasMorphingLabel = props.hasMorphingLabel ?? false;
+  const morphingButton = useLabelMorph(whole, hasMorphingLabel);
+  const className = classNameOf(props, hasMorphingLabel);
   const content = (
     <>
       {Icon && <Icon aria-hidden="true" />}
@@ -121,6 +129,7 @@ export const Button = (props: ButtonProps) => {
       aria-pressed={isPressed}
       aria-expanded={isExpanded}
       disabled={isDisabled}
+      aria-disabled={isInactive ? true : undefined}
       onClick={blurAfterClick(props.onPress)}
     >
       {content}

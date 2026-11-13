@@ -548,6 +548,18 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         state: { kind: "view", gauge: gaugeAt(nowMs, 8, 3), canClaim: false, draftSize: 3 },
       },
       {
+        name: "Hors live",
+        detail:
+          "Fresque réservée au live, streamer absent : Dessiner grisé, la pill reste la même. Le toucher ou un raccourci (D, Entrée, Espace) ouvre un toast ; le brouillon est gardé.",
+        state: {
+          kind: "view",
+          gauge: gaugeAt(nowMs, 8, 3),
+          canClaim: false,
+          draftSize: 3,
+          isDrawingClosed: true,
+        },
+      },
+      {
         name: "Après un refus",
         detail: "La raison, à côté de Dessiner.",
         state: {

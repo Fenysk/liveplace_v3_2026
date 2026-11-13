@@ -29,7 +29,15 @@ export type DraftPillState =
   | { kind: "banned" } // lecture seule (§10.2, JOURNAL 2026-09-25)
   | { kind: "guest"; signInHref: string } // l'invitation à se connecter, directement (CDC 2026)
   | { kind: "signingIn"; signInHref: string } // parti chez Twitch : l'invitation, en attente
-  | { kind: "view"; gauge: GaugeProps; canClaim: boolean; draftSize?: number; refusal?: RefusalCode } // `draftSize` : le brouillon gardé, absent sans
+  // `draftSize` : le brouillon gardé, absent sans. `isDrawingClosed` : fresque réservée au live, streamer hors live : Dessiner grisé, un toast dit quand il s'ouvre (JOURNAL 2026-11-12)
+  | {
+      kind: "view";
+      gauge: GaugeProps;
+      canClaim: boolean;
+      draftSize?: number;
+      isDrawingClosed?: boolean;
+      refusal?: RefusalCode;
+    }
   | {
       kind: "draft";
       gauge: GaugeProps;
@@ -93,8 +101,9 @@ const Refusal = ({ code }: { code: RefusalCode | undefined }) => {
 // §9.6 : avec un brouillon gardé, « Dessiner · 12 » ; son libellé change, la largeur glisse.
 const EnterButton = ({
   draftSize = 0,
+  isInactive = false,
   onEnter,
-}: { draftSize?: number | undefined } & Pick<DraftPillActions, "onEnter">) => {
+}: { draftSize?: number | undefined; isInactive?: boolean } & Pick<DraftPillActions, "onEnter">) => {
   const t = useTexts(DRAFT_TEXTS);
   return (
     <Button
@@ -103,6 +112,7 @@ const EnterButton = ({
       variant="primary"
       title={t.drawTip}
       hasMorphingLabel
+      isInactive={isInactive}
       onPress={onEnter}
     />
   );
@@ -382,7 +392,11 @@ const contentOf = (
                 <ClaimButton max={state.gauge.max} onClaim={actions.onClaim} />
               </BubbleTarget>
             ) : (
-              <EnterButton draftSize={state.draftSize} onEnter={actions.onEnter} />
+              <EnterButton
+                draftSize={state.draftSize}
+                isInactive={state.isDrawingClosed === true}
+                onEnter={actions.onEnter}
+              />
             )}
             <Refusal code={state.refusal} />
           </>

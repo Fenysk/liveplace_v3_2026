@@ -41,6 +41,7 @@ const canvasView = (claimable: number): CanvasView => ({
   palette: [],
   version: 1,
   isBanned: false,
+  isDrawingClosed: false,
   isArchived: false,
   isDiscarded: false,
   isDynamicSize: false,
@@ -109,6 +110,55 @@ describe("the Draft button in View (§9.6)", () => {
       expect(markup).toContain("lp-claim");
       expect(markup).not.toContain("Dessiner");
     }
+  });
+});
+
+// La pill d'une fresque réservée au live, vue du canvas dont le dessin est fermé (JOURNAL 2026-11-12)
+const closedView: CanvasView = { ...canvasView(0), isDrawingClosed: true };
+const closedMarkup = (view: CanvasView = closedView): string =>
+  renderToStaticMarkup(
+    createElement(DraftPill, {
+      state: toDraftPillState(view, viewDraft(4), GAUGE, "user1", false, undefined),
+      actions: ACTIONS,
+      isCompact: true,
+      isDocked: false,
+    }),
+  );
+
+describe("the Draw pill outside the live of the streamer (JOURNAL 2026-11-12)", () => {
+  const enterButtonOf = (markup: string) =>
+    markup.match(/<button[^>]*title="Passer en mode Dessin"[^>]*>/)?.[0] ?? "";
+
+  // La pill reste telle quelle (jauge, brouillon gardé) ; Dessiner est grisé mais reste pressable : aria-disabled, jamais disabled
+  it("keeps the pill as it is, with Dessiner greyed but still pressable: aria-disabled, never disabled", () => {
+    const markup = closedMarkup();
+    const button = enterButtonOf(markup);
+
+    expect(markup).toContain("<span>Dessiner · 4</span>");
+    expect(markup).toContain("lp-gauge");
+    expect(button).toContain("lp-btn--inactive");
+    expect(button).toContain(`aria-disabled="true"`);
+    expect(button).not.toMatch(/ disabled/);
+    expect(markup).not.toContain("s&#x27;ouvre quand");
+  });
+
+  // Ouvert, Dessiner est un bouton ordinaire
+  it("gives an ordinary Dessiner button once drawing is open", () => {
+    const button = enterButtonOf(closedMarkup({ ...closedView, isDrawingClosed: false }));
+
+    expect(button).not.toContain("lp-btn--inactive");
+    expect(button).not.toContain("aria-disabled");
+  });
+
+  // Un invité garde son invitation et un banni son message : la fermeture ne passe ni devant l'un ni devant l'autre
+  it("leaves the invitation to a guest and the message to a banned user", () => {
+    const { userId: _userId, ...guest } = closedView;
+    const banned = closedMarkup({ ...closedView, isBanned: true });
+
+    expect(closedMarkup(guest)).toContain("Se connecter pour dessiner");
+    expect(closedMarkup(guest)).not.toContain("lp-btn--inactive");
+    expect(banned).toContain("Tu es banni·e de cette fresque");
+    expect(banned).not.toContain("lp-btn--inactive");
   });
 });
 

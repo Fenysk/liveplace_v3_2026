@@ -28,6 +28,7 @@ const sectionHtml = (
         onPickOpacity: doNothing,
       },
       dynamic: { isOn: false, isBusy: false, onToggle: doNothing, ...dynamic },
+      liveOnly: { isOn: false, onToggle: doNothing },
       current,
       choice,
       chosen: choice && toCanvasSize(choice),
@@ -114,5 +115,48 @@ describe("the dynamic size in the Canvas section (§5.8)", () => {
     expect(html.match(/<input type="radio"[^>]*checked/g)).toBeNull();
     expect(html).not.toContain("Petit");
     expect(html).toContain('class="lp-btn lp-type-body lp-btn--primary" disabled');
+  });
+});
+
+describe("the drawing only while live in the Canvas section (JOURNAL 2026-11-12)", () => {
+  const sectionOf = (isOn: boolean) =>
+    renderToString(
+      createElement(CanvasSettings, {
+        theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
+        background: { value: "transparent", isTouch: false, onPick: doNothing },
+        image: {
+          imageUrl: null,
+          background: "transparent",
+          opacity: 40,
+          isSending: false,
+          onChooseFile: doNothing,
+          onClearImage: doNothing,
+          onPickOpacity: doNothing,
+        },
+        dynamic: { isOn: false, isBusy: false, onToggle: doNothing },
+        liveOnly: { isOn, onToggle: doNothing },
+        current: { width: 50, height: 50 },
+        choice: { format: "1:1", sizeIndex: 0 },
+        chosen: { width: 50, height: 50 },
+        onChoose: doNothing,
+        onApply: doNothing,
+      }),
+    );
+  // Le dernier : la case de la taille dynamique vient avant
+  const lastCheckbox = (html: string) => html.match(/<input type="checkbox"[^>]*>/g)?.at(-1) ?? "";
+
+  // Une case décochée par défaut, qui dit ce qu'elle règle, et que le streamer dessine toujours
+  it("shows a box, unchecked by default, saying what it sets and that the streamer always draws", () => {
+    const html = sectionOf(false);
+
+    expect(html).toContain("Dessin seulement pendant le live");
+    expect(html).toContain("Toi, tu dessines toujours.");
+    expect(html.match(/<input type="checkbox"/g)).toHaveLength(2);
+    expect(lastCheckbox(html)).not.toContain("checked");
+  });
+
+  // Activé, la case est cochée
+  it("shows the box checked once it is on", () => {
+    expect(lastCheckbox(sectionOf(true))).toContain("checked");
   });
 });

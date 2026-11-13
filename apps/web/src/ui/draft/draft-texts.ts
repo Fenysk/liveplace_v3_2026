@@ -59,6 +59,11 @@ export const DRAFT_TEXTS = defineTexts({
   connectionLost: { fr: "Connexion perdue", en: "Connection lost" },
   reload: { fr: "Recharger", en: "Reload" },
   banned: { fr: "Tu es banni·e de cette fresque", en: "You're banned from this canvas" },
+  // JOURNAL 2026-11-12 : une fresque réservée au live du streamer, hors de son live : le toast de Dessiner grisé.
+  waitingForLive: localized({
+    fr: (name: string) => `Le dessin s'ouvre quand ${name} est en live`,
+    en: (name) => `Drawing opens when ${name} is live`,
+  }),
   signInToDraw: { fr: "Se connecter pour dessiner", en: "Sign in to draw" },
 
   // Un refus du gateway : il envoie un code (`ErrorCodeSchema`), jamais une phrase.

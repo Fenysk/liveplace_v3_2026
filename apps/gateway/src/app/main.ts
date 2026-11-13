@@ -26,6 +26,7 @@ import { parseGatewayConfig } from "./config";
 
 const CLOSE_RESTART = 1012; // §6.3 : les pages se reconnectent, un redéploiement coûte une seconde de blanc
 const SHUTDOWN_GRACE_MS = 2000; // une socket qui ne répond plus à la fermeture ne retient pas l'arrêt
+const DRAWING_TICK_MS = 1000; // JOURNAL 2026-11-12 : la fermeture du dessin, à la seconde près après la fin du live + 10 min
 const HEARTBEAT_MS = 10_000; // le battement expire en 30 s : deux battements manqués sont tolérés
 
 // Fail-closed : sans une variable obligatoire, le process s'arrête ici en la nommant (§11.5).
@@ -51,6 +52,8 @@ const broadcast = createBroadcast(core, { now: Date.now, record: delays.record, 
 setInterval(broadcast.tick, tickMs);
 // JOURNAL 2026-10-06 : le classement a sa propre cadence, plus lente.
 setInterval(() => void broadcast.tickScoreboard(), SCOREBOARD_WINDOW_MS);
+// JOURNAL 2026-11-12 : le dessin seulement pendant le live se ferme à l'échéance, sans événement.
+setInterval(broadcast.tickDrawing, DRAWING_TICK_MS);
 
 // §16.2 : la température d'avant le redémarrage, avant la première page.
 const activity = createActivity({

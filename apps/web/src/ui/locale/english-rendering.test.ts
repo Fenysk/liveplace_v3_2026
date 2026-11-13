@@ -160,6 +160,10 @@ describe("the Draw pill in English (§9.9)", () => {
     expect(draftPill({ kind: "banned" })).toContain("You&#x27;re banned from this canvas");
     expect(draftPill({ kind: "guest", signInHref: "#" })).toContain("Sign in to draw");
     expect(draftPill({ kind: "signingIn", signInHref: "#" })).toContain("Connecting to Twitch");
+    // Hors live : la pill reste, Draw grisé mais pressable
+    const closed = draftPill({ kind: "view", gauge: GAUGE, canClaim: false, isDrawingClosed: true });
+    expect(closed).toContain(">Draw</span>");
+    expect(closed).toContain(`aria-disabled="true"`);
   });
 
   // La vue : Dessiner, et un refus du gateway dit en phrase, jamais son code
@@ -395,6 +399,7 @@ describe("the canvas settings and the archives in English (§9.9)", () => {
           onPickOpacity: doNothing,
         },
         dynamic: { isOn: false, isBusy: false, onToggle: doNothing },
+        liveOnly: { isOn: false, onToggle: doNothing },
         current,
         choice: { format: "16:9", sizeIndex: 1 },
         chosen: { width: 64, height: 36 },
@@ -418,6 +423,8 @@ describe("the canvas settings and the archives in English (§9.9)", () => {
     expect(section).toContain("Currently 32 × 32 cells.");
     expect(section).toContain("Landscape 16:9, 64 × 36 cells. Nothing is lost");
     expect(section).toContain("Dynamic size");
+    expect(section).toContain("Drawing only while live");
+    expect(section).toContain("You always draw.");
     expect(section).toContain("keeps 3 empty cells around its drawings");
     for (const label of ["Small", "Medium", "Large", "Change size"]) expect(section).toContain(label);
     // Le fond de la fresque, avec son image (§9.5)

@@ -1,4 +1,4 @@
-// Les Nouveautés (CDC 2026) : la section de la fenêtre pour chaque public, sur mobile aussi, et les dix-huit vignettes, toutes animées.
+// Les Nouveautés (CDC 2026) : la section de la fenêtre pour chaque public, sur mobile aussi, et les dix-neuf vignettes, toutes animées.
 // Les vrais composants, avec les vraies publications : une vignette se clique, et s'ouvre en grand sur un flou.
 
 import { ReleaseList } from "../release-notes/release-list";
@@ -114,6 +114,12 @@ const SHOTS = [
     detail:
       "Animée, en boucle de 9 s : une mini-fresque (une épée, un coffre, une potion) et, au centre, la fenêtre Fresque réduite à son champ Thème (le libellé, le champ avec son exemple « Ex. : Halloween », la phrase « Affiché en haut de la fresque, pour tout le monde. ») sur un voile. Une souris clique le champ (l'anneau de focus du jeu, le curseur d'écriture), le thème s'écrit lettre par lettre (« Aventure », « Adventure »), puis elle clique à côté, sur la phrase d'aide : le champ perd le focus, ce qui l'enregistre (il n'a pas de bouton), et le toast « Thème enregistré » paraît. La fenêtre se ferme et la pill Thème du jeu paraît en haut au centre : « Dessine sur le thème », puis le thème en gros. Elle reste le temps de se lire, puis s'efface. Fixe : la pill Thème en haut, sans fenêtre ni souris.",
   },
+  {
+    kind: "liveOnly",
+    name: "Dessin pendant tes lives",
+    detail:
+      "Animée, en boucle de 6 s : une mini-fresque (un cœur), la pill de profil du streamer (son avatar, son nom, le bouton Twitch gris) au-dessus de la pill Dessin dont Dessiner est grisé (le bouton inactif du jeu). Une souris appuie sur Dessiner : le toast du jeu paraît en haut, « Le dessin s'ouvre quand Kira est en live », reste deux secondes et s'en va. Puis le live démarre : le bouton Twitch passe en live (violet, son rond, la catégorie) et Dessiner redevient plein. Tout s'efface en fondu, et la boucle repart. Fixe : hors live, Dessiner grisé, le toast visible, sans souris.",
+  },
 ] as const;
 
 export const ReleaseNotesEntry = () => (
@@ -121,7 +127,7 @@ export const ReleaseNotesEntry = () => (
     slug="nouveautes"
     components={["ReleaseList", "ReleaseShot"]}
     file="ui/release-notes/release-list.tsx"
-    note="Cinq publications datées, la plus récente en haut (1er novembre, 18 octobre, 11 octobre, 4 octobre, 27 septembre), 18 lignes en tout ; chaque nouveauté a sa vignette (une ligne qui n'en aurait pas ne serait que du texte). Des lignes sous un filet dans la fenêtre. Le rôle se lit sur la fresque où l'on est : ce qui s'adresse à tous vient d'abord, sans titre de groupe ; le streamer voit ensuite Pour les modérateurs et Pour les streamers (dans cet ordre), le modérateur Pour les modérateurs ; un viewer ou un invité ne voit que ce qui s'adresse à tous, sans aucun titre de groupe. Ouvrir la section marque tout comme lu ; le point du bouton Nouveautés s'éteint. La page /nouveautes montre les trois groupes à tous les publics (le premier sans titre), sous une phrase d'accueil : chaque nouveauté y est une carte (la vignette en haut à toute la largeur de la carte, le titre et la phrase dessous), les cartes d'un groupe en 2 colonnes dès 760 px de bloc, 3 dès 1100 px, la colonne allant jusqu'à 1200 px ; sous 760 px, les cartes l'une sous l'autre."
+    note="Six publications datées, la plus récente en haut (13 novembre, 1er novembre, 18 octobre, 11 octobre, 4 octobre, 27 septembre), 19 lignes en tout ; chaque nouveauté a sa vignette (une ligne qui n'en aurait pas ne serait que du texte). Des lignes sous un filet dans la fenêtre. Le rôle se lit sur la fresque où l'on est : ce qui s'adresse à tous vient d'abord, sans titre de groupe ; le streamer voit ensuite Pour les modérateurs et Pour les streamers (dans cet ordre), le modérateur Pour les modérateurs ; un viewer ou un invité ne voit que ce qui s'adresse à tous, sans aucun titre de groupe. Ouvrir la section marque tout comme lu ; le point du bouton Nouveautés s'éteint. La page /nouveautes montre les trois groupes à tous les publics (le premier sans titre), sous une phrase d'accueil : chaque nouveauté y est une carte (la vignette en haut à toute la largeur de la carte, le titre et la phrase dessous), les cartes d'un groupe en 2 colonnes dès 760 px de bloc, 3 dès 1100 px, la colonne allant jusqu'à 1200 px ; sous 760 px, les cartes l'une sous l'autre."
   >
     <Block title="La section de la fenêtre">
       <StateRow

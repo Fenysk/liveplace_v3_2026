@@ -22,3 +22,24 @@ describe("le bouton qui garde la largeur de son plus long libellé (§9.6)", () 
     expect(render({ label: "Valider" })).not.toContain("data-reserve");
   });
 });
+
+describe("le bouton inactif (JOURNAL 2026-11-12)", () => {
+  const markup = (props: { isDisabled?: boolean; isInactive?: boolean }): string =>
+    renderToStaticMarkup(createElement(Button, { onPress: noop, label: "Dessiner", ...props }));
+
+  // Grisé mais pressable : aria-disabled et sa classe, jamais l\u2019attribut disabled qui retiendrait le clic
+  it("is greyed but pressable: aria-disabled and its class, never the disabled attribute", () => {
+    const inactive = markup({ isInactive: true });
+
+    expect(inactive).toContain("lp-btn--inactive");
+    expect(inactive).toContain('aria-disabled="true"');
+    expect(inactive).not.toMatch(/ disabled/);
+  });
+
+  // Sans lui, le bouton n\u2019a ni classe ni aria-disabled ; désactivé, il garde l\u2019attribut disabled
+  it("has neither class nor aria-disabled without it, and keeps disabled when disabled", () => {
+    expect(markup({})).not.toContain("aria-disabled");
+    expect(markup({})).not.toContain("lp-btn--inactive");
+    expect(markup({ isDisabled: true })).toMatch(/ disabled/);
+  });
+});

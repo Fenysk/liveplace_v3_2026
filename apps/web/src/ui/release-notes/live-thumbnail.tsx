@@ -32,7 +32,7 @@ const renderLive = (host: HTMLElement, timeMs: number): void => {
 };
 
 // Le bouton Twitch du profil, dans ses deux états superposés : le logo seul (hors live), et le bouton en live (le logo violet, la catégorie).
-const TwitchButtonMini = () => (
+export const TwitchButtonMini = () => (
   <span className="lp-release-twitch">
     <PillTool icon={TwitchGlyph} className="lp-release-twitch-off" />
     <span className="lp-btn lp-btn--live lp-type-caption lp-release-twitch-on" aria-hidden="true">

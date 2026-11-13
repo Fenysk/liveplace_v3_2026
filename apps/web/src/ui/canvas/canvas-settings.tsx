@@ -204,6 +204,10 @@ export type DynamicSizeField = {
   onToggle: (isOn: boolean) => void;
 };
 
+// JOURNAL 2026-11-12 : le dessin seulement pendant le live. `isOn` est la valeur choisie, ou demandée tant que le gateway ne l'a pas
+// confirmée.
+export type LiveOnlyField = { isOn: boolean; onToggle: (isOn: boolean) => void };
+
 type SizeChoiceSettingsProps = {
   current: CanvasSize;
   choice: SizeChoice | null; // `null` : la taille d'aujourd'hui n'est dans aucun format, aucun n'est présenté comme choisi
@@ -266,6 +270,7 @@ type CanvasSettingsProps = {
   background: BackgroundField;
   image: BackgroundImageField;
   dynamic: DynamicSizeField;
+  liveOnly: LiveOnlyField;
   current: CanvasSize;
   choice: SizeChoice | null;
   chosen: CanvasSize | null;
@@ -278,6 +283,7 @@ export const CanvasSettings = ({
   background,
   image,
   dynamic,
+  liveOnly,
   current,
   choice,
   chosen,
@@ -311,6 +317,10 @@ export const CanvasSettings = ({
         onChoose={onChoose}
         onApply={onApply}
       />
+      <div className="lp-setting">
+        <Checkbox label={t.liveOnly} isChecked={liveOnly.isOn} onToggle={liveOnly.onToggle} />
+        <p className="lp-type-caption lp-muted">{t.liveOnlyNote}</p>
+      </div>
     </>
   );
 };

@@ -198,6 +198,8 @@ export async function getCanvasMeta(redis: Redis, canvasId: string): Promise<Can
     ...(fields.movedAtVersion === undefined ? {} : { movedAtVersion: metaNumber(fields, "movedAtVersion") }),
     // §5.8 : absents, la taille dynamique est retirée et la fresque n'a jamais été décalée.
     ...(fields.dynamicSize === "1" ? { isDynamicSize: true } : {}),
+    // JOURNAL 2026-11-12 : absent, le dessin est toujours ouvert.
+    ...(fields.liveOnly === "1" ? { isLiveOnly: true } : {}),
     ...(fields.originX === undefined
       ? {}
       : { origin: { x: metaNumber(fields, "originX"), y: metaNumber(fields, "originY") } }),
@@ -257,11 +259,13 @@ const composeBadgesFromReplies = (
 // qui s'écrivent sous d'autres noms.
 export const toMetaFields = ({
   isDynamicSize,
+  isLiveOnly,
   origin,
   ...fields
 }: CanvasMeta): Record<string, string | number> => ({
   ...fields,
   ...(isDynamicSize ? { dynamicSize: 1 } : {}),
+  ...(isLiveOnly ? { liveOnly: 1 } : {}),
   ...(origin ? { originX: origin.x, originY: origin.y } : {}),
 });
 
@@ -1255,6 +1259,8 @@ export function createCanvasCore(
       return (await getTwitchLiveState(redis, userId))?.twitchLive ?? null;
     },
 
+    getTwitchLiveState: (userId) => getTwitchLiveState(redis, userId),
+
     listTwitchLives: (userIds) => listTwitchLives(redis, userIds),
 
     // Écrit par le web dans `meta` (createTwitchWrites), lu ici pour l'onglet Modération (JOURNAL 2026-09-27).
@@ -1350,6 +1356,16 @@ export function createCanvasCore(
         .hset(keys.meta, "backgroundImageOpacity", backgroundImageOpacity)
         .publish(keys.live, JSON.stringify(control))
         .exec();
+    },
+
+    // JOURNAL 2026-11-12 : comme le fond, `meta` et le `ctl` ensemble, sans version. Retiré, le champ part : absent, toujours ouvert.
+    async setLiveOnly(canvasId, isLiveOnly) {
+      const keys = buildCanvasKeys(canvasId);
+      const control: LiveMessage = { ctl: { t: "liveOnly", isLiveOnly } };
+      const transaction = redis.multi();
+      if (isLiveOnly) transaction.hset(keys.meta, "liveOnly", 1);
+      else transaction.hdel(keys.meta, "liveOnly");
+      await transaction.publish(keys.live, JSON.stringify(control)).exec();
     },
 
     // JOURNAL 2026-09-30 : comme le délai. Personne ne perd ce qu'il a réclamé : la jauge max se recalcule.

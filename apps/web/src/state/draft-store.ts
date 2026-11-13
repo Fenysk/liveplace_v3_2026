@@ -10,7 +10,7 @@ import {
   toCellKey,
   toStateOffset,
 } from "@liveplace/domain";
-import type { CanvasStore, Pixel } from "./canvas-store";
+import type { CanvasStore, CanvasView, Pixel } from "./canvas-store";
 import {
   type Draft,
   type DraftContext,
@@ -63,6 +63,9 @@ export type DraftStore = {
   // §5.8 : des pixels ont changé de case, le brouillon (non vide) est effacé, sans rétablissement possible.
   // Un simple décalage de la fresque (JOURNAL 2026-10-28) ne l'efface pas : ses cases suivent.
   listenWiped(listener: () => void): () => void;
+  // JOURNAL 2026-11-12 : le Dessin est refusé parce que le streamer n'est pas en live (le bouton, ou D, Entrée, Espace), ou se ferme sous
+  // un viewer qui dessinait. Le brouillon reste.
+  listenClosed(listener: () => void): () => void;
   selectColor(colorIndex: number): void; // dans la palette ou la rangée : celle qu'elle remplace va dans la rangée
   selectRecentColor(slot: number): void; // les touches 1 à 5 : la récente de cette place, comme un clic sur elle
   toggleEraser(): void; // `E` : la gomme, puis retour à la dernière couleur
@@ -92,6 +95,14 @@ const randomPlacementId = (): string => `p${crypto.randomUUID().replaceAll("-", 
 export type DraftCanvas = Pick<CanvasStore, "subscribe" | "getView" | "placeBatch">;
 
 // `onPlaced` : tout le brouillon vient d'être posé (§9.11), de quoi compter les dessins de l'appareil.
+// Plus rien à y poser : banni (§10.2), archive (§17.1), ou dessin fermé hors du live du streamer (JOURNAL 2026-11-12).
+const isReadOnly = ({ isBanned, isArchived, isDrawingClosed }: CanvasView): boolean =>
+  isBanned || isArchived || isDrawingClosed;
+
+// Seul le live manque : un banni garde son message et une archive son bandeau, la fermeture ne s'y dit pas.
+const isClosedOnlyByLive = ({ isBanned, isArchived, isDrawingClosed }: CanvasView): boolean =>
+  isDrawingClosed && !isBanned && !isArchived;
+
 export function createDraftStore(
   canvasId: string,
   canvas: DraftCanvas,
@@ -125,6 +136,7 @@ export function createDraftStore(
   let knownMovedAtVersion = 0;
   let wipeCount = 0;
   const wipedListeners = new Set<() => void>();
+  const closedListeners = new Set<() => void>();
   // §5.8 : le repère que ce brouillon connaît. `successors` : un brouillon décalé prend la place de
   // celui d'avant (l'historique, le toast de Vider), pour que Rétablir retrouve le sien.
   let knownOrigin: CanvasOrigin = START_ORIGIN;
@@ -150,6 +162,10 @@ export function createDraftStore(
   const leaveDraftMode = (): void =>
     publish({ mode: "view", isTracing: false, isTouchTracing: false, isPicking: false });
 
+  const notifyClosed = (): void => {
+    for (const listener of closedListeners) listener();
+  };
+
   const notifyWiped = (): void => {
     for (const listener of wipedListeners) listener();
   };
@@ -170,11 +186,13 @@ export function createDraftStore(
     saveDraft(getStorage, canvasId, userId, EMPTY_DRAFT, knownMovedAtVersion, knownOrigin);
     notifyWiped();
   };
-  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. §17.1 : une archive aussi,
-  // personne n'y pose ; le brouillon reste rangé sous ce canvas et ne suit pas sur le nouveau.
+  // §10.2 : un banni sort du Dessin, son brouillon reste sauvegardé. §17.1 : une archive aussi, personne n'y pose ; le brouillon reste
+  // rangé sous ce canvas et ne suit pas sur le nouveau. JOURNAL 2026-11-12 : de même hors du live, quand la fresque le demande.
   const leaveIfReadOnly = (): void => {
-    const { isBanned, isArchived } = canvas.getView();
-    if ((isBanned || isArchived) && view.mode === "draft") leaveDraftMode();
+    const canvasView = canvas.getView();
+    if (!isReadOnly(canvasView) || view.mode !== "draft") return;
+    leaveDraftMode();
+    if (isClosedOnlyByLive(canvasView)) notifyClosed();
   };
   const fitted = (draft: Draft): Draft => {
     const { width, height } = canvas.getView();
@@ -308,7 +326,8 @@ export function createDraftStore(
     const result = await canvas.placeBatch(batch, placementId);
     if (!result.ok) return false;
     setDraft(settleBatch(view.draft, shiftBatch(batch, originShift(sentOrigin, knownOrigin)), result.value));
-    return !canvas.getView().isBanned;
+    const { isBanned, isDrawingClosed } = canvas.getView();
+    return !isBanned && !isDrawingClosed;
   };
 
   // Un lot à la fois, après l'ack du précédent, jamais plus de 8 par seconde. Tous portent la pose de la validation.
@@ -325,8 +344,9 @@ export function createDraftStore(
   };
 
   const submit = async (): Promise<void> => {
-    const { status, isBanned, isArchived } = canvas.getView();
-    if (view.isSending || view.draft.size === 0 || status !== "live" || isBanned || isArchived) return;
+    const canvasView = canvas.getView();
+    if (view.isSending || view.draft.size === 0 || canvasView.status !== "live" || isReadOnly(canvasView))
+      return;
     forgetHistory(); // CDC 2026, §8 : une vraie pose ne s'annule jamais
     const wipesBefore = wipeCount;
     publish({ isSending: true });
@@ -350,10 +370,14 @@ export function createDraftStore(
     },
     getView: () => view,
     enterDraftMode() {
-      const { userId, isBanned, isArchived } = canvas.getView();
-      if (isBanned || isArchived) return;
+      const canvasView = canvas.getView();
+      if (isReadOnly(canvasView)) {
+        if (canvasView.userId && isClosedOnlyByLive(canvasView)) notifyClosed();
+        return;
+      }
       // Un invité n'entre jamais en Dessin : la pill Dessin lui montre déjà l'invitation (CDC 2026).
-      if (userId && !view.isSending) publish({ mode: "draft", isTouchTracing: isTouchTracingRemembered });
+      if (canvasView.userId && !view.isSending)
+        publish({ mode: "draft", isTouchTracing: isTouchTracingRemembered });
     },
     exitDraftMode() {
       if (!view.isSending) leaveDraftMode();
@@ -366,6 +390,10 @@ export function createDraftStore(
     },
     restoreDraft(cleared) {
       if (history.past.at(-1) === currentOf(cleared)) travel(undoDraftStep);
+    },
+    listenClosed(listener) {
+      closedListeners.add(listener);
+      return () => closedListeners.delete(listener);
     },
     listenWiped(listener) {
       wipedListeners.add(listener);

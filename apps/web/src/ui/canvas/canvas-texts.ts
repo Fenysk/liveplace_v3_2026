@@ -174,6 +174,18 @@ export const CANVAS_TEXTS = defineTexts({
     en: ({ width, height }) => `Size changed: ${width} × ${height} cells`,
   }),
   canvasSize: { fr: "Taille de la fresque", en: "Canvas size" },
+  // JOURNAL 2026-11-12 : le dessin seulement pendant le live du streamer.
+  liveOnly: { fr: "Dessin seulement pendant le live", en: "Drawing only while live" },
+  liveOnlyNote: {
+    fr: "Les viewers ne dessinent que pendant ton live. Une coupure de stream ne ferme rien tout de suite. Toi, tu dessines toujours.",
+    en: "Viewers only draw while you're live. A short stream drop doesn't close anything right away. You always draw.",
+  },
+  liveOnlySaved: localized({
+    fr: (isOn: boolean) =>
+      isOn ? "Dessin seulement pendant le live activé" : "Dessin seulement pendant le live désactivé",
+    en: (isOn) => (isOn ? "Drawing only while live on" : "Drawing only while live off"),
+  }),
+
   // §5.8 : la taille dynamique, et une taille qui n'est dans aucun format.
   dynamicSize: { fr: "Taille dynamique", en: "Dynamic size" },
   dynamicSizeNote: {

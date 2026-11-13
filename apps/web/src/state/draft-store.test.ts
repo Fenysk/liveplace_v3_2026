@@ -29,6 +29,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
   lastError: null,
   inspection: null,
   isBanned: false,
+  isDrawingClosed: false,
   isArchived: false,
   isDiscarded: false,
   isDynamicSize: false,
@@ -606,6 +607,110 @@ describe("createDraftStore — a banned user (§10.2, JOURNAL 2026-09-25)", () =
     expect(sentBatches).toHaveLength(1);
     expect(cells()).toHaveLength(130);
     expect(store.getView()).toMatchObject({ mode: "view", isSending: false });
+  });
+});
+
+describe("createDraftStore — a drawing closed outside the live (JOURNAL 2026-11-12)", () => {
+  const fill = (store: ReturnType<typeof setup>["store"], count: number) => {
+    store.enterDraftMode();
+    store.startTrace();
+    store.traceCells(Array.from({ length: count }, (_, x) => ({ x, y: 0 })));
+    store.endTrace();
+  };
+
+  // Un viewer en Dessin à la fermeture revient en Vue, n'y entre plus, n'envoie rien, et garde son brouillon
+  it("brings a viewer in draft mode back to view at the closing, who cannot enter again nor send, and keeps the draft", async () => {
+    const { store, sentBatches, setCanvasView, cells } = setup();
+    fill(store, 3);
+
+    setCanvasView(liveView({ isDrawingClosed: true }));
+    store.enterDraftMode();
+    await store.submit();
+
+    expect(store.getView().mode).toBe("view");
+    expect(sentBatches).toEqual([]);
+    expect(cells()).toHaveLength(3);
+  });
+
+  // Dessiner (bouton, D, Entrée, Espace : toutes les entrées passent par là) refusé hors du live le dit une fois par appui, brouillon gardé
+  it("says it on each refused press of Dessiner, and keeps the draft", () => {
+    const { store, setCanvasView, cells } = setup();
+    fill(store, 3);
+    store.exitDraftMode();
+    const heard: string[] = [];
+    store.listenClosed(() => heard.push("closed"));
+    setCanvasView(liveView({ isDrawingClosed: true }));
+
+    store.enterDraftMode();
+    store.enterDraftMode();
+
+    expect(heard).toEqual(["closed", "closed"]);
+    expect(store.getView().mode).toBe("view");
+    expect(cells()).toHaveLength(3);
+  });
+
+  // Un viewer en Dessin à la fermeture revient en Vue avec le même message, une seule fois
+  it("says it once when the closing brings a viewer in draft mode back to view", () => {
+    const { store, setCanvasView } = setup();
+    fill(store, 2);
+    const heard: string[] = [];
+    store.listenClosed(() => heard.push("closed"));
+
+    setCanvasView(liveView({ isDrawingClosed: true }));
+    setCanvasView(liveView({ isDrawingClosed: true }));
+
+    expect(heard).toEqual(["closed"]);
+    expect(store.getView().mode).toBe("view");
+  });
+
+  // Ouvert, un invité, un banni ou une archive : rien n'est dit
+  it("says nothing when drawing is open, for a guest, a banned user or an archive", () => {
+    const { store, setCanvasView } = setup();
+    const heard: string[] = [];
+    store.listenClosed(() => heard.push("closed"));
+
+    store.enterDraftMode();
+    store.exitDraftMode();
+    for (const view of [
+      liveView({ isDrawingClosed: true, isBanned: true }),
+      liveView({ isDrawingClosed: true, isArchived: true }),
+      guestView({ isDrawingClosed: true }),
+    ]) {
+      setCanvasView(view);
+      store.enterDraftMode();
+    }
+
+    expect(heard).toEqual([]);
+  });
+
+  // À la réouverture, le même brouillon revient : Dessiner s'ouvre de nouveau, rien n'a été perdu
+  it("gives the same draft back at the reopening: drawing opens again, nothing was lost", () => {
+    const { store, setCanvasView, cells } = setup();
+    fill(store, 3);
+    setCanvasView(liveView({ isDrawingClosed: true }));
+
+    setCanvasView(liveView({ isDrawingClosed: false }));
+    store.enterDraftMode();
+
+    expect(store.getView().mode).toBe("draft");
+    expect(cells()).toHaveLength(3);
+  });
+
+  // Arrête l'envoi quand la fermeture tombe pendant qu'il part : les lots suivants ne partent pas
+  it("stops sending when the closing lands mid-send: the next batches never leave", async () => {
+    const context: { close?: () => void } = {};
+    const { store, sentBatches, setCanvasView, cells } = setup({
+      results: [{ ok: true, value: acceptAll([]) }],
+      onPlace: () => context.close?.(),
+    });
+    context.close = () => setCanvasView(liveView({ isDrawingClosed: true }));
+    fill(store, 130);
+
+    await store.submit();
+
+    expect(sentBatches).toHaveLength(1);
+    expect(store.getView()).toMatchObject({ mode: "view", isSending: false });
+    expect(cells().length).toBeGreaterThan(0);
   });
 });
 

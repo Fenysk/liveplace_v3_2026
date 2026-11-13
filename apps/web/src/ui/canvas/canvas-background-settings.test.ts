@@ -54,6 +54,7 @@ const sectionHtml = (image: Partial<BackgroundImageField> = {}): string =>
       image: imageOf(image),
       current: { width: 50, height: 50 },
       dynamic: { isOn: false, isBusy: false, onToggle: doNothing },
+      liveOnly: { isOn: false, onToggle: doNothing },
       choice: { format: "1:1", sizeIndex: 0 },
       chosen: { width: 50, height: 50 },
       onChoose: doNothing,

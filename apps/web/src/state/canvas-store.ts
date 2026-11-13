@@ -42,6 +42,8 @@ import {
 import type { Result } from "@liveplace/shared";
 
 type ErrorCode = Extract<ServerFrame, { t: "error" }>["code"];
+// Le refus que la page montre : jamais `drawing_closed`, qui ne vient qu'avec sa requête, et dont la page apprend l'état par `drawingClosed`.
+type PageErrorCode = Exclude<ErrorCode, "drawing_closed">;
 type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 type PlaceFrame = Extract<ClientFrame, { t: "place" }>;
 
@@ -98,6 +100,9 @@ export type CanvasView = {
   role?: Role;
   ownerId?: string; // le streamer : jamais modéré sur son canvas (JOURNAL 2026-09-25)
   isBanned: boolean; // lecture seule (§10.2), mis par `banned`, retiré par `unbanned`
+  // JOURNAL 2026-11-12 : le dessin de cette page est fermé, le streamer étant hors live depuis plus de 10 minutes sur une fresque réservée
+  // à son live. Le `welcome` le dit, la frame `drawingClosed` le change ; jamais vrai pour le streamer. Lecture seule, comme un ban.
+  isDrawingClosed: boolean;
   // §17.1 : le canvas est une archive, lecture seule pour tous. Le `welcome` le dit, la frame
   // `canvasStatus` le change, et une écriture refusée par `canvas_archived` l'apprend. `isDiscarded` : il a été supprimé.
   isArchived: boolean;
@@ -120,7 +125,7 @@ export type CanvasView = {
   gauge: ServerGauge | null; // `null` pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   scoreboard?: Scoreboard | undefined; // absent avant sa première frame et après une coupure : le gateway renvoie le sien
-  lastError: ErrorCode | null;
+  lastError: PageErrorCode | null;
   inspection: Inspection | null;
   pixels: Uint8Array; // un octet par case, l'index de palette (§4.3)
   isImageLoaded: boolean; // le snapshot est arrivé : `pixels` est la copie du serveur, plus un décor vide
@@ -160,6 +165,8 @@ export type CanvasStore = {
   resizeCanvas(width: number, height: number): Promise<RequestResult<true>>;
   // §5.8 : de même, activée ou retirée ; le `welcome` qui suit porte le réglage.
   setDynamicSize(isDynamicSize: boolean): Promise<RequestResult<true>>;
+  // JOURNAL 2026-11-12 : le streamer seul ; confirmé par la frame `liveOnly`, qui met à jour `params`.
+  setLiveOnly(isLiveOnly: boolean): void;
   // Les pixels de l'auteur de cette pose, pour choisir la plage à signaler (JOURNAL 2026-09-29).
   listAuthorPixels(x: number, y: number, placementId: string): Promise<RequestResult<AuthoredPixel[]>>;
   listReports(): Promise<RequestResult<ReportedPlacement[]>>; // pour qui modère
@@ -264,6 +271,7 @@ export function createCanvasStore(
     lastError: null,
     inspection: null,
     isBanned: false,
+    isDrawingClosed: false,
     isArchived: false,
     isDiscarded: false,
     isImageLoaded: false,
@@ -435,6 +443,7 @@ export function createCanvasStore(
       version: frame.version,
       role,
       isArchived: frame.canvas.archivedAt !== undefined,
+      isDrawingClosed: frame.canvas.isDrawingClosed === true,
       ownerTwitchLive: frame.canvas.ownerTwitchLive,
       twitchLive: frame.you.twitchLive,
       movedAtVersion: frame.canvas.movedAtVersion,
@@ -525,7 +534,7 @@ export function createCanvasStore(
   };
 
   // Une `error` n'a pas de `requestId` : tout ce qui attend échoue.
-  const refuse = (code: ErrorCode): void => {
+  const refuse = (code: PageErrorCode): void => {
     // §4.5 : le code a changé pendant la coupure, la page va le chercher.
     if (code === "protocol_version" && hasWelcomed) {
       options.reload();
@@ -577,7 +586,7 @@ export function createCanvasStore(
     ...change
   }: Extract<
     ServerFrame,
-    { t: "obsDelay" | "obsBackground" | "backgroundImageOpacity" | "gaugeLimits" }
+    { t: "obsDelay" | "obsBackground" | "backgroundImageOpacity" | "gaugeLimits" | "liveOnly" }
   >): void => {
     if (view.params) publish({ params: { ...view.params, ...change } });
   };
@@ -663,7 +672,11 @@ export function createCanvasStore(
       case "obsBackground":
       case "backgroundImageOpacity":
       case "gaugeLimits":
+      case "liveOnly":
         takeSetting(frame);
+        break;
+      case "drawingClosed":
+        publish({ isDrawingClosed: frame.isClosed });
         break;
       case "backgroundImage":
         takeBackgroundImage(frame);
@@ -680,7 +693,7 @@ export function createCanvasStore(
       case "error":
         if (frame.code === "canvas_archived") archive();
         else if (frame.requestId) refuseRequest(frame.requestId, frame.code);
-        else refuse(frame.code);
+        else if (frame.code !== "drawing_closed") refuse(frame.code);
         break;
       default:
     }
@@ -799,6 +812,8 @@ export function createCanvasStore(
         requestId: crypto.randomUUID(),
         backgroundImageOpacity,
       }),
+    setLiveOnly: (isLiveOnly) =>
+      transport.send({ t: "setLiveOnly", requestId: crypto.randomUUID(), isLiveOnly }),
     claimGauge: () => transport.send({ t: "claimGauge", requestId: crypto.randomUUID() }),
     // Les deux bornes seules : la frame est stricte, et `params` porte bien d'autres réglages.
     setGaugeLimits: ({ gaugeMaxStart, gaugeMaxCeiling }) =>

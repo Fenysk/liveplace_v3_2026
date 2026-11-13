@@ -49,7 +49,9 @@ import { z } from "zod";
 // (CDC §8, Supprimer son compte).
 // 25 : les badges à côté du pseudo, `badges` dans l'entrée de `inspected`, chaque ligne de `scoreboard` et sa place `you`, `bans`,
 // `moderators` et `reports` (CDC des badges, JOURNAL 2026-11-03).
-export const PROTOCOL_VERSION = 25;
+// 26 : le dessin seulement pendant le live, `setLiveOnly`, `isLiveOnly` dans les `params`, `isDrawingClosed` dans le `welcome`,
+// les frames `liveOnly` et `drawingClosed`, et le code d'erreur `drawing_closed` (JOURNAL 2026-11-12).
+export const PROTOCOL_VERSION = 26;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -183,6 +185,7 @@ const ErrorCodeSchema = z.enum([
   "canvas_not_found",
   "canvas_archived", // §17.1 : une écriture sur une archive, refusée sans fermer la connexion
   "canvas_recovering", // §7.4 : Convex le connaît, Redis le remet en place ; la page reprend seule
+  "drawing_closed", // JOURNAL 2026-11-12 : une pose hors du live du streamer, sur une fresque réservée à son live
   "server_full",
 ]);
 
@@ -326,6 +329,13 @@ const SetBackgroundImageOpacityFrameSchema = z.strictObject({
   backgroundImageOpacity: BackgroundImageOpacitySchema,
 });
 
+// JOURNAL 2026-11-12 : le streamer seul, pris aussitôt par chaque page ; le dessin des viewers ne s'ouvre que pendant son live.
+const SetLiveOnlyFrameSchema = z.strictObject({
+  t: z.literal("setLiveOnly"),
+  requestId: RequestIdSchema,
+  isLiveOnly: z.boolean(),
+});
+
 // CDC 2026 §1 : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
 const SetObsBackgroundFrameSchema = z.strictObject({
   t: z.literal("setObsBackground"),
@@ -393,6 +403,7 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetDynamicSizeFrameSchema,
   SetObsBackgroundFrameSchema,
   SetBackgroundImageOpacityFrameSchema,
+  SetLiveOnlyFrameSchema,
   ClaimGaugeFrameSchema,
   SetGaugeLimitsFrameSchema,
   WatchActivityFrameSchema,
@@ -429,6 +440,8 @@ const WelcomeFrameSchema = z.object({
     // §5.8 : la taille dynamique est activée ; et le repère de la fresque (absent : jamais décalée).
     isDynamicSize: z.boolean().optional(),
     origin: OriginSchema.optional(),
+    // JOURNAL 2026-11-12 : le dessin de cette page est fermé (réglage `isLiveOnly`, streamer hors live depuis plus de 10 minutes). Absent : ouvert.
+    isDrawingClosed: z.boolean().optional(),
   }),
   params: z.object({
     gaugeMaxStart: z.number().int().positive(), // JOURNAL 2026-09-30 : la jauge max du joueur vient de `gauge`
@@ -440,6 +453,7 @@ const WelcomeFrameSchema = z.object({
     backgroundImageAt: TimestampSchema.int().positive().optional(), // §4.3 : absent, le canvas n'a pas d'image
     backgroundImageOpacity: BackgroundImageOpacitySchema.optional(), // de même : absent, 40 %
     theme: ThemeSchema.optional(), // §4.3 : absent, le canvas n'a pas de thème
+    isLiveOnly: z.boolean().optional(), // JOURNAL 2026-11-12 : absent, le dessin est toujours ouvert
   }),
   palette: z.array(z.string()),
   version: VersionSchema,
@@ -636,6 +650,12 @@ const BackgroundImageFrameSchema = z.object({
 // Le thème vient de changer : toutes les pages du canvas le prennent aussitôt ; sans `theme`, il n'y en a plus
 // (§4.3).
 const ThemeFrameSchema = z.object({ t: z.literal("theme"), theme: ThemeSchema.optional() });
+
+// Le réglage « dessin seulement pendant le live » vient de changer : toutes les pages du canvas le prennent aussitôt (JOURNAL 2026-11-12).
+const LiveOnlyFrameSchema = z.object({ t: z.literal("liveOnly"), isLiveOnly: z.boolean() });
+
+// Le dessin de cette page s'ouvre ou se ferme, à la page seule : sa fermeture dépend de son rôle, jamais celle du streamer (JOURNAL 2026-11-12).
+const DrawingClosedFrameSchema = z.object({ t: z.literal("drawingClosed"), isClosed: z.boolean() });
 
 // Les bornes viennent de changer : chaque page les prend, et reçoit ensuite sa jauge (JOURNAL 2026-09-30).
 const GaugeLimitsFrameSchema = z.object({
@@ -893,6 +913,8 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   BackgroundImageFrameSchema,
   BackgroundImageOpacityFrameSchema,
   ThemeFrameSchema,
+  LiveOnlyFrameSchema,
+  DrawingClosedFrameSchema,
   GaugeLimitsFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,

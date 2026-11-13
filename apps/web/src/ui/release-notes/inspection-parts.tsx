@@ -3,7 +3,7 @@
 // celles du jeu (inspection-pill.tsx, moderation-window.tsx, toast.tsx) ; ce ne sont que des `<span>`, la vignette est déjà un bouton.
 
 import { PALETTE } from "@liveplace/domain";
-import { Check, CircleCheck, Flag, X } from "lucide-react";
+import { Check, CircleAlert, CircleCheck, Flag, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { Avatar } from "../design/profile";
@@ -121,11 +121,11 @@ export const ConfirmWindowMini = ({ kind }: { kind: InspectionKind }) => {
 };
 
 // Le toast de succès, en bas à gauche : l'icône et la phrase.
-export const ToastMini = ({ message }: { message: string }) => (
+export const ToastMini = ({ message, tone = "success" }: { message: string; tone?: "success" | "error" }) => (
   <span className="lp-pill lp-release-pill lp-release-toast">
     <span className="lp-pill-content">
-      <span className="lp-toast lp-toast--success lp-type-body">
-        <CircleCheck aria-hidden="true" />
+      <span className={`lp-toast lp-toast--${tone} lp-type-body`}>
+        {tone === "success" ? <CircleCheck aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}
         {message}
       </span>
     </span>

@@ -18,8 +18,10 @@ export type CellsListener = (frame: Extract<ServerFrame, { t: "cells" }>) => voi
 export type ScoreboardControl = { t: "scoreboard"; frame: ScoreboardFrame };
 // §10.4 : le live d'un compte a changé ; chaque page décide s'il la regarde. Absent : plus en live.
 export type TwitchLiveControl = { t: "twitchLive"; userId: string; twitchLive?: TwitchLive };
-// Un message de contrôle de moderate.lua (§5.4), le classement ou un live : ni tick ni conflation, il n'a aucune case.
-export type ControlMessage = LiveControl | ScoreboardControl | TwitchLiveControl;
+// JOURNAL 2026-11-12 : l'horloge du dessin seulement pendant le live, une fois par seconde ; chaque page voit si son échéance est passée.
+export type DrawingTickControl = { t: "drawingTick" };
+// Un message de contrôle de moderate.lua (§5.4), le classement, un live ou l'horloge : ni tick ni conflation, il n'a aucune case.
+export type ControlMessage = LiveControl | ScoreboardControl | TwitchLiveControl | DrawingTickControl;
 export type ControlListener = (control: ControlMessage) => void;
 
 export interface Broadcast {
@@ -37,6 +39,8 @@ export interface Broadcast {
   countAccounts(canvasId: string): number; // un compte ouvert dans deux pages compte une fois
   // §10.4 : un message de contrôle à toutes les pages jointes, tous canvas confondus.
   announce(control: ControlMessage): void;
+  // JOURNAL 2026-11-12 : l'horloge du dessin seulement pendant le live, à toutes les pages jointes. Appelée chaque seconde.
+  tickDrawing(): void;
   // §16.3 : les pages et vues OBS jointes à un canvas, en tout et au plus gros canvas.
   countConnections(): { total: number; largestCanvas: number };
 }
@@ -190,6 +194,11 @@ export function createBroadcast(
     if (delays) recordDelays(events, arrivals, expectedAt, delays);
   };
 
+  const announce = (control: ControlMessage): void => {
+    for (const { listeners } of canvases.values())
+      for (const { onControl } of listeners.values()) onControl(control);
+  };
+
   return {
     // S'abonner avant que l'appelant lise l'état : le pub/sub n'a aucune mémoire (§6.1).
     async join(canvasId, listener, onControl, accountId) {
@@ -230,10 +239,9 @@ export function createBroadcast(
       return accountIdsOf(canvases.get(canvasId)).size;
     },
 
-    announce(control) {
-      for (const { listeners } of canvases.values())
-        for (const { onControl } of listeners.values()) onControl(control);
-    },
+    announce,
+
+    tickDrawing: () => announce({ t: "drawingTick" }),
 
     countConnections() {
       const sizes = [...canvases.values()].map(({ listeners }) => listeners.size);

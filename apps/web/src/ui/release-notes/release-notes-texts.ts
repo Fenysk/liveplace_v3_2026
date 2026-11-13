@@ -33,10 +33,26 @@ const line = (
   thumbnail?: ReleaseThumbnail,
 ): ReleaseLine => (thumbnail ? { audience, texts, thumbnail } : { audience, texts });
 
-// Cinq publications datées, la plus récente en haut. Les phrases françaises sont celles qu'Alexis a validées, mot pour mot ; l'anglais reprend
+// Six publications datées, la plus récente en haut. Les phrases françaises sont celles qu'Alexis a validées, mot pour mot ; l'anglais reprend
 // les mots que l'interface emploie déjà (eyedropper, cell, report, clear, canvas, viewer, gauge, theme, tutorial…). Une ligne sans vignette
 // n'en a pas la clé : elle s'affiche en texte seul.
 export const RELEASES: readonly Release[] = [
+  {
+    date: "2026-11-13",
+    lines: [
+      line(
+        "owner",
+        defineTexts({
+          sentence: {
+            fr: "Dans Menu > Fresque, coche Dessin seulement pendant le live : tes viewers dessinent quand tu es en live.",
+            en: "In Menu > Canvas, tick Drawing only while live: your viewers draw while you're live.",
+          },
+          title: { fr: "Dessin pendant tes lives", en: "Drawing during your streams" },
+        }),
+        "liveOnly",
+      ),
+    ],
+  },
   {
     date: "2026-11-01",
     lines: [

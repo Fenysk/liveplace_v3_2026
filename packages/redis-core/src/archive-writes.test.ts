@@ -5,7 +5,7 @@ import { createSignInWrites } from "./client";
 import { buildCanvasKeys, OWNER_LOCK_TTL_MS, ownerLockKey } from "./keys";
 import { createRedisHarness } from "./test-harness";
 
-const { redis, runId, uniqueCanvasId } = createRedisHarness();
+const { redis, core, runId, uniqueCanvasId } = createRedisHarness();
 const writes = createArchiveWrites(redis);
 const signIn = createSignInWrites(redis);
 
@@ -200,6 +200,20 @@ describe("copying what is common to the owner (§17.2)", () => {
       metaFields: ["5000", "transparent", null, null],
       proofs: [],
     });
+  });
+
+  // Le dessin seulement pendant le live est un réglage du streamer : il suit le canvas actif, et se retire avec lui (JOURNAL 2026-11-12)
+  it("carries the drawing only while live to the incoming canvas, and removes it when the outgoing one has none", async () => {
+    const [outgoing, incoming] = [uniqueCanvasId(), uniqueCanvasId()];
+    await signIn.createCanvas(outgoing, { ...meta, isLiveOnly: true });
+    await signIn.createCanvas(incoming, meta);
+
+    await writes.copyShared(outgoing, incoming);
+    expect((await writes.getCanvas(incoming))?.isLiveOnly).toBe(true);
+
+    await core.setLiveOnly(outgoing, false);
+    await writes.copyShared(outgoing, incoming);
+    expect((await writes.getCanvas(incoming))?.isLiveOnly).toBeUndefined();
   });
 
   // Ne touche pas aux pixels : le dessin de l'entrant reste le sien

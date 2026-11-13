@@ -13,6 +13,7 @@ import {
   toNextDayStart,
   toPreviousDayStart,
 } from "@liveplace/domain";
+import { LIVE_ONLY_GRACE_MS } from "@liveplace/domain/live-only";
 import type {
   AckFrame,
   ActivityStore,
@@ -38,6 +39,7 @@ import type {
   ScoreboardEntry,
   ScoreboardRank,
   TwitchLive,
+  TwitchLiveState,
   TwitchSync,
 } from "@liveplace/domain/ports";
 import { type Event, PROTOCOL_VERSION, type ServerFrame } from "@liveplace/protocol";
@@ -245,6 +247,8 @@ type SetupOptions = {
   scoreboard?: ScoreboardEntry[]; // ce que rend `listScoreboard`
   ranks?: Map<string, ScoreboardRank>; // ce que rend `listScoreboardRanks`
   twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (§10.4)
+  isLiveOnly?: boolean; // le dessin seulement pendant le live, lu dans `meta` (JOURNAL 2026-11-12)
+  liveStates?: Record<string, TwitchLiveState>; // l'état du live de chaque compte, par `getTwitchLiveState` ; absent : jamais lu
 };
 
 // Ce que répond un script à qui écrit sur une archive.
@@ -266,6 +270,9 @@ const setup = (options: SetupOptions = {}) => {
   const namedModerators: ModeratorRole[] = [];
   const reports: Report[] = [];
   const dynamicSizes: { isDynamicSize: boolean }[] = [];
+  const liveOnlySettings: { isLiveOnly: boolean }[] = [];
+  const liveStates: Record<string, TwitchLiveState> = { ...options.liveStates }; // modifiable en cours de test
+  const liveStateReads: string[] = []; // les comptes dont l'état du live a été relu
   const twitchLiveReads: string[] = []; // les comptes dont le live a été lu
   let publishTo: ((message: LiveMessage) => void) | null = null;
   const roles = { isModerator: options.isModerator ?? false }; // ce que rend `isModerator`, modifiable en cours de test
@@ -276,6 +283,7 @@ const setup = (options: SetupOptions = {}) => {
     ...(options.theme === undefined ? {} : { theme: options.theme }),
     ...(options.movedAtVersion === undefined ? {} : { movedAtVersion: options.movedAtVersion }),
     ...(options.isDynamicSize ? { isDynamicSize: true } : {}),
+    ...(options.isLiveOnly ? { isLiveOnly: true } : {}),
     ...(options.origin === undefined ? {} : { origin: options.origin }),
     ...(options.backgroundImageAt === undefined ? {} : { backgroundImageAt: options.backgroundImageAt }),
     ...(options.backgroundImageOpacity === undefined
@@ -337,6 +345,13 @@ const setup = (options: SetupOptions = {}) => {
     async getTwitchLive(userId: string) {
       twitchLiveReads.push(userId);
       return options.twitchLives?.[userId] ?? null;
+    },
+    async getTwitchLiveState(userId: string) {
+      liveStateReads.push(userId);
+      return liveStates[userId] ?? null;
+    },
+    async setLiveOnly(_asked: string, isLiveOnly: boolean) {
+      liveOnlySettings.push({ isLiveOnly });
     },
     async listTwitchLives() {
       return new Map<string, TwitchLive>();
@@ -497,6 +512,9 @@ const setup = (options: SetupOptions = {}) => {
     namedModerators,
     reports,
     dynamicSizes,
+    liveOnlySettings,
+    liveStates,
+    liveStateReads,
     twitchLiveReads,
     clock,
     roles,
@@ -1705,6 +1723,7 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
     },
     { name: "resizeCanvas", minimum: "owner", frame: { t: "resizeCanvas", width: 64, height: 36 } },
     { name: "setDynamicSize", minimum: "owner", frame: { t: "setDynamicSize", isDynamicSize: true } },
+    { name: "setLiveOnly", minimum: "owner", frame: { t: "setLiveOnly", isLiveOnly: true } },
   ];
   const ownerOnly = reserved.filter(({ minimum }) => minimum === "owner");
   const moderatorLevel = reserved.filter(({ minimum }) => minimum === "moderator");
@@ -1719,6 +1738,7 @@ describe("role refusals in the connection (audit de sécurité du 26/09, §4)", 
     ...context.backgroundImageOpacities,
     ...context.gaugeLimits,
     ...context.dynamicSizes,
+    ...context.liveOnlySettings,
   ];
 
   // Refuse chaque commande réservée à un viewer et à un invité par forbidden, nommée par sa requête, sans toucher au noyau ni fermer
@@ -2063,6 +2083,7 @@ describe("an archive in the connection (§17.1)", () => {
     report: { t: "report", requestId: "report-1", x: 1, y: 2, placementId: "puser2001" },
     resizeCanvas: { t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 },
     setDynamicSize: { t: "setDynamicSize", requestId: "dynamic-1", isDynamicSize: true },
+    setLiveOnly: { t: "setLiveOnly", requestId: "live-only-1", isLiveOnly: true },
     setObsDelay: { t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 },
     setObsBackground: { t: "setObsBackground", requestId: "background-1", obsBackground: "white" },
     setBackgroundImageOpacity: {
@@ -2135,7 +2156,8 @@ describe("an archive in the connection (§17.1)", () => {
       context.backgroundImageOpacities,
       context.gaugeLimits,
       context.listedPixels,
-    ]).toEqual([[], [], [], [], [], [], [], [], [], []]);
+      context.liveOnlySettings,
+    ]).toEqual([[], [], [], [], [], [], [], [], [], [], []]);
   });
 
   // Laisse l'inspection et le ping : une archive se regarde, et la connexion reste en vie
@@ -2787,5 +2809,259 @@ describe("a deleted account in the connection (CDC §8, JOURNAL 2026-11-01)", ()
     expect(page.connections.closeAccount(session.userId)).toBe(0);
     expect(page.connections.closeAccount(meta.ownerId)).toBe(0);
     expect(page.closed).toEqual([]);
+  });
+});
+
+describe("the drawing only while live in the connection (JOURNAL 2026-11-12)", () => {
+  const onAir: TwitchLive = { category: "Art" };
+  const live: TwitchLiveState = { twitchLive: onAir, checkedAt: now };
+  const endedAt = now - 60_000; // le live a fini il y a une minute
+  const closesAt = endedAt + LIVE_ONLY_GRACE_MS;
+  const offline: TwitchLiveState = { checkedAt: now, endedAt };
+  const drawingFrames = (sent: readonly unknown[]) =>
+    sent.filter((frame) => hasFrame(frame, "drawingClosed") || hasFrame(frame, "liveOnly"));
+  const closedFrom = (sent: readonly unknown[]) => sent.filter((frame) => hasFrame(frame, "drawingClosed"));
+
+  // Le welcome dit le réglage, et que le dessin est fermé quand le streamer est hors live depuis plus de 10 minutes
+  it("says the setting in the welcome, and that the drawing is closed once the streamer has been offline for ten minutes", async () => {
+    const longAgo: TwitchLiveState = { checkedAt: now, endedAt: now - LIVE_ONLY_GRACE_MS };
+    const closed = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: longAgo } });
+    const open = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: offline } });
+
+    await closed.connection.receive(hello());
+    await open.connection.receive(hello());
+
+    expect(closed.sent[0]).toMatchObject({
+      t: "welcome",
+      canvas: { isDrawingClosed: true },
+      params: { isLiveOnly: true },
+    });
+    expect(open.sent[0]).toMatchObject({ t: "welcome", params: { isLiveOnly: true } });
+    expect(open.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+  });
+
+  // Sans le réglage, rien ne change : ni champ dans le welcome, ni lecture de l'état du live
+  it("changes nothing without the setting: no field in the welcome, and the live state is never read", async () => {
+    const context = setup({ liveStates: { [meta.ownerId]: { checkedAt: now } } });
+
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).not.toHaveProperty("params.isLiveOnly");
+    expect(context.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+    expect(context.liveStateReads).toEqual([]);
+    expect(context.placements).toHaveLength(1);
+  });
+
+  // L'état du live jamais lu laisse le dessin ouvert : LivePlace ne ferme pas dans le doute
+  it("keeps the drawing open when the live state was never read", async () => {
+    const context = setup({ isLiveOnly: true });
+
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+    expect(context.placements).toHaveLength(1);
+  });
+
+  // Une pose envoyée après la fermeture est refusée par le gateway, sans toucher au noyau, et la page apprend la fermeture
+  it("refuses a placement sent after the closing before the core, and tells the page it is closed", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: offline } });
+    await context.connection.receive(hello());
+    context.clock.nowMs = closesAt; // l'échéance est passée, aucun message de contrôle n'est arrivé
+    context.sent.length = 0;
+
+    await context.connection.receive(place());
+
+    expect(context.placements).toEqual([]);
+    expect(context.sent).toEqual([
+      { t: "drawingClosed", isClosed: true },
+      { t: "error", code: "drawing_closed", requestId: ack.requestId },
+    ]);
+    expect(context.closed).toEqual([]);
+  });
+
+  // Le délai de grâce : la pose passe jusqu'à 10 minutes après la fin du live, et pas une milliseconde de plus
+  it("lets a placement through up to ten minutes after the live ends, and not a millisecond more", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: offline } });
+    await context.connection.receive(hello());
+
+    context.clock.nowMs = closesAt - 1;
+    await context.connection.receive(place());
+    context.clock.nowMs = closesAt;
+    await context.connection.receive(place());
+
+    expect(context.placements).toHaveLength(1);
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "drawing_closed", requestId: ack.requestId });
+  });
+
+  // Un stream qui coupe et repart : la pose repasse dès qu'il est en live, sans attendre aucun message
+  it("accepts a placement again as soon as the streamer is live, reading the state again", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: offline } });
+    await context.connection.receive(hello());
+    context.clock.nowMs = closesAt;
+    await context.connection.receive(place());
+    context.liveStates[meta.ownerId] = live;
+    context.sent.length = 0;
+
+    await context.connection.receive(place());
+
+    expect(context.placements).toHaveLength(1);
+    expect(context.sent).toEqual([{ t: "drawingClosed", isClosed: false }, ack]);
+  });
+
+  // Le streamer dessine toujours, en live ou non, sans que son état de live ne soit lu
+  it("lets the owner draw whenever, live or not, without reading the live state", async () => {
+    const context = setup({
+      session: owner,
+      isLiveOnly: true,
+      liveStates: { [meta.ownerId]: { checkedAt: now } },
+    });
+    await context.connection.receive(hello());
+    context.clock.nowMs = now + 10 * LIVE_ONLY_GRACE_MS;
+
+    await context.connection.receive(place());
+    context.broadcast.tickDrawing();
+    await flush();
+
+    expect(context.placements).toHaveLength(1);
+    expect(context.liveStateReads).toEqual([]);
+    expect(drawingFrames(context.sent)).toEqual([]);
+  });
+
+  // Un modérateur suit la règle des viewers
+  it("makes a moderator follow the rule of the viewers", async () => {
+    const context = setup({
+      isModerator: true,
+      isLiveOnly: true,
+      liveStates: { [meta.ownerId]: { checkedAt: now } },
+    });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).toMatchObject({ canvas: { isDrawingClosed: true } });
+    expect(context.placements).toEqual([]);
+  });
+
+  // Un invité n'est pas concerné : il n'apprend rien de la fermeture, et sa pose reste refusée comme avant
+  it("changes nothing for a guest", async () => {
+    const context = setup({
+      session: null,
+      isLiveOnly: true,
+      liveStates: { [meta.ownerId]: { checkedAt: now } },
+    });
+    await context.connection.receive(hello());
+
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: ack.requestId });
+    expect(context.liveStateReads).toEqual([]);
+  });
+
+  // La fermeture à l'échéance vient de l'horloge, sans événement : le tick envoie drawingClosed une seule fois
+  it("closes at the deadline on the clock alone: the tick sends drawingClosed once", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: offline } });
+    await context.connection.receive(hello());
+    context.sent.length = 0;
+
+    context.clock.nowMs = closesAt - 1;
+    context.broadcast.tickDrawing();
+    await flush();
+    expect(context.sent).toEqual([]);
+
+    context.clock.nowMs = closesAt;
+    context.broadcast.tickDrawing();
+    context.broadcast.tickDrawing();
+    await flush();
+    context.broadcast.tickDrawing();
+    await flush();
+
+    expect(context.sent).toEqual([{ t: "drawingClosed", isClosed: true }]);
+  });
+
+  // Un live qui s'éteint puis repart : le gateway relit l'état, il ne se fie pas au message
+  it("reads the state again when the streamer's live changes, and closes the drawing at the new deadline", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: live } });
+    await context.connection.receive(hello());
+    context.sent.length = 0;
+
+    context.liveStates[meta.ownerId] = offline;
+    context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId });
+    await flush();
+    context.clock.nowMs = closesAt;
+    context.broadcast.tickDrawing();
+    await flush();
+    context.liveStates[meta.ownerId] = live;
+    context.broadcast.announce({ t: "twitchLive", userId: meta.ownerId, twitchLive: onAir });
+    await flush();
+
+    expect(drawingFrames(context.sent)).toEqual([
+      { t: "drawingClosed", isClosed: true },
+      { t: "drawingClosed", isClosed: false },
+    ]);
+  });
+
+  // Changer le réglage vaut aussitôt sur chaque page ouverte : la frame liveOnly, puis la fermeture ou l'ouverture qui en découle
+  it("applies the setting at once on every open page: the liveOnly frame, then the closing or opening that follows", async () => {
+    const context = setup({ liveStates: { [meta.ownerId]: { checkedAt: now } } });
+    const owned = context.open(owner);
+    const obs = context.open(null);
+    await context.connection.receive(hello());
+    await owned.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    context.sent.length = 0;
+
+    await owned.connection.receive(
+      JSON.stringify({ t: "setLiveOnly", requestId: "live-only-1", isLiveOnly: true }),
+    );
+    context.control({ t: "liveOnly", isLiveOnly: true });
+    await flush();
+    context.control({ t: "liveOnly", isLiveOnly: false });
+    await flush();
+
+    expect(context.liveOnlySettings).toEqual([{ isLiveOnly: true }]);
+    expect(context.sent).toEqual([
+      { t: "liveOnly", isLiveOnly: true },
+      { t: "drawingClosed", isClosed: true },
+      { t: "liveOnly", isLiveOnly: false },
+      { t: "drawingClosed", isClosed: false },
+    ]);
+    expect(drawingFrames(owned.sent)).toEqual([
+      { t: "liveOnly", isLiveOnly: true },
+      { t: "liveOnly", isLiveOnly: false },
+    ]);
+    expect(drawingFrames(obs.sent)).toEqual([]);
+  });
+
+  // Un réglage retiré rouvre aussi la pose refusée juste avant
+  it("accepts the placement again once the setting is removed", async () => {
+    const context = setup({ isLiveOnly: true, liveStates: { [meta.ownerId]: { checkedAt: now } } });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+    context.control({ t: "liveOnly", isLiveOnly: false });
+    await flush();
+
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).toMatchObject({ canvas: { isDrawingClosed: true } }); // fermé dès le welcome
+    expect(context.placements).toHaveLength(1); // la première pose, refusée, n'a pas atteint le noyau
+    expect(closedFrom(context.sent)).toEqual([{ t: "drawingClosed", isClosed: false }]);
+  });
+
+  // Une archive n'a pas de dessin à fermer : rien n'est lu
+  it("has no drawing to close on an archive, and reads nothing", async () => {
+    const context = setup({
+      session: owner,
+      isLiveOnly: true,
+      archivedAt: now - 86_400_000,
+      liveStates: { [meta.ownerId]: { checkedAt: now } },
+    });
+
+    await context.connection.receive(hello());
+
+    expect(context.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+    expect(context.liveStateReads).toEqual([]);
   });
 });

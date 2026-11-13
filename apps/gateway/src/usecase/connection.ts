@@ -13,6 +13,7 @@ import {
   type Timestamp,
   toStateOffset,
 } from "@liveplace/domain";
+import { type DrawingGate, isBoundToLive, liveGate, OPEN_DRAWING } from "@liveplace/domain/live-only";
 import type {
   AckFrame,
   CanvasCore,
@@ -37,6 +38,7 @@ import type {
   CellsListener,
   ControlListener,
   ControlMessage,
+  DrawingTickControl,
   ScoreboardControl,
   TwitchLiveControl,
 } from "./broadcast";
@@ -75,6 +77,7 @@ type ListPixelsFrame = Extract<ClientFrame, { t: "listPixels" }>;
 type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetObsBackgroundFrame = Extract<ClientFrame, { t: "setObsBackground" }>;
 type SetBackgroundImageOpacityFrame = Extract<ClientFrame, { t: "setBackgroundImageOpacity" }>;
+type SetLiveOnlyFrame = Extract<ClientFrame, { t: "setLiveOnly" }>;
 type SetGaugeLimitsFrame = Extract<ClientFrame, { t: "setGaugeLimits" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
@@ -104,6 +107,7 @@ type ControlFrame = Extract<
       | "backgroundImage"
       | "backgroundImageOpacity"
       | "theme"
+      | "liveOnly"
       | "twitchLive";
   }
 >;
@@ -130,6 +134,11 @@ type ReadyState = {
   height: number;
   role: Role;
   isArchived: boolean;
+  // JOURNAL 2026-11-12 : le réglage du canvas, et le dessin de cette page : fermé, ou ouvert jusqu'à `closesAt` (le live du streamer vient de
+  // finir). L'état du live n'est pas gardé ici : chaque pose et chaque événement le relisent dans Redis.
+  isLiveOnly: boolean;
+  isDrawingClosed: boolean;
+  closesAt: Timestamp | undefined;
   // §5.8 : la dernière version que l'arrivée de la page a déjà couverte. Une case plus ancienne, qui
   // attendait encore dans le tampon du tick, parle peut-être d'un cadre d'avant un agrandissement : elle n'est plus envoyée.
   coveredVersion: number;
@@ -197,6 +206,58 @@ const isArchivedAfter = (status: CanvasStatus | undefined, wasArchived: boolean)
 const lastStatusOf = (controls: readonly ControlFrame[]): CanvasStatus | undefined =>
   controls.flatMap((control) => (control.t === "canvasStatus" ? [control.status] : [])).at(-1);
 
+// Ce qu'un message de contrôle change à la connexion elle-même : son statut d'archive, et le réglage du dessin seulement pendant le live.
+const readyAfter = (ready: ReadyState, frame: ControlFrame): ReadyState => {
+  if (frame.t === "canvasStatus")
+    return { ...ready, isArchived: isArchivedAfter(frame.status, ready.isArchived) };
+  if (frame.t === "liveOnly") return { ...ready, isLiveOnly: frame.isLiveOnly };
+  return ready;
+};
+
+// De même pour le réglage du dessin seulement pendant le live.
+const lastLiveOnlyOf = (controls: readonly ControlFrame[]): boolean | undefined =>
+  controls.flatMap((control) => (control.t === "liveOnly" ? [control.isLiveOnly] : [])).at(-1);
+
+// Ce qui dit de relire l'état du dessin : le réglage change, ou le live du streamer (ou de cette personne).
+const isDrawingControl = ({ t }: ControlFrame): boolean => t === "liveOnly" || t === "twitchLive";
+
+// Ce dont le dessin d'une page dépend : le réglage, son rôle, et le streamer dont on lit le live.
+type GateInput = { isLiveOnly: boolean; role: Role; ownerId: string };
+
+// Ce que le `welcome` dit du canvas : sa taille, son streamer en live, et le dessin de cette page.
+const welcomeCanvasOf = (
+  canvasId: string,
+  meta: CanvasMeta,
+  lives: TwitchLives,
+  gate: DrawingGate,
+): WelcomeFrame["canvas"] => ({
+  canvasId,
+  width: meta.width,
+  height: meta.height,
+  ownerId: meta.ownerId,
+  ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
+  ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
+  ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // §5.8
+  ...(meta.isDynamicSize ? { isDynamicSize: true } : {}), // §5.8
+  ...(meta.origin ? { origin: meta.origin } : {}),
+  ...(gate.isClosed ? { isDrawingClosed: true } : {}), // JOURNAL 2026-11-12
+});
+
+const welcomeParamsOf = (meta: CanvasMeta): WelcomeFrame["params"] => ({
+  gaugeMaxStart: meta.gaugeMaxStart,
+  gaugeMaxCeiling: meta.gaugeMaxCeiling,
+  refillMs: meta.refillMs,
+  refillCharges: meta.refillCharges,
+  obsDelayMs: meta.obsDelayMs,
+  obsBackground: meta.obsBackground,
+  ...(meta.backgroundImageAt === undefined ? {} : { backgroundImageAt: meta.backgroundImageAt }), // §8.4
+  ...(meta.backgroundImageOpacity === undefined
+    ? {}
+    : { backgroundImageOpacity: meta.backgroundImageOpacity }),
+  ...(meta.theme === undefined ? {} : { theme: meta.theme }), // §8.1
+  ...(meta.isLiveOnly ? { isLiveOnly: true } : {}), // JOURNAL 2026-11-12
+});
+
 const buildWelcome = (
   canvasId: string,
   meta: CanvasMeta,
@@ -205,32 +266,11 @@ const buildWelcome = (
   session: Session | null,
   gauge: AckFrame["gauge"] | null,
   lives: TwitchLives,
+  gate: DrawingGate,
 ): WelcomeFrame => ({
   t: "welcome",
-  canvas: {
-    canvasId,
-    width: meta.width,
-    height: meta.height,
-    ownerId: meta.ownerId,
-    ...(meta.archivedAt === undefined ? {} : { archivedAt: meta.archivedAt }),
-    ...(lives.owner ? { ownerTwitchLive: lives.owner } : {}),
-    ...(meta.movedAtVersion === undefined ? {} : { movedAtVersion: meta.movedAtVersion }), // §5.8
-    ...(meta.isDynamicSize ? { isDynamicSize: true } : {}), // §5.8
-    ...(meta.origin ? { origin: meta.origin } : {}),
-  },
-  params: {
-    gaugeMaxStart: meta.gaugeMaxStart,
-    gaugeMaxCeiling: meta.gaugeMaxCeiling,
-    refillMs: meta.refillMs,
-    refillCharges: meta.refillCharges,
-    obsDelayMs: meta.obsDelayMs,
-    obsBackground: meta.obsBackground,
-    ...(meta.backgroundImageAt === undefined ? {} : { backgroundImageAt: meta.backgroundImageAt }), // §8.4
-    ...(meta.backgroundImageOpacity === undefined
-      ? {}
-      : { backgroundImageOpacity: meta.backgroundImageOpacity }),
-    ...(meta.theme === undefined ? {} : { theme: meta.theme }), // §8.1
-  },
+  canvas: welcomeCanvasOf(canvasId, meta, lives, gate),
+  params: welcomeParamsOf(meta),
   palette: [...PALETTE],
   version,
   you: session ? { ...youOf(session), ...(lives.you ? { twitchLive: lives.you } : {}), role } : { role },
@@ -263,16 +303,37 @@ const backgroundImageFrameOf = (control: BackgroundImageControl): ControlFrame =
     ? { t: "backgroundImage", ...(control.at ? { at: control.at } : {}) }
     : { t: "backgroundImageOpacity", backgroundImageOpacity: control.backgroundImageOpacity };
 
+type SharedControl = Extract<Control, { t: "obsDelay" | "obsBackground" | "canvasStatus" | "theme" }>;
+
+const isSharedControl = (control: Control): control is SharedControl =>
+  control.t === "obsDelay" ||
+  control.t === "obsBackground" ||
+  control.t === "canvasStatus" ||
+  control.t === "theme";
+
+// Ce que toutes les pages du canvas reçoivent tel que le canvas l'a publié : le délai et le fond OBS, le statut, le thème.
+const sharedFrameOf = (control: SharedControl): ControlFrame => {
+  switch (control.t) {
+    case "obsDelay":
+      return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
+    case "obsBackground":
+      return { t: "obsBackground", obsBackground: control.obsBackground };
+    case "canvasStatus":
+      return { t: "canvasStatus", status: control.status };
+    case "theme":
+      return { t: "theme", theme: control.theme };
+  }
+};
+
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
 const controlFrameOf = (control: Control, session: Session | null, page: Page): ControlFrame | null => {
-  if (control.t === "obsDelay") return { t: "obsDelay", obsDelayMs: control.obsDelayMs };
-  if (control.t === "obsBackground") return { t: "obsBackground", obsBackground: control.obsBackground };
+  if (isSharedControl(control)) return sharedFrameOf(control);
   if (control.t === "reports")
     return canModerate(page.role) ? { t: "reportCount", count: control.count } : null;
-  if (control.t === "canvasStatus") return { t: "canvasStatus", status: control.status };
   if (isBackgroundImageControl(control)) return backgroundImageFrameOf(control);
-  if (control.t === "theme") return { t: "theme", theme: control.theme };
+  if (control.t === "liveOnly")
+    return page.mode === "ui" ? { t: "liveOnly", isLiveOnly: control.isLiveOnly } : null; // la vue OBS n'a pas de dessin
   if (control.t === "twitchLive") return twitchLiveFrameOf(control, session, page);
   if (control.t === "tracesPurged") return null; // ne devient pas une frame : `tellStaleList` périme les listes
   return control.userId === session?.userId ? { t: control.t } : null;
@@ -352,8 +413,13 @@ export function createConnection(
   // §10.2 et CDC 2026 §1 : le ban de cette personne, le délai OBS de ce canvas.
   const onControl: ControlListener = (control) => {
     if (control.t === "scoreboard") return onScoreboardControl(control);
+    if (control.t === "drawingTick") return onDrawingTick();
     tellStaleList(control);
     rereadRoleOnBan(control);
+    onStateControl(control);
+  };
+
+  const onStateControl = (control: Exclude<ControlMessage, ScoreboardControl | DrawingTickControl>) => {
     if (control.t === "role") return onRoleControl(control.userId);
     if (control.t === "resize") return onResizeControl();
     if (control.t === "gaugeLimits") return onGaugeLimitsControl(control);
@@ -366,10 +432,41 @@ export function createConnection(
   const deliverControl = (frame: ControlFrame): void => {
     if (state.status === "joining") state.pendingControls.push(frame);
     else if (state.status === "ready") {
-      if (frame.t === "canvasStatus")
-        state = { ...state, isArchived: isArchivedAfter(frame.status, state.isArchived) };
+      state = readyAfter(state, frame);
       socket.sendFrame(frame);
+      if (isDrawingControl(frame)) syncDrawingInBackground();
     }
+  };
+
+  // JOURNAL 2026-11-12 : le dessin de cette page se relit dans Redis, jamais dans le message de contrôle, qui dit seulement qu'il
+  // faut regarder. Un streamer, un invité ou un réglage retiré : toujours ouvert. Rien de lu hors d'un cas qui s'y lie.
+  const getGate = async ({ isLiveOnly, role, ownerId }: GateInput): Promise<DrawingGate> =>
+    isBoundToLive(isLiveOnly, role)
+      ? liveGate(await deps.core.getTwitchLiveState(ownerId), deps.now())
+      : OPEN_DRAWING;
+
+  // La page n'apprend que ce qui change.
+  const applyGate = (gate: DrawingGate): void => {
+    if (state.status !== "ready") return;
+    if (gate.isClosed !== state.isDrawingClosed)
+      socket.sendFrame({ t: "drawingClosed", isClosed: gate.isClosed });
+    state = { ...state, isDrawingClosed: gate.isClosed, closesAt: gate.closesAt };
+  };
+
+  // §17.1 : une archive n'a plus de dessin à ouvrir ni à fermer.
+  const syncDrawing = async (): Promise<void> => {
+    if (state.status !== "ready" || state.isArchived) return;
+    applyGate(await getGate(state));
+  };
+
+  const syncDrawingInBackground = (): void => {
+    syncDrawing().catch((error: unknown) => console.error("dessin non relu", error));
+  };
+
+  // L'échéance passée, le dessin se ferme sans qu'aucun message ne le dise : l'horloge du gateway (`deps.now`) la voit.
+  const onDrawingTick = (): void => {
+    if (state.status === "ready" && state.closesAt !== undefined && deps.now() >= state.closesAt)
+      syncDrawingInBackground();
   };
 
   // JOURNAL 2026-10-06 : le classement de cette page, jamais en vue OBS.
@@ -503,7 +600,7 @@ export function createConnection(
     return { owner, you: isOwner ? owner : you };
   };
 
-  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live.
+  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live, le dessin.
   // §17.1 : une archive n'en a pas à dire, personne n'y pose.
   const getArrivalParts = (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
     const isArchived = meta.archivedAt !== undefined;
@@ -512,6 +609,7 @@ export function createConnection(
       session && !isArchived ? deps.core.isBanned(frame.canvasId, session.userId) : false,
       canModerate(role) && !isArchived ? deps.core.getReportCount(frame.canvasId) : null,
       getTwitchLives(frame.mode, meta.ownerId),
+      getGate({ isLiveOnly: meta.isLiveOnly === true && !isArchived, role, ownerId: meta.ownerId }),
     ]);
   };
 
@@ -524,9 +622,9 @@ export function createConnection(
     scoreboard: ScoreboardFrame | null,
   ) => {
     const { canvasId } = frame;
-    const [arrival, wasBanned, reportCount, lives] = await getArrivalParts(frame, meta, role);
+    const [arrival, wasBanned, reportCount, lives, gate] = await getArrivalParts(frame, meta, role);
 
-    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge, lives));
+    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge, lives, gate));
     sendAfterArrival(reportCount, scoreboard);
 
     const held =
@@ -542,10 +640,14 @@ export function createConnection(
       height: meta.height,
       role,
       isArchived: isArchivedAfter(lastStatusOf(held.pendingControls), meta.archivedAt !== undefined),
+      isLiveOnly: lastLiveOnlyOf(held.pendingControls) ?? meta.isLiveOnly === true,
+      isDrawingClosed: gate.isClosed,
+      closesAt: gate.closesAt,
       coveredVersion: arrival.coveredVersion,
     };
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
+    if (held.pendingControls.some(isDrawingControl)) await syncDrawing();
     if (held.isRoleStale) await refreshRole();
     if (held.isSizeStale) await rearrive();
   };
@@ -602,7 +704,17 @@ export function createConnection(
     socket.sendFrame({ t: "error", code: "canvas_archived", requestId });
   };
 
-  const placePixels = async (frame: PlaceFrame, canvasId: string): Promise<void> => {
+  // JOURNAL 2026-11-12 : une fresque réservée au live refuse la pose d'un viewer ou d'un modérateur hors du live du streamer. L'état est relu
+  // dans Redis à chaque pose (jamais celui d'un message de contrôle, qui a pu se perdre) ; la page apprend aussi qu'elle est fermée.
+  const isDrawingRefused = async (ready: ReadyState): Promise<boolean> => {
+    if (!isBoundToLive(ready.isLiveOnly, ready.role)) return false;
+    const gate = await getGate(ready);
+    applyGate(gate);
+    return gate.isClosed;
+  };
+
+  const placePixels = async (frame: PlaceFrame, ready: ReadyState): Promise<void> => {
+    const { canvasId } = ready;
     // §6.3 : au-delà, la frame est refusée avant Redis, nommée par son `requestId`, et la connexion reste ouverte.
     if (!isPlaceAllowed(deps.now())) {
       deps.capacity.countRefusedPlacement();
@@ -611,6 +723,8 @@ export function createConnection(
     // Un invité reste connecté : il regarde, il ne pose pas (§10.2).
     if (!session)
       return socket.sendFrame({ t: "error", code: "unauthenticated", requestId: frame.requestId });
+    if (await isDrawingRefused(ready))
+      return socket.sendFrame({ t: "error", code: "drawing_closed", requestId: frame.requestId });
     const result = await deps.core.place(canvasId, {
       userId: session.userId,
       requestId: frame.requestId,
@@ -822,6 +936,12 @@ export function createConnection(
     await deps.core.setBackgroundImageOpacity(ready.canvasId, backgroundImageOpacity);
   };
 
+  // JOURNAL 2026-11-12 : le streamer seul, comme le fond ; chaque page, la sienne comprise, l'apprend par la frame `liveOnly`.
+  const setLiveOnly = async ({ requestId, isLiveOnly }: SetLiveOnlyFrame, ready: ReadyState) => {
+    if (ready.role !== "owner") return forbid(requestId);
+    await deps.core.setLiveOnly(ready.canvasId, isLiveOnly);
+  };
+
   // JOURNAL 2026-09-30 : le streamer seul. Le schéma n'a laissé passer que des bornes valides.
   const setGaugeLimits = async (
     { requestId, gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
@@ -875,7 +995,7 @@ export function createConnection(
       return refuseArchived(frame.requestId);
     switch (frame.t) {
       case "place":
-        return placePixels(frame, ready.canvasId);
+        return placePixels(frame, ready);
       case "inspect":
         return inspectCell(frame, ready);
       case "moderate":
@@ -892,6 +1012,8 @@ export function createConnection(
         return setObsBackground(frame, ready);
       case "setBackgroundImageOpacity":
         return setBackgroundImageOpacity(frame, ready);
+      case "setLiveOnly":
+        return setLiveOnly(frame, ready);
       case "claimGauge":
         return claimGauge(frame.requestId, ready.canvasId);
       case "setGaugeLimits":

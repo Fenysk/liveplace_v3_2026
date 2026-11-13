@@ -34,8 +34,15 @@ for index = 1, #held, 2 do
 end
 return 1`;
 
-// Les champs de `meta` qui sont ceux du streamer, pas d'un canvas : le délai et le fond de la vue OBS, la synchro Twitch.
-const SHARED_META_FIELDS = ["obsDelayMs", "obsBackground", "twitchSync", "twitchSyncedAt"] as const;
+// Les champs de `meta` qui sont ceux du streamer, pas d'un canvas : le délai et le fond de la vue OBS, le dessin seulement pendant
+// le live (JOURNAL 2026-11-12), la synchro Twitch.
+const SHARED_META_FIELDS = [
+  "obsDelayMs",
+  "obsBackground",
+  "liveOnly",
+  "twitchSync",
+  "twitchSyncedAt",
+] as const;
 
 // Un identifiant de canvas est un UUID : tout ce qui pourrait se lire comme un motif SCAN est refusé, pour qu'un
 // identifiant vide ou `*` ne balaie jamais les canvas des autres.

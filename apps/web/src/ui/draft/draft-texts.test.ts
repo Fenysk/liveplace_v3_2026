@@ -15,6 +15,14 @@ const CODES = [
   "server_full",
 ] as const;
 
+describe("the toast of a closed drawing (JOURNAL 2026-11-12)", () => {
+  // Il nomme le streamer, dans les deux langues
+  it("names the streamer, in both languages", () => {
+    expect(fr.waitingForLive("BourguiTv")).toBe("Le dessin s'ouvre quand BourguiTv est en live");
+    expect(en.waitingForLive("BourguiTv")).toBe("Drawing opens when BourguiTv is live");
+  });
+});
+
 describe("the tip of the gauge (JOURNAL 2026-09-30, §9.9)", () => {
   const full = { charges: 10, max: 10, claimable: 0 };
 

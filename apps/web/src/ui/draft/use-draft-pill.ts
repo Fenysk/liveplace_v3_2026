@@ -149,6 +149,7 @@ const toShownState = (
       gauge,
       canClaim,
       draftSize: draft.draft.size,
+      ...(canvas.isDrawingClosed ? { isDrawingClosed: true } : {}),
       ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
     };
   }

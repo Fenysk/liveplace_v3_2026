@@ -15,6 +15,17 @@ import type {
 // Au-delà, l'état d'un streamer dont on rend la page est revérifié chez Twitch : un live resté allumé s'éteint.
 const STALE_AFTER_MS = 5 * MINUTE_MS;
 
+// JOURNAL 2026-11-12 : un live qui s'éteint note son heure de fin, que le dessin seulement pendant le live compte à partir de là ; hors
+// live, une revérification la garde ; en live, elle n'a pas lieu d'être.
+const endedAtOf = (
+  previous: TwitchLiveState | null,
+  isLive: boolean,
+  at: Timestamp,
+): Timestamp | undefined => {
+  if (isLive) return undefined;
+  return previous?.twitchLive ? at : previous?.endedAt;
+};
+
 export type TwitchLiveDeps = {
   source: TwitchLiveSource;
   eventSub: Pick<TwitchEventSub, "subscribeToLive" | "deleteSubscriptions">;
@@ -46,9 +57,11 @@ export function createTwitchLiveTracker({
   // l'un ni l'autre : le magasin les refuse d'un seul bloc.
   const settle = async (userId: string, previous: TwitchLiveState | null, twitchLive?: TwitchLive) => {
     const hasChanged = previous?.twitchLive?.category !== twitchLive?.category;
+    const checkedAt = now();
+    const endedAt = endedAtOf(previous, twitchLive !== undefined, checkedAt);
     await store.setTwitchLiveState(
       userId,
-      { ...(twitchLive ? { twitchLive } : {}), checkedAt: now() },
+      { ...(twitchLive ? { twitchLive } : {}), checkedAt, ...(endedAt === undefined ? {} : { endedAt }) },
       hasChanged ? { kind: "twitchLive", userId, ...(twitchLive ? { twitchLive } : {}) } : undefined,
     );
   };

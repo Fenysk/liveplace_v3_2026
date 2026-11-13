@@ -45,6 +45,31 @@ describe("the Twitch live of an account (JOURNAL 2026-10-07)", () => {
     expect(await core.getTwitchLive(userId)).toBeNull();
   });
 
+  // La fin du dernier live se garde hors live, et se rend avec l'état (JOURNAL 2026-11-12)
+  it("keeps the end of the last live while offline, and gives it back with the state", async () => {
+    const userId = `${runId}-ended`;
+    await store.setTwitchLiveState(userId, { twitchLive: { category: "Art" }, checkedAt: 1 });
+
+    await store.setTwitchLiveState(userId, { checkedAt: 2, endedAt: 2 });
+    await store.setTwitchLiveState(userId, { checkedAt: 3, endedAt: 2 });
+
+    expect(await store.getTwitchLiveState(userId)).toEqual({ checkedAt: 3, endedAt: 2 });
+    expect(await redis.hgetall(twitchLiveKey(userId))).toEqual({ checkedAt: "3", endedAt: "2" });
+    expect(await core.getTwitchLiveState(userId)).toEqual({ checkedAt: 3, endedAt: 2 });
+    expect(await core.getTwitchLive(userId)).toBeNull();
+  });
+
+  // Repartir en live efface la fin d'avant : un compte en live n'en a pas
+  it("drops the end of the previous live once the account is live again", async () => {
+    const userId = `${runId}-restarted`;
+    await store.setTwitchLiveState(userId, { checkedAt: 2, endedAt: 2 });
+
+    await store.setTwitchLiveState(userId, { twitchLive: { category: "" }, checkedAt: 3 });
+
+    expect(await store.getTwitchLiveState(userId)).toEqual({ twitchLive: { category: "" }, checkedAt: 3 });
+    expect(await redis.hgetall(twitchLiveKey(userId))).toEqual({ checkedAt: "3", category: "" });
+  });
+
   // Lit le live de plusieurs comptes d'un coup : seuls ceux en live ont une entrée, catégorie vide comprise
   it("lists the live of several accounts at once: only those live have an entry, an empty category included", async () => {
     const [art, bare, offline, unknown] = ["art", "bare", "off", "none"].map(

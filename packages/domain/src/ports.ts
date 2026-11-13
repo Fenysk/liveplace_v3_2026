@@ -97,8 +97,9 @@ export type TwitchUser = Pick<User, "userId" | "login" | "displayName">;
 // Absent : hors live.
 export type TwitchLive = NonNullable<Extract<ServerFrame, { t: "twitchLive" }>["twitchLive"]>;
 
-// Ce que le web garde par compte : son live, et l'heure de la dernière vérification chez Twitch.
-export type TwitchLiveState = { twitchLive?: TwitchLive; checkedAt: Timestamp };
+// Ce que le web garde par compte : son live, l'heure de la dernière vérification chez Twitch, et la fin du dernier live
+// (`endedAt`, absente en live et pour un compte qu'on n'a jamais vu en live).
+export type TwitchLiveState = { twitchLive?: TwitchLive; checkedAt: Timestamp; endedAt?: Timestamp };
 
 // §2 : une action venue de Twitch sur un canvas. Le web la dépose, le gateway l'applique avec ses scripts.
 export type CanvasTwitchCommand =
@@ -172,6 +173,7 @@ export type LiveControl =
   | { t: "canvasStatus"; status: CanvasStatus } // publié par le web : archivé, redevenu actif, supprimé (§17.1)
   | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (§4.3)
   | { t: "backgroundImage"; at?: Timestamp } // publié par le web : l'image du fond a changé, sans `at` il n'y en a plus (§4.3)
+  | { t: "liveOnly"; isLiveOnly: boolean } // le streamer règle le dessin seulement pendant le live (§4.3)
   | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (§4.3)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
@@ -248,11 +250,13 @@ export interface CanvasCore {
   setObsBackground(canvasId: string, obsBackground: ObsBackground): Promise<void>; // JOURNAL 2026-09-29, comme le délai
   setBackgroundImageOpacity(canvasId: string, backgroundImageOpacity: number): Promise<void>; // §9.5, de même
   setGaugeLimits(canvasId: string, limits: GaugeLimits): Promise<void>; // JOURNAL 2026-09-30, comme le délai
+  setLiveOnly(canvasId: string, isLiveOnly: boolean): Promise<void>; // JOURNAL 2026-11-12, de même
   // §5.1 : sans version non plus, ce n'est pas un pixel. Publie le `ctl` `role`.
   setModerator(canvasId: string, change: ModeratorRole): Promise<Result<void, CanvasRefusal | "forbidden">>;
   listModerators(canvasId: string): Promise<Moderator[]>;
   getTwitchSync(canvasId: string): Promise<TwitchSync | null>; // `null` : jamais synchronisé
   getTwitchLive(userId: string): Promise<TwitchLive | null>; // §10.4 ; `null` : hors live, ou inconnu
+  getTwitchLiveState(userId: string): Promise<TwitchLiveState | null>; // JOURNAL 2026-11-12 ; `null` : aucun état connu
   // Une seule lecture pour tous ces comptes (l'activité du développeur) : seuls ceux en live ont une entrée.
   listTwitchLives(userIds: readonly string[]): Promise<Map<string, TwitchLive>>;
   // §17.1 : le nom Twitch de ces personnes, d'un canvas à son successeur, là où il manque.

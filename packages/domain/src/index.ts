@@ -221,6 +221,8 @@ export type CanvasMeta = Omit<GaugeParams, "gaugeMax"> &
     // §5.8 : la taille dynamique est activée ; et le repère de la fresque, absent : jamais décalée.
     isDynamicSize?: boolean;
     origin?: CanvasOrigin;
+    // Le dessin des viewers ne s'ouvre que pendant le live du streamer (`live-only.ts`). Absent : toujours ouvert.
+    isLiveOnly?: boolean;
   };
 
 // §17.1 : ce que dit un canvas dont le statut change, à toutes les pages qui l'ont ouvert.

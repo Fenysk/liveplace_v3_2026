@@ -192,6 +192,7 @@ const CanvasSettingsScene = ({
   const [size, setSize] = useState(current);
   const [choice, setChoice] = useState(startChoice(current, isDynamic, hasFormat));
   const [isOn, setIsOn] = useState(isDynamic);
+  const [isLiveOnly, setIsLiveOnly] = useState(false);
   const [confirming, setConfirming] = useState<"resize" | "turnOff" | null>(null);
   const [status, setStatus] = useState<ResizeStatus>("idle");
   const chosen = choice && toCanvasSize(choice);
@@ -221,6 +222,7 @@ const CanvasSettingsScene = ({
               } else turnOff();
             },
           }}
+          liveOnly={{ isOn: isLiveOnly, onToggle: setIsLiveOnly }}
           current={size}
           choice={choice}
           chosen={chosen}

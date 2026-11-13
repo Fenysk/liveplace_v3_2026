@@ -1083,6 +1083,37 @@ button.lp-release-shot:focus-visible {
   display: none;
 }
 
+/* Dessin pendant tes lives : la pill de profil du streamer au-dessus de la pill Dessin, et le toast du jeu en haut au centre. Les valeurs par
+   défaut des variables sont celles de l'image fixe : hors live (le bouton Twitch gris), le toast visible. Les deux pills s'effacent ensemble. */
+.lp-release-liveonly {
+  --lp-release-font: calc(5.4 * var(--lp-release-pu));
+  --lp-release-live: 0;
+  --lp-release-toast: 1;
+  --lp-release-pill: 1;
+}
+
+.lp-release-liveonly .lp-release-pill:not(.lp-release-toast) {
+  opacity: var(--lp-release-pill, 1);
+}
+
+.lp-release-profile {
+  position: absolute;
+  bottom: calc(8 * var(--lp-u) + 22 * var(--lp-release-pu));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lp-release-liveonly .lp-release-toast {
+  top: calc(8 * var(--lp-u));
+  bottom: auto;
+  left: 50%;
+  transform: translate(-50%, calc((var(--lp-release-toast, 1) - 1) * 3 * var(--lp-release-pu)));
+}
+
+.lp-release-liveonly .lp-release-toast .lp-toast {
+  white-space: nowrap;
+}
+
 /* App mobile : un téléphone au milieu de la vignette, tout en unités de --lp-u (il grandit avec la carte, sans le plafond des pills). L'écran
    d'accueil et l'appli ouverte sont deux calques ; `--lp-release-open` (1 par défaut : l'image fixe) fait grandir l'appli depuis l'icône, qui
    est à la 2e colonne de la 3e rangée. Les pills du jeu y sont à une échelle de pill plus petite, redéfinie sur l'écran. */

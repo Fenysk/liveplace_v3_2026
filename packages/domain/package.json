@@ -13,6 +13,7 @@
     "./accounts-filter": "./src/accounts-filter.ts",
     "./resize": "./src/resize.ts",
     "./dynamic-size": "./src/dynamic-size.ts",
+    "./live-only": "./src/live-only.ts",
     "./retention": "./src/retention.ts",
     "./capacity": "./src/capacity.ts",
     "./support": "./src/support.ts",

@@ -112,8 +112,34 @@ describe("the live of a channel, told by Twitch (§10.4)", () => {
 
     await tracker.apply(offline);
 
-    expect(states.get(userId)).toEqual({ checkedAt: now });
+    expect(states.get(userId)).toEqual({ checkedAt: now, endedAt: now });
     expect(commands).toEqual([{ kind: "twitchLive", userId }]);
+  });
+
+  // La fin du live porte son heure : le gateway compte les 10 minutes de grâce du dessin à partir d'elle (JOURNAL 2026-11-12)
+  it("notes the end time of a live that goes out, keeps it while the account stays offline, and drops it when it is live again", async () => {
+    const { tracker, states } = setup({ state: live("Art"), category: "Music" });
+
+    await tracker.apply(offline);
+    expect(states.get(userId)).toEqual({ checkedAt: now, endedAt: now });
+    states.set(userId, { checkedAt: now - MINUTE, endedAt: now - 3 * MINUTE }); // une revérification plus tard
+    await tracker.apply(offline);
+    expect(states.get(userId)).toEqual({ checkedAt: now, endedAt: now - 3 * MINUTE });
+
+    await tracker.apply(online);
+    expect(states.get(userId)).toEqual({ twitchLive: { category: "Music" }, checkedAt: now });
+  });
+
+  // Un compte jamais vu en live n'a pas d'heure de fin : il est hors live depuis avant qu'on le note
+  it("gives no end time to an account never seen live", async () => {
+    const unknown = setup({ streaming: null });
+    const known = setup({ state: { checkedAt: now - MINUTE } });
+
+    await unknown.tracker.apply(offline);
+    await known.tracker.apply(offline);
+
+    expect(unknown.states.get(userId)).toEqual({ checkedAt: now });
+    expect(known.states.get(userId)).toEqual({ checkedAt: now });
   });
 
   // Une révocation de l'abonnement de live efface le live comme sa fin
@@ -122,7 +148,7 @@ describe("the live of a channel, told by Twitch (§10.4)", () => {
 
     await tracker.apply({ kind: "liveRevoked", broadcasterId: userId });
 
-    expect(states.get(userId)).toEqual({ checkedAt: now });
+    expect(states.get(userId)).toEqual({ checkedAt: now, endedAt: now });
     expect(commands).toEqual([{ kind: "twitchLive", userId }]);
   });
 
@@ -275,7 +301,7 @@ describe("reading the live of an owner when its page is rendered (§10.4)", () =
 
     expect(asked).toEqual(["streams 1234"]);
     expect(subscribed).toEqual([]);
-    expect(states.get(userId)).toEqual({ checkedAt: now });
+    expect(states.get(userId)).toEqual({ checkedAt: now, endedAt: now });
     expect(commands).toEqual([{ kind: "twitchLive", userId }]);
   });
 

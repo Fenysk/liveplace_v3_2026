@@ -138,12 +138,15 @@
   position: relative;
 }
 
-.lp-btn:disabled {
+/* `--inactive` : grisé comme désactivé, mais cliquable (aria-disabled) : le clic dit pourquoi, dans un toast */
+.lp-btn:disabled,
+.lp-btn--inactive {
   opacity: 0.45;
   cursor: default;
 }
 
-.lp-btn:disabled:active {
+.lp-btn:disabled:active,
+.lp-btn--inactive:active {
   transform: none;
 }
 

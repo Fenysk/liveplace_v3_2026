@@ -2092,3 +2092,61 @@ describe("a dynamic size, and the shifts it brings (§5.8)", () => {
     expect(await asking).toEqual({ ok: false, error: "forbidden" });
   });
 });
+
+describe("the drawing only while live in the canvas view (JOURNAL 2026-11-12)", () => {
+  const welcomeOf = (canvas: object, params: object = {}): Extract<ServerFrame, { t: "welcome" }> => {
+    if (welcome.t !== "welcome") throw new Error("welcome attendu");
+    return { ...welcome, canvas: { ...welcome.canvas, ...canvas }, params: { ...welcome.params, ...params } };
+  };
+
+  // Le welcome dit le réglage et la fermeture ; sans eux, le dessin est ouvert et le réglage éteint
+  it("takes the setting and the closing of the welcome, and open and off when it says none", () => {
+    const { store, receive } = setup();
+
+    expect(store.getView()).toMatchObject({ isDrawingClosed: false });
+    expect(store.getView().params?.isLiveOnly).toBeUndefined();
+
+    receive(welcomeOf({ isDrawingClosed: true }, { isLiveOnly: true }));
+    expect(store.getView()).toMatchObject({ isDrawingClosed: true, params: { isLiveOnly: true } });
+
+    receive(welcome);
+    expect(store.getView().isDrawingClosed).toBe(false);
+  });
+
+  // Les frames drawingClosed ouvrent et ferment le dessin de la page, et liveOnly change le réglage sans toucher au reste des params
+  it("opens and closes the drawing on drawingClosed, and changes the setting on liveOnly without touching the other params", () => {
+    const { store, receive } = setup();
+
+    receive({ t: "drawingClosed", isClosed: true });
+    expect(store.getView().isDrawingClosed).toBe(true);
+    receive({ t: "drawingClosed", isClosed: false });
+    expect(store.getView().isDrawingClosed).toBe(false);
+
+    receive({ t: "liveOnly", isLiveOnly: true });
+    expect(store.getView().params).toEqual({ ...welcomeOf({}).params, isLiveOnly: true });
+    receive({ t: "liveOnly", isLiveOnly: false });
+    expect(store.getView().params?.isLiveOnly).toBe(false);
+  });
+
+  // Le streamer demande le réglage par une frame sans réponse attendue : la frame liveOnly du gateway le confirme
+  it("asks the gateway for the setting, which the liveOnly frame then confirms", () => {
+    const { store, sent } = setup();
+
+    store.setLiveOnly(true);
+
+    expect(sent.at(-1)).toMatchObject({ t: "setLiveOnly", isLiveOnly: true });
+    expect(store.getView().params?.isLiveOnly).toBeUndefined();
+  });
+
+  // Une pose refusée parce que le dessin est fermé rend ses pixels et le dit au lot, sans coller de refus à la page
+  it("hands back the pixels of a placement refused because the drawing is closed, with its code", async () => {
+    const { store, receive, lastPlace, pixelAt } = setup();
+
+    const placing = store.placeBatch([{ x: 1, y: 2, colorIndex: 5 }], PLACEMENT_ID);
+    receive({ t: "error", code: "drawing_closed", requestId: lastPlace().requestId });
+
+    expect(await placing).toEqual({ ok: false, error: "drawing_closed" });
+    expect(pixelAt(1, 2)).toBe(0);
+    expect(store.getView().lastError).toBeNull();
+  });
+});

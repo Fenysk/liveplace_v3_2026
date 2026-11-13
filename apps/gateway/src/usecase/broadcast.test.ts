@@ -261,6 +261,21 @@ describe("announcing a control to every page (§10.4)", () => {
 
     expect(controls).toEqual([{ t: "twitchLive", userId: "owner-1", twitchLive: { category: "Art" } }]);
   });
+
+  // L'horloge du dessin seulement pendant le live : chaque page de chaque canvas la reçoit, détachée de son objet comme les autres ticks
+  it("hands the drawing clock to every page of every canvas, callable on its own", async () => {
+    const { core } = fakeCore();
+    const broadcast = createBroadcast(core);
+    const { tickDrawing } = broadcast;
+    const controls: ControlMessage[] = [];
+    const listener = (control: ControlMessage) => controls.push(control);
+    await broadcast.join("canvas-1", () => undefined, listener);
+    await broadcast.join("canvas-2", () => undefined, listener);
+
+    tickDrawing();
+
+    expect(controls).toEqual([{ t: "drawingTick" }, { t: "drawingTick" }]);
+  });
 });
 
 const entry = (login: string, pixels: number): ScoreboardEntry => ({ login, displayName: login, pixels });

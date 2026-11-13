@@ -7,9 +7,13 @@ import { TWITCH_COMMANDS_KEY, TWITCH_COMMANDS_MAXLEN, twitchLiveKey, userKey } f
 
 // `category` présent : en live, même vide. Sans `checkedAt`, la clé n'est pas la nôtre : aucun état.
 export async function getTwitchLiveState(redis: Redis, userId: string): Promise<TwitchLiveState | null> {
-  const { category, checkedAt } = await redis.hgetall(twitchLiveKey(userId));
+  const { category, checkedAt, endedAt } = await redis.hgetall(twitchLiveKey(userId));
   if (checkedAt === undefined) return null;
-  return { ...(category === undefined ? {} : { twitchLive: { category } }), checkedAt: Number(checkedAt) };
+  return {
+    ...(category === undefined ? {} : { twitchLive: { category } }),
+    checkedAt: Number(checkedAt),
+    ...(endedAt === undefined ? {} : { endedAt: Number(endedAt) }),
+  };
 }
 
 // Un seul aller-retour : le champ `category` de chacun, présent seulement pour qui est en live.
@@ -33,17 +37,23 @@ export async function listTwitchLives(
 // Un compte supprimé n'a plus d'état de live à écrire (JOURNAL 2026-11-02) : un suivi parti avant l'effacement et revenu après ne
 // recrée ni `twitch:live:<userId>` ni l'action qui le dit au gateway. Un seul script : la garde, l'état et l'action ne laissent pas
 // l'effacement passer entre eux. KEYS : l'état de live, les trois clés de la garde, la file des actions ; ARGV : le compte, l'heure
-// de vérification, la taille de la file, l'action en JSON (vide : aucune), puis la catégorie si le compte est en live.
+// de vérification, la taille de la file, l'action en JSON (vide : aucune), la fin du dernier live (vide : aucune), puis la catégorie
+// si le compte est en live.
 const SET_LIVE_STATE = `${IS_DELETED_ACCOUNT_LUA}
 if isDeletedAccount(ARGV[1], KEYS[2], KEYS[3], KEYS[4]) then
   return 0
 end
 redis.call("DEL", KEYS[1])
-if ARGV[5] then
-  redis.call("HSET", KEYS[1], "checkedAt", ARGV[2], "category", ARGV[5])
-else
-  redis.call("HSET", KEYS[1], "checkedAt", ARGV[2])
+local fields = { "checkedAt", ARGV[2] }
+if ARGV[5] ~= "" then
+  table.insert(fields, "endedAt")
+  table.insert(fields, ARGV[5])
 end
+if ARGV[6] then
+  table.insert(fields, "category")
+  table.insert(fields, ARGV[6])
+end
+redis.call("HSET", KEYS[1], unpack(fields))
 if ARGV[4] ~= "" then
   redis.call("XADD", KEYS[5], "MAXLEN", "~", ARGV[3], "*", "c", ARGV[4])
 end
@@ -83,7 +93,7 @@ export function createTwitchLiveStore(redis: Redis, secret: string): TwitchLiveS
     getTwitchLiveState: (userId) => getTwitchLiveState(redis, userId),
 
     // L'ancienne catégorie ne survit pas à un état hors live. Faux : le compte est supprimé, ni état ni action n'est écrit.
-    async setTwitchLiveState(userId, { twitchLive, checkedAt }, announce) {
+    async setTwitchLiveState(userId, { twitchLive, checkedAt, endedAt }, announce) {
       const written = await redis.eval(
         SET_LIVE_STATE,
         5,
@@ -94,6 +104,7 @@ export function createTwitchLiveStore(redis: Redis, secret: string): TwitchLiveS
         checkedAt,
         TWITCH_COMMANDS_MAXLEN,
         announce ? JSON.stringify(announce) : "",
+        endedAt === undefined ? "" : endedAt,
         ...(twitchLive ? [twitchLive.category] : []),
       );
       return written === 1;

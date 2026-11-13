@@ -13,6 +13,7 @@ import { previewResize, type SizeChoice, toCanvasSize, toSizeChoice, turnOffPrev
 import { CANVAS_TEXTS } from "./canvas-texts";
 import { useBackgroundFields } from "./use-background-fields";
 import { useDynamicSizeField } from "./use-dynamic-size-field";
+import { useLiveOnlyField } from "./use-live-only-field";
 import { useThemeField } from "./use-theme-field";
 
 // `canvasId` et `login` : ceux de la page, qui visent l'image du fond.
@@ -48,6 +49,7 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
   const theme = useThemeField();
   const { background, image } = useBackgroundFields({ canvas, canvasId, login });
   const dynamic = useDynamicSizeField(canvas);
+  const liveOnly = useLiveOnlyField(canvas);
 
   // Retirer le réglage : des dessins sortiraient du cadre de 50 × 50, la confirmation s'ouvre ; sinon la case se décoche et la taille change.
   const toggleDynamic = (isOn: boolean) => {
@@ -83,6 +85,7 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
         background={background}
         image={image}
         dynamic={{ isOn: dynamic.isOn, isBusy: dynamic.isBusy, onToggle: toggleDynamic }}
+        liveOnly={liveOnly}
         current={current}
         choice={choice}
         chosen={chosen}
