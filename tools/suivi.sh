@@ -3,7 +3,7 @@
 #   sh tools/suivi.sh
 # Sort toujours en 0 : c'est une liste, pas un gate.
 
-vault="${LIVEPLACE_VAULT:-$HOME/Leviia/Obsidian MacOS}/LivePlace"
+vault="${LIVEPLACE_VAULT:-$HOME/Obsidian}/LivePlace"
 depuis="${SUIVI_DEPUIS:-2026-11-02}"
 
 if [ ! -d "$vault" ]; then
