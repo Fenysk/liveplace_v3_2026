@@ -35,6 +35,7 @@ import {
 } from "./draft-history";
 import { predictGauge } from "./gauge";
 import { INITIAL_RECENT_COLOR_INDEXES, rememberColorIndex } from "./recent-color-indexes";
+import { getSavedColor, saveColor } from "./saved-color";
 import { type DraftStorage, getSavedDraft, isSavedDraftStale, saveDraft } from "./saved-draft";
 
 export type DraftMode = "view" | "draft";
@@ -110,20 +111,25 @@ export function createDraftStore(
   clock: DraftClock,
   onPlaced?: () => void,
 ): DraftStore {
+  // La couleur et la rangée gardées d'un rechargement à l'autre ; sans elles, le noir et la rangée de départ.
+  const saved = getSavedColor(getStorage) ?? {
+    colorIndex: FIRST_COLOR_INDEX,
+    recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES,
+  };
   let view: DraftView = {
     mode: "view",
     draft: EMPTY_DRAFT,
-    colorIndex: FIRST_COLOR_INDEX,
+    colorIndex: saved.colorIndex,
     isSending: false,
     isTracing: false,
     isTouchTracing: false,
     isPicking: false,
     shakeCount: 0,
-    recentColorIndexes: INITIAL_RECENT_COLOR_INDEXES,
+    recentColorIndexes: saved.recentColorIndexes,
     canUndo: false,
     canRedo: false,
   };
-  let lastColorIndex = FIRST_COLOR_INDEX;
+  let lastColorIndex = saved.colorIndex;
   // §9.6 : gardé d'un Dessin au suivant, pas au rechargement ; la vue ne le porte qu'en Dessin.
   let isTouchTracingRemembered = false;
   let loadedUserId: string | undefined;
@@ -267,7 +273,10 @@ export function createDraftStore(
   // Gomme armée, la couleur remplacée est celle d'avant la gomme : aucune ne se perd.
   const selectColor = (colorIndex: number): void => {
     const recentColorIndexes = rememberColorIndex(view.recentColorIndexes, lastColorIndex, colorIndex);
-    if (colorIndex !== TRANSPARENT_COLOR_INDEX) lastColorIndex = colorIndex;
+    if (colorIndex !== TRANSPARENT_COLOR_INDEX) {
+      lastColorIndex = colorIndex;
+      saveColor(getStorage, colorIndex, recentColorIndexes);
+    }
     publish({ colorIndex, recentColorIndexes, isPicking: false });
   };
 

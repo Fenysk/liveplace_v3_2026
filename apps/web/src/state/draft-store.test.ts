@@ -285,6 +285,22 @@ describe("createDraftStore — the modes (CDC 2026)", () => {
   });
 });
 
+describe("createDraftStore — the saved color", () => {
+  // La couleur choisie et sa rangée reviennent au rechargement (un second store sur le même stockage), la gomme jamais :
+  // ici la gomme est armée au moment du rechargement, et c'est la dernière vraie couleur qui revient
+  it("keeps the chosen color and its row for the next page load, and never the eraser", () => {
+    const { store, entries } = setup();
+    store.enterDraftMode();
+    store.selectColor(12);
+    const row = store.getView().recentColorIndexes;
+    store.toggleEraser();
+
+    const reloaded = setup({ entries }).store;
+
+    expect(reloaded.getView()).toMatchObject({ colorIndex: 12, recentColorIndexes: row });
+  });
+});
+
 describe("createDraftStore — the cap (CDC 2026)", () => {
   // Plafonne aux charges prévues : une recharge arrivée depuis le dernier ack compte déjà
   it("caps at the predicted charges: a refill that came since the last ack already counts", () => {
