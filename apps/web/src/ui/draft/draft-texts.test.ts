@@ -72,6 +72,28 @@ describe("the tip of the gauge (JOURNAL 2026-09-30, §9.9)", () => {
   });
 });
 
+describe("the tip of the gauge with a reserve (mode événement)", () => {
+  const withReserve = { charges: 10, max: 10, claimable: 0, reserve: 1200 };
+
+  // La réserve se dit après les charges, au format de la langue
+  it("says the reserve after the pixels", () => {
+    expect(fr.gaugeLabel(withReserve)).toBe("10 / 10 pixels, plus 1 200 en réserve, jauge pleine");
+    expect(en.gaugeLabel(withReserve)).toBe("10 / 10 pixels, plus 1,200 in reserve, gauge full");
+  });
+
+  // Après le brouillon, le reste vaut le total des charges et de la réserve
+  it("says what is left in all after the draft", () => {
+    const drafting = { ...withReserve, afterPlacement: 1197 };
+
+    expect(fr.gaugeLabel(drafting)).toContain("1 197 en tout après ce dessin");
+    expect(en.gaugeLabel(drafting)).toContain("1,197 in all after this drawing");
+  });
+
+  it("says nothing of the reserve when it is empty", () => {
+    expect(fr.gaugeLabel({ ...withReserve, reserve: 0 })).toBe("10 / 10 pixels, jauge pleine");
+  });
+});
+
 describe("the tip of Attendre (§9.6)", () => {
   // Le bouton attend le prochain pixel : le mot « charge » ne se dit plus à l'écran
   it("says the next pixel, never a charge", () => {

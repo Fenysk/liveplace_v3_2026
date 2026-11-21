@@ -13,12 +13,21 @@ import {
   type Timestamp,
   toStateOffset,
 } from "@liveplace/domain";
-import { type DrawingGate, isBoundToLive, liveGate, OPEN_DRAWING } from "@liveplace/domain/live-only";
+import { charityGate } from "@liveplace/domain/charity-event";
+import {
+  combineGates,
+  type DrawingGate,
+  isBoundToLive,
+  liveGate,
+  OPEN_DRAWING,
+} from "@liveplace/domain/live-only";
 import type {
   AckFrame,
   CanvasCore,
+  CharityEventState,
   ClientConnection,
   ClientSocket,
+  EventCore,
   InspectEntry,
   LiveControl,
   Moderation,
@@ -78,6 +87,9 @@ type SetObsDelayFrame = Extract<ClientFrame, { t: "setObsDelay" }>;
 type SetObsBackgroundFrame = Extract<ClientFrame, { t: "setObsBackground" }>;
 type SetBackgroundImageOpacityFrame = Extract<ClientFrame, { t: "setBackgroundImageOpacity" }>;
 type SetLiveOnlyFrame = Extract<ClientFrame, { t: "setLiveOnly" }>;
+
+type SetCharityEventFrame = Extract<ClientFrame, { t: "setCharityEvent" }>;
+type ClaimCharityBonusFrame = Extract<ClientFrame, { t: "claimCharityBonus" }>;
 type SetGaugeLimitsFrame = Extract<ClientFrame, { t: "setGaugeLimits" }>;
 type SetModeratorFrame = Extract<ClientFrame, { t: "setModerator" }>;
 type ReportFrame = Extract<ClientFrame, { t: "report" }>;
@@ -91,26 +103,31 @@ type WelcomeFrame = Extract<ServerFrame, { t: "welcome" }>;
 // Un message de contrôle devenu frame pour cette socket : son ban, le délai OBS du canvas, les signalements en
 // attente et les listes périmées pour qui modère, le classement (JOURNAL 2026-09-28, 2026-10-06), le statut du
 // canvas (§17.1), ou le live du streamer ou de cette personne (§10.4).
-type ControlFrame = Extract<
-  ServerFrame,
-  {
-    t:
-      | "banned"
-      | "unbanned"
-      | "obsDelay"
-      | "obsBackground"
-      | "gaugeLimits"
-      | "reportCount"
-      | "staleList"
-      | "scoreboard"
-      | "canvasStatus"
-      | "backgroundImage"
-      | "backgroundImageOpacity"
-      | "theme"
-      | "liveOnly"
-      | "twitchLive";
-  }
->;
+type ControlFrame =
+  | Extract<
+      ServerFrame,
+      {
+        t:
+          | "banned"
+          | "unbanned"
+          | "obsDelay"
+          | "obsBackground"
+          | "gaugeLimits"
+          | "reportCount"
+          | "staleList"
+          | "scoreboard"
+          | "canvasStatus"
+          | "backgroundImage"
+          | "backgroundImageOpacity"
+          | "theme"
+          | "liveOnly"
+          | "twitchLive";
+      }
+    >
+  | Extract<ServerFrame, { t: "charityEvent" | "charityDonation" }>;
+
+// CDC 2026 §8 : ce que le `welcome` dit du mode événement. `null` : il n'existe pas sur cette fresque, ni sur cette page.
+type CharityView = Awaited<ReturnType<EventCore["getCharityEvent"]>>;
 
 // §10.4 : le live du streamer du canvas et celui de la personne connectée.
 type TwitchLives = { owner: TwitchLive | null; you: TwitchLive | null };
@@ -139,6 +156,12 @@ type ReadyState = {
   isLiveOnly: boolean;
   isDrawingClosed: boolean;
   closesAt: Timestamp | undefined;
+  // Fermé avant le début de l'événement : s'ouvre à cette heure. Le réglage de l'événement tel que la page le reçoit : la porte
+  // « dessin seulement pendant l'événement » (JOURNAL 2026-11-21) le lit, la fin aussi.
+  opensAt: Timestamp | undefined;
+  charity: CharityEventState | undefined;
+  // JOURNAL 2026-11-20 : la fin de l'événement tant qu'elle n'est pas passée ; l'horloge la voit, aucun message ne la dit.
+  charityEndsAt: Timestamp | undefined;
   // §5.8 : la dernière version que l'arrivée de la page a déjà couverte. Une case plus ancienne, qui
   // attendait encore dans le tampon du tick, parle peut-être d'un cadre d'avant un agrandissement : elle n'est plus envoyée.
   coveredVersion: number;
@@ -164,6 +187,7 @@ export type ConnectionDeps = {
   // Tout le noyau, sauf ce qu'écrit le web à la connexion, l'abonnement que tient `broadcast`, et ce que suivent les
   // actions Twitch (`twitch-commands.ts`).
   core: Omit<CanvasCore, "createCanvas" | "setUser" | "subscribe" | "copyTwitchUsers">;
+  event: EventCore; // CDC 2026 §8 : le mode événement et le bonus de chaque compte
   broadcast: Broadcast;
   activity: Omit<Activity, "tick" | "start">; // §16.1 : le gateway décide, et ne dit rien aux autres
   // §16.1 : de même ; §16.3 : il compte aussi les poses refusées
@@ -211,18 +235,34 @@ const readyAfter = (ready: ReadyState, frame: ControlFrame): ReadyState => {
   if (frame.t === "canvasStatus")
     return { ...ready, isArchived: isArchivedAfter(frame.status, ready.isArchived) };
   if (frame.t === "liveOnly") return { ...ready, isLiveOnly: frame.isLiveOnly };
+  if (frame.t === "charityEvent")
+    return { ...ready, charity: frame.state, charityEndsAt: charityEndsAtOf(frame.state) };
   return ready;
+};
+
+// Un événement désactivé n'a plus de fin à attendre.
+const charityEndsAtOf = (state: CharityEventState | undefined): Timestamp | undefined =>
+  state?.isEnabled ? state.endsAt : undefined;
+
+// L'événement le plus récent l'emporte sur celui du `welcome` : un `charityEvent` tombé pendant l'arrivée.
+const lastCharityOf = (
+  view: CharityView,
+  controls: readonly ControlFrame[],
+): CharityEventState | undefined => {
+  const last = controls.filter((control) => control.t === "charityEvent").at(-1);
+  return last ? last.state : view?.state;
 };
 
 // De même pour le réglage du dessin seulement pendant le live.
 const lastLiveOnlyOf = (controls: readonly ControlFrame[]): boolean | undefined =>
   controls.flatMap((control) => (control.t === "liveOnly" ? [control.isLiveOnly] : [])).at(-1);
 
-// Ce qui dit de relire l'état du dessin : le réglage change, ou le live du streamer (ou de cette personne).
-const isDrawingControl = ({ t }: ControlFrame): boolean => t === "liveOnly" || t === "twitchLive";
+// Ce qui dit de relire l'état du dessin : un réglage change (le live, l'événement), ou le live du streamer (ou de cette personne).
+const isDrawingControl = ({ t }: ControlFrame): boolean =>
+  t === "liveOnly" || t === "twitchLive" || t === "charityEvent";
 
-// Ce dont le dessin d'une page dépend : le réglage, son rôle, et le streamer dont on lit le live.
-type GateInput = { isLiveOnly: boolean; role: Role; ownerId: string };
+// Ce dont le dessin d'une page dépend : les réglages, son rôle, et le streamer dont on lit le live.
+type GateInput = { isLiveOnly: boolean; role: Role; ownerId: string; charity: CharityEventState | undefined };
 
 // Ce que le `welcome` dit du canvas : sa taille, son streamer en live, et le dessin de cette page.
 const welcomeCanvasOf = (
@@ -267,6 +307,7 @@ const buildWelcome = (
   gauge: AckFrame["gauge"] | null,
   lives: TwitchLives,
   gate: DrawingGate,
+  charity: CharityView,
 ): WelcomeFrame => ({
   t: "welcome",
   canvas: welcomeCanvasOf(canvasId, meta, lives, gate),
@@ -275,6 +316,7 @@ const buildWelcome = (
   version,
   you: session ? { ...youOf(session), ...(lives.you ? { twitchLive: lives.you } : {}), role } : { role },
   ...(gauge ? { gauge } : {}),
+  ...(charity ? { charityEvent: charity } : {}), // CDC 2026 §8 : présent, le mode événement existe sur cette fresque
 });
 
 // La page à qui un message de contrôle s'adresse : son rôle, son mode, et le streamer du canvas.
@@ -325,6 +367,20 @@ const sharedFrameOf = (control: SharedControl): ControlFrame => {
   }
 };
 
+// JOURNAL 2026-11-20 : l'événement et ses dons, les mêmes pour toutes les pages de la fresque, sauf la vue OBS qui n'en montre rien.
+type CharityControl = Extract<Control, { t: "charityEvent" | "donation" }>;
+
+const isCharityControl = (control: Control): control is CharityControl =>
+  control.t === "charityEvent" || control.t === "donation";
+
+const charityFrameOf = (control: CharityControl, { mode }: Page): ControlFrame | null => {
+  if (mode !== "ui") return null;
+  if (control.t === "charityEvent")
+    return { t: "charityEvent", ...(control.state ? { state: control.state } : {}) };
+  const { donationId, name, cents, currency, pixels, donationCount } = control;
+  return { t: "charityDonation", donationId, name, cents, currency, pixels, donationCount };
+};
+
 // Un ban ne regarde que les sockets de la cible (JOURNAL 2026-09-25) ; le délai OBS, toutes celles du canvas ; les
 // signalements, celles qui modèrent. Le `ctl` `role` est traité à part : il se relit dans Redis avant de partir.
 const controlFrameOf = (control: Control, session: Session | null, page: Page): ControlFrame | null => {
@@ -334,6 +390,7 @@ const controlFrameOf = (control: Control, session: Session | null, page: Page): 
   if (isBackgroundImageControl(control)) return backgroundImageFrameOf(control);
   if (control.t === "liveOnly")
     return page.mode === "ui" ? { t: "liveOnly", isLiveOnly: control.isLiveOnly } : null; // la vue OBS n'a pas de dessin
+  if (isCharityControl(control)) return charityFrameOf(control, page);
   if (control.t === "twitchLive") return twitchLiveFrameOf(control, session, page);
   if (control.t === "tracesPurged") return null; // ne devient pas une frame : `tellStaleList` périme les listes
   return control.userId === session?.userId ? { t: control.t } : null;
@@ -373,6 +430,26 @@ export function createConnection(
         socket.sendFrame(frame); // le même objet pour tout le canvas : un seul JSON (ws-server)
       else if (cells.length > 0) socket.sendFrame({ t: "cells", toVersion: frame.toVersion, cells });
     }
+  };
+
+  // JOURNAL 2026-11-20 : le bonus de ce compte se lit et part dans l'ordre, une relecture à la fois : une réclamation et un don qui se
+  // croisent ne laissent jamais la page sur le plus ancien des deux.
+  let bonusQueue: Promise<void> = Promise.resolve();
+  const queueBonus = (task: () => Promise<void>): Promise<void> => {
+    const done = bonusQueue.then(task);
+    bonusQueue = done.catch(() => undefined);
+    return done;
+  };
+
+  // Un compte seul, en vue UI : un invité n'a rien à réclamer, la vue OBS ne montre rien de l'événement. Un bonus expiré se lit 0.
+  const sendBonus = async (): Promise<void> => {
+    if (!session || state.status !== "ready" || state.mode !== "ui" || state.isArchived) return;
+    const pending = await deps.event.getCharityBonus(state.canvasId, session.userId, deps.now());
+    socket.sendFrame({ t: "charityBonus", pending });
+  };
+
+  const sendBonusInBackground = (): void => {
+    queueBonus(sendBonus).catch((error: unknown) => console.error("bonus non relu", error));
   };
 
   // §10.3 : ses droits ont changé, le rôle se relit et la page l'apprend. Sur une archive, plus personne ne modère.
@@ -435,22 +512,27 @@ export function createConnection(
       state = readyAfter(state, frame);
       socket.sendFrame(frame);
       if (isDrawingControl(frame)) syncDrawingInBackground();
+      if (frame.t === "charityDonation" || frame.t === "charityEvent") sendBonusInBackground();
     }
   };
 
   // JOURNAL 2026-11-12 : le dessin de cette page se relit dans Redis, jamais dans le message de contrôle, qui dit seulement qu'il
   // faut regarder. Un streamer, un invité ou un réglage retiré : toujours ouvert. Rien de lu hors d'un cas qui s'y lie.
-  const getGate = async ({ isLiveOnly, role, ownerId }: GateInput): Promise<DrawingGate> =>
-    isBoundToLive(isLiveOnly, role)
-      ? liveGate(await deps.core.getTwitchLiveState(ownerId), deps.now())
-      : OPEN_DRAWING;
+  // JOURNAL 2026-11-21 : la porte de l'événement se lit dans son réglage, tenu à jour par les frames `charityEvent`. Les deux portes s'appliquent.
+  const getGate = async ({ isLiveOnly, role, ownerId, charity }: GateInput): Promise<DrawingGate> =>
+    combineGates(
+      isBoundToLive(isLiveOnly, role)
+        ? liveGate(await deps.core.getTwitchLiveState(ownerId), deps.now())
+        : OPEN_DRAWING,
+      charityGate(charity, role, deps.now()),
+    );
 
   // La page n'apprend que ce qui change.
   const applyGate = (gate: DrawingGate): void => {
     if (state.status !== "ready") return;
     if (gate.isClosed !== state.isDrawingClosed)
       socket.sendFrame({ t: "drawingClosed", isClosed: gate.isClosed });
-    state = { ...state, isDrawingClosed: gate.isClosed, closesAt: gate.closesAt };
+    state = { ...state, isDrawingClosed: gate.isClosed, closesAt: gate.closesAt, opensAt: gate.opensAt };
   };
 
   // §17.1 : une archive n'a plus de dessin à ouvrir ni à fermer.
@@ -463,10 +545,16 @@ export function createConnection(
     syncDrawing().catch((error: unknown) => console.error("dessin non relu", error));
   };
 
-  // L'échéance passée, le dessin se ferme sans qu'aucun message ne le dise : l'horloge du gateway (`deps.now`) la voit.
+  // L'échéance passée, le dessin se ferme (ou s'ouvre) sans qu'aucun message ne le dise : l'horloge du gateway (`deps.now`) la voit.
   const onDrawingTick = (): void => {
-    if (state.status === "ready" && state.closesAt !== undefined && deps.now() >= state.closesAt)
-      syncDrawingInBackground();
+    if (state.status !== "ready") return;
+    const nextSwitchAt = Math.min(state.closesAt ?? Infinity, state.opensAt ?? Infinity);
+    if (deps.now() >= nextSwitchAt) syncDrawingInBackground();
+    // JOURNAL 2026-11-20 : la fin de l'événement par l'horloge perd le bonus non réclamé, une seule fois.
+    if (state.charityEndsAt !== undefined && deps.now() >= state.charityEndsAt) {
+      state = { ...state, charityEndsAt: undefined };
+      sendBonusInBackground();
+    }
   };
 
   // JOURNAL 2026-10-06 : le classement de cette page, jamais en vue OBS.
@@ -600,7 +688,23 @@ export function createConnection(
     return { owner, you: isOwner ? owner : you };
   };
 
-  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live, le dessin.
+  // CDC 2026 §8 : jamais en vue OBS, ni sur une archive. Un viewer et un invité le lisent aussi : ils voient l'événement et ses dons.
+  const getCharityView = async ({ canvasId, mode }: HelloFrame, meta: CanvasMeta): Promise<CharityView> =>
+    mode === "ui" && meta.archivedAt === undefined ? deps.event.getCharityEvent(canvasId) : null;
+
+  // Le mode événement et le dessin : la porte de l'événement dépend du réglage lu avec lui.
+  const getCharityAndGate = async (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
+    const charity = await getCharityView(frame, meta);
+    const gate = await getGate({
+      isLiveOnly: meta.isLiveOnly === true && meta.archivedAt === undefined,
+      role,
+      ownerId: meta.ownerId,
+      charity: charity?.state,
+    });
+    return { charity, gate };
+  };
+
+  // Ce que l'arrivée lit avec l'état : le ban, les signalements en attente, le live, le mode événement et le dessin.
   // §17.1 : une archive n'en a pas à dire, personne n'y pose.
   const getArrivalParts = (frame: HelloFrame, meta: CanvasMeta, role: Role) => {
     const isArchived = meta.archivedAt !== undefined;
@@ -609,7 +713,7 @@ export function createConnection(
       session && !isArchived ? deps.core.isBanned(frame.canvasId, session.userId) : false,
       canModerate(role) && !isArchived ? deps.core.getReportCount(frame.canvasId) : null,
       getTwitchLives(frame.mode, meta.ownerId),
-      getGate({ isLiveOnly: meta.isLiveOnly === true && !isArchived, role, ownerId: meta.ownerId }),
+      getCharityAndGate(frame, meta, role),
     ]);
   };
 
@@ -622,9 +726,16 @@ export function createConnection(
     scoreboard: ScoreboardFrame | null,
   ) => {
     const { canvasId } = frame;
-    const [arrival, wasBanned, reportCount, lives, gate] = await getArrivalParts(frame, meta, role);
+    const [arrival, wasBanned, reportCount, lives, { charity, gate }] = await getArrivalParts(
+      frame,
+      meta,
+      role,
+    );
 
-    sendArrival(arrival, buildWelcome(canvasId, meta, arrival.version, role, session, gauge, lives, gate));
+    sendArrival(
+      arrival,
+      buildWelcome(canvasId, meta, arrival.version, role, session, gauge, lives, gate, charity),
+    );
     sendAfterArrival(reportCount, scoreboard);
 
     const held =
@@ -643,10 +754,14 @@ export function createConnection(
       isLiveOnly: lastLiveOnlyOf(held.pendingControls) ?? meta.isLiveOnly === true,
       isDrawingClosed: gate.isClosed,
       closesAt: gate.closesAt,
+      opensAt: gate.opensAt,
+      charity: lastCharityOf(charity, held.pendingControls),
+      charityEndsAt: charityEndsAtOf(lastCharityOf(charity, held.pendingControls)),
       coveredVersion: arrival.coveredVersion,
     };
     sendHeld(held.pendingFrames, arrival.coveredVersion);
     sendHeldControls(held.pendingControls, wasBanned);
+    if (charity) await queueBonus(sendBonus); // après ce qui est tombé pendant l'arrivée : un don gardé est déjà compté
     if (held.pendingControls.some(isDrawingControl)) await syncDrawing();
     if (held.isRoleStale) await refreshRole();
     if (held.isSizeStale) await rearrive();
@@ -706,8 +821,8 @@ export function createConnection(
 
   // JOURNAL 2026-11-12 : une fresque réservée au live refuse la pose d'un viewer ou d'un modérateur hors du live du streamer. L'état est relu
   // dans Redis à chaque pose (jamais celui d'un message de contrôle, qui a pu se perdre) ; la page apprend aussi qu'elle est fermée.
+  // JOURNAL 2026-11-21 : la même pose se refuse hors des dates de l'événement, quand il le demande ; un streamer, lui, pose toujours.
   const isDrawingRefused = async (ready: ReadyState): Promise<boolean> => {
-    if (!isBoundToLive(ready.isLiveOnly, ready.role)) return false;
     const gate = await getGate(ready);
     applyGate(gate);
     return gate.isClosed;
@@ -942,6 +1057,43 @@ export function createConnection(
     await deps.core.setLiveOnly(ready.canvasId, isLiveOnly);
   };
 
+  // Le streamer seul règle l'événement. Le noyau décide de l'état de l'événement.
+  // Le succès n'a pas de réponse à lui : le réglage part à toutes les pages du canvas, la sienne comprise, par le `ctl` `charityEvent`.
+  // Un refus se dit par son code, nommé par la requête ; la connexion reste ouverte.
+  const setCharityEvent = async (frame: SetCharityEventFrame, ready: ReadyState): Promise<void> => {
+    if (ready.role !== "owner") return forbid(frame.requestId);
+    const { isEnabled, title, address, startsAt, endsAt, isEventOnly } = frame;
+    const result = await deps.event.setCharityEvent(
+      ready.canvasId,
+      {
+        isEnabled,
+        title,
+        address,
+        ...(startsAt === undefined ? {} : { startsAt }),
+        ...(endsAt === undefined ? {} : { endsAt }),
+        ...(isEventOnly === undefined ? {} : { isEventOnly }),
+      },
+      deps.now(),
+    );
+    if (!result.ok) socket.sendFrame({ t: "error", code: result.error, requestId: frame.requestId });
+  };
+
+  // Tout compte réclame tout son bonus ; un invité n'en a pas. Passé la fin de l'événement (ou l'heure d'un compte neuf), la
+  // réponse dit 0 : la page reçoit ensuite son bonus relu, juste.
+  const claimCharityBonus = async (
+    { requestId }: ClaimCharityBonusFrame,
+    ready: ReadyState,
+  ): Promise<void> => {
+    if (!session) return socket.sendFrame({ t: "error", code: "unauthenticated", requestId });
+    const { userId } = session;
+    await queueBonus(async () => {
+      const pixels = await deps.event.claimCharityBonus(ready.canvasId, userId, deps.now());
+      const gauge = await deps.core.getGauge(ready.canvasId, userId, deps.now());
+      socket.sendFrame({ t: "charityBonusClaimed", requestId, pixels, gauge });
+      await sendBonus();
+    });
+  };
+
   // JOURNAL 2026-09-30 : le streamer seul. Le schéma n'a laissé passer que des bornes valides.
   const setGaugeLimits = async (
     { requestId, gaugeMaxStart, gaugeMaxCeiling }: SetGaugeLimitsFrame,
@@ -1016,6 +1168,10 @@ export function createConnection(
         return setLiveOnly(frame, ready);
       case "claimGauge":
         return claimGauge(frame.requestId, ready.canvasId);
+      case "setCharityEvent":
+        return setCharityEvent(frame, ready);
+      case "claimCharityBonus":
+        return claimCharityBonus(frame, ready);
       case "setGaugeLimits":
         return setGaugeLimits(frame, ready);
       case "setModerator":

@@ -9,6 +9,148 @@
   text-align: center;
 }
 
+/* La pastille de l'événement : le titre sur fond blanc, entouré d'un cadre arc-en-ciel de 3 px. Le cadre est un dégradé conique
+   (--event-rainbow), plus grand que la pastille et centré, qui tourne derrière le contenu blanc ; le conteneur le rogne.
+   Au-dessus du thème, le conteneur est `.lp-event-title` ; sans thème, c'est la pill elle-même (`.lp-pill--claim`).
+   Les arrondis de `.lp-event-title` et `.lp-event-body` sont concentriques à celui de la pill mère. */
+.lp-event-title,
+.lp-pill--claim {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.lp-event-title {
+  display: flex;
+  align-self: center;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 3px;
+  border-radius: calc(var(--lp-radius-box) - var(--space-2));
+}
+
+/* Le cadre : deux couches imbriquées, dans le conteneur. `.lp-event-frame` tourne sans fin (un tour en 12 s) ; `.lp-event-frame-boost`
+   porte le dégradé et fait 3 tours de plus en 2,6 s quand la classe `is-boosting` s'ajoute (survol, toucher). 1080° = 0° : le tour
+   lent reprend sans saut. */
+.lp-event-frame {
+  position: absolute;
+  z-index: 0;
+  inset: 50% auto auto 50%;
+  width: max(250%, 300px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: lp-event-frame-turn 12s linear infinite;
+}
+
+.lp-event-frame-boost {
+  position: absolute;
+  inset: 0;
+  background: var(--event-rainbow);
+}
+
+.lp-event-frame-boost.is-boosting {
+  animation: lp-event-frame-boost 2.6s cubic-bezier(0.45, 0, 0.25, 1);
+}
+
+@keyframes lp-event-frame-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes lp-event-frame-boost {
+  to {
+    rotate: 1080deg;
+  }
+}
+
+/* Mouvement réduit : le cadre ne tourne pas */
+@media (prefers-reduced-motion: reduce) {
+  .lp-event-frame,
+  .lp-event-frame-boost.is-boosting {
+    animation: none;
+  }
+}
+
+/* Sans thème, la pill n'a que son cadre : une marge de 3 px autour du contenu blanc */
+.lp-pill.lp-pill--claim .lp-pill-content {
+  position: relative;
+  z-index: 1;
+  padding: 3px;
+}
+
+/* Le contenu blanc : le titre, le compte à rebours dessous, et la ligne d'un don quand il y en a une */
+.lp-event-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: calc(var(--lp-radius-box) - var(--space-2) - 3px);
+  background: var(--pill-surface);
+  text-align: center;
+}
+
+.lp-pill--claim .lp-event-body {
+  border-radius: calc(var(--lp-radius-box) - 3px);
+}
+
+.lp-event-heading {
+  max-width: 100%;
+  margin: 0;
+  font-weight: var(--type-title-weight);
+}
+
+.lp-event-title-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La 2e ligne de la pastille (compte à rebours, « En cours », temps qui reste), en petit et en gris */
+.lp-event-line {
+  margin: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le lien de la page de dons : le titre et sa ligne, sans rien de changé au repos ; le titre se souligne au survol d'une souris */
+.lp-event-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.lp-event-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .lp-event-link:hover .lp-event-title-text {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* Le thème, quand la pastille est là, prend sa place dessous */
+.lp-event-title + .lp-theme {
+  margin-top: var(--space-2);
+}
+
 .lp-theme-narrow {
   display: none;
 }
@@ -53,6 +195,29 @@
     display: inline;
   }
 
+  /* La pastille tient sur deux lignes au plus, coupée par « … » au-delà, comme le thème de la bande */
+  .lp-event-title-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  /* La pastille seule, au mobile : la pill se resserre sur elle, centrée dans la largeur de la bande, au lieu de la remplir,
+     sans jamais dépasser l'écran */
+  .lp-floating[data-dock="tc"] > .lp-pill.lp-pill--claim {
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--space-4));
+    margin-inline: auto;
+  }
+
+  .lp-floating[data-dock="tc"] .lp-pill.lp-pill--claim .lp-pill-content {
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--space-4));
+  }
+
   .lp-theme-caption {
     margin-inline-end: var(--space-2);
   }
@@ -64,5 +229,16 @@
     font-size: var(--type-title-size);
     line-height: var(--type-title-line);
     font-weight: var(--type-title-weight);
+  }
+}
+
+/* Sur un téléphone, la bulle qui vise la rangée du haut (« Ajoute ta fresque à OBS ici ») se pose juste sous elle, là où la bande
+   du titre commence : elle le recouvrirait. Elle s'efface tant que la pastille de l'événement est là, et revient avec elle.
+   Le texte de la bulle reste dans l'aide du menu. */
+@media (max-width: 640px) {
+  html:has(.lp-event-body) .lp-bubble:is([data-aimed-dock="tl"], [data-aimed-dock="tr"]) {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 }

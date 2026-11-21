@@ -3,10 +3,12 @@
 // CSS (JOURNAL 2026-09-24). Pas d'ondulation au repos : la seule boucle de l'interface est celle de « Reconnexion… » (design system).
 
 import { useEffect, useRef, useState } from "react";
-import { useTexts } from "../locale/use-locale";
+import { formatNumber } from "../locale/locale";
+import { useLocale, useTexts } from "../locale/use-locale";
 import { blurAfterClick } from "./button";
 import { type CssVariables, classNames } from "./class-names";
 import { DESIGN_TEXTS } from "./design-texts";
+import { DONATION_TEXTS } from "./donation-toast-texts";
 import {
   type GaugeLevels,
   type GaugeRefill,
@@ -33,6 +35,7 @@ export type GaugeProps = {
   charges: number; // les pixels qu'on a : le nombre du tube, « 8/20 », garde toujours ce sens
   max: number; // la capacité
   draft?: number; // les pixels réservés par le brouillon : la partie claire du fluide
+  reserve?: number; // la réserve du mode événement : dépensée avant les charges, elle garde le tube plein et s'ajoute au nombre
   refill: GaugeRefill | null; // `null` : jauge pleine, l'anneau reste plein et immobile, sans chiffre
   label: string; // les chiffres, dans l'infobulle et pour les lecteurs d'écran
   shakeCount?: number; // +1 : la jauge vibre
@@ -196,6 +199,24 @@ export const ClaimButton = ({ max, onClaim }: { max: number; onClaim: () => void
   );
 };
 
+// Le bonus de l'événement : le même bouton doré, avec tous les pixels en attente (JOURNAL 2026-11-20).
+export const BonusClaimButton = ({ pixels, onClaim }: { pixels: number; onClaim: () => void }) => {
+  const locale = useLocale();
+  const donation = useTexts(DONATION_TEXTS);
+  const text = formatNumber(pixels, locale);
+  return (
+    <button
+      type="button"
+      className="lp-btn lp-claim lp-type-body"
+      aria-label={donation.claim(text)}
+      title={donation.claim(text)}
+      onClick={blurAfterClick(onClaim)}
+    >
+      <span className="lp-type-numeric">{`+${text}`}</span>
+    </button>
+  );
+};
+
 const useShake = (shakeCount: number) => {
   const meter = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -210,6 +231,7 @@ export const Gauge = ({
   charges,
   max,
   draft = 0,
+  reserve = 0,
   refill,
   label,
   shakeCount = 0,
@@ -218,9 +240,10 @@ export const Gauge = ({
 }: GaugeProps) => {
   const t = useTexts(DESIGN_TEXTS);
   const ring = useRingAnimation(refill);
-  const tube = useGrowth(max);
+  const locale = useLocale();
+  const tube = useGrowth(max + reserve);
   const meter = useShake(shakeCount);
-  const levels = gaugeLevels(charges, max, draft);
+  const levels = gaugeLevels(charges, max, draft, reserve);
   const draftFluid = useFluidMotion(levels.chargesLevel, orientation, shakeCount);
   const chargeFluid = useFluidMotion(levels.remainingLevel, orientation, shakeCount);
   return (
@@ -238,8 +261,8 @@ export const Gauge = ({
       <meter
         className="lp-visually-hidden"
         min={0}
-        max={max}
-        value={charges}
+        max={Math.max(max, charges + reserve)}
+        value={charges + reserve}
         aria-label={t.charges}
         aria-valuetext={label}
       />
@@ -264,7 +287,7 @@ export const Gauge = ({
           <span ref={draftFluid} className="lp-fluid-draft" style={percent(levels.chargesLevel)} />
           <span ref={chargeFluid} className="lp-fluid-charge" style={percent(levels.remainingLevel)} />
         </span>
-        <TubeNumber text={`${charges}/${max}`} {...levels} />
+        <TubeNumber text={`${formatNumber(charges + reserve, locale)}/${max}`} {...levels} />
       </span>
     </span>
   );

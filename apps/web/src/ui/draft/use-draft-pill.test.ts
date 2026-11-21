@@ -70,7 +70,7 @@ describe("Annuler et Rétablir de la pill Dessin", () => {
     palette: [...PALETTE],
     version: 1,
     you: { userId: "user-1", login: "user1", displayName: "User 1", role: "viewer" },
-    gauge: { charges: 200, max: 200, nextRefillAt: NOW + 10_000, claimable: 0 },
+    gauge: { charges: 200, max: 200, nextRefillAt: NOW + 10_000, claimable: 0, reserve: 0 },
   };
 
   const openStores = () => {

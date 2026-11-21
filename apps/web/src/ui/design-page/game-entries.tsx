@@ -1,7 +1,7 @@
 // Le chapitre L'écran de jeu : les pills, les vraies, avec des props d'exemple, chacune dans chacun de ses états.
 
 import { PALETTE } from "@liveplace/domain";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { AccountPill, type AccountPillProps } from "../account/account-pill";
 import { SignInExpired } from "../account/sign-in-expired";
 import { ArchiveNotFound } from "../archive/archive-not-found";
@@ -10,8 +10,9 @@ import { CANVAS_TEXTS } from "../canvas/canvas-texts";
 import type { Framing } from "../canvas/viewport";
 import { ViewportPill } from "../canvas/viewport-pill";
 import { Button } from "../design/button";
+import { type Donation, type DonationControls, DonationLine } from "../design/donation-toast";
 import type { GaugeProps } from "../design/gauge";
-import { NoticePill } from "../design/pill";
+import { NoticePill, Pill } from "../design/pill";
 import type { ProfileUser } from "../design/profile";
 import { SupportPill, SupportWindow } from "../design/support";
 import { ThemePill } from "../design/theme-pill";
@@ -47,6 +48,8 @@ type PhoneHeaderProps = {
   owner: ProfileUser;
   identity?: AccountPillProps["identity"];
   theme?: string | undefined;
+  eventTitle?: string | undefined;
+  donation?: Donation | undefined; // une ligne de don ouverte, fixe
   isNarrow?: boolean;
   isDrafting?: boolean;
   fold?: CanvasPillFold;
@@ -59,6 +62,8 @@ const PhoneHeader = ({
   owner,
   identity = SIGNED_IN,
   theme,
+  eventTitle,
+  donation,
   isNarrow = false,
   isDrafting = false,
   fold,
@@ -83,7 +88,12 @@ const PhoneHeader = ({
           />
         </div>
       )}
-      <ThemePill theme={theme} isDocked={false} />
+      <ThemePill
+        theme={theme}
+        eventTitle={eventTitle}
+        {...(donation ? { donation: openDonation(donation) } : {})}
+        isDocked={false}
+      />
     </InPhoneTop>
   );
 };
@@ -168,6 +178,46 @@ export const CanvasPillEntry = () => (
 const SHORT_THEME = "Halloween";
 const LONG_THEME = "Grande pixel war de la rentrée des lives"; // 40 caractères, le maximum
 const TWO_LINES_THEME = "Festival international des pixels fous";
+const EVENT_TITLE = "Live caritatif de décembre";
+const LONG_EVENT_TITLE = "Grand live caritatif des fresques collectives";
+
+// Un don : un pseudo et un montant tirés au hasard, comme le fera un don reçu. Un exemple fixe ne se ferme pas (pas de `onDismiss`).
+const FIXED_DONATION: Donation = { id: 1, donor: "lunaa", amountCents: 500 };
+const LONG_NAME_DONATION: Donation = {
+  id: 2,
+  donor: "un_pseudo_vraiment_beaucoup_trop_long",
+  amountCents: 1250,
+};
+const SAMPLE_DONORS = ["kevin_", "lunaa", "mxtt"] as const;
+const SAMPLE_AMOUNTS_CENTS = [200, 500, 1250, 2000] as const;
+const pickOne = <Item,>(items: readonly Item[]): Item | undefined =>
+  items[Math.floor(Math.random() * items.length)];
+
+const openDonation = (donation: Donation): DonationControls => ({ donation, onClaim: noop });
+
+const DonationDemo = ({ theme }: { theme: string | undefined }) => {
+  const [donation, setDonation] = useState<Donation | null>(null);
+  const count = useRef(0);
+  const simulate = () => {
+    count.current += 1;
+    setDonation({
+      id: count.current,
+      donor: pickOne(SAMPLE_DONORS) ?? "lunaa",
+      amountCents: pickOne(SAMPLE_AMOUNTS_CENTS) ?? 500,
+    });
+  };
+  return (
+    <>
+      <ThemePill
+        theme={theme}
+        eventTitle={EVENT_TITLE}
+        donation={{ donation, onClaim: noop, onDismiss: () => setDonation(null) }}
+        isDocked={false}
+      />
+      <Button label="Simuler un don" onPress={simulate} />
+    </>
+  );
+};
 
 // Le thème qui paraît, change de largeur puis part : la pill, comme dans le jeu quand le streamer règle son thème.
 const THEME_STEPS = [undefined, SHORT_THEME, "Pixel war de la rentrée", undefined] as const;
@@ -187,9 +237,9 @@ const ThemeDemo = () => {
 export const ThemePillEntry = () => (
   <Entry
     slug="pill-theme"
-    components={["ThemePill"]}
-    file="ui/design/theme-pill.tsx"
-    note="Le thème de la fresque, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Sans thème, pas de pill."
+    components={["ThemePill", "DonationLine"]}
+    file="ui/design/{theme-pill,donation-toast}.tsx"
+    note="Le thème de la fresque, pour tout le monde, dès que le streamer l'a rempli : pas cliquable, et jamais dans la vue OBS ni sur une archive. Pendant un événement, son titre s'y ajoute en pastille blanche, entourée d'un cadre arc-en-ciel de 3 px qui tourne 2 s toutes les 10 s (fixe en mouvement réduit), au-dessus du thème ; avant le début, un compte à rebours s'y ajoute sous le titre, et et chaque don y ouvre une ligne de plus : le bloc grandit, puis reprend sa taille. En mouvement réduit, le texte du don ne défile pas et passe à la ligne. 1 € = 10 pixels. Sans thème ni événement, pas de pill."
     where="En haut au centre, entre les pills Fresque et Compte · sur mobile, une bande sous la rangée des pills du haut, qui monte à leur place en Dessin"
   >
     <Block title="États">
@@ -205,6 +255,111 @@ export const ThemePillEntry = () => (
         </InTopRoom>
       </StateRow>
       <StateRow
+        name="Pendant un événement"
+        detail="Le titre de l'événement, en pastille blanche à cadre arc-en-ciel, au-dessus du thème, dans la même pill. Il se coupe par « … » s'il est trop long."
+      >
+        <ThemePill theme={SHORT_THEME} eventTitle={EVENT_TITLE} isDocked={false} />
+      </StateRow>
+      <StateRow
+        name="Avant l'événement, avec un thème"
+        detail="Le compte à rebours est la 2e ligne de la pastille, en petit, gras et gris ; il passe en « En cours » au début."
+      >
+        <ThemePill
+          theme={SHORT_THEME}
+          eventTitle={EVENT_TITLE}
+          eventLine="Commence dans 2 j 5 h"
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="Un événement sans thème"
+        detail="La pastille est la pill elle-même : blanche, avec son cadre arc-en-ciel, et le compte à rebours sous le titre avant le début."
+      >
+        <ThemePill
+          theme={undefined}
+          eventTitle={EVENT_TITLE}
+          eventLine="Commence dans 12 min 30 s"
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="Un événement en cours"
+        detail="« En cours » sous le titre, jusqu'à la dernière heure avant la fin ; sans fin, jusqu'au bout."
+      >
+        <ThemePill theme={undefined} eventTitle={EVENT_TITLE} eventLine="En cours" isDocked={false} />
+      </StateRow>
+      <StateRow
+        name="La dernière heure avant la fin"
+        detail="Les minutes et les secondes qui restent, les secondes descendent une à une."
+      >
+        <ThemePill
+          theme={undefined}
+          eventTitle={EVENT_TITLE}
+          eventLine="Se termine dans 12 min 30 s"
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="Un événement avec sa page de dons"
+        detail="Le titre et la ligne dessous sont un lien vers la page de dons, dans un nouvel onglet ; le titre se souligne au survol et le focus clavier a son anneau. Sans adresse, la pastille n'est pas un lien."
+      >
+        <ThemePill
+          theme={undefined}
+          eventTitle={EVENT_TITLE}
+          eventLine="En cours"
+          eventHref="https://streamlabscharity.com/@exemple/soiree"
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="Un don, avec un thème"
+        detail="Une ligne de plus sous le thème, séparée par un trait fin : un cœur rose, le pseudo, le texte de remerciement qui défile, le +N doré à droite. Le bloc grandit pour l'ouvrir."
+      >
+        <ThemePill
+          theme={SHORT_THEME}
+          eventTitle={EVENT_TITLE}
+          donation={openDonation(FIXED_DONATION)}
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="Un don, sans thème"
+        detail="La pastille grandit : le titre reste en haut, la ligne s'ouvre dessous, dans le cadre arc-en-ciel, sur le fond blanc ; le cadre continue son cycle."
+      >
+        <ThemePill
+          theme={undefined}
+          eventTitle={EVENT_TITLE}
+          donation={openDonation(FIXED_DONATION)}
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow name="Pseudo trop long" detail="Coupé d'une ellipse à 120 px.">
+        <ThemePill
+          theme={SHORT_THEME}
+          eventTitle={EVENT_TITLE}
+          donation={openDonation(LONG_NAME_DONATION)}
+          isDocked={false}
+        />
+      </StateRow>
+      <StateRow
+        name="La ligne seule"
+        detail="Le composant de la ligne, hors du bloc : dans une pill, sans trait au-dessus (le trait n'existe que sous un thème)."
+      >
+        <Pill layout="title">
+          <DonationLine {...openDonation(FIXED_DONATION)} />
+        </Pill>
+      </StateRow>
+      <StateRow
+        name="Un don qui part"
+        detail="Le +N ferme la ligne, ou elle se ferme seule : au bout de 8 s au moins, et de deux passages du texte. Le bloc reprend sa taille. Un don qui en suit un autre remplace le premier dans la ligne ouverte, sans fermeture entre les deux."
+        isDemo
+      >
+        <DonationDemo theme={SHORT_THEME} />
+      </StateRow>
+      <StateRow name="Un don qui part, sans thème" isDemo>
+        <DonationDemo theme={undefined} />
+      </StateRow>
+      <StateRow
         name="Elle paraît, change de largeur et part"
         detail="Quand le streamer règle son thème, partout en direct."
         isDemo
@@ -213,6 +368,18 @@ export const ThemePillEntry = () => (
       </StateRow>
     </Block>
     <Block title="Sur mobile">
+      <StateRow
+        name="Pendant un événement"
+        detail="La pastille du titre dans la bande, au-dessus du thème ; sur deux lignes au plus, coupée par « … » au-delà. La bulle d'aide de la rangée du haut s'efface tant qu'elle est là."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} eventTitle={LONG_EVENT_TITLE} />
+      </StateRow>
+      <StateRow
+        name="Un événement sans thème"
+        detail="Pas de bande : la pastille seule, à cadre arc-en-ciel, resserrée sur son titre et centrée sous la rangée des pills du haut."
+      >
+        <PhoneHeader owner={SAMPLE_OWNER} theme={undefined} eventTitle={EVENT_TITLE} />
+      </StateRow>
       <StateRow
         name="Un thème court"
         detail="Une bande sous la rangée des pills du haut, sur la même largeur : « Thème » en petit devant le thème, sur la même ligne."
@@ -236,6 +403,28 @@ export const ThemePillEntry = () => (
         <PanFadeDemo>
           <PhoneHeader owner={SAMPLE_OWNER} theme={SHORT_THEME} />
         </PanFadeDemo>
+      </StateRow>
+      <StateRow
+        name="Un don, avec un thème"
+        detail="La ligne s'ouvre sous le thème, dans la bande : elle ne dépasse pas l'écran moins une marge de chaque côté, le texte défile dans la place qui reste."
+      >
+        <PhoneHeader
+          owner={SAMPLE_OWNER}
+          theme={TWO_LINES_THEME}
+          eventTitle={EVENT_TITLE}
+          donation={FIXED_DONATION}
+        />
+      </StateRow>
+      <StateRow
+        name="Un don, sans thème"
+        detail="La pastille arc-en-ciel s'élargit jusqu'à cette largeur le temps du don, la ligne blanche dedans ; elle se resserre ensuite."
+      >
+        <PhoneHeader
+          owner={SAMPLE_OWNER}
+          theme={undefined}
+          eventTitle={EVENT_TITLE}
+          donation={FIXED_DONATION}
+        />
       </StateRow>
       <StateRow
         name="Un toast sous la bande"
@@ -448,6 +637,7 @@ export const AccountPillEntry = () => (
 export const DRAFT_ACTIONS: DraftPillActions = {
   onEnter: noop,
   onClaim: noop,
+  onClaimBonus: noop,
   onExit: noop,
   onSubmit: noop,
   onDiscard: noop,
@@ -540,6 +730,11 @@ const draftBlocks = (nowMs: number): readonly DraftBlock[] => [
         name: "Une récompense attend",
         detail: "Le +1 prend la place de Dessiner.",
         state: { kind: "view", gauge: gaugeAt(nowMs, 7), canClaim: true },
+      },
+      {
+        name: "Un bonus d'événement attend",
+        detail: "Le +N doré, tous les pixels en attente, passe avant le +1.",
+        state: { kind: "view", gauge: gaugeAt(nowMs, 7), canClaim: true, bonus: 1200 },
       },
       {
         name: "Un brouillon gardé",

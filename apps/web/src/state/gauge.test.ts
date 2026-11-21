@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { predictGauge } from "./gauge";
 
 const refill = { refillMs: 10_000, refillCharges: 1 };
-const gauge = { charges: 3, max: 10, nextRefillAt: 50_000, claimable: 0 };
+const gauge = { charges: 3, max: 10, nextRefillAt: 50_000, claimable: 0, reserve: 0 };
 
 describe("predictGauge (§9.4)", () => {
   // Rend la jauge telle quelle avant la prochaine recharge
@@ -17,12 +17,14 @@ describe("predictGauge (§9.4)", () => {
       max: 10,
       nextRefillAt: 60_000,
       claimable: 0,
+      reserve: 0,
     });
     expect(predictGauge(gauge, refill, 75_000)).toEqual({
       charges: 6,
       max: 10,
       nextRefillAt: 80_000,
       claimable: 0,
+      reserve: 0,
     });
   });
 

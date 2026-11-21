@@ -30,3 +30,28 @@
 .lp-input:disabled {
   opacity: 0.5;
 }
+
+/* Date et heure côte à côte : la date prend la place, l'heure a sa largeur */
+.lp-field-pair {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.lp-field-pair .lp-input--date {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lp-field-pair .lp-input--time {
+  flex: 0 0 8rem;
+  width: 8rem;
+}
+
+/* Date et heure : le sélecteur du navigateur suit l'apparence choisie (html[data-appearance]) */
+.lp-input--date {
+  color-scheme: light;
+}
+
+:root[data-appearance="dark"] .lp-input--date {
+  color-scheme: dark;
+}

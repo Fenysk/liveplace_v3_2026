@@ -360,6 +360,7 @@ describe("place (§5.3)", () => {
         max: meta.gaugeMaxStart,
         nextRefillAt: gauge.at + meta.refillMs,
         claimable: 0,
+        reserve: 0,
       },
     });
     const cellKey = toCellKey(pixel.x, pixel.y);
@@ -425,7 +426,13 @@ describe("place (§5.3)", () => {
       requestId: second.requestId,
       accepted: 0,
       rejected: [{ index: 0, reason: "gauge" }],
-      gauge: { charges: 0, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0 },
+      gauge: {
+        charges: 0,
+        max: meta.gaugeMaxStart,
+        nextRefillAt: now + meta.refillMs,
+        claimable: 0,
+        reserve: 0,
+      },
     });
     expect(await redis.get(keys.version)).toBe("1");
     expect(await redis.xlen(keys.events)).toBe(1);
@@ -449,6 +456,7 @@ describe("place (§5.3)", () => {
       max: meta.gaugeMaxStart,
       nextRefillAt: gauge.at + meta.refillMs,
       claimable: 0,
+      reserve: 0,
     });
   });
 
@@ -466,6 +474,7 @@ describe("place (§5.3)", () => {
       max: meta.gaugeMaxStart,
       nextRefillAt: later + meta.refillMs,
       claimable: 0,
+      reserve: 0,
     });
   });
 
@@ -484,6 +493,7 @@ describe("place (§5.3)", () => {
       max: meta.gaugeMaxStart,
       nextRefillAt: now + meta.refillMs,
       claimable: 0,
+      reserve: 0,
     });
     expect(await redis.hgetall(keys.gauge(request.userId))).toEqual({
       charges: String(meta.gaugeMaxStart - 2),
@@ -695,6 +705,7 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
       max: meta.gaugeMaxStart,
       nextRefillAt: now + meta.refillMs,
       claimable: 0,
+      reserve: 0,
     });
     expect(await redis.exists(buildCanvasKeys(canvasId).gauge("user-1"))).toBe(0);
   });
@@ -722,6 +733,7 @@ describe("getGauge (§5.6, JOURNAL 2026-09-24)", () => {
       max: meta.gaugeMaxStart,
       nextRefillAt: expected.at + meta.refillMs,
       claimable: 0,
+      reserve: 0,
     });
     expect(await redis.hgetall(keys.gauge("user-1"))).toEqual({ charges: "0", at: String(now) });
   });

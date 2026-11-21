@@ -20,7 +20,10 @@ import type {
   BannedUser,
   CanvasCore,
   CapacityStore,
+  CharityEventRefusal,
+  CharityEventState,
   ClientSocket,
+  EventCore,
   GaugeClaim,
   HostProbe,
   InspectEntry,
@@ -125,6 +128,16 @@ const quietHost: HostProbe = {
 };
 const owner: Session = { userId: meta.ownerId, login: "owner1", displayName: "Owner 1" };
 
+// CDC 2026 §8 : un événement en cours, une heure avant sa fin.
+const runningEvent: CharityEventState = {
+  isEnabled: true,
+  title: "Live caritatif",
+  address: "https://example.org/campaign",
+  startsAt: now - HOUR_MS,
+  endsAt: now + HOUR_MS,
+  donationCount: 3,
+};
+
 const proof: Pixel[] = [{ x: 1, y: 2, colorIndex: 3 }];
 const bannedUsers: BannedUser[] = [
   {
@@ -169,7 +182,7 @@ const ack: AckFrame = {
   version: 3,
   accepted: 1,
   rejected: [],
-  gauge: { charges: 2, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0 },
+  gauge: { charges: 2, max: meta.gaugeMaxStart, nextRefillAt: now + meta.refillMs, claimable: 0, reserve: 0 },
 };
 
 // Ce qu'en voit qui ne modère pas : tout, sauf l'identifiant (§4.3).
@@ -249,6 +262,9 @@ type SetupOptions = {
   twitchLives?: Record<string, TwitchLive>; // le live de chaque compte, par `getTwitchLive` (§10.4)
   isLiveOnly?: boolean; // le dessin seulement pendant le live, lu dans `meta` (JOURNAL 2026-11-12)
   liveStates?: Record<string, TwitchLiveState>; // l'état du live de chaque compte, par `getTwitchLiveState` ; absent : jamais lu
+  charity?: { state?: CharityEventState }; // ce que rend `getCharityEvent` ; absent : le mode événement n'existe pas sur cette fresque
+  bonus?: number; // le bonus que ce compte peut réclamer, lu par `getCharityBonus` ; modifiable en cours de test
+  charityRefusal?: CharityEventRefusal; // le noyau refuse de régler l'événement
 };
 
 // Ce que répond un script à qui écrit sur une archive.
@@ -290,6 +306,30 @@ const setup = (options: SetupOptions = {}) => {
       ? {}
       : { backgroundImageOpacity: options.backgroundImageOpacity }),
   };
+  const bonus = { pending: options.bonus ?? 0 }; // `claimCharityBonus` le vide, comme le noyau
+  const charityCalls: string[] = []; // les réglages de l'événement qui ont atteint le noyau
+  const charityReads: string[] = []; // les fresques dont l'événement a été lu
+  const bonusReads: string[] = []; // les comptes dont le bonus a été lu
+  const event: EventCore = {
+    async getCharityEvent(asked) {
+      charityReads.push(asked);
+      return options.charity ?? null;
+    },
+    async setCharityEvent(asked, setting) {
+      charityCalls.push(`set ${asked} ${setting.address}`);
+      if (options.charityRefusal) return { ok: false, error: options.charityRefusal };
+      return { ok: true, value: { ...setting, donationCount: 0 } };
+    },
+    async getCharityBonus(_asked, userId) {
+      bonusReads.push(userId);
+      return bonus.pending;
+    },
+    async claimCharityBonus() {
+      const claimed = bonus.pending;
+      bonus.pending = 0;
+      return claimed;
+    },
+  };
   const core = {
     async getCanvas(asked: string) {
       return asked === canvasId ? currentMeta : null;
@@ -308,7 +348,7 @@ const setup = (options: SetupOptions = {}) => {
       };
     },
     async getGauge(_asked: string, _userId: string, nowMs: number) {
-      return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs, claimable: 0 };
+      return { ...ack.gauge, nextRefillAt: nowMs + meta.refillMs, claimable: 0, reserve: 0 };
     },
     async inspect(_asked: string, x: number, y: number) {
       inspected.push({ x, y });
@@ -479,7 +519,7 @@ const setup = (options: SetupOptions = {}) => {
     };
     return {
       connection: createConnection(
-        { core, broadcast, activity, capacity, connections, now: () => clock.nowMs },
+        { core, event, broadcast, activity, capacity, connections, now: () => clock.nowMs },
         socket,
         opened,
         device,
@@ -516,6 +556,10 @@ const setup = (options: SetupOptions = {}) => {
     liveStates,
     liveStateReads,
     twitchLiveReads,
+    charityCalls,
+    charityReads,
+    bonusReads,
+    bonus,
     clock,
     roles,
     open,
@@ -550,7 +594,7 @@ describe("createConnection (§6.1)", () => {
 
     expect(sent[0]).toMatchObject({
       t: "welcome",
-      gauge: { ...ack.gauge, nextRefillAt: now + meta.refillMs, claimable: 0 },
+      gauge: { ...ack.gauge, nextRefillAt: now + meta.refillMs, claimable: 0, reserve: 0 },
     });
   });
 
@@ -2084,6 +2128,16 @@ describe("an archive in the connection (§17.1)", () => {
     resizeCanvas: { t: "resizeCanvas", requestId: "resize-1", width: 64, height: 36 },
     setDynamicSize: { t: "setDynamicSize", requestId: "dynamic-1", isDynamicSize: true },
     setLiveOnly: { t: "setLiveOnly", requestId: "live-only-1", isLiveOnly: true },
+    setCharityEvent: {
+      t: "setCharityEvent",
+      requestId: "charity-1",
+      isEnabled: true,
+      title: "Live caritatif",
+      address: "https://example.org/campaign",
+      startsAt: now,
+      endsAt: now + HOUR_MS,
+    },
+    claimCharityBonus: { t: "claimCharityBonus", requestId: "charity-4" },
     setObsDelay: { t: "setObsDelay", requestId: "delay-1", obsDelayMs: 60_000 },
     setObsBackground: { t: "setObsBackground", requestId: "background-1", obsBackground: "white" },
     setBackgroundImageOpacity: {
@@ -2157,7 +2211,9 @@ describe("an archive in the connection (§17.1)", () => {
       context.gaugeLimits,
       context.listedPixels,
       context.liveOnlySettings,
-    ]).toEqual([[], [], [], [], [], [], [], [], [], [], []]);
+      context.charityCalls,
+      context.bonusReads,
+    ]).toEqual([[], [], [], [], [], [], [], [], [], [], [], [], []]);
   });
 
   // Laisse l'inspection et le ping : une archive se regarde, et la connexion reste en vie
@@ -3063,5 +3119,400 @@ describe("the drawing only while live in the connection (JOURNAL 2026-11-12)", (
 
     expect(context.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
     expect(context.liveStateReads).toEqual([]);
+  });
+});
+
+describe("the drawing only during the event in the connection (JOURNAL 2026-11-21)", () => {
+  const startsAt = now + HOUR_MS;
+  const endsAt = now + 2 * HOUR_MS;
+  const upcoming: CharityEventState = { ...runningEvent, startsAt, endsAt, isEventOnly: true };
+  const running: CharityEventState = { ...upcoming, startsAt: now - HOUR_MS, endsAt: now + HOUR_MS };
+  const drawingFrames = (sent: readonly unknown[]) =>
+    sent.filter((frame) => hasFrame(frame, "drawingClosed"));
+
+  // Le welcome dit la fermeture avant le début ; une pose d'un viewer est refusée avant le noyau, et passe au début
+  it("closes before the start, refuses the placement before the core, and opens at the start", async () => {
+    const context = setup({ charity: { state: upcoming } });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    context.clock.nowMs = startsAt;
+    context.sent.length = 0;
+    context.broadcast.tickDrawing();
+    await flush();
+    await context.connection.receive(place());
+
+    expect(context.placements).toHaveLength(1);
+    expect(drawingFrames(context.sent)).toEqual([{ t: "drawingClosed", isClosed: false }]);
+  });
+
+  // Le welcome porte la fermeture, la pose refusée porte le code drawing_closed
+  it("says the closing in the welcome, and refuses with drawing_closed", async () => {
+    const context = setup({ charity: { state: upcoming } });
+
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).toMatchObject({ t: "welcome", canvas: { isDrawingClosed: true } });
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "drawing_closed", requestId: ack.requestId });
+    expect(context.placements).toEqual([]);
+  });
+
+  // Dans la fenêtre la pose passe ; à la fin elle est refusée, sans aucun message de contrôle
+  it("accepts a placement inside the window and refuses it once the end has passed", async () => {
+    const context = setup({ charity: { state: running } });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    context.clock.nowMs = running.endsAt ?? 0;
+    context.sent.length = 0;
+    await context.connection.receive(place());
+
+    expect(context.placements).toHaveLength(1);
+    expect(context.sent).toEqual([
+      { t: "drawingClosed", isClosed: true },
+      { t: "error", code: "drawing_closed", requestId: ack.requestId },
+    ]);
+  });
+
+  // Après la fin, le dessin reste fermé tant que le switch est activé ; il rouvre au switch OFF, et le streamer dessine toujours
+  it("stays closed after the end while the switch is on, and opens again when it goes off", async () => {
+    const context = setup({ charity: { state: running } });
+    await context.connection.receive(hello());
+    context.clock.nowMs = (running.endsAt ?? 0) + 1_000 * HOUR_MS;
+
+    await context.connection.receive(place());
+    await context.connection.receive(place());
+    expect(context.placements).toEqual([]);
+    expect(context.sent.at(-1)).toEqual({ t: "error", code: "drawing_closed", requestId: ack.requestId });
+
+    context.control({ t: "charityEvent", state: { ...running, isEnabled: false } });
+    await flush();
+    await context.connection.receive(place());
+    expect(context.placements).toHaveLength(1);
+
+    const ownerContext = setup({ session: owner, charity: { state: running } });
+    await ownerContext.connection.receive(hello());
+    ownerContext.clock.nowMs = (running.endsAt ?? 0) + 1_000 * HOUR_MS;
+    await ownerContext.connection.receive(place());
+    expect(ownerContext.placements).toHaveLength(1);
+  });
+
+  // Sans fin : fermé avant le début, ouvert au début, et jamais refermé ensuite, longtemps après
+  it("without an end, opens at the start and never closes again", async () => {
+    const { endsAt: _end, ...noEnd } = upcoming;
+    const context = setup({ charity: { state: noEnd } });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+    expect(context.placements).toEqual([]);
+
+    context.clock.nowMs = startsAt;
+    context.sent.length = 0;
+    context.broadcast.tickDrawing();
+    await flush();
+    context.clock.nowMs = startsAt + 1_000 * HOUR_MS;
+    context.broadcast.tickDrawing();
+    await flush();
+    await context.connection.receive(place());
+
+    expect(context.placements).toHaveLength(1);
+    expect(drawingFrames(context.sent)).toEqual([{ t: "drawingClosed", isClosed: false }]);
+  });
+
+  // Le streamer dessine toujours, avant le début comme après la fin
+  it("lets the owner draw outside the window", async () => {
+    const context = setup({ session: owner, charity: { state: upcoming } });
+    await context.connection.receive(hello());
+    context.clock.nowMs = endsAt + HOUR_MS;
+
+    await context.connection.receive(place());
+    context.broadcast.tickDrawing();
+    await flush();
+
+    expect(context.placements).toHaveLength(1);
+    expect(drawingFrames(context.sent)).toEqual([]);
+  });
+
+  // Le switch éteint, ou sans le drapeau, ne ferme rien
+  it("closes nothing when the switch is off or the flag is absent", async () => {
+    const off = setup({ charity: { state: { ...upcoming, isEnabled: false } } });
+    const withoutFlag = setup({ charity: { state: { ...upcoming, isEventOnly: false } } });
+
+    for (const opened of [off, withoutFlag]) {
+      await opened.connection.receive(hello());
+      await opened.connection.receive(place());
+      expect(opened.sent[0]).not.toHaveProperty("canvas.isDrawingClosed");
+      expect(opened.placements).toHaveLength(1);
+    }
+  });
+
+  // Changer le réglage ou les dates vaut aussitôt sur les pages ouvertes
+  it("follows a new setting at once: the closing, then the opening", async () => {
+    const context = setup({ charity: { state: running } });
+    await context.connection.receive(hello());
+    context.sent.length = 0;
+
+    context.control({ t: "charityEvent", state: upcoming });
+    await flush();
+    context.control({ t: "charityEvent", state: { ...upcoming, isEventOnly: false } });
+    await flush();
+
+    expect(drawingFrames(context.sent)).toEqual([
+      { t: "drawingClosed", isClosed: true },
+      { t: "drawingClosed", isClosed: false },
+    ]);
+  });
+
+  // Les deux portes s'appliquent : l'événement ouvert ne rouvre pas un live fermé
+  it("applies both gates: the event being open does not reopen a closed live", async () => {
+    const offline: TwitchLiveState = { checkedAt: now, endedAt: now - LIVE_ONLY_GRACE_MS };
+    const context = setup({
+      isLiveOnly: true,
+      liveStates: { [meta.ownerId]: offline },
+      charity: { state: running },
+    });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).toMatchObject({ canvas: { isDrawingClosed: true } });
+    expect(context.placements).toEqual([]);
+  });
+
+  // Le live ouvert ne rouvre pas l'événement fermé
+  it("applies both gates: a live streamer does not reopen a closed event", async () => {
+    const context = setup({
+      isLiveOnly: true,
+      liveStates: { [meta.ownerId]: { twitchLive: { category: "Art" }, checkedAt: now } },
+      charity: { state: upcoming },
+    });
+    await context.connection.receive(hello());
+    await context.connection.receive(place());
+
+    expect(context.sent[0]).toMatchObject({ canvas: { isDrawingClosed: true } });
+    expect(context.placements).toEqual([]);
+  });
+});
+
+describe("the charity event in the connection (CDC 2026 §8)", () => {
+  const donation: LiveControl = {
+    t: "donation",
+    donationId: "don-1",
+    name: "Ada",
+    cents: 500,
+    currency: "EUR",
+    pixels: 500,
+    donationCount: 4,
+  };
+  const donationFrame = { ...donation, t: "charityDonation" };
+  const setting = {
+    t: "setCharityEvent",
+    requestId: "charity-1",
+    isEnabled: true,
+    title: "Live caritatif",
+    address: "https://example.org/campaign",
+    startsAt: now,
+    endsAt: now + HOUR_MS,
+  };
+  const typeOf = (frame: unknown) =>
+    typeof frame === "object" && frame !== null && "t" in frame ? frame.t : "snapshot";
+  const types = (sent: readonly unknown[]) => sent.map(typeOf);
+
+  // Dit l'événement au welcome, puis le bonus d'un compte, après le snapshot
+  it("tells the welcome the event, then the bonus of an account after the snapshot", async () => {
+    const { connection, sent } = setup({ charity: { state: runningEvent }, bonus: 12 });
+
+    await connection.receive(hello());
+
+    expect(sent[0]).toMatchObject({ t: "welcome", charityEvent: { state: runningEvent } });
+    expect(types(sent)).toEqual(["welcome", "snapshot", "charityBonus"]);
+    expect(sent[2]).toEqual({ t: "charityBonus", pending: 12 });
+  });
+
+  // Ne dit rien de l'événement là où le mode n'existe pas
+  it("says nothing of the event where it does not exist", async () => {
+    const { connection, sent, bonusReads } = setup({ bonus: 12 });
+
+    await connection.receive(hello());
+
+    expect(types(sent)).toEqual(["welcome", "snapshot"]);
+    expect(sent[0]).not.toHaveProperty("charityEvent");
+    expect(bonusReads).toEqual([]);
+  });
+
+  // Donne l'événement à un invité, sans bonus : il n'a rien à réclamer
+  it("gives a guest the event, never a bonus", async () => {
+    const { connection, sent, bonusReads } = setup({
+      session: null,
+      charity: { state: runningEvent },
+      bonus: 12,
+    });
+
+    await connection.receive(hello());
+
+    expect(types(sent)).toEqual(["welcome", "snapshot"]);
+    expect(sent[0]).toMatchObject({ charityEvent: { state: runningEvent } });
+    expect(bonusReads).toEqual([]);
+  });
+
+  // Ne montre rien de l'événement en vue OBS, ni sur une archive, et ne le lit pas
+  it("shows nothing of the event to the OBS view nor on an archive, and does not read it", async () => {
+    const obs = setup({ charity: { state: runningEvent }, bonus: 12 });
+    await obs.connection.receive(hello({ mode: "obs" }));
+    const archived = setup({ charity: { state: runningEvent }, bonus: 12, archivedAt: now - HOUR_MS });
+    await archived.connection.receive(hello());
+
+    for (const opened of [obs, archived]) {
+      expect(types(opened.sent)).toEqual(["welcome", "snapshot"]);
+      expect(opened.sent[0]).not.toHaveProperty("charityEvent");
+      expect(opened.charityReads).toEqual([]);
+      expect(opened.bonusReads).toEqual([]);
+    }
+  });
+
+  // Le streamer seul règle l'événement, y compris son switch ; un viewer et un invité sont refusés sans toucher au noyau
+  it("lets only the owner set the event, its switch included; a viewer and a guest are refused without touching the core", async () => {
+    const context = setup({ session: owner });
+    const viewer = context.open(session);
+    const guest = context.open(null);
+    for (const opened of [context, viewer, guest]) await opened.connection.receive(hello());
+    const frames = [
+      JSON.stringify(setting),
+      JSON.stringify({ ...setting, isEnabled: false, requestId: "charity-2" }),
+    ];
+
+    for (const frame of frames) {
+      await viewer.connection.receive(frame);
+      expect(viewer.sent.at(-1)).toMatchObject({ t: "error", code: "forbidden" });
+    }
+    await guest.connection.receive(frames[0] as string);
+    expect(guest.sent.at(-1)).toMatchObject({ t: "error", code: "forbidden" });
+    expect(context.charityCalls).toEqual([]);
+
+    for (const frame of frames) await context.connection.receive(frame);
+
+    expect(context.charityCalls).toEqual([
+      `set ${canvasId} ${setting.address}`,
+      `set ${canvasId} ${setting.address}`,
+    ]);
+    expect(types(context.sent).filter((type) => type === "error")).toEqual([]);
+  });
+
+  // Rend au streamer le refus du noyau, nommé par sa requête, sans fermer la connexion
+  it("hands the owner the refusal of the core, naming his request, without closing", async () => {
+    for (const refusal of ["charity_event_unavailable"] as const) {
+      const context = setup({ session: owner, charityRefusal: refusal });
+      await context.connection.receive(hello());
+
+      await context.connection.receive(JSON.stringify(setting));
+
+      expect(context.sent.at(-1)).toEqual({ t: "error", code: refusal, requestId: "charity-1" });
+      expect(context.closed).toEqual([]);
+    }
+  });
+
+  // Transmet l'état de l'événement à toutes les pages de l'écran, et le bonus relu à chaque compte, pas à un invité ni à la vue OBS
+  it("hands the new state to every page, and a re-read bonus to each account, never to a guest nor the OBS view", async () => {
+    const context = setup({ charity: { state: runningEvent }, bonus: 0 });
+    const guest = context.open(null);
+    const obs = context.open(null);
+    for (const opened of [context, guest]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    const ended = { ...runningEvent, isEnabled: false };
+    for (const opened of [context, guest, obs]) opened.sent.length = 0;
+
+    context.control({ t: "charityEvent", state: ended });
+    await flush();
+
+    expect(context.sent).toEqual([
+      { t: "charityEvent", state: ended },
+      { t: "charityBonus", pending: 0 },
+    ]);
+    expect(guest.sent).toEqual([{ t: "charityEvent", state: ended }]);
+    expect(obs.sent).toEqual([]);
+  });
+
+  // Dit chaque don à toutes les pages, et son bonus propre à chaque compte, relu ; l'invité voit le don sans bonus ; la vue OBS ne voit rien
+  it("tells every page each donation and each account its own bonus, re-read; a guest sees the donation without a bonus; the OBS view sees nothing", async () => {
+    const context = setup({ charity: { state: runningEvent }, bonus: 5 });
+    const guest = context.open(null);
+    const obs = context.open(null);
+    for (const opened of [context, guest]) await opened.connection.receive(hello());
+    await obs.connection.receive(hello({ mode: "obs" }));
+    for (const opened of [context, guest, obs]) opened.sent.length = 0;
+    context.bonus.pending = 505;
+
+    context.control(donation);
+    await flush();
+
+    expect(context.sent).toEqual([donationFrame, { t: "charityBonus", pending: 505 }]);
+    expect(guest.sent).toEqual([donationFrame]);
+    expect(obs.sent).toEqual([]);
+    expect(context.bonusReads).toEqual([session.userId, session.userId]); // l'arrivée, puis le don
+  });
+
+  // Rend au compte son bonus, avec sa jauge, puis le bonus relu à zéro
+  it("hands an account its bonus with the gauge, then the bonus re-read at zero", async () => {
+    const { connection, sent, bonus } = setup({ charity: { state: runningEvent }, bonus: 12 });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(JSON.stringify({ t: "claimCharityBonus", requestId: "claim-1" }));
+
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({
+      t: "charityBonusClaimed",
+      requestId: "claim-1",
+      pixels: 12,
+      gauge: { reserve: 0 },
+    });
+    expect(sent[1]).toEqual({ t: "charityBonus", pending: 0 });
+    expect(bonus.pending).toBe(0);
+  });
+
+  // Garde unauthenticated, nommé par sa requête, à l'invité qui réclame
+  it("keeps unauthenticated, naming the request, for a guest who claims", async () => {
+    const { connection, sent, closed, bonusReads } = setup({
+      session: null,
+      charity: { state: runningEvent },
+      bonus: 12,
+    });
+    await connection.receive(hello());
+
+    await connection.receive(JSON.stringify({ t: "claimCharityBonus", requestId: "claim-1" }));
+
+    expect(sent.at(-1)).toEqual({ t: "error", code: "unauthenticated", requestId: "claim-1" });
+    expect(closed).toEqual([]);
+    expect(bonusReads).toEqual([]);
+  });
+
+  // Après l'expiration du bonus, la réponse dit zéro pixel et la page reçoit son bonus juste
+  it("answers zero pixels once the bonus has expired, and the page receives its bonus right", async () => {
+    const { connection, sent } = setup({ charity: { state: runningEvent }, bonus: 0 });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    await connection.receive(JSON.stringify({ t: "claimCharityBonus", requestId: "claim-1" }));
+
+    expect(sent[0]).toMatchObject({ t: "charityBonusClaimed", requestId: "claim-1", pixels: 0 });
+    expect(sent[1]).toEqual({ t: "charityBonus", pending: 0 });
+  });
+
+  // À la fin de l'événement, par l'horloge, le bonus perdu part une seule fois à la page, sans message de contrôle
+  it("sends the lost bonus once, by the clock, at the end of the event", async () => {
+    const { connection, broadcast, sent, clock, bonus } = setup({
+      charity: { state: runningEvent },
+      bonus: 9,
+    });
+    await connection.receive(hello());
+    sent.length = 0;
+
+    clock.nowMs = now + HOUR_MS + 1;
+    bonus.pending = 0; // le noyau ne compte plus rien passé la fin
+    broadcast.tickDrawing();
+    await flush();
+    broadcast.tickDrawing();
+    await flush();
+
+    expect(sent).toEqual([{ t: "charityBonus", pending: 0 }]);
   });
 });

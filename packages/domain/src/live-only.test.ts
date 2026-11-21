@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MINUTE_MS, type Role } from "./index";
-import { isBoundToLive, LIVE_ONLY_GRACE_MS, liveGate, OPEN_DRAWING } from "./live-only";
+import { combineGates, isBoundToLive, LIVE_ONLY_GRACE_MS, liveGate, OPEN_DRAWING } from "./live-only";
 
 const endedAt = 1_700_000_000_000;
 
@@ -66,5 +66,36 @@ describe("isBoundToLive (JOURNAL 2026-11-12)", () => {
   it("binds nobody without the setting", () => {
     expect(isBoundToLive(false, "viewer")).toBe(false);
     expect(isBoundToLive(false, "moderator")).toBe(false);
+  });
+});
+
+describe("combineGates : les deux portes s'appliquent", () => {
+  const closedByLive = { isClosed: true };
+  const closedUntil = (opensAt: number) => ({ isClosed: true, opensAt });
+  const openUntil = (closesAt: number) => ({ isClosed: false, closesAt });
+
+  // Deux portes ouvertes sans échéance : ouvert
+  it("is open when both gates are open", () => {
+    expect(combineGates(OPEN_DRAWING, OPEN_DRAWING)).toEqual(OPEN_DRAWING);
+  });
+
+  // Ouvert, la première échéance ferme
+  it("closes at the earliest deadline when both are open", () => {
+    expect(combineGates(openUntil(500), openUntil(300))).toEqual(openUntil(300));
+    expect(combineGates(OPEN_DRAWING, openUntil(300))).toEqual(openUntil(300));
+  });
+
+  // Une porte fermée suffit à fermer
+  it("closes when one gate is closed", () => {
+    expect(combineGates(closedByLive, OPEN_DRAWING)).toEqual({ isClosed: true });
+    expect(combineGates(OPEN_DRAWING, closedByLive)).toEqual({ isClosed: true });
+  });
+
+  // Fermé, il ne s'ouvre à heure fixe que si chaque porte fermée le fait, à la plus tardive
+  it("opens at a set time only if every closed gate does, at the latest one", () => {
+    expect(combineGates(closedUntil(300), OPEN_DRAWING)).toEqual(closedUntil(300));
+    expect(combineGates(closedUntil(300), closedUntil(700))).toEqual(closedUntil(700));
+    expect(combineGates(closedUntil(300), closedByLive)).toEqual({ isClosed: true });
+    expect(combineGates(closedUntil(300), openUntil(100))).toEqual(closedUntil(300));
   });
 });

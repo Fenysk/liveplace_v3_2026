@@ -30,6 +30,24 @@
   --claim-hover: #f7c35f;
   --on-claim: #10121c;
   --claim-sheen: #f7f3b7;
+  /* Le cadre de la pastille d'un événement : sept couleurs, les mêmes en clair et en sombre, en un dégradé qui boucle */
+  --event-rainbow-1: #e53935;
+  --event-rainbow-2: #fb8c00;
+  --event-rainbow-3: #fdd835;
+  --event-rainbow-4: #43a047;
+  --event-rainbow-5: #1e88e5;
+  --event-rainbow-6: #5e35b1;
+  --event-rainbow-7: #d81b60;
+  --event-rainbow: conic-gradient(
+    var(--event-rainbow-1),
+    var(--event-rainbow-2),
+    var(--event-rainbow-3),
+    var(--event-rainbow-4),
+    var(--event-rainbow-5),
+    var(--event-rainbow-6),
+    var(--event-rainbow-7),
+    var(--event-rainbow-1)
+  );
   --gauge-empty: #e4e2e7;
   --draft-outline-in: #ffffff;
   --draft-outline-out: #10121c;
@@ -84,6 +102,24 @@
   --claim-hover: #f7c35f;
   --on-claim: #10121c;
   --claim-sheen: #f7f3b7;
+  /* Le cadre de la pastille d'un événement : sept couleurs, les mêmes en clair et en sombre, en un dégradé qui boucle */
+  --event-rainbow-1: #e53935;
+  --event-rainbow-2: #fb8c00;
+  --event-rainbow-3: #fdd835;
+  --event-rainbow-4: #43a047;
+  --event-rainbow-5: #1e88e5;
+  --event-rainbow-6: #5e35b1;
+  --event-rainbow-7: #d81b60;
+  --event-rainbow: conic-gradient(
+    var(--event-rainbow-1),
+    var(--event-rainbow-2),
+    var(--event-rainbow-3),
+    var(--event-rainbow-4),
+    var(--event-rainbow-5),
+    var(--event-rainbow-6),
+    var(--event-rainbow-7),
+    var(--event-rainbow-1)
+  );
   --gauge-empty: #2e3040;
   --draft-outline-in: #ffffff;
   --draft-outline-out: #10121c;

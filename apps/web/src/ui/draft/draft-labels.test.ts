@@ -47,7 +47,8 @@ const canvasView = (claimable: number): CanvasView => ({
   isDynamicSize: false,
   origin: { x: 0, y: 0 },
   userId: "user-1",
-  gauge: { charges: 6, max: 10, nextRefillAt: 0, claimable },
+  gauge: { charges: 6, max: 10, nextRefillAt: 0, claimable, reserve: 0 },
+  charityBonus: 0,
   reportCount: 0,
   lastError: null,
   inspection: null,
@@ -71,11 +72,18 @@ const viewDraft = (keptCells: number): DraftView => ({
 });
 
 // La pill telle que la page la rend, de la jauge du canvas et du brouillon gardé
-const viewMarkup = (keptCells: number, claimable = 0): string =>
+const viewMarkup = (keptCells: number, claimable = 0, bonus = 0): string =>
   renderToStaticMarkup(
     createElement(DraftPill, {
-      state: toDraftPillState(canvasView(claimable), viewDraft(keptCells), GAUGE, "user1", false, undefined),
-      actions: ACTIONS,
+      state: toDraftPillState(
+        { ...canvasView(claimable), charityBonus: bonus },
+        viewDraft(keptCells),
+        GAUGE,
+        "user1",
+        false,
+        undefined,
+      ),
+      actions: { ...ACTIONS, onClaimBonus: noop },
       isCompact: true,
       isDocked: false,
     }),
@@ -110,6 +118,29 @@ describe("the Draft button in View (§9.6)", () => {
       expect(markup).toContain("lp-claim");
       expect(markup).not.toContain("Dessiner");
     }
+  });
+});
+
+describe("the event bonus on the Draft pill (JOURNAL 2026-11-20)", () => {
+  // Un bonus en attente prend la place de Dessiner, écrit avec ses milliers
+  it("shows the pending bonus in the gold button instead of Dessiner", () => {
+    const markup = viewMarkup(0, 0, 1200);
+
+    expect(markup).toContain("lp-claim");
+    expect(markup.replace(/[\s  ]/g, " ")).toContain("+1 200");
+    expect(markup).not.toContain("Dessiner");
+  });
+
+  // Les deux possibles : le bonus d'abord, jamais le +1
+  it("puts the bonus before the +1 of the gauge", () => {
+    const markup = viewMarkup(0, 1, 500);
+
+    expect(markup).toContain("+500");
+    expect(markup).not.toContain("+1<");
+  });
+
+  it("is back to Dessiner once the bonus is claimed", () => {
+    expect(viewMarkup(0, 0, 0)).toContain("Dessiner");
   });
 });
 

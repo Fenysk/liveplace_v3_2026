@@ -34,6 +34,7 @@ import {
   ACTIVITY_SEEN_RETENTION_MS,
   buildActivityKeys,
   CANVAS_PIXELS_TTL_SECONDS,
+  CREATED_AT_FIELD,
   SIGNUPS_TTL_SECONDS,
   toActiveField,
   toSignupsField,
@@ -206,10 +207,12 @@ const addMembers = (transaction: ChainableCommander, key: string, members: Reado
 export function createSignupWrites(redis: Redis, keys: ActivityKeys = buildActivityKeys()): SignupWrites {
   return {
     // Le compte se compte aussi dans les points du canvas d'où il vient, quand le web le connaît (JOURNAL 2026-10-07).
-    async storeSignup({ nowMs, discoveredViaUserId, discoveredViaCanvasId }) {
+    async storeSignup({ userId, nowMs, discoveredViaUserId, discoveredViaCanvasId }) {
       const starts = toActivityPointStarts(nowMs);
       const signups = keys.signups(toParisDay(nowMs));
       const transaction = redis.multi();
+      // JOURNAL 2026-11-20 : l'heure de création du compte, pour la règle des comptes neufs du bonus d'un événement.
+      transaction.hset(userKey(userId), CREATED_AT_FIELD, nowMs);
       addSignupPoints(transaction, keys, starts);
       if (
         discoveredViaCanvasId &&

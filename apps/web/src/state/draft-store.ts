@@ -263,7 +263,9 @@ export function createDraftStore(
 
   const context = (): DraftContext => {
     const { gauge, params, pixels, width } = canvas.getView();
-    const charges = gauge && params ? predictGauge(gauge, params, clock.now()).charges : 0;
+    // Les pixels qu'on peut poser : la réserve (mode événement) se dépense avant les charges.
+    const predicted = gauge && params ? predictGauge(gauge, params, clock.now()) : null;
+    const charges = predicted ? predicted.charges + predicted.reserve : 0;
     return { charges, colorIndexAt: (x, y) => pixels[toStateOffset(x, y, width)] ?? TRANSPARENT_COLOR_INDEX };
   };
 

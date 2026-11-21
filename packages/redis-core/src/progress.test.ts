@@ -90,8 +90,14 @@ describe("the progress of a player (JOURNAL 2026-09-30)", () => {
     const again = await claim(canvasId);
 
     expect(claimed).toMatchObject({ accepted: 1, rejected: [] });
-    expect(claimed.gauge).toEqual({ charges: 51, max: 51, nextRefillAt: now + meta.refillMs, claimable: 0 });
-    expect(again).toMatchObject({ accepted: 0, gauge: { charges: 51, max: 51, claimable: 0 } });
+    expect(claimed.gauge).toEqual({
+      charges: 51,
+      max: 51,
+      nextRefillAt: now + meta.refillMs,
+      claimable: 0,
+      reserve: 0,
+    });
+    expect(again).toMatchObject({ accepted: 0, gauge: { charges: 51, max: 51, claimable: 0, reserve: 0 } });
     expect(await redis.hget(keys.progress(USER), "claimed")).toBe("1");
   });
 
@@ -102,7 +108,13 @@ describe("the progress of a player (JOURNAL 2026-09-30)", () => {
 
     const claimed = await claim(canvasId, randomUUID(), now + 500);
 
-    expect(claimed.gauge).toEqual({ charges: 39, max: 51, nextRefillAt: now + meta.refillMs, claimable: 0 });
+    expect(claimed.gauge).toEqual({
+      charges: 39,
+      max: 51,
+      nextRefillAt: now + meta.refillMs,
+      claimable: 0,
+      reserve: 0,
+    });
     expect(await redis.hget(keys.gauge(USER), "charges")).toBe("39");
   });
 
@@ -126,7 +138,7 @@ describe("the progress of a player (JOURNAL 2026-09-30)", () => {
 
     const refused = await claim(canvasId);
 
-    expect(refused).toMatchObject({ accepted: 0, gauge: { max: 50, claimable: 0 } });
+    expect(refused).toMatchObject({ accepted: 0, gauge: { max: 50, claimable: 0, reserve: 0 } });
     expect((await core.getGauge(canvasId, USER, now)).claimable).toBe(0);
     expect(await redis.hgetall(keys.progress(USER))).toEqual({ counted: "100" });
 
@@ -142,8 +154,8 @@ describe("the progress of a player (JOURNAL 2026-09-30)", () => {
     const claimed = await claim(canvasId);
     const refused = await claim(canvasId);
 
-    expect(claimed).toMatchObject({ accepted: 1, gauge: { max: 51, claimable: 0 } });
-    expect(refused).toMatchObject({ accepted: 0, gauge: { max: 51, claimable: 0 } });
+    expect(claimed).toMatchObject({ accepted: 1, gauge: { max: 51, claimable: 0, reserve: 0 } });
+    expect(refused).toMatchObject({ accepted: 0, gauge: { max: 51, claimable: 0, reserve: 0 } });
   });
 
   // Rabote la jauge sous un plafond baissé sans perdre d'autre charge, et rend le niveau quand il remonte
@@ -153,12 +165,22 @@ describe("the progress of a player (JOURNAL 2026-09-30)", () => {
     await place(canvasId, row(1));
 
     await core.setGaugeLimits(canvasId, { gaugeMaxStart: 50, gaugeMaxCeiling: 52 });
-    expect(await core.getGauge(canvasId, USER, now)).toMatchObject({ charges: 52, max: 52, claimable: 0 });
+    expect(await core.getGauge(canvasId, USER, now)).toMatchObject({
+      charges: 52,
+      max: 52,
+      claimable: 0,
+      reserve: 0,
+    });
     const trimmed = await place(canvasId, row(1, 1));
-    expect(trimmed.gauge).toMatchObject({ charges: 51, max: 52, claimable: 0 });
+    expect(trimmed.gauge).toMatchObject({ charges: 51, max: 52, claimable: 0, reserve: 0 });
 
     await core.setGaugeLimits(canvasId, { gaugeMaxStart: 50, gaugeMaxCeiling: 60 });
-    expect(await core.getGauge(canvasId, USER, now)).toMatchObject({ charges: 51, max: 58, claimable: 1 });
+    expect(await core.getGauge(canvasId, USER, now)).toMatchObject({
+      charges: 51,
+      max: 58,
+      claimable: 1,
+      reserve: 0,
+    });
   });
 
   // Écrit les bornes dans meta et les publie sur le canal du canvas

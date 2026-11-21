@@ -16,6 +16,7 @@ import {
   encodeChunk,
 } from "@liveplace/durable";
 import {
+  createCharityDonationStore,
   createHistorySource,
   createRecoveryTarget,
   createSnapshotDelayWrites,
@@ -25,7 +26,9 @@ import { Redis } from "ioredis";
 import { encodeImage } from "../infra/image-codec";
 import { createPresence } from "../infra/presence";
 import { decodeSnapshot, encodeSnapshot } from "../infra/snapshot-codec";
+import { createStreamlabsCharitySource } from "../infra/streamlabs-charity";
 import { createBudgetCycle } from "../usecase/budget-cycle";
+import { createCharityCycle } from "../usecase/charity-cycle";
 import { createErasureCycle } from "../usecase/erasure-cycle";
 import { createExpiryCycle } from "../usecase/expiry-cycle";
 import { createHistoryCycle } from "../usecase/history-cycle";
@@ -155,6 +158,16 @@ const expiry =
         now: Date.now,
         log,
       });
+// CDC 2026 §8, Mode événement : les dons Streamlabs Charity des fresques qui ont un événement, lus toutes les 20 s. Il ne passe
+// que par Redis : il tourne aussi quand `scope` est `off`, pour qu'un événement se prouve sans Convex.
+const charity = createCharityCycle({
+  store: createCharityDonationStore(redis),
+  source: createStreamlabsCharitySource(),
+  holder: randomUUID(),
+  now: Date.now,
+  wait: (ms) => delay(ms),
+  log,
+});
 const delayWrites = createSnapshotDelayWrites(redis);
 console.log(`worker: scope ${config.scope ?? "off"}`);
 
@@ -196,9 +209,11 @@ while (isRunning) {
   await erasure?.tick();
   await orphans?.tick();
   await expiry?.tick();
+  await charity.tick();
   await delay(TICK_MS);
 }
 
+await charity.settle();
 await unwatch?.();
 await unwatchHistory?.();
 await presence.leave();

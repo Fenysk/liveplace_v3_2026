@@ -11,6 +11,7 @@ import { useLocale } from "../locale/use-locale";
 import { ordinalSuffix } from "../scoreboard/scoreboard-texts";
 import { ArchivesThumbnail } from "./archive-thumbnail";
 import { BackgroundsThumbnail } from "./background-thumbnail";
+import { CharityThumbnail } from "./charity-thumbnail";
 import { EyedropperThumbnail } from "./eyedropper-thumbnail";
 import { FormatThumbnail } from "./format-thumbnail";
 import { GaugeThumbnail } from "./gauge-thumbnail";
@@ -173,4 +174,5 @@ export const THUMBNAILS = {
   live: LiveThumbnail,
   theme: ThemeThumbnail,
   liveOnly: LiveOnlyThumbnail,
+  charity: CharityThumbnail,
 } as const satisfies Record<ReleaseThumbnail, ComponentType>;

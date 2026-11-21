@@ -62,6 +62,7 @@ const ENTRIES_BY_SLUG = {
   "message-seul": { title: "Message seul", chapterId: "game", place: "centre" },
 
   "fenetre-canvas": { title: "Fresque", chapterId: "window" },
+  "fenetre-evenement": { title: "Événement", chapterId: "window" },
   archives: { title: "Archives", chapterId: "window" },
   "vue-obs": { title: "Vue OBS", chapterId: "window" },
   moderation: { title: "Modération", chapterId: "window" },

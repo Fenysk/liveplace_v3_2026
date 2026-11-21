@@ -58,6 +58,20 @@ describe("la fenêtre ouverte par Réglages (CDC 2026, Fenêtre)", () => {
 });
 
 describe("les sections de la fenêtre (CDC 2026, Fenêtre)", () => {
+  // Événement vient juste après Fresque (JOURNAL 2026-11-21) : le thème et l'événement Streamlabs Charity y sont
+  it("puts Événement right after Fresque for the owner", () => {
+    const tabs = { ...OWNER_TABS, eventTab: tab("contenu de la section Événement") };
+    expect(sectionsOf(renderWindow(tabs))).toEqual([
+      "Fresque",
+      "Événement",
+      "Vue OBS",
+      "Modération",
+      "Mon compte",
+    ]);
+    expect(renderWindow({ ...tabs, sectionId: "event" })).toContain("contenu de la section Événement");
+    expect(sectionsOf(renderWindow(OWNER_TABS))).not.toContain("Événement");
+  });
+
   // Le streamer : Canvas, Vue OBS, Modération, Mon compte ; plus de Préférences
   it("lists Canvas, Vue OBS, Modération and Mon compte for the owner", () => {
     expect(sectionsOf(renderWindow(OWNER_TABS))).toEqual(["Fresque", "Vue OBS", "Modération", "Mon compte"]);

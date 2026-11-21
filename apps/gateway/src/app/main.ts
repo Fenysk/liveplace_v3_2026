@@ -6,6 +6,7 @@ import {
   createCanvasCore,
   createCapacityStore,
   createDeletedAccounts,
+  createEventCore,
   createGatewayHeartbeat,
   createTwitchCommandQueue,
   revokeBannedModerators,
@@ -36,6 +37,7 @@ const redis = new Redis(config.redisUrl);
 // En mode abonné, Redis n'accepte plus les autres commandes : il faut sa propre connexion (§6.3).
 const liveSubscriber = new Redis(config.redisUrl);
 const core = createCanvasCore(redis, liveSubscriber);
+const event = createEventCore(redis); // CDC 2026 §8 : le mode événement, ses dons et le bonus de chaque compte
 // §5.4 : avant la première page, les modérateurs nommés ici que le bug avait laissés bannis perdent ce
 // rôle. Un échec se journalise : les scripts tiennent déjà la règle, et le prochain démarrage recommence.
 await revokeBannedModerators(redis).then(
@@ -110,7 +112,7 @@ const server = startGatewayServer({
   verifier: createSessionVerifier(config.sessionSecret, createDeletedAccounts(redis, config.sessionSecret)),
   openConnection: (socket, session, device) =>
     createConnection(
-      { core, broadcast, activity, capacity, connections, now: Date.now },
+      { core, event, broadcast, activity, capacity, connections, now: Date.now },
       socket,
       session,
       device,

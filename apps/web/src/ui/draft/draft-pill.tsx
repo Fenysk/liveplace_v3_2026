@@ -9,9 +9,10 @@
 import { TRANSPARENT_COLOR_INDEX } from "@liveplace/domain";
 import { Brush, Eraser, Pipette, Redo2, Trash, Undo2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { claimChoiceOf } from "../../state/charity-event";
 import { Button } from "../design/button";
 import { DESIGN_TEXTS } from "../design/design-texts";
-import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
+import { BonusClaimButton, ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import { Grabber } from "../design/grabber";
 import { CurrentColorButton, Palette, RecentSwatches } from "../design/palette";
 import { Pill, type PillDock, type PillLayout, type PillState } from "../design/pill";
@@ -34,6 +35,7 @@ export type DraftPillState =
       kind: "view";
       gauge: GaugeProps;
       canClaim: boolean;
+      bonus?: number | undefined; // le bonus de l'événement en attente : son +N passe avant le +1
       draftSize?: number;
       isDrawingClosed?: boolean;
       refusal?: RefusalCode;
@@ -60,6 +62,7 @@ export type DraftPillState =
 export type DraftPillActions = {
   onEnter: () => void; // Dessiner
   onClaim: () => void; // +1 de jauge max (JOURNAL 2026-09-30)
+  onClaimBonus?: (() => void) | undefined; // tout le bonus de l'événement en attente (JOURNAL 2026-11-20)
   onExit: () => void; // Fermer : sort du Dessin, le brouillon est gardé
   onSubmit: () => void;
   onDiscard: () => void;
@@ -346,6 +349,37 @@ const draftContent = (
   ),
 });
 
+// Dessiner, ou le bouton doré à sa place : le bonus de l'événement avant le +1 de jauge (JOURNAL 2026-11-20).
+const ViewButton = ({
+  state,
+  actions,
+}: {
+  state: Extract<DraftPillState, { kind: "view" }>;
+  actions: DraftPillActions;
+}) => {
+  const bonus = state.bonus ?? 0;
+  const choice = claimChoiceOf(bonus, state.canClaim ? 1 : 0);
+  if (choice === "bonus" && actions.onClaimBonus)
+    return (
+      <BubbleTarget name="claim">
+        <BonusClaimButton pixels={bonus} onClaim={actions.onClaimBonus} />
+      </BubbleTarget>
+    );
+  if (choice === "gauge")
+    return (
+      <BubbleTarget name="claim">
+        <ClaimButton max={state.gauge.max} onClaim={actions.onClaim} />
+      </BubbleTarget>
+    );
+  return (
+    <EnterButton
+      draftSize={state.draftSize}
+      isInactive={state.isDrawingClosed === true}
+      onEnter={actions.onEnter}
+    />
+  );
+};
+
 const contentOf = (
   state: DraftPillState,
   actions: DraftPillActions,
@@ -387,17 +421,7 @@ const contentOf = (
         content: (
           <>
             <PillGauge gauge={state.gauge} isFill={isCompact} />
-            {state.canClaim ? (
-              <BubbleTarget name="claim">
-                <ClaimButton max={state.gauge.max} onClaim={actions.onClaim} />
-              </BubbleTarget>
-            ) : (
-              <EnterButton
-                draftSize={state.draftSize}
-                isInactive={state.isDrawingClosed === true}
-                onEnter={actions.onEnter}
-              />
-            )}
+            <ViewButton state={state} actions={actions} />
             <Refusal code={state.refusal} />
           </>
         ),

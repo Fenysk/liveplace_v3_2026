@@ -65,12 +65,14 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
     expect(pageAudienceTitlesOf(serverHtml.page("fr"))).toEqual([
       "Pour les streamers",
       "Pour les streamers",
+      "Pour les streamers",
       "Pour les modérateurs",
       "Pour les streamers",
       "Pour les modérateurs",
       "Pour les streamers",
     ]);
     expect(pageAudienceTitlesOf(serverHtml.page("en"))).toEqual([
+      "For streamers",
       "For streamers",
       "For streamers",
       "For moderators",
@@ -83,13 +85,14 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
   });
 
   // Le titre « Nouveautés » en grand, sa phrase, le titre de la publication (plus petit) avec sa date selon la langue, puis les 7 lignes
-  it("writes the title, its sentence, the date alone as the title of each of the 6 releases, and the 19 lines", () => {
+  it("writes the title, its sentence, the date alone as the title of each of the 7 releases, and the 21 lines", () => {
     const french = serverHtml.page("fr");
     const english = serverHtml.page("en");
 
     expect(french).toMatch(/<h1 class="lp-type-display">Nouveautés<\/h1>/);
     expect(english).toMatch(/<h1 class="lp-type-display">What(?:&#x27;|')s new<\/h1>/);
     expect(releaseDatesOf(french)).toEqual([
+      "25 novembre",
       "13 novembre",
       "1er novembre",
       "18 octobre",
@@ -98,6 +101,7 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
       "27 septembre",
     ]);
     expect(releaseDatesOf(english)).toEqual([
+      "November 25",
       "November 13",
       "November 1",
       "October 18",
@@ -111,7 +115,7 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
     expect(english).toMatch(
       /<p class="lp-release-intro lp-type-body lp-muted">What(?:&#x27;|')s changing in LivePlace, newest first\.<\/p>/,
     );
-    expect(french.match(/<li class="lp-release-line[ "]/g)).toHaveLength(19);
+    expect(french.match(/<li class="lp-release-line[ "]/g)).toHaveLength(21);
     expect(french.indexOf("<h1")).toBeLessThan(french.indexOf("lp-release-intro"));
     expect(french.indexOf("lp-release-intro")).toBeLessThan(french.indexOf(">13 novembre<"));
   });
@@ -154,6 +158,8 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
       );
 
     expect(names(french)).toEqual([
+      "Agrandir\u00a0: Les dons t&#x27;offrent des pixels",
+      "Agrandir\u00a0: Événement caritatif",
       "Agrandir\u00a0: Dessin pendant tes lives",
       "Agrandir\u00a0: Annuler, refaire",
       "Agrandir\u00a0: La fresque grandit seule",
@@ -175,6 +181,8 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
       "Agrandir\u00a0: Lancement de LivePlace (bêta)",
     ]);
     expect(names(english)).toEqual([
+      "Enlarge: Donations give you pixels",
+      "Enlarge: Charity event",
       "Enlarge: Drawing during your streams",
       "Enlarge: Undo, redo",
       "Enlarge: The canvas grows by itself",
@@ -206,7 +214,7 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
     expect(html).not.toContain("lp-release-shot-hint");
     expect(html).not.toContain("lucide-maximize");
     expect(serverHtml.list(AUDIENCES)).not.toContain("lp-release-shot-hint");
-    expect(html.match(/<button[^>]*class="lp-release-shot"[^>]*aria-label="[^"]+"/g)).toHaveLength(19);
+    expect(html.match(/<button[^>]*class="lp-release-shot"[^>]*aria-label="[^"]+"/g)).toHaveLength(21);
   });
 
   // Les vignettes ne sont pas des images : des tracés SVG et le podium, aucune `<img>`, aucune icône inventée
@@ -215,7 +223,7 @@ describe("the HTML the server writes for /nouveautes (CSP of production)", () =>
 
     expect(html).not.toContain("<img");
     expect(html.match(/<svg class="lp-release-svg"/g)).toHaveLength(3); // la fresque qui grandit, les fonds et le format
-    expect(html.match(/<svg class="lp-release-svg lp-release-mini"/g)).toHaveLength(13); // la Modération, Annuler refaire, Signaler, Effacer, la pipette, le clavier, la jauge, le lancement, l'aide, la langue, le live, le thème et le dessin pendant le live
+    expect(html.match(/<svg class="lp-release-svg lp-release-mini"/g)).toHaveLength(15); // la Modération, Annuler refaire, Signaler, Effacer, la pipette, le clavier, la jauge, le lancement, l'aide, la langue, le live, le thème, le dessin pendant le live et l'événement caritatif (deux lignes)
     expect(html).toContain("lp-release-bg-preview");
     expect(html).toContain("lp-release-podium");
     expect(html.match(/class="lp-rank-ring lp-rank-ring--[123]"/g)).toHaveLength(3);
@@ -252,8 +260,8 @@ describe("the cards of /nouveautes (server HTML)", () => {
     const entries = linesOf(serverHtml.page());
     const withShot = entries.filter(({ content }) => content.includes("lp-release-shot-cell"));
 
-    expect(entries).toHaveLength(19);
-    expect(withShot).toHaveLength(19);
+    expect(entries).toHaveLength(21);
+    expect(withShot).toHaveLength(21);
     for (const { className, content } of entries) {
       expect(className).toBe("lp-release-line lp-release-entry");
       expect(content).toMatch(
@@ -265,20 +273,22 @@ describe("the cards of /nouveautes (server HTML)", () => {
     }
   });
 
-  // Une seule forme : plus de ligne simple, une carte ; la cellule de la vignette n'existe que pour les dix-neuf cartes qui en ont une
-  it("has a single form: no plain row, a thumbnail cell only for the nineteen cards that have a thumbnail", () => {
+  // Une seule forme : plus de ligne simple, une carte ; la cellule de la vignette n'existe que pour les vingt et une cartes qui en ont une
+  it("has a single form: no plain row, a thumbnail cell only for the twenty-one cards that have a thumbnail", () => {
     const html = serverHtml.page();
 
     expect(html).not.toContain("lp-release-plain");
-    expect(html.match(/lp-release-shot-cell/g)).toHaveLength(19);
-    expect(html.match(/<button[^>]*class="lp-release-shot"/g)).toHaveLength(19);
+    expect(html.match(/lp-release-shot-cell/g)).toHaveLength(21);
+    expect(html.match(/<button[^>]*class="lp-release-shot"/g)).toHaveLength(21);
   });
 
   // Les cartes se lisent publication par publication, puis groupe par groupe dans l'ordre de l'écran (tous, modérateurs, streamers), chaque groupe dans l'ordre de la publication
   it("reads the cards release by release, then group by group in the order of the screen, each group in the order of the release", () => {
     const expected = RELEASES.flatMap(({ lines }) =>
       AUDIENCE_DISPLAY_ORDER.flatMap((audience) =>
-        lines.filter((entry) => entry.audience === audience).map(({ texts }) => texts.fr.title),
+        lines
+          .filter((entry) => entry.audience === audience)
+          .map(({ texts }) => texts.fr.title.replace("'", "&#x27;")),
       ),
     );
 
@@ -290,12 +300,12 @@ describe("the cards of /nouveautes (server HTML)", () => {
   it("puts the release title first in its article and each group title first in its section", () => {
     const html = serverHtml.page("fr");
 
-    expect(html.match(/<article class="lp-release"><h2 class="lp-type-heading">/g)).toHaveLength(6);
-    expect(html.match(/<section class="lp-release-audience"><h3 class="lp-type-title">/g)).toHaveLength(6);
+    expect(html.match(/<article class="lp-release"><h2 class="lp-type-heading">/g)).toHaveLength(7);
+    expect(html.match(/<section class="lp-release-audience"><h3 class="lp-type-title">/g)).toHaveLength(7);
     expect(html.match(/<\/h2><div class="lp-release-audience"><ul class="lp-release-lines">/g)).toHaveLength(
-      5,
+      6,
     );
-    expect(html.match(/<div class="lp-release-audience">/g)).toHaveLength(5);
+    expect(html.match(/<div class="lp-release-audience">/g)).toHaveLength(6);
   });
 });
 
@@ -367,6 +377,7 @@ describe("the thumbnails of a pill (server HTML, still image)", () => {
       "live",
       "theme",
       "liveOnly",
+      "charity",
     ]);
   });
 });
@@ -703,6 +714,40 @@ describe("the still image of each animated thumbnail (reduced motion, server)", 
     expect(html).toContain("lp-btn--inactive");
   });
 
+  // Événement caritatif : la pastille (titre, « En cours », cadre arc-en-ciel) avec sa ligne de don et son +50 doré, la pill Dessin dessous ;
+  // ni style, ni image, ni bouton (la vignette en est déjà un)
+  it("shows the event pill with its donation line and the golden +50, and the Draw pill, with no style, no image, no button", () => {
+    const html = still("charity");
+
+    expect(html).toContain("lp-pill--claim");
+    expect(html).toContain("lp-event-frame");
+    expect(html).toContain("Soirée caritative");
+    expect(html).toContain("En cours");
+    expect(html).toContain("Nouveau don");
+    expect(html).toContain("lp-claim");
+    expect(html).toContain("+50");
+    expect(html).toContain("lp-release-pill--bottom-center");
+    expect(html).toContain("lp-gauge");
+    expect(html).toContain("Dessiner");
+    expect(html).toContain("lp-release-pointer");
+    expect(html).not.toMatch(INLINE_STYLE);
+    expect(html).not.toContain("<img");
+    expect(html).not.toMatch(/<input|<button|aria-disabled/);
+    expect(html.match(/<svg class="lp-release-svg lp-release-mini"/g)).toHaveLength(1);
+  });
+
+  // En anglais : le titre, la ligne, le don et le bouton de l'anglais
+  it("says the event pill and the donation in English", () => {
+    const html = still("charity", "en");
+
+    expect(html).toContain("Charity night");
+    expect(html).toContain("Live now");
+    expect(html).toContain("New donation");
+    expect(html).toContain("Draw");
+    expect(html).not.toContain("Dessiner");
+    expect(html).not.toContain("En cours");
+  });
+
   // L'archivage : six fresques, chacune avec ses propres pixel arts, la pile de trois en escalier (devant 1, au milieu 0,8, derrière 0,55)
   it("holds six different canvases, three of them stacked in sight: front, middle and back", () => {
     const html = still("archives");
@@ -804,33 +849,33 @@ describe("the still image of each animated thumbnail (reduced motion, server)", 
 });
 
 describe("the lists of each public", () => {
-  // Un viewer ne voit que ce qui s'adresse à tous : onze lignes dans cinq publications, toutes avec leur vignette (à droite du texte), et aucun titre de groupe
-  it("gives a viewer the eleven lines for everyone, each with a thumbnail, and no group title", () => {
+  // Un viewer ne voit que ce qui s'adresse à tous : douze lignes dans six publications, toutes avec leur vignette (à droite du texte), et aucun titre de groupe
+  it("gives a viewer the twelve lines for everyone, each with a thumbnail, and no group title", () => {
     const html = serverHtml.list(["viewer"]);
 
     expect(audienceTitlesOf(html)).toEqual([]);
-    expect(html.match(/class="lp-release-line"/g)).toHaveLength(11);
-    expect(html.match(/class="lp-release-shot"/g)).toHaveLength(11);
+    expect(html.match(/class="lp-release-line"/g)).toHaveLength(12);
+    expect(html.match(/class="lp-release-shot"/g)).toHaveLength(12);
     expect(html).toContain("Annuler, refaire");
     expect(html).not.toContain("Archive et recommence");
     expect(html).not.toContain("Modération facile");
   });
 
-  // Un modérateur de la fresque : tous (sans titre) puis modérateurs (titré), dans les deux publications qui lui parlent ; 13 lignes
+  // Un modérateur de la fresque : tous (sans titre) puis modérateurs (titré), dans les deux publications qui lui parlent ; 14 lignes
   it("gives a moderator the everyone lines with no title, then the moderators' with theirs", () => {
     const html = serverHtml.list(["moderator", "viewer"]);
 
     expect(audienceTitlesOf(html)).toEqual(["Pour les modérateurs", "Pour les modérateurs"]);
-    expect(html.match(/class="lp-release-line"/g)).toHaveLength(13);
+    expect(html.match(/class="lp-release-line"/g)).toHaveLength(14);
     expect(html).not.toContain("Archive et recommence");
   });
 
-  // Le streamer sur sa fresque : les trois groupes, les 19 lignes, six titres de groupe
-  it("gives the owner the three byAudience, six group titles, and the nineteen lines", () => {
+  // Le streamer sur sa fresque : les trois groupes, les 21 lignes, sept titres de groupe
+  it("gives the owner the three byAudience, seven group titles, and the twenty-one lines", () => {
     const html = serverHtml.list(AUDIENCES);
 
-    expect(audienceTitlesOf(html)).toHaveLength(6);
-    expect(html.match(/class="lp-release-line"/g)).toHaveLength(19);
+    expect(audienceTitlesOf(html)).toHaveLength(7);
+    expect(html.match(/class="lp-release-line"/g)).toHaveLength(21);
   });
 
   // Le titre de la publication de la fenêtre est de niveau 3 sous le titre de la fenêtre ; sur la page, de niveau 2 sous le grand titre
@@ -850,6 +895,7 @@ describe("the lists of each public", () => {
     expect(html).not.toContain("lp-release-intro");
     expect(html).not.toContain("Ce qui change dans LivePlace");
     expect(audienceTitlesOf(html)).toEqual([
+      "Pour les streamers",
       "Pour les streamers",
       "Pour les streamers",
       "Pour les modérateurs",

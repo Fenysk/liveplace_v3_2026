@@ -25,6 +25,7 @@ const guestView = (overrides: Partial<CanvasView> = {}): CanvasView => ({
     obsBackground: "transparent",
   },
   gauge: null,
+  charityBonus: 0,
   reportCount: 0,
   lastError: null,
   inspection: null,
@@ -44,7 +45,7 @@ const liveView = (overrides: Partial<CanvasView> = {}): CanvasView =>
     role: "viewer",
     userId: "user-1",
     displayName: "User 1",
-    gauge: { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0 },
+    gauge: { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 0 },
     ...overrides,
   });
 
@@ -120,7 +121,7 @@ const acceptAll = (pixels: readonly Pixel[]) => ({
   requestId: "request",
   accepted: pixels.length,
   rejected: [],
-  gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0 },
+  gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 0 },
 });
 
 describe("createDraftStore — the modes (CDC 2026)", () => {
@@ -305,7 +306,7 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
   // Plafonne aux charges prévues : une recharge arrivée depuis le dernier ack compte déjà
   it("caps at the predicted charges: a refill that came since the last ack already counts", () => {
     const { store, cells } = setup({
-      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now, claimable: 0 } }),
+      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now, claimable: 0, reserve: 0 } }),
     });
     store.enterDraftMode();
 
@@ -319,7 +320,9 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
   // Ne fait vibrer la jauge qu'une fois par tracé, et de nouveau au tracé suivant
   it("shakes the gauge once per trace, and again on the next trace", () => {
     const { store, cells } = setup({
-      view: liveView({ gauge: { charges: 2, max: 200, nextRefillAt: now + refillMs, claimable: 0 } }),
+      view: liveView({
+        gauge: { charges: 2, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 0 },
+      }),
     });
     store.enterDraftMode();
 
@@ -335,10 +338,27 @@ describe("createDraftStore — the cap (CDC 2026)", () => {
     expect(store.getView().shakeCount).toBe(2);
   });
 
+  // La réserve du mode événement s'ajoute aux charges : le brouillon peut aller jusqu'à leur somme
+  it("lets the draft grow up to the charges plus the reserve", () => {
+    const { store, cells } = setup({
+      view: liveView({
+        gauge: { charges: 2, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 3 },
+      }),
+    });
+    store.enterDraftMode();
+
+    store.startTrace();
+    store.traceCells([0, 1, 2, 3, 4, 5].map((x) => ({ x, y: 0 })));
+    store.endTrace();
+    expect(cells()).toHaveLength(5);
+  });
+
   // Un abonné qui retrace à chaque publication (la scène, au début d'un tracé) ne boucle pas au plafond
   it("does not loop when a listener traces again on every publish with the gauge empty", () => {
     const { store } = setup({
-      view: liveView({ gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0 } }),
+      view: liveView({
+        gauge: { charges: 0, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 0 },
+      }),
     });
     store.enterDraftMode();
     store.subscribe(() => store.traceCells([{ x: 0, y: 0 }]));
@@ -732,7 +752,7 @@ describe("createDraftStore — a drawing closed outside the live (JOURNAL 2026-1
 
 // Sur un vrai store du canvas : le gateway refuse un lot par son requestId (§6.3, dix poses par seconde au plus).
 describe("createDraftStore — a lot the gateway refuses as rate_limited (§6.3)", () => {
-  const gauge = { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0 };
+  const gauge = { charges: 200, max: 200, nextRefillAt: now + refillMs, claimable: 0, reserve: 0 };
   const welcome: ServerFrame = {
     t: "welcome",
     canvas: { canvasId: "canvas-1", width: 256, height: 4, ownerId: "owner-1" },
@@ -959,7 +979,13 @@ describe("createDraftStore — the recent color keys (JOURNAL 2026-10-09)", () =
 });
 
 describe("createDraftStore — the history (CDC 2026, §8 Historique)", () => {
-  const gaugeOf = (charges: number) => ({ charges, max: 200, nextRefillAt: now + refillMs, claimable: 0 });
+  const gaugeOf = (charges: number) => ({
+    charges,
+    max: 200,
+    nextRefillAt: now + refillMs,
+    claimable: 0,
+    reserve: 0,
+  });
 
   // Le Dessin ouvert, avec de quoi cliquer (ligne 1) et tracer (ligne 0), et lire les colonnes du brouillon
   const drawing = (options: Setup = {}) => {

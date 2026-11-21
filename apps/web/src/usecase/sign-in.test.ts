@@ -321,7 +321,7 @@ describe("completeSignIn (§10.1)", () => {
     await completeSignIn(first.deps, "code", "/benitoad");
     await completeSignIn(later.deps, "code", "/benitoad");
 
-    expect(first.signups).toEqual([{ nowMs: now, discoveredViaUserId: owner.userId }]);
+    expect(first.signups).toEqual([{ userId: user.userId, nowMs: now, discoveredViaUserId: owner.userId }]);
     expect(later.signups).toEqual([]);
   });
 
@@ -331,7 +331,7 @@ describe("completeSignIn (§10.1)", () => {
 
     await completeSignIn(deps, "code", null);
 
-    expect(signups).toEqual([{ nowMs: now }]);
+    expect(signups).toEqual([{ userId: user.userId, nowMs: now }]);
     expect(signups[0]).not.toHaveProperty("discoveredViaUserId");
   });
 
@@ -343,7 +343,12 @@ describe("completeSignIn (§10.1)", () => {
 
     expect(activeCanvasReads).toEqual([owner.userId]);
     expect(signups).toEqual([
-      { nowMs: now, discoveredViaUserId: owner.userId, discoveredViaCanvasId: "owner-canvas" },
+      {
+        userId: user.userId,
+        nowMs: now,
+        discoveredViaUserId: owner.userId,
+        discoveredViaCanvasId: "owner-canvas",
+      },
     ]);
   });
 
@@ -359,7 +364,9 @@ describe("completeSignIn (§10.1)", () => {
 
     expect(known.activeCanvasReads).toEqual([]);
     expect(fromHome.activeCanvasReads).toEqual([]);
-    expect(withoutCanvas.signups).toEqual([{ nowMs: now, discoveredViaUserId: owner.userId }]);
+    expect(withoutCanvas.signups).toEqual([
+      { userId: user.userId, nowMs: now, discoveredViaUserId: owner.userId },
+    ]);
     expect(withoutCanvas.signups[0]).not.toHaveProperty("discoveredViaCanvasId");
   });
 });

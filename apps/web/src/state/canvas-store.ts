@@ -35,6 +35,7 @@ import type {
 import {
   type BroadcastCell,
   type CellsFrame,
+  type CharityEventState,
   type ClientFrame,
   PROTOCOL_VERSION,
   type ServerFrame,
@@ -73,6 +74,18 @@ export type ConfirmedPixel = Pixel & { previousColorIndex: number };
 // Une case venue d'un autre joueur (ou de la modération) qui change ce que la page montre, avec la couleur qu'elle montrait.
 export type ArrivedPixel = Pixel & { previousColorIndex: number };
 export type ServerGauge = AckFrame["gauge"];
+// Ce que le streamer règle : le titre, la page de dons (absente : un événement sans don) et les dates.
+export type CharityEventSetting = {
+  isEnabled: boolean;
+  title: string;
+  address: string;
+  startsAt?: Timestamp;
+  endsAt?: Timestamp;
+  isEventOnly?: boolean; // absent : faux
+};
+export type CharityEventView = { state?: CharityEventState | undefined };
+// Un don reçu : tel que la frame le porte, le toast le montre.
+export type CharityDonation = Omit<Extract<ServerFrame, { t: "charityDonation" }>, "t">;
 // `closed` : la connexion est tombée avant l'ack.
 export type PlaceResult = Result<AckFrame, ErrorCode | "closed">;
 // Les modérateurs, et l'état de la synchro Twitch quand elle a été faite (JOURNAL 2026-09-27).
@@ -123,6 +136,9 @@ export type CanvasView = {
   origin: CanvasOrigin;
   params?: WelcomeFrame["params"];
   gauge: ServerGauge | null; // `null` pour un invité
+  // JOURNAL 2026-11-20 : présent, le mode événement existe sur cette fresque (absent : rien ne s'affiche) ; sans `state`, aucun événement n'est réglé.
+  charityEvent?: CharityEventView | undefined;
+  charityBonus: number; // le bonus en attente de ce compte, en pixels ; 0 pour un invité
   reportCount: number; // les signalements en attente, pour qui modère (JOURNAL 2026-09-28)
   scoreboard?: Scoreboard | undefined; // absent avant sa première frame et après une coupure : le gateway renvoie le sien
   lastError: PageErrorCode | null;
@@ -158,6 +174,11 @@ export type CanvasStore = {
   setBackgroundImageOpacity(backgroundImageOpacity: number): void; // confirmé par la frame du même nom (§9.5)
   // JOURNAL 2026-09-30 : la jauge arrive par l'`ack` ; les bornes, le streamer seul, par la frame `gaugeLimits`.
   claimGauge(): void;
+  // JOURNAL 2026-11-21 : le mode événement. Le réglage entier, enregistré à chaque champ : résolu quand la frame `charityEvent` arrive ;
+  // refusé : par l'erreur.
+  setCharityEvent(setting: CharityEventSetting): Promise<RequestResult<true>>;
+  claimCharityBonus(): void; // tout le bonus en attente ; la réponse met la jauge à jour
+  listenCharityDonations(listener: (donation: CharityDonation) => void): () => void;
   setGaugeLimits(limits: GaugeLimits): void;
   // JOURNAL 2026-09-28. `range` : ses poses voisines aussi (JOURNAL 2026-09-29).
   report(x: number, y: number, placementId: string, range?: PlacementRange): Promise<RequestResult<true>>;
@@ -267,6 +288,7 @@ export function createCanvasStore(
     isDynamicSize: false,
     origin: START_ORIGIN,
     gauge: null,
+    charityBonus: 0,
     reportCount: 0,
     lastError: null,
     inspection: null,
@@ -286,6 +308,8 @@ export function createCanvasStore(
   const confirmedListeners = new Set<(pixels: readonly ConfirmedPixel[]) => void>();
   const arrivedListeners = new Set<(pixels: readonly ArrivedPixel[]) => void>();
   const staleListeners = new Set<(list: StaleList) => void>();
+  const charityDonationListeners = new Set<(donation: CharityDonation) => void>();
+  const charityWaiters = new Set<() => void>(); // les réglages de l'événement, résolus à la frame `charityEvent` suivante
   const activityListeners = new Set<(frame: ActivityFrame) => void>();
   let isWatchingActivity = false;
   const capacityListeners = new Set<(frame: CapacityFrame) => void>();
@@ -362,6 +386,43 @@ export function createCanvasStore(
   const failAllRequests = (error: ErrorCode | "closed"): void => {
     for (const request of requests.values()) request.fail(error);
     requests.clear();
+  };
+
+  // Aucune frame de succès ne porte le `requestId` d'un réglage de l'événement : la frame `charityEvent` suivante les résout tous.
+  const sendCharity = (frame: Extract<ClientFrame, { requestId: string }>): Promise<RequestResult<true>> =>
+    new Promise((resolve) => {
+      const done = (): void => {
+        charityWaiters.delete(done);
+        requests.delete(frame.requestId);
+        resolve({ ok: true, value: true });
+      };
+      charityWaiters.add(done);
+      requests.set(frame.requestId, {
+        receive: () => false,
+        fail(error) {
+          charityWaiters.delete(done);
+          resolve({ ok: false, error });
+        },
+      });
+      transport.send(frame);
+    });
+
+  const takeCharityEvent = (frame: Extract<ServerFrame, { t: "charityEvent" }>): void => {
+    publish({ charityEvent: { state: frame.state } });
+    for (const done of [...charityWaiters]) done();
+  };
+
+  // Un don ne porte pas l'état : seul son compte avance.
+  const takeCharityDonation = (frame: Extract<ServerFrame, { t: "charityDonation" }>): void => {
+    const { t, ...donation } = frame;
+    const state = view.charityEvent?.state;
+    if (state) publish({ charityEvent: { state: { ...state, donationCount: donation.donationCount } } });
+    notify(charityDonationListeners, donation);
+  };
+
+  // La jauge de la réponse porte la réserve, que la page garde sans l'afficher.
+  const takeCharityBonusClaimed = (frame: Extract<ServerFrame, { t: "charityBonusClaimed" }>): void => {
+    publish({ gauge: frame.gauge, charityBonus: 0 });
   };
 
   const answer = (reply: ReplyFrame): void => {
@@ -451,6 +512,7 @@ export function createCanvasStore(
       origin: frame.canvas.origin ?? START_ORIGIN,
       params: frame.params,
       gauge: frame.gauge ?? null,
+      charityEvent: frame.charityEvent,
       ...(userId ? { userId } : {}),
       ...(login ? { login } : {}),
       ...(displayName ? { displayName } : {}),
@@ -652,6 +714,18 @@ export function createCanvasStore(
       case "reportCount":
         publish({ reportCount: frame.count });
         break;
+      case "charityEvent":
+        takeCharityEvent(frame);
+        break;
+      case "charityDonation":
+        takeCharityDonation(frame);
+        break;
+      case "charityBonus":
+        publish({ charityBonus: frame.pending });
+        break;
+      case "charityBonusClaimed":
+        takeCharityBonusClaimed(frame);
+        break;
       case "staleList":
         emitStale(frame.list);
         break;
@@ -815,6 +889,22 @@ export function createCanvasStore(
     setLiveOnly: (isLiveOnly) =>
       transport.send({ t: "setLiveOnly", requestId: crypto.randomUUID(), isLiveOnly }),
     claimGauge: () => transport.send({ t: "claimGauge", requestId: crypto.randomUUID() }),
+    setCharityEvent: ({ isEnabled, title, address, startsAt, endsAt, isEventOnly }) =>
+      sendCharity({
+        t: "setCharityEvent",
+        requestId: crypto.randomUUID(),
+        isEnabled,
+        title,
+        address,
+        ...(startsAt === undefined ? {} : { startsAt }),
+        ...(endsAt === undefined ? {} : { endsAt }),
+        ...(isEventOnly === undefined ? {} : { isEventOnly }),
+      }),
+    claimCharityBonus: () => transport.send({ t: "claimCharityBonus", requestId: crypto.randomUUID() }),
+    listenCharityDonations(listener) {
+      charityDonationListeners.add(listener);
+      return () => charityDonationListeners.delete(listener);
+    },
     // Les deux bornes seules : la frame est stricte, et `params` porte bien d'autres réglages.
     setGaugeLimits: ({ gaugeMaxStart, gaugeMaxCeiling }) =>
       transport.send({ t: "setGaugeLimits", requestId: crypto.randomUUID(), gaugeMaxStart, gaugeMaxCeiling }),

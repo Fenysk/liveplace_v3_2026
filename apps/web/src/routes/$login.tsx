@@ -19,12 +19,15 @@ import { CanvasPill, type CanvasPillFold } from "../ui/canvas/canvas-pill";
 import { CanvasRecovering, useIsCanvasRecovering } from "../ui/canvas/canvas-recovering";
 import { CanvasTab } from "../ui/canvas/canvas-tab";
 import { CANVAS_TEXTS } from "../ui/canvas/canvas-texts";
+import { EventTab } from "../ui/canvas/event-tab";
 import { createHandoff } from "../ui/canvas/handoff";
 import { useOwnerProfile } from "../ui/canvas/owner-profile";
 import { PixelCanvas } from "../ui/canvas/pixel-canvas";
 import { useCanvasTheme } from "../ui/canvas/use-canvas-theme";
 import { useCanvasToasts } from "../ui/canvas/use-canvas-toasts";
 import { useFollowActiveCanvas } from "../ui/canvas/use-follow-active-canvas";
+import { useCharityDonations } from "../ui/charity/use-charity-donations";
+import { useCharityPill } from "../ui/charity/use-charity-pill";
 import type { ProfileUser } from "../ui/design/profile";
 import { SupportPill } from "../ui/design/support";
 import { ThemePill } from "../ui/design/theme-pill";
@@ -146,6 +149,17 @@ const LivePills = ({
   const isOwner = role === "owner";
   // Avant le `hello`, le streamer n'attend que sa pill : ni celle de gauche, ni celle de droite ; ensuite, le gateway décide.
   const isWaitingForOwner = role === undefined && isOwnerSession;
+  // Les onglets du streamer : absents pour qui n'est pas sur sa fresque.
+  const ownerTabs = isOwner
+    ? {
+        obsTab: <ObsTab canvas={stores.canvas} login={login} onCopy={help.onObsLinkCopied} />,
+        canvasTab: <CanvasTab canvas={stores.canvas} canvasId={stores.canvasId} login={login} />,
+        eventTab: <EventTab canvas={stores.canvas} />,
+        canvasesTab: (
+          <ArchivesTab key={stores.canvasId} canvas={stores.canvas} login={login} tracker={switchTracker} />
+        ),
+      }
+    : {};
   const openWindow = (sectionId: AccountSection) => {
     setWindowState({ isOpen: true, sectionId });
     help.onWindowSection(sectionId);
@@ -211,26 +225,7 @@ const LivePills = ({
               />
             )
           }
-          obsTab={
-            isOwner ? (
-              <ObsTab canvas={stores.canvas} login={login} onCopy={help.onObsLinkCopied} />
-            ) : undefined
-          }
-          canvasTab={
-            isOwner ? (
-              <CanvasTab canvas={stores.canvas} canvasId={stores.canvasId} login={login} />
-            ) : undefined
-          }
-          canvasesTab={
-            isOwner ? (
-              <ArchivesTab
-                key={stores.canvasId}
-                canvas={stores.canvas}
-                login={login}
-                tracker={switchTracker}
-              />
-            ) : undefined
-          }
+          {...ownerTabs}
           scoreboardTab={isCompact ? <ScoreboardList rows={scoreboard} /> : undefined}
           releaseNotesTab={<ReleaseNotesTab audiences={audiences} isOpen={windowState.isOpen} />}
         />
@@ -272,7 +267,21 @@ const CanvasThemePill = ({
 }: {
   canvas: CanvasStore | undefined;
   loaded: string | undefined;
-}) => <ThemePill theme={useCanvasTheme(canvas, loaded)} />;
+}) => {
+  const theme = useCanvasTheme(canvas, loaded);
+  const event = useCharityPill(canvas);
+  // Les dons de l'événement ouvrent une ligne de plus dans ce même bloc (CDC 2026, Mode événement).
+  const donation = useCharityDonations(canvas, event?.isRunning ?? false);
+  return (
+    <ThemePill
+      theme={theme}
+      eventTitle={event?.title}
+      eventLine={event?.line}
+      eventHref={event?.href}
+      donation={donation}
+    />
+  );
+};
 
 const GamePage = () => {
   const { canvasId, owner, theme, isOwnerSession = false } = Route.useLoaderData();

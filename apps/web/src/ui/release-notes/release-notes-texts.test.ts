@@ -17,9 +17,10 @@ describe("les publications des Nouveautés", () => {
     expect(new Set(dates).size).toBe(dates.length);
   });
 
-  // Six publications, la plus récente en haut, avec leurs 19 lignes dans l'ordre où Alexis les a validées ; chacune a sa vignette, une seule
-  it("holds the six releases of 13 November, 1 November, 18 October, 11 October, 4 October and 27 September, with their 19 lines in order", () => {
+  // Sept publications, la plus récente en haut, avec leurs 21 lignes dans l'ordre où Alexis les a validées ; chacune a sa vignette, une seule
+  it("holds the seven releases of 25 November, 13 November, 1 November, 18 October, 11 October, 4 October and 27 September, with their 21 lines in order", () => {
     expect(RELEASES.map(({ date }) => date)).toEqual([
+      "2026-11-25",
       "2026-11-13",
       "2026-11-01",
       "2026-10-18",
@@ -32,6 +33,10 @@ describe("les publications des Nouveautés", () => {
         lines.map(({ audience, texts, thumbnail }) => [audience, texts.fr.title, thumbnail]),
       ),
     ).toEqual([
+      [
+        ["viewer", "Les dons t'offrent des pixels", "charity"],
+        ["owner", "Événement caritatif", "charity"],
+      ],
       [["owner", "Dessin pendant tes lives", "liveOnly"]],
       [
         ["viewer", "Annuler, refaire", "undo"],
@@ -58,12 +63,14 @@ describe("les publications des Nouveautés", () => {
       ],
       [["viewer", "Lancement de LivePlace (bêta)", "launch"]],
     ]);
-    // Les dix-neuf vignettes dessinées gardent leur ligne, chacune une fois
+    // Les vingt et une lignes ont leur vignette ; celle de l'événement caritatif sert aux deux lignes de sa publication
     const lines = RELEASES.flatMap((release) => release.lines);
-    expect(lines).toHaveLength(19);
+    expect(lines).toHaveLength(21);
     expect(lines.flatMap(({ thumbnail }) => (thumbnail ? [thumbnail] : [])).sort()).toEqual([
       "archives",
       "backgrounds",
+      "charity",
+      "charity",
       "clear",
       "eyedropper",
       "format",
@@ -99,14 +106,24 @@ describe("les publications des Nouveautés", () => {
     expect(HELLO_WORLD).toBe("Hello world!");
   });
 
-  // Les titres et les phrases des 19 lignes, mot pour mot, dans les deux langues : le français validé par Alexis, l'anglais avec les mots
+  // Les titres et les phrases des 21 lignes, mot pour mot, dans les deux langues : le français validé par Alexis, l'anglais avec les mots
   // de l'interface (eyedropper, cell, report, clear, canvas, viewer, gauge, theme, tutorial)
-  it("says the 19 lines in French and in English, word for word", () => {
+  it("says the 21 lines in French and in English, word for word", () => {
     const lines = RELEASES.flatMap(({ date, lines: releaseLines }) =>
       releaseLines.map(({ audience, texts }) => ({ date, audience, texts })),
     );
 
     expect(lines.map(({ date, texts }) => [date, texts.fr.title, texts.fr.sentence])).toEqual([
+      [
+        "2026-11-25",
+        "Les dons t'offrent des pixels",
+        `Pendant un événement caritatif, clique sur +N à chaque don${NB}: les pixels vont dans ta jauge.`,
+      ],
+      [
+        "2026-11-25",
+        "Événement caritatif",
+        `Dans Menu > Événement, relie ta page Streamlabs Charity${NB}: chaque don offre des pixels à tous tes viewers.`,
+      ],
       [
         "2026-11-13",
         "Dessin pendant tes lives",
@@ -201,6 +218,14 @@ describe("les publications des Nouveautés", () => {
     ]);
     expect(lines.map(({ texts }) => [texts.en.title, texts.en.sentence])).toEqual([
       [
+        "Donations give you pixels",
+        "During a charity event, click +N on each donation: the pixels go to your gauge.",
+      ],
+      [
+        "Charity event",
+        "In Menu > Event, link your Streamlabs Charity page: every donation gives pixels to all your viewers.",
+      ],
+      [
         "Drawing during your streams",
         "In Menu > Canvas, tick Drawing only while live: your viewers draw while you're live.",
       ],
@@ -237,8 +262,8 @@ describe("les publications des Nouveautés", () => {
     ]);
   });
 
-  // Un invité ou un viewer ne voit que les lignes qui s'adressent à tous (11, dans les cinq publications qui leur parlent) ; le streamer voit les 19
-  it("shows a viewer the eleven lines for everyone, and the owner all nineteen", () => {
+  // Un invité ou un viewer ne voit que les lignes qui s'adressent à tous (12, dans les six publications qui leur parlent) ; le streamer voit les 21
+  it("shows a viewer the twelve lines for everyone, and the owner all twenty-one", () => {
     const viewerReleases = shownReleases(RELEASES, ["viewer"]);
     const ownerReleases = shownReleases(RELEASES, AUDIENCES);
     const sizes = (shown: typeof viewerReleases) =>
@@ -248,6 +273,7 @@ describe("les publications des Nouveautés", () => {
       ]);
 
     expect(sizes(viewerReleases)).toEqual([
+      ["2026-11-25", [["viewer", 1]]],
       ["2026-11-01", [["viewer", 1]]],
       ["2026-10-18", [["viewer", 1]]],
       ["2026-10-11", [["viewer", 4]]],
@@ -256,6 +282,13 @@ describe("les publications des Nouveautés", () => {
     ]);
     // Dans l'ordre de l'écran : tous, les modérateurs, les streamers
     expect(sizes(ownerReleases)).toEqual([
+      [
+        "2026-11-25",
+        [
+          ["viewer", 1],
+          ["owner", 1],
+        ],
+      ],
       ["2026-11-13", [["owner", 1]]],
       [
         "2026-11-01",
@@ -284,10 +317,10 @@ describe("les publications des Nouveautés", () => {
       ["2026-09-27", [["viewer", 1]]],
     ]);
     expect(viewerReleases.flatMap(({ byAudience }) => byAudience.flatMap(({ lines }) => lines))).toHaveLength(
-      11,
+      12,
     );
     expect(ownerReleases.flatMap(({ byAudience }) => byAudience.flatMap(({ lines }) => lines))).toHaveLength(
-      19,
+      21,
     );
   });
 });

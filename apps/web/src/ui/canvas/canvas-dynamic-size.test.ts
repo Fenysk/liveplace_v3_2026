@@ -16,7 +16,6 @@ const sectionHtml = (
   const choice = toSizeChoice(current);
   return renderToString(
     createElement(CanvasSettings, {
-      theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
       background: { value: "transparent", isTouch: false, onPick: doNothing },
       image: {
         imageUrl: null,
@@ -122,7 +121,6 @@ describe("the drawing only while live in the Canvas section (JOURNAL 2026-11-12)
   const sectionOf = (isOn: boolean) =>
     renderToString(
       createElement(CanvasSettings, {
-        theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
         background: { value: "transparent", isTouch: false, onPick: doNothing },
         image: {
           imageUrl: null,

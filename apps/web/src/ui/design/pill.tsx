@@ -21,6 +21,7 @@ export type PillState = { kind: "locked" } | { kind: "reconnecting"; label: stri
 type PillProps = {
   dock?: PillDock | undefined; // absente : posée sur place, comme sur /design
   layout?: PillLayout | undefined;
+  tone?: "claim" | undefined; // la pill elle-même est le cadre arc-en-ciel de la pastille (le titre d'un événement, seul)
   state?: PillState | undefined;
   isVisible?: boolean;
   children: ReactNode;
@@ -69,7 +70,7 @@ const usePublishedSize = (
   }, [content, size, isPublished]);
 };
 
-export const Pill = ({ dock, layout = "row", state, isVisible = true, children }: PillProps) => {
+export const Pill = ({ dock, layout = "row", tone, state, isVisible = true, children }: PillProps) => {
   const morph = useMorph<HTMLDivElement, HTMLDivElement>();
   usePublishedSize(morph.content, dock && PUBLISHED_SIZES[dock], isVisible);
   const pill = (
@@ -78,6 +79,7 @@ export const Pill = ({ dock, layout = "row", state, isVisible = true, children }
       className={classNames(
         "lp-pill",
         LAYOUT_CLASSES[layout].pill,
+        tone === "claim" && "lp-pill--claim",
         state && `is-${state.kind}`,
         !isVisible && "is-hidden",
       )}

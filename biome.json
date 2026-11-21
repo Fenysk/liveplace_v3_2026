@@ -90,7 +90,7 @@
       "linter": { "rules": { "style": { "useNamingConvention": "off" } } }
     },
     {
-      "includes": ["apps/web/src/infra/twitch.ts"],
+      "includes": ["apps/web/src/infra/twitch.ts", "apps/worker/src/infra/streamlabs-charity*.ts"],
       "linter": { "rules": { "style": { "useNamingConvention": "off" } } }
     },
     {

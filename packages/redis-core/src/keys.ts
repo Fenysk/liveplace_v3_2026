@@ -102,7 +102,22 @@ export function buildCanvasKeys(canvasId: string) {
     // §5.1 : le classement, un ZSET `userId` → score, à part de `progress` que le reste copie. Sans EXPIRE non plus.
     scoreboard: `${prefix}scoreboard`,
     scoreboardBanned: `${prefix}scoreboard:banned`, // `userId` → score, mis à l'écart par ban, rendu par unban
+    // JOURNAL 2026-11-20 : l'événement de dons de cette fresque. Sans EXPIRE : « Nouvel événement » les efface, la suppression de la fresque aussi.
+    charityEvent: `${prefix}charity`, // HASH `address`, `startsAt`, `endsAt`, `donationCount`, `totalCents`
+    charityDonations: `${prefix}charity:donations`, // HASH id du don → JSON ; la garde contre un don lu deux fois
+    charityRecent: `${prefix}charity:recent`, // ZSET `seq:cents` → heure du don, pour la fenêtre d'un compte neuf
+    charityClaims: `${prefix}charity:claims`, // HASH `userId` → `seq:totalCents` au moment de sa dernière réclamation
+    charityLock: `${prefix}charity:lock`, // le lecteur de l'événement : un seul à la fois, expire de lui-même
     req: (userId: string, requestId: string) => `${prefix}req:${userId}:${requestId}`,
+  };
+}
+
+// JOURNAL 2026-11-20 : les fresques qui ont un événement à lire. Un préfixe par appel isole les clés d'un test, comme l'activité.
+export type CharityKeys = ReturnType<typeof buildCharityKeys>;
+
+export function buildCharityKeys(prefix = "charity:") {
+  return {
+    active: `${prefix}active`, // SET des `canvasId` dont l'événement est à venir, en cours, ou dans sa fin de lecture
   };
 }
 
@@ -115,6 +130,8 @@ export function userKey(userId: string): string {
 // le gateway les compare à l'heure à chaque affichage ; supprimer le compte efface le miroir entier, donc eux aussi.
 export const SUPPORT_TITLE_FIELD = "supportTitle";
 export const SUPPORT_ENDS_AT_FIELD = "supportEndsAt";
+// JOURNAL 2026-11-20 : l'instant où le compte est né, écrit par le web à la création seulement. Absent : un compte d'avant la règle.
+export const CREATED_AT_FIELD = "createdAt";
 
 // §10.4 : le live Twitch d'un compte, un HASH `checkedAt` et, en live seulement, `category`.
 // Sans EXPIRE : « hors live » est un état connu, et le web revérifie celui qui date.

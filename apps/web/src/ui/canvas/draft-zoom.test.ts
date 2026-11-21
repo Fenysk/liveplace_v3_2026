@@ -394,7 +394,7 @@ const welcomeOf = (canvas: Size, background: BackgroundParams = {}, isDynamicSiz
   palette: [...PALETTE],
   version: 7,
   you: { userId: "user-1", login: "user1", displayName: "User 1", role: "viewer" },
-  gauge: { charges: 10, max: 10, nextRefillAt: NOW + 10_000, claimable: 0 },
+  gauge: { charges: 10, max: 10, nextRefillAt: NOW + 10_000, claimable: 0, reserve: 0 },
 });
 
 // Un écran comme la page le mesure : le pointeur, les marges des pills en Vue (et la zone d'arrivée), puis celles du Dessin.
@@ -551,7 +551,7 @@ const openScene = (
         requestId,
         accepted: pixels.length - rejectedIndexes.length,
         rejected: rejectedIndexes.map((index) => ({ index, reason: "gauge" })),
-        gauge: { charges: 9, max: 10, nextRefillAt: NOW + 10_000, claimable: 0 },
+        gauge: { charges: 9, max: 10, nextRefillAt: NOW + 10_000, claimable: 0, reserve: 0 },
       });
     },
     receiveAndPaint: (frame: ServerFrame) => {
@@ -1093,7 +1093,10 @@ describe("la case qui entre au brouillon", () => {
   const widenGauge = (world: ReturnType<typeof openScene>, charges: number) => {
     const welcome = welcomeOf(CANVAS);
     if (welcome.t !== "welcome") throw new Error("un welcome était attendu");
-    world.receive({ ...welcome, gauge: { charges, max: charges, nextRefillAt: NOW + 10_000, claimable: 0 } });
+    world.receive({
+      ...welcome,
+      gauge: { charges, max: charges, nextRefillAt: NOW + 10_000, claimable: 0, reserve: 0 },
+    });
   };
 
   // Une case ajoutée paraît en fondu depuis rien, sur `--lp-dur-fast`, puis plus rien n'est attendu

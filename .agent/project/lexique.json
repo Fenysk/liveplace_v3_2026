@@ -13,6 +13,7 @@
     { "canonical": "palette",      "definition": "La liste des couleurs, indexée. Index 0 = transparent.",               "banned": ["colors"] },
     { "canonical": "batch",        "definition": "Un lot de pixels dans une frame `place`. Réservé aux poses.",          "banned": ["group"] },
     { "canonical": "event",        "definition": "Une opération validée, canonique, portant une `version`. Vit dans le stream et dans les `chunk`.", "banned": ["delta", "update", "change"] },
+    { "canonical": "charityEvent", "definition": "Le mode événement d'une fresque (CDC 2026 §8, JOURNAL 2026-11-20) : la collecte de dons Streamlabs Charity que son streamer règle, et dont les dons donnent un bonus de pixels. Préfixe `charity` pour tout ce qui le touche : `event` est réservé au flux de poses. Ses dons sont des `donation`, son bonus un `bonus`, sa réserve la `reserve` de la jauge.", "banned": [] },
     { "canonical": "version",      "definition": "Le curseur unique du système : reconnexion, resync, historique, restauration (D-05).", "banned": ["revision", "seq", "sequence"] },
     { "canonical": "frame",        "definition": "Un message WebSocket. `CellsFrame` est un lot de cases envoyé au client — ce n'est PAS un `event` : il est conflaté et couvre une plage de versions.", "banned": [] },
     { "canonical": "gauge",        "definition": "Le compteur de pixels disponibles, en `charges`, rechargé par `refill`.", "banned": ["quota", "cooldown", "credits"] },

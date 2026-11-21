@@ -1670,3 +1670,157 @@ describe("protocol 26: the drawing only while live", () => {
     expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
   });
 });
+
+// Protocole 27 (JOURNAL 2026-11-20) : le mode événement
+describe("protocol 27: the event mode", () => {
+  const gauge = { charges: 1, max: 10, nextRefillAt: 5, claimable: 0, reserve: 40 };
+  const state = {
+    isEnabled: true,
+    title: "Live caritatif",
+    address: "https://streamlabscharity.com/@a/b",
+    startsAt: 1,
+    endsAt: 2,
+    donationCount: 3,
+  };
+
+  // Passe au protocole 27 : une page en 26 se recharge
+  it("is protocol 27 or later: a page in 26 reloads", () => {
+    expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(27);
+    expect(decodeClientFrame({ t: "hello", protocolVersion: 26, canvasId: "c1", mode: "ui" }).ok).toBe(false);
+  });
+
+  // Porte la réserve dans la jauge, et refuse une jauge sans elle
+  it("carries the reserve in the gauge, and refuses a gauge without it", () => {
+    expect(decodeServerFrame({ t: "gauge", ...gauge })).toEqual({
+      ok: true,
+      value: { t: "gauge", ...gauge },
+    });
+    expect(decodeServerFrame({ t: "gauge", ...gauge, reserve: -1 }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "gauge", ...gauge, reserve: undefined }).ok).toBe(false);
+  });
+
+  // Le réglage porte le switch, le titre, l'adresse et les dates facultatives, un titre ou une adresse vides y sont permis
+  it("takes the setting frame and the claim frame, and nothing else in them", () => {
+    const setting = {
+      t: "setCharityEvent",
+      requestId: "r",
+      isEnabled: true,
+      title: "Live caritatif",
+      address: "https://streamlabscharity.com/@a/b",
+      startsAt: 1,
+      endsAt: 2,
+    };
+
+    expect(decodeClientFrame(setting)).toEqual({ ok: true, value: setting });
+    expect(decodeClientFrame({ ...setting, address: "" }).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, startsAt: undefined, endsAt: undefined }).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, isEnabled: "oui" }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, isEnabled: undefined }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, address: undefined }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, title: "" }).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, title: undefined }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, title: "x".repeat(40) }).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, title: "x".repeat(41) }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, title: "\u{1F600}".repeat(40) }).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, address: "x".repeat(301) }).ok).toBe(false);
+    expect(decodeClientFrame({ ...setting, endsAt: "demain" }).ok).toBe(false);
+    for (const t of ["claimCharityBonus"]) {
+      expect(decodeClientFrame({ t: "endCharityEvent", requestId: "r" }).ok).toBe(false);
+      expect(decodeClientFrame({ t: "restartCharityEvent", requestId: "r" }).ok).toBe(false);
+      expect(decodeClientFrame({ t, requestId: "r" }).ok).toBe(true);
+      expect(decodeClientFrame({ t, requestId: "r", extra: 1 }).ok).toBe(false);
+      expect(decodeClientFrame({ t }).ok).toBe(false);
+    }
+  });
+
+  // Dit l'état dans le welcome et dans la frame, avec ou sans événement réglé
+  it("says the state in the welcome and in the frame, with or without an event", () => {
+    const frame = { t: "charityEvent", state };
+    const welcome = {
+      t: "welcome",
+      canvas: { canvasId: "abc123", width: 4, height: 4, ownerId: "owner-1" },
+      params: {
+        gaugeMaxStart: 10,
+        gaugeMaxCeiling: 150,
+        refillMs: 10_000,
+        refillCharges: 1,
+        obsDelayMs: 5000,
+        obsBackground: "transparent",
+      },
+      palette: ["#00000000"],
+      version: 0,
+      you: { role: "viewer" },
+    };
+
+    expect(decodeServerFrame(frame)).toEqual({ ok: true, value: frame });
+    expect(decodeServerFrame({ t: "charityEvent" }).ok).toBe(true);
+    expect(decodeServerFrame({ ...frame, state: { ...state, isEnabled: "oui" } }).ok).toBe(false);
+    expect(
+      decodeServerFrame({ ...frame, state: { ...state, startsAt: undefined, endsAt: undefined } }).ok,
+    ).toBe(true);
+    expect(decodeServerFrame({ ...welcome, charityEvent: { state } }).ok).toBe(true);
+    expect(decodeServerFrame({ ...welcome, charityEvent: {} }).ok).toBe(true);
+    expect(decodeServerFrame(welcome).ok).toBe(true);
+  });
+
+  // L'adresse de l'état est facultative, son titre ne l'est pas (il peut être vide)
+  it("accepts a state without an address, and refuses one without a title", () => {
+    const { address: _address, ...addressless } = state;
+    expect(decodeServerFrame({ t: "charityEvent", state: addressless }).ok).toBe(true);
+    const { title: _title, ...untitled } = state;
+    expect(decodeServerFrame({ t: "charityEvent", state: untitled }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "charityEvent", state: { ...state, title: "x".repeat(41) } }).ok).toBe(
+      false,
+    );
+  });
+
+  // Le drapeau « dessin seulement pendant l'événement » est facultatif, dans le réglage comme dans l'état, et booléen
+  it("takes the event-only flag as an optional boolean, in the setting and in the state", () => {
+    const setting = { t: "setCharityEvent", requestId: "r", isEnabled: true, title: "Live", address: "" };
+
+    expect(decodeClientFrame({ ...setting, isEventOnly: true })).toEqual({
+      ok: true,
+      value: { ...setting, isEventOnly: true },
+    });
+    expect(decodeClientFrame(setting).ok).toBe(true);
+    expect(decodeClientFrame({ ...setting, isEventOnly: "oui" }).ok).toBe(false);
+    expect(decodeServerFrame({ t: "charityEvent", state: { ...state, isEventOnly: true } }).ok).toBe(true);
+    expect(decodeServerFrame({ t: "charityEvent", state: { ...state, isEventOnly: 1 } }).ok).toBe(false);
+  });
+
+  // Dit chaque don tel quel, avec ses pixels, et refuse un don sans montant
+  it("says each donation as it is, with its pixels, and refuses one without an amount", () => {
+    const donation = {
+      t: "charityDonation",
+      donationId: "9",
+      name: "Anonyme 42",
+      cents: 500,
+      currency: "EUR",
+      pixels: 500,
+      donationCount: 7,
+    };
+
+    expect(decodeServerFrame(donation)).toEqual({ ok: true, value: donation });
+    expect(decodeServerFrame({ ...donation, cents: 0 }).ok).toBe(false);
+    expect(decodeServerFrame({ ...donation, pixels: 1.5 }).ok).toBe(false);
+    expect(decodeServerFrame({ ...donation, name: "x".repeat(101) }).ok).toBe(false);
+  });
+
+  // Dit le bonus en attente et le résultat d'une réclamation
+  it("says the pending bonus and the result of a claim", () => {
+    const claimed = { t: "charityBonusClaimed", requestId: "r", pixels: 40, gauge };
+
+    expect(decodeServerFrame({ t: "charityBonus", pending: 0 }).ok).toBe(true);
+    expect(decodeServerFrame({ t: "charityBonus", pending: -1 }).ok).toBe(false);
+    expect(decodeServerFrame(claimed)).toEqual({ ok: true, value: claimed });
+    expect(decodeServerFrame({ ...claimed, pixels: -1 }).ok).toBe(false);
+  });
+
+  // Le seul refus du mode événement est un code, jamais une phrase
+  it("knows the one refusal of the event mode", () => {
+    for (const code of ["charity_event_unavailable"])
+      expect(decodeServerFrame({ t: "error", requestId: "r", code }).ok).toBe(true);
+    for (const code of ["invalid_charity_address", "invalid_charity_title", "invalid_charity_dates"])
+      expect(decodeServerFrame({ t: "error", requestId: "r", code }).ok).toBe(false);
+  });
+});

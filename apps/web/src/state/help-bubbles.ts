@@ -7,7 +7,7 @@ import { PLACEMENT_COUNT_CAP } from "./placement-count";
 
 // Les sections de la fenêtre du compte que les bulles connaissent (`AccountSection`, qui est dans `ui/`).
 const OBS_SECTION = "obs";
-const CANVAS_SECTION = "canvas";
+const EVENT_SECTION = "event";
 const MODERATION_SECTION = "moderation";
 
 // Dans l'ordre de priorité : ce qui attend un geste de la personne d'abord (modérer, brancher OBS, réclamer, trouver Modération),
@@ -73,10 +73,10 @@ const WISHES: Record<HelpBubble, (facts: HelpFacts) => boolean> = {
     role === "owner" && windowSection !== undefined && windowSection !== OBS_SECTION,
   "obs-address": ({ role, windowSection }) => role === "owner" && windowSection === OBS_SECTION,
   // §9.11 : la chaîne continue après l'adresse, qui passe avant (`HELP_BUBBLES`) : le lien à partager,
-  // le thème dans la section Fresque, la synchro Twitch partout sauf dans Modération.
+  // le thème dans la section Événement, la synchro Twitch partout sauf dans Modération.
   "invite-link": ({ role, windowSection }) => role === "owner" && windowSection === OBS_SECTION,
   theme: ({ role, windowSection, isThemeMissing }) =>
-    role === "owner" && windowSection === CANVAS_SECTION && isThemeMissing,
+    role === "owner" && windowSection === EVENT_SECTION && isThemeMissing,
   "twitch-sync": ({ role, windowSection, isTwitchSyncMissing }) =>
     role === "owner" &&
     windowSection !== undefined &&

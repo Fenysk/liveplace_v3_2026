@@ -24,6 +24,10 @@ export const RELEASE_NOTES_TEXTS = defineTexts({
   }),
   // Le thème qui s'écrit dans la vignette « Un thème pour la fresque » : un exemple, comme celui du champ (Halloween).
   themeExample: { fr: "Aventure", en: "Adventure" },
+  // Ce qui s'écrit dans la vignette « Événement caritatif » : le titre de la pastille, sa 2e ligne et le début de la ligne de don.
+  charityTitle: { fr: "Soirée caritative", en: "Charity night" },
+  charityLine: { fr: "En cours", en: "Live now" },
+  charityDonation: { fr: "Nouveau don", en: "New donation" },
 });
 
 // Avec `exactOptionalPropertyTypes`, une ligne sans vignette n'a pas la clé.
@@ -33,10 +37,37 @@ const line = (
   thumbnail?: ReleaseThumbnail,
 ): ReleaseLine => (thumbnail ? { audience, texts, thumbnail } : { audience, texts });
 
-// Six publications datées, la plus récente en haut. Les phrases françaises sont celles qu'Alexis a validées, mot pour mot ; l'anglais reprend
+// Sept publications datées, la plus récente en haut. Les phrases françaises sont celles qu'Alexis a validées, mot pour mot ; l'anglais reprend
 // les mots que l'interface emploie déjà (eyedropper, cell, report, clear, canvas, viewer, gauge, theme, tutorial…). Une ligne sans vignette
 // n'en a pas la clé : elle s'affiche en texte seul.
 export const RELEASES: readonly Release[] = [
+  {
+    date: "2026-11-25",
+    lines: [
+      line(
+        "viewer",
+        defineTexts({
+          title: { fr: "Les dons t'offrent des pixels", en: "Donations give you pixels" },
+          sentence: {
+            fr: "Pendant un événement caritatif, clique sur +N à chaque don : les pixels vont dans ta jauge.",
+            en: "During a charity event, click +N on each donation: the pixels go to your gauge.",
+          },
+        }),
+        "charity",
+      ),
+      line(
+        "owner",
+        defineTexts({
+          title: { fr: "Événement caritatif", en: "Charity event" },
+          sentence: {
+            fr: "Dans Menu > Événement, relie ta page Streamlabs Charity : chaque don offre des pixels à tous tes viewers.",
+            en: "In Menu > Event, link your Streamlabs Charity page: every donation gives pixels to all your viewers.",
+          },
+        }),
+        "charity",
+      ),
+    ],
+  },
   {
     date: "2026-11-13",
     lines: [

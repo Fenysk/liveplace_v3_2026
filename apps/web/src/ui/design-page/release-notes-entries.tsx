@@ -120,6 +120,12 @@ const SHOTS = [
     detail:
       "Animée, en boucle de 6 s : une mini-fresque (un cœur), la pill de profil du streamer (son avatar, son nom, le bouton Twitch gris) au-dessus de la pill Dessin dont Dessiner est grisé (le bouton inactif du jeu). Une souris appuie sur Dessiner : le toast du jeu paraît en haut, « Le dessin s'ouvre quand Kira est en live », reste deux secondes et s'en va. Puis le live démarre : le bouton Twitch passe en live (violet, son rond, la catégorie) et Dessiner redevient plein. Tout s'efface en fondu, et la boucle repart. Fixe : hors live, Dessiner grisé, le toast visible, sans souris.",
   },
+  {
+    kind: "charity",
+    name: "Événement caritatif",
+    detail:
+      "Animée, en boucle de 7 s : une mini-fresque (un champignon, un chat, un cœur) et, en haut au centre, la pastille de l'événement du jeu : le cadre arc-en-ciel, un titre générique (« Soirée caritative ») et « En cours ». Une ligne de don paraît dessous (un cœur, « Nouveau don · 5 € ») avec le bouton doré « +50 ». Une souris clique le bouton : la ligne se referme, la jauge de la pill Dessin, en bas, monte jusqu'au plein (« 20/20 »). Tout s'efface en fondu, et la boucle repart. Fixe : la pastille et sa ligne de don, la jauge à moitié pleine, sans souris.",
+  },
 ] as const;
 
 export const ReleaseNotesEntry = () => (
@@ -127,7 +133,7 @@ export const ReleaseNotesEntry = () => (
     slug="nouveautes"
     components={["ReleaseList", "ReleaseShot"]}
     file="ui/release-notes/release-list.tsx"
-    note="Six publications datées, la plus récente en haut (13 novembre, 1er novembre, 18 octobre, 11 octobre, 4 octobre, 27 septembre), 19 lignes en tout ; chaque nouveauté a sa vignette (une ligne qui n'en aurait pas ne serait que du texte). Des lignes sous un filet dans la fenêtre. Le rôle se lit sur la fresque où l'on est : ce qui s'adresse à tous vient d'abord, sans titre de groupe ; le streamer voit ensuite Pour les modérateurs et Pour les streamers (dans cet ordre), le modérateur Pour les modérateurs ; un viewer ou un invité ne voit que ce qui s'adresse à tous, sans aucun titre de groupe. Ouvrir la section marque tout comme lu ; le point du bouton Nouveautés s'éteint. La page /nouveautes montre les trois groupes à tous les publics (le premier sans titre), sous une phrase d'accueil : chaque nouveauté y est une carte (la vignette en haut à toute la largeur de la carte, le titre et la phrase dessous), les cartes d'un groupe en 2 colonnes dès 760 px de bloc, 3 dès 1100 px, la colonne allant jusqu'à 1200 px ; sous 760 px, les cartes l'une sous l'autre."
+    note="Sept publications datées, la plus récente en haut (25 novembre, 13 novembre, 1er novembre, 18 octobre, 11 octobre, 4 octobre, 27 septembre), 21 lignes en tout ; chaque nouveauté a sa vignette (une ligne qui n'en aurait pas ne serait que du texte). Des lignes sous un filet dans la fenêtre. Le rôle se lit sur la fresque où l'on est : ce qui s'adresse à tous vient d'abord, sans titre de groupe ; le streamer voit ensuite Pour les modérateurs et Pour les streamers (dans cet ordre), le modérateur Pour les modérateurs ; un viewer ou un invité ne voit que ce qui s'adresse à tous, sans aucun titre de groupe. Ouvrir la section marque tout comme lu ; le point du bouton Nouveautés s'éteint. La page /nouveautes montre les trois groupes à tous les publics (le premier sans titre), sous une phrase d'accueil : chaque nouveauté y est une carte (la vignette en haut à toute la largeur de la carte, le titre et la phrase dessous), les cartes d'un groupe en 2 colonnes dès 760 px de bloc, 3 dès 1100 px, la colonne allant jusqu'à 1200 px ; sous 760 px, les cartes l'une sous l'autre."
   >
     <Block title="La section de la fenêtre">
       <StateRow

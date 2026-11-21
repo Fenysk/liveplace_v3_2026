@@ -22,6 +22,29 @@ describe("gaugeLevels", () => {
   });
 });
 
+describe("gaugeLevels avec réserve (mode événement)", () => {
+  // La réserve tient le tube plein, même avec peu de charges
+  it("garde le tube plein tant qu'il reste une réserve", () => {
+    expect(gaugeLevels(8, 10, 0, 500)).toEqual({ remainingLevel: 0.8, chargesLevel: 1 });
+  });
+
+  // Le brouillon se paie d'abord sur la réserve : le fluide clair n'apparaît pas
+  it("ne montre pas le brouillon tant qu'il tient dans la réserve", () => {
+    expect(gaugeLevels(10, 10, 3, 500)).toEqual({ remainingLevel: 1, chargesLevel: 1 });
+    expect(gaugeLevels(10, 10, 500, 500)).toEqual({ remainingLevel: 1, chargesLevel: 1 });
+  });
+
+  // Au-delà de la réserve, le reste se prend sur les charges
+  it("prend sur les charges ce que la réserve ne couvre pas", () => {
+    expect(gaugeLevels(10, 10, 503, 500)).toEqual({ remainingLevel: 0.7, chargesLevel: 1 });
+    expect(gaugeLevels(10, 10, 600, 500)).toEqual({ remainingLevel: 0, chargesLevel: 1 });
+  });
+
+  it("revient aux niveaux d'avant sans réserve", () => {
+    expect(gaugeLevels(8, 10, 3, 0)).toEqual(gaugeLevels(8, 10, 3));
+  });
+});
+
 describe("timerText (§9.4)", () => {
   // Sous la minute, les secondes seules, sans unité : l'anneau n'a pas la place d'en écrire une
   it("writes the seconds alone under a minute", () => {

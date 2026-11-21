@@ -1,14 +1,16 @@
 -- La jauge d'un joueur (§5.3). §5.3 : collé devant place.lua et claim.lua, comme pile.lua.
 -- Les formules de `refillGauge`, `playerGaugeMax` et `claimableRewards` (domain) : les deux côtés comptent pareil.
 
--- §5.1 : sans TTL, une progression ne se perd jamais.
+-- §5.1 : sans TTL, une progression ne se perd jamais. `reserve` : les pixels du bonus de l'événement, dépensés avant la jauge,
+-- sans recharge, gardés après l'événement (JOURNAL 2026-11-20).
 local function readProgress(progressKey)
-  local fields = redis.call("HMGET", progressKey, "counted", "day", "dayCounted", "claimed")
+  local fields = redis.call("HMGET", progressKey, "counted", "day", "dayCounted", "claimed", "reserve")
   return {
     counted = tonumber(fields[1]) or 0,
     day = fields[2] or "",
     dayCounted = tonumber(fields[3]) or 0,
     claimed = tonumber(fields[4]) or 0,
+    reserve = tonumber(fields[5]) or 0,
   }
 end
 

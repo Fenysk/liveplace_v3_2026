@@ -1,4 +1,4 @@
-// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : le thème du canvas, son fond (§9.5), la taille
+// La section Canvas, branchée sur le store (JOURNAL 2026-09-29) : son fond (§9.5), la taille
 // dynamique (§5.8) ou la taille choisie, sa confirmation, puis la demande au gateway. La nouvelle taille arrive
 // d'elle-même, par un `welcome` et un snapshot, à toutes les pages. Retirer la taille dynamique ramène la fresque à la taille fixe par défaut
 // (JOURNAL 2026-10-29) : avec des dessins qui sortiraient du cadre, c'est la confirmation d'un format plus petit ; sans, rien à confirmer.
@@ -14,7 +14,6 @@ import { CANVAS_TEXTS } from "./canvas-texts";
 import { useBackgroundFields } from "./use-background-fields";
 import { useDynamicSizeField } from "./use-dynamic-size-field";
 import { useLiveOnlyField } from "./use-live-only-field";
-import { useThemeField } from "./use-theme-field";
 
 // `canvasId` et `login` : ceux de la page, qui visent l'image du fond.
 type CanvasTabProps = { canvas: CanvasStore; canvasId: string; login: string };
@@ -46,7 +45,6 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
   const preview = next ? previewResize(pixels, current, next) : NOTHING_OUTSIDE;
   const toast = useToast();
   const t = useTexts(CANVAS_TEXTS);
-  const theme = useThemeField();
   const { background, image } = useBackgroundFields({ canvas, canvasId, login });
   const dynamic = useDynamicSizeField(canvas);
   const liveOnly = useLiveOnlyField(canvas);
@@ -81,7 +79,6 @@ export const CanvasTab = ({ canvas, canvasId, login }: CanvasTabProps) => {
   return (
     <>
       <CanvasSettings
-        theme={theme}
         background={background}
         image={image}
         dynamic={{ isOn: dynamic.isOn, isBusy: dynamic.isBusy, onToggle: toggleDynamic }}

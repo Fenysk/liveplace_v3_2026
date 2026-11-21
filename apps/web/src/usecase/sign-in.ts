@@ -92,6 +92,7 @@ export async function signInTwitchUser(
   if (canvasId === candidateCanvasId) {
     const discoveredViaCanvasId = await getDiscoveredViaCanvasId(deps.durable, discoveredViaUserId);
     await deps.redis.storeSignup({
+      userId: user.userId,
       nowMs: deps.now(),
       ...(discoveredViaUserId ? { discoveredViaUserId } : {}),
       ...(discoveredViaCanvasId ? { discoveredViaCanvasId } : {}),

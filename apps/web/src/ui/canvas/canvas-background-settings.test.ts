@@ -49,7 +49,6 @@ const imageHtml = (overrides: Partial<BackgroundImageField> = {}): string =>
 const sectionHtml = (image: Partial<BackgroundImageField> = {}): string =>
   renderToString(
     createElement(CanvasSettings, {
-      theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
       background: fieldOf(),
       image: imageOf(image),
       current: { width: 50, height: 50 },
@@ -225,18 +224,17 @@ describe("the image of the canvas in the settings (§9.5)", () => {
 });
 
 describe("the background and the image in the Canvas section (§9.5)", () => {
-  // Sous le thème, avant la taille : le fond puis l'image sont les deuxième et troisième réglages de la section
-  it("comes under the theme and before the size, the background first and the image after it", () => {
+  // Le thème est parti dans l'onglet Événement : le fond puis l'image ouvrent la section, avant la taille
+  it("opens the section and comes before the size, the background first and the image after it", () => {
     const html = sectionHtml();
-    const [theme, background, image, size] = [
-      "Thème",
+    const [background, image, size] = [
       "Fond de la fresque",
       "Image de la fresque",
       "Taille de la fresque",
     ].map((text) => html.indexOf(text));
 
-    expect(theme).toBeGreaterThan(-1);
-    expect(background).toBeGreaterThan(theme ?? 0);
+    expect(html).not.toContain("Thème");
+    expect(background).toBeGreaterThan(-1);
     expect(image).toBeGreaterThan(background ?? 0);
     expect(size).toBeGreaterThan(image ?? 0);
   });

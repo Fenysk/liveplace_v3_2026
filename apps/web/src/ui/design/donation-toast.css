@@ -1,0 +1,137 @@
+/* La ligne d'un don (mode événement) : une ligne de plus dans le bloc du titre et du thème (theme-pill.tsx), sous le thème,
+   avec un cœur, le pseudo, un texte qui défile et le +N doré (gauge.css, .lp-claim) qui la ferme à droite. Le bloc grandit
+   pour l'ouvrir et reprend sa taille à sa fermeture : c'est le morphing de la pill (use-morph.ts), pas une animation de plus.
+   Aucune couleur, aucun rayon ni aucune ombre de plus. */
+
+/* Une ligne : la place d'un don est de 304 px au moins, moins ce que l'écran n'a pas (deux marges de l'écran, deux marges du
+   contenu de la pill). Le contenu de la pill vaut --lp-donation-pad de chaque côté : celui de la pill Thème, ou celui de la pastille seule. */
+.lp-donation {
+  --lp-donation-pad: var(--space-4);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: min(304px, calc(100vw - 2 * var(--space-2) - 2 * var(--lp-donation-pad)));
+  min-height: var(--control-size);
+}
+
+.lp-donation svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--support-ink);
+}
+
+.lp-donation .lp-btn {
+  flex: none;
+}
+
+/* Le trait fin qui sépare la ligne du thème, sur la largeur du contenu : il n'existe que sous un thème, sans thème la ligne
+   s'ouvre sur son propre fond */
+.lp-donation-rule {
+  display: none;
+  align-self: stretch;
+  height: 1px;
+  background: var(--chip-hover);
+}
+
+.lp-theme ~ .lp-donation-rule {
+  display: block;
+}
+
+/* Sans thème, la pastille est la pill elle-même : la ligne s'ouvre dessous, dans son cadre arc-en-ciel, sur le fond blanc du
+   titre (theme-pill.css). Elle reprend à gauche la marge du titre ; le +N est à une marge de l'arrondi du fond, comme les boutons
+   des autres pills. */
+.lp-pill--claim .lp-donation {
+  --lp-donation-pad: calc(var(--space-1) + 3px);
+  align-self: stretch;
+  min-height: calc(var(--control-size) + var(--space-1));
+  margin-inline: calc(var(--space-1) - var(--space-3));
+  padding: 0 0 var(--space-1) var(--space-2);
+}
+
+/* Avec un thème, le +N est à une marge de l'arrondi de la pill, comme les boutons des autres pills : la ligne reprend à droite ce
+   que le contenu de la pill met de plus que la marge */
+.lp-pill:not(.lp-pill--claim) .lp-donation {
+  margin-inline-end: calc(var(--space-2) - var(--space-4));
+}
+
+/* Le pseudo est un texte libre : il se coupe d'une ellipse plutôt que d'élargir la ligne */
+.lp-donation-donor {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--support-ink);
+  font-weight: var(--type-title-weight);
+}
+
+/* Le texte défile dans une fenêtre qui le coupe net, sans fondu. `contain: inline-size` : la fenêtre ne demande aucune largeur à
+   la pill, c'est la ligne (min-width) qui la donne, sinon la pill s'élargirait à la longueur du texte entier. */
+.lp-donation-marquee {
+  flex: 1 1 96px;
+  min-width: 96px;
+  contain: inline-size;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Deux copies côte à côte, la piste glisse d'une copie : la boucle n'a pas de couture. La durée d'un tour et le départ sont
+   mesurés et posés par le composant (donation-toast.tsx) ; sans eux, la piste reste immobile. */
+.lp-donation-track {
+  display: flex;
+  width: max-content;
+  animation: lp-donation-scroll var(--lp-donation-cycle) linear var(--lp-donation-delay) infinite;
+}
+
+.lp-donation-copy {
+  flex: none;
+  padding-inline-end: var(--space-4);
+}
+
+@keyframes lp-donation-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.lp-pill.is-hidden .lp-donation-track {
+  animation-play-state: paused;
+}
+
+/* Au PC, la place du bloc (--lp-theme-room, pill.css) s'arrête aux pills Fresque et Compte : le bloc ouvert prend au moins la
+   largeur d'une ligne de don, pour que le texte ait de la place, au besoin sous ces pills plutôt que sur une ligne illisible */
+@media (min-width: 641px) and (not (pointer: coarse)) {
+  .lp-pill--title .lp-pill-content:has(.lp-donation) {
+    max-width: max(var(--lp-theme-room, 336px), 336px);
+  }
+}
+
+/* Mouvement réduit : le texte ne défile pas, il reste entier et passe à la ligne */
+@media (prefers-reduced-motion: reduce) {
+  .lp-donation {
+    align-items: flex-start;
+  }
+
+  .lp-donation-marquee {
+    flex-basis: 0;
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .lp-donation-track {
+    width: auto;
+    animation: none;
+  }
+
+  .lp-donation-copy {
+    padding-inline-end: 0;
+  }
+
+  .lp-donation-copy--twin {
+    display: none;
+  }
+}

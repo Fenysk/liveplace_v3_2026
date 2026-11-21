@@ -5,6 +5,7 @@
 
 import type { SupportTitle } from "@liveplace/domain/support";
 import {
+  CalendarDays,
   Layers,
   LogOut,
   type LucideIcon,
@@ -36,6 +37,7 @@ import { SupportBadgeRow } from "./support-badge-row";
 
 export type AccountSection =
   | "canvas"
+  | "event"
   | "canvases"
   | "obs"
   | "moderation"
@@ -46,10 +48,11 @@ export type AccountSection =
 // La section que Réglages ouvre : la taille et les jauges du canvas.
 export const SETTINGS_SECTION = "canvas" as const satisfies AccountSection;
 
-// Dans l'ordre du CDC 2026 : Canvas, Vue OBS, Modération, Mon compte ; Archives à côté de Canvas (§17.1).
+// Dans l'ordre du CDC 2026 : Canvas, Événement, Vue OBS, Modération, Mon compte ; Archives à côté de Canvas (§17.1).
 // Le Classement du mobile se met avant Mon compte, Nouveautés après.
 const SECTION_ICONS = {
   canvas: Scaling,
+  event: CalendarDays,
   canvases: Layers,
   obs: MonitorPlay,
   moderation: Shield,
@@ -85,6 +88,7 @@ type AccountWindowProps = {
   moderationTab?: ReactNode | undefined; // absent : pas le droit de modérer (JOURNAL 2026-09-25)
   obsTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-25)
   canvasTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-09-29)
+  eventTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (JOURNAL 2026-11-21)
   canvasesTab?: ReactNode | undefined; // absent : ce n'est pas le streamer (§17.1)
   scoreboardTab?: ReactNode | undefined; // absent : sur PC, le classement est une colonne (JOURNAL 2026-10-06)
   releaseNotesTab?: ReactNode | undefined; // les Nouveautés des publics du rôle ; absent : pas de section
@@ -143,6 +147,7 @@ const MyAccount = ({
 // L'ordre des sections de la fenêtre : celles dont le contenu est donné, et Nouveautés après Mon compte.
 const SECTION_ORDER = [
   "canvas",
+  "event",
   "canvases",
   "obs",
   "moderation",
@@ -166,6 +171,7 @@ export const AccountWindow = ({
   moderationTab,
   obsTab,
   canvasTab,
+  eventTab,
   canvasesTab,
   scoreboardTab,
   releaseNotesTab,
@@ -174,6 +180,7 @@ export const AccountWindow = ({
   const releaseNotes = useTexts(RELEASE_NOTES_TEXTS);
   const labels: Record<AccountSection, string> = {
     canvas: t.canvas,
+    event: t.event,
     canvases: t.archives,
     obs: t.obsView,
     moderation: t.moderation,
@@ -183,6 +190,7 @@ export const AccountWindow = ({
   };
   const contents: Record<AccountSection, ReactNode> = {
     canvas: canvasTab,
+    event: eventTab,
     canvases: canvasesTab,
     obs: obsTab,
     moderation: moderationTab,

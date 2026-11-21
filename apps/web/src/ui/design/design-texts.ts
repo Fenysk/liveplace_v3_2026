@@ -29,6 +29,11 @@ export const DESIGN_TEXTS = defineTexts({
   // La pill Thème, en haut : le thème du canvas, donné par le streamer. Le petit mot seul sert sur mobile.
   theme: { fr: "Thème", en: "Theme" },
   themeDraw: { fr: "Dessine sur le thème", en: "Draw the theme" },
+  // Le nom accessible du lien de la pastille de l'événement : son titre, puis ce que le lien fait.
+  eventDonate: localized({
+    fr: (title: string) => `${title}, faire un don (nouvel onglet)`,
+    en: (title) => `${title}, donate (new tab)`,
+  }),
 
   viewCanvasOf: localized({
     fr: (name: string) => `Voir la fresque de ${name}`,

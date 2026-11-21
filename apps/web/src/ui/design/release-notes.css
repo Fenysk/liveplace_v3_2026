@@ -881,7 +881,8 @@ button.lp-release-shot:focus-visible {
   --lp-release-font: calc(6 * var(--lp-release-pu));
 }
 
-:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-release-pill {
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install, .lp-release-charity)
+  .lp-release-pill {
   --control-size: calc(12 * var(--lp-release-pu));
 }
 
@@ -889,23 +890,27 @@ button.lp-release-shot:focus-visible {
   opacity: var(--lp-release-pill, 1);
 }
 
-:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge {
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install, .lp-release-charity)
+  .lp-gauge {
   gap: calc(2 * var(--lp-release-pu));
 }
 
-:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge-tube {
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install, .lp-release-charity)
+  .lp-gauge-tube {
   --lp-level: 100%;
   width: calc(36 * var(--lp-release-pu));
   height: calc(8 * var(--lp-release-pu));
   transform: scale(calc(1 + 0.12 * var(--lp-release-grow, 0)));
 }
 
-:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-fluid-charge {
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install, .lp-release-charity)
+  .lp-fluid-charge {
   width: var(--lp-level);
   transition: none;
 }
 
-:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install) .lp-gauge-text {
+:is(.lp-release-gauge, .lp-release-help, .lp-release-locale, .lp-release-install, .lp-release-charity)
+  .lp-gauge-text {
   padding-inline: calc(2 * var(--lp-release-pu));
   clip-path: none;
   transition: none;
@@ -1112,6 +1117,75 @@ button.lp-release-shot:focus-visible {
 
 .lp-release-liveonly .lp-release-toast .lp-toast {
   white-space: nowrap;
+}
+
+/* Événement caritatif : la pastille de l'événement en haut, avec sa ligne de don (le +50 doré) qui s'ouvre sous son titre, et la pill Dessin dessous. Les
+   valeurs par défaut des variables sont celles de l'image fixe : les pills visibles, la ligne de don ouverte, la jauge à 30 %. Les deux pills s'effacent ensemble. */
+.lp-release-charity {
+  --lp-release-pill: 1;
+  --lp-release-donation: 1;
+  --lp-release-level: 0.3;
+}
+
+.lp-release-charity .lp-release-pill {
+  opacity: var(--lp-release-pill, 1);
+}
+
+.lp-release-charity .lp-gauge-tube {
+  --lp-level: calc(var(--lp-release-level, 0.3) * 100%);
+}
+
+.lp-release-charity .lp-event-heading {
+  font-size: calc(var(--lp-release-font) * 1.2);
+  line-height: 1.2;
+}
+
+.lp-release-charity .lp-release-donation {
+  min-width: calc(64 * var(--lp-release-pu));
+  min-height: 0;
+  /* Le cœur, le texte et le +N sur un même centre : le mouvement réduit du jeu passe la ligne en flex-start */
+  align-items: center;
+  /* Le +N (12 pu) et 4 pu sous lui, comme à sa droite : 3 pu ici, plus 1 pu de padding du corps */
+  max-height: calc(var(--lp-release-donation, 1) * 16 * var(--lp-release-pu));
+  padding-block-end: calc(var(--lp-release-donation, 1) * 3 * var(--lp-release-pu));
+  /* Pas d'overflow: hidden, il couperait la lueur du +50 en carré. Le clip suit la lueur (6 pu) et se referme avec la ligne. */
+  clip-path: inset(calc(-6 * var(--lp-release-pu) * var(--lp-release-donation, 1)));
+  opacity: var(--lp-release-donation, 1);
+}
+
+/* Le +N reste à 4 pu de l'arrondi, comme le cœur à gauche : la marge du jeu (en px, via la carte) le poussait sur le bord. */
+.lp-release-charity .lp-pill.lp-pill--claim .lp-release-donation {
+  margin-inline-end: calc(2 * var(--lp-release-pu));
+}
+
+.lp-release-charity .lp-release-donation svg {
+  width: calc(6 * var(--lp-release-pu));
+  height: calc(6 * var(--lp-release-pu));
+}
+
+.lp-release-donation-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-release-charity .lp-release-pill .lp-btn.lp-claim {
+  min-width: 0;
+  animation: none;
+  box-shadow: 0 0 calc(5 * var(--lp-release-pu)) color-mix(in srgb, var(--claim) 45%, transparent);
+}
+
+.lp-release-charity .lp-release-pill .lp-btn.lp-claim::after {
+  animation: none;
+}
+
+/* Le +50 s'enfonce et s'éclaircit au clic, sans perdre son or */
+.lp-release-charity .lp-release-pill .lp-btn.lp-claim[data-tap] {
+  background: var(--claim);
+  filter: brightness(calc(1 + 0.15 * var(--lp-release-tap, 0)));
 }
 
 /* App mobile : un téléphone au milieu de la vignette, tout en unités de --lp-u (il grandit avec la carte, sans le plafond des pills). L'écran

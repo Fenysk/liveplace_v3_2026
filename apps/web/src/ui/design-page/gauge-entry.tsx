@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "../design/button";
-import { ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
+import { BonusClaimButton, ClaimButton, Gauge, type GaugeProps } from "../design/gauge";
 import type { GaugeRefill } from "../design/gauge-levels";
 import { Pill } from "../design/pill";
 import { waitSecondsOf } from "../draft/draft-labels";
@@ -55,6 +55,53 @@ const SPECIMENS: readonly GaugeSpecimen[] = [
     name: "À trois chiffres",
     detail: "Le plafond par défaut : « 150/150 » tient dans le tube.",
     props: { charges: 150, max: 150, label: "150 / 150 pixels, jauge pleine" },
+    refillSeconds: null,
+  },
+  {
+    name: "Avec réserve",
+    detail:
+      "Mode événement : la réserve se dépense avant les charges. Le nombre est leur somme sur la capacité, « 510/10 », et le tube reste plein et vert.",
+    props: {
+      charges: 10,
+      max: MAX,
+      reserve: 500,
+      label: "10 / 10 pixels, plus 500 en réserve, jauge pleine",
+    },
+    refillSeconds: null,
+  },
+  {
+    name: "Réserve et brouillon de 3",
+    detail: "Le brouillon se paie d'abord sur la réserve : le nombre baisse, le tube ne change pas.",
+    props: {
+      charges: 10,
+      max: MAX,
+      reserve: 500,
+      draft: 3,
+      label: "10 / 10 pixels, plus 500 en réserve, 507 en tout après ce dessin, jauge pleine",
+    },
+    refillSeconds: null,
+  },
+  {
+    name: "Brouillon au-delà de la réserve",
+    detail: "Le fluide clair n'apparaît que pour ce que la réserve ne couvre pas.",
+    props: {
+      charges: 10,
+      max: MAX,
+      reserve: 2,
+      draft: 5,
+      label: "10 / 10 pixels, plus 2 en réserve, 7 en tout après ce dessin, jauge pleine",
+    },
+    refillSeconds: null,
+  },
+  {
+    name: "Réserve à quatre chiffres",
+    detail: "« 1 210/10 » tient dans le tube, sur le PC comme sur mobile.",
+    props: {
+      charges: 10,
+      max: MAX,
+      reserve: 1200,
+      label: "10 / 10 pixels, plus 1 200 en réserve, jauge pleine",
+    },
     refillSeconds: null,
   },
   {
@@ -138,7 +185,7 @@ export const GaugeEntry = () => {
   return (
     <Entry
       slug="jauge"
-      components={["Gauge", "ClaimButton"]}
+      components={["Gauge", "ClaimButton", "BonusClaimButton"]}
       file="ui/design/gauge.tsx"
       note="Un anneau-minuteur du prochain pixel, puis un tube où les pixels sont un fluide, avec le nombre dedans : ce que tu as sur ta capacité. L'infobulle dit tout, en une phrase."
     >
@@ -157,6 +204,12 @@ export const GaugeEntry = () => {
           detail="Un halo doré, un reflet à son arrivée et au survol, jamais en boucle. Son infobulle dit où la jauge passe."
         >
           <ClaimButton max={MAX} onClaim={noop} />
+        </StateRow>
+        <StateRow
+          name="Le bonus d'un événement"
+          detail="Le même bouton doré, avec tous les pixels en attente : il passe avant le +1."
+        >
+          <BonusClaimButton pixels={1200} onClaim={noop} />
         </StateRow>
       </Block>
       <Block title="À manipuler">

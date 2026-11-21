@@ -192,7 +192,7 @@ end
 for _, name in ipairs({ "bans", "bans:twitch", "mods", "mods:twitch", "mods:liveplace" }) do
   changed = changed + redis.call("SREM", prefix .. name, userId)
 end
-for _, name in ipairs({ "cleared", "cleared:ranges", "scoreboard:banned", "twitch:users" }) do
+for _, name in ipairs({ "cleared", "cleared:ranges", "scoreboard:banned", "twitch:users", "charity:claims" }) do
   changed = changed + redis.call("HDEL", prefix .. name, userId)
 end
 changed = changed + redis.call("ZREM", prefix .. "scoreboard", userId)

@@ -7,9 +7,9 @@ import type { CanvasStore } from "../../state/canvas-store";
 import type { DraftStore } from "../../state/draft-store";
 import type { OwnSwitchTracker } from "../archive/own-switch";
 import { useToast } from "../design/toast";
-import { DRAFT_TEXTS } from "../draft/draft-texts";
 import { useLocale } from "../locale/use-locale";
 import { CANVAS_TEXTS } from "./canvas-texts";
+import { closedToast } from "./closed-toast";
 import { connectionToast } from "./connection-toast";
 import { switchToast } from "./switch-toast";
 
@@ -67,7 +67,7 @@ export function useCanvasToasts(
     const unsubscribeWiped = draft.listenWiped(() => toast("success", CANVAS_TEXTS[locale].draftWiped));
     // JOURNAL 2026-11-12 : fresque réservée au live, streamer hors live : Dessiner, un raccourci ou la fermeture sous un viewer le disent.
     const unsubscribeClosed = draft.listenClosed(() =>
-      toast("error", DRAFT_TEXTS[locale].waitingForLive(ownerName)),
+      toast("error", closedToast(canvas.getView().charityEvent?.state, ownerName, locale, Date.now())),
     );
     return () => {
       unsubscribeClosed();

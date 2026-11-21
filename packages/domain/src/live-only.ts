@@ -10,7 +10,8 @@ export const LIVE_ONLY_GRACE_MS = 10 * MINUTE_MS;
 export type LiveRecord = { twitchLive?: object | undefined; endedAt?: Timestamp | undefined };
 
 // `closesAt` : le dessin est ouvert et se ferme à cette heure, sans autre événement (le live vient de finir).
-export type DrawingGate = { isClosed: boolean; closesAt?: Timestamp };
+// `opensAt` : le dessin est fermé et s'ouvre à cette heure, sans autre événement (l'événement n'a pas commencé).
+export type DrawingGate = { isClosed: boolean; closesAt?: Timestamp; opensAt?: Timestamp };
 
 export const OPEN_DRAWING: DrawingGate = { isClosed: false };
 
@@ -25,4 +26,19 @@ export function liveGate(record: LiveRecord | null, nowMs: Timestamp): DrawingGa
   if (record === null || record.twitchLive) return OPEN_DRAWING;
   const closesAt = (record.endedAt ?? 0) + LIVE_ONLY_GRACE_MS;
   return nowMs >= closesAt ? { isClosed: true } : { isClosed: false, closesAt };
+}
+
+// Deux portes s'appliquent ensemble : fermé si l'une l'est. Ouvert, il se ferme à la première échéance ; fermé, il ne s'ouvre à heure
+// fixe que si chaque porte fermée le fait (une porte sans `opensAt` attend un événement), et à la plus tardive.
+export function combineGates(first: DrawingGate, second: DrawingGate): DrawingGate {
+  const gates = [first, second];
+  const closed = gates.filter((gate) => gate.isClosed);
+  if (closed.length === 0) {
+    const closesAt = gates.flatMap((gate) => (gate.closesAt === undefined ? [] : [gate.closesAt]));
+    return closesAt.length === 0 ? OPEN_DRAWING : { isClosed: false, closesAt: Math.min(...closesAt) };
+  }
+  const opensAt = closed.flatMap((gate) => (gate.opensAt === undefined ? [] : [gate.opensAt]));
+  return opensAt.length === closed.length
+    ? { isClosed: true, opensAt: Math.max(...opensAt) }
+    : { isClosed: true };
 }

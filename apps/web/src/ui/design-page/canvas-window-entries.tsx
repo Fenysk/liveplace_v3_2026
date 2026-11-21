@@ -26,10 +26,13 @@ import {
   ThemeSettings,
 } from "../canvas/canvas-settings";
 import { previewResize, type SizeChoice, toCanvasSize, toSizeChoice } from "../canvas/canvas-size";
+import { type CharityFields, CharitySection } from "../charity/charity-section";
+import { CHARITY_TEXTS } from "../charity/charity-texts";
 import { BackgroundPreview } from "../design/background-preview";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../design/use-media-query";
+import { useTexts } from "../locale/use-locale";
 import { ObsSettings } from "../obs/obs-settings";
-import { SAMPLE_CANVAS, SAMPLE_DRAWING } from "./design-fixtures";
+import { noop, SAMPLE_CANVAS, SAMPLE_DRAWING } from "./design-fixtures";
 import { Block, DIALOG_NOTE, Entry, InWindow, OpenWindow, StateRow } from "./entry-layout";
 import sampleBackgroundUrl from "./sample-background.svg?url";
 
@@ -149,6 +152,8 @@ const BackgroundAndImageScene = () => {
   );
 };
 
+type EventSceneProps = { isEnabled: boolean; isEventOnly: boolean; isOpenEnded?: boolean };
+
 type ThemeSceneProps = { initial: string; status?: ThemeField["status"]; isSaving?: boolean };
 
 const ThemeScene = ({ initial, status, isSaving }: ThemeSceneProps) => {
@@ -160,7 +165,7 @@ const ThemeScene = ({ initial, status, isSaving }: ThemeSceneProps) => {
   );
 };
 
-// Le thème du canvas, puis la taille dynamique, le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui
+// La taille dynamique, le format et la taille ; Changer la taille ouvre la confirmation, qui montre ce qui
 // sort du cadre (le petit dessin d'exemple, placé au bord d'un canvas de 256). §5.8 : une taille dans aucun
 // format n'en présente aucun comme choisi. §5.8 : la taille dynamique activée grise le choix de taille, qui
 // montre encore le format de la taille d'aujourd'hui ; la décocher ramène la fresque à 50 × 50, par la confirmation d'un format plus petit
@@ -186,7 +191,6 @@ const CanvasSettingsScene = ({
   hasFormat = true,
   hasOutside = true,
 }: CanvasSettingsSceneProps) => {
-  const theme = useThemeField("");
   const background = useBackgroundDemo("transparent");
   const image = useImageDemo(background.value, false, 40);
   const [size, setSize] = useState(current);
@@ -208,7 +212,6 @@ const CanvasSettingsScene = ({
     <>
       <InWindow>
         <CanvasSettings
-          theme={theme}
           background={background}
           image={image}
           dynamic={{
@@ -282,22 +285,94 @@ const GaugeSettingsScene = () => {
   );
 };
 
+// La section Événement : le vrai formulaire, qui garde ses valeurs le temps de la démonstration. Rien ne part au gateway.
+const EventScene = ({
+  isEnabled: startEnabled,
+  isEventOnly: startEventOnly,
+  isOpenEnded = false,
+}: EventSceneProps) => {
+  const t = useTexts(CHARITY_TEXTS);
+  const [isEnabled, setIsEnabled] = useState(startEnabled);
+  const [isEventOnly, setIsEventOnly] = useState(startEventOnly);
+  const [fields, setFields] = useState<CharityFields>({
+    title: "",
+    address: "",
+    startDate: "2026-12-05",
+    startTime: isOpenEnded ? "" : "20:00",
+    endDate: isOpenEnded ? "" : "2026-12-06",
+    endTime: isOpenEnded ? "" : "20:00",
+  });
+  return (
+    <InWindow>
+      <CharitySection
+        isEnabled={isEnabled}
+        isEventOnly={isEventOnly}
+        statusLine={
+          isEnabled ? { text: t.upcoming("2 j 5 h"), isDanger: false } : { text: t.off, isDanger: false }
+        }
+        fields={fields}
+        failure={null}
+        onInput={(field, value) => setFields((current) => ({ ...current, [field]: value }))}
+        onCommit={noop}
+        onToggle={setIsEnabled}
+        onToggleEventOnly={setIsEventOnly}
+      />
+    </InWindow>
+  );
+};
+
+export const EventSettingsEntry = () => (
+  <Entry
+    slug="fenetre-evenement"
+    components={["ThemeSettings", "CharitySection"]}
+    file="ui/canvas/event-tab.tsx"
+    note="Pour le streamer : le thème de la fresque, qui s'enregistre quand le champ perd le focus, puis l'événement Streamlabs Charity, chaque champ s'enregistrant en le quittant. Sur la fresque d'un autre, l'onglet ne garde que le thème."
+  >
+    <Block title="États">
+      <StateRow name="Le thème de la fresque rempli" detail="Enregistré en quittant le champ, sans bouton.">
+        <ThemeScene initial="Halloween" />
+      </StateRow>
+      <StateRow name="Le thème s'enregistre" detail="Le champ attend la réponse.">
+        <ThemeScene initial="Halloween" isSaving />
+      </StateRow>
+      <StateRow name="Le thème se lit" detail="Un squelette de champ attend la réponse, après 200 ms.">
+        <ThemeScene initial="" status="loading" />
+      </StateRow>
+      <StateRow name="Le thème ne se lit pas" detail="Le champ reste fermé, et le dit.">
+        <ThemeScene initial="" status="unavailable" />
+      </StateRow>
+      <StateRow
+        name="L'événement désactivé"
+        detail="Le dessin seulement pendant l'événement ne ferme rien tant que l'événement est désactivé."
+      >
+        <EventScene isEnabled={false} isEventOnly={false} />
+      </StateRow>
+      <StateRow
+        name="Le dessin seulement pendant l'événement"
+        detail="Les viewers ne dessinent qu'entre le début et la fin ; le streamer dessine toujours. La case s'enregistre au clic."
+      >
+        <EventScene isEnabled isEventOnly />
+      </StateRow>
+      <StateRow
+        name="Une fin et des heures facultatives"
+        detail="Sans heure, le début est à 0 h 00 ce jour-là et la fin est le lendemain à 0 h 00. Sans fin, l'événement dure jusqu'à ce que le streamer éteigne l'interrupteur."
+      >
+        <EventScene isEnabled isEventOnly={false} isOpenEnded />
+      </StateRow>
+    </Block>
+  </Entry>
+);
+
 export const CanvasSettingsEntry = () => (
   <Entry
     slug="fenetre-canvas"
-    components={[
-      "CanvasSettings",
-      "ThemeSettings",
-      "BackgroundSettings",
-      "BackgroundImageSettings",
-      "GaugeSettings",
-    ]}
+    components={["CanvasSettings", "BackgroundSettings", "BackgroundImageSettings", "GaugeSettings"]}
     file="ui/canvas/canvas-settings.tsx"
-    note="Pour le streamer : le thème de la fresque, qui s'enregistre quand le champ perd le focus, son fond (Transparent, Noir ou Blanc), son image avec son opacité, la taille de la fresque, sans rien perdre, ou dynamique (une case à cocher : elle grandit avec ses dessins, et le choix de taille se grise), et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
+    note="Pour le streamer : son fond (Transparent, Noir ou Blanc), son image avec son opacité, la taille de la fresque, sans rien perdre, ou dynamique (une case à cocher : elle grandit avec ses dessins, et le choix de taille se grise), et la jauge de ses joueurs (masquée dans le jeu pour l'instant)."
   >
     <Block title="États">
       <StateRow
-        name="Le thème de la fresque, vide, puis un format, Petit, Moyen ou Grand"
+        name="La taille de la fresque, puis un format, Petit, Moyen ou Grand"
         detail="La confirmation montre ce qui sort du cadre."
       >
         <CanvasSettingsScene />
@@ -325,18 +400,6 @@ export const CanvasSettingsEntry = () => (
         detail="Après la taille dynamique : aucun format n'est présenté comme choisi, la taille réelle est dite. Choisir un format ouvre le choix de taille."
       >
         <CanvasSettingsScene current={{ width: 37, height: 41 }} hasFormat={false} />
-      </StateRow>
-      <StateRow name="Le thème de la fresque rempli" detail="Enregistré en quittant le champ, sans bouton.">
-        <ThemeScene initial="Halloween" />
-      </StateRow>
-      <StateRow name="Le thème s'enregistre" detail="Le champ attend la réponse.">
-        <ThemeScene initial="Halloween" isSaving />
-      </StateRow>
-      <StateRow name="Le thème se lit" detail="Un squelette de champ attend la réponse, après 200 ms.">
-        <ThemeScene initial="" status="loading" />
-      </StateRow>
-      <StateRow name="Le thème ne se lit pas" detail="Le champ reste fermé, et le dit.">
-        <ThemeScene initial="" status="unavailable" />
       </StateRow>
       <StateRow
         name="Le fond de la fresque, Transparent"

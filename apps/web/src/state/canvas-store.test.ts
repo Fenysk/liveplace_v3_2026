@@ -15,7 +15,7 @@ import {
 const width = 4;
 const now = 1_700_000_000_000;
 const PLACEMENT_ID = "ptest0001";
-const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000, claimable: 0 };
+const gauge = { charges: 3, max: 10, nextRefillAt: now + 10_000, claimable: 0, reserve: 0 };
 
 const welcome: ServerFrame = {
   t: "welcome",
@@ -1256,13 +1256,13 @@ describe("the OBS delay and the arrivals (§9.5, JOURNAL 2026-09-25)", () => {
     const { store, sent, receive } = setup();
 
     receive({ t: "gaugeLimits", gaugeMaxStart: 20, gaugeMaxCeiling: 40 });
-    receive({ t: "gauge", charges: 5, max: 20, nextRefillAt: 1, claimable: 2 });
+    receive({ t: "gauge", charges: 5, max: 20, nextRefillAt: 1, claimable: 2, reserve: 0 });
     const params = store.getView().params;
     if (params) store.setGaugeLimits({ ...params, gaugeMaxCeiling: 30 });
     store.claimGauge();
 
     expect(params).toMatchObject({ gaugeMaxStart: 20, gaugeMaxCeiling: 40 });
-    expect(store.getView().gauge).toEqual({ charges: 5, max: 20, nextRefillAt: 1, claimable: 2 });
+    expect(store.getView().gauge).toEqual({ charges: 5, max: 20, nextRefillAt: 1, claimable: 2, reserve: 0 });
     expect(sent.slice(-2)).toEqual([
       { t: "setGaugeLimits", requestId: expect.any(String), gaugeMaxStart: 20, gaugeMaxCeiling: 30 },
       { t: "claimGauge", requestId: expect.any(String) },
@@ -2148,5 +2148,115 @@ describe("the drawing only while live in the canvas view (JOURNAL 2026-11-12)", 
     expect(await placing).toEqual({ ok: false, error: "drawing_closed" });
     expect(pixelAt(1, 2)).toBe(0);
     expect(store.getView().lastError).toBeNull();
+  });
+});
+
+describe("the charity event (mode événement)", () => {
+  const eventState = {
+    isEnabled: true,
+    title: "Live caritatif",
+    address: "https://streamlabscharity.com/@a/b",
+    startsAt: now + 1_000,
+    endsAt: now + 2_000,
+    donationCount: 0,
+  };
+  const donationFrame: ServerFrame = {
+    t: "charityDonation",
+    donationId: "d1",
+    name: "Léa",
+    cents: 500,
+    currency: "EUR",
+    pixels: 500,
+    donationCount: 1,
+  };
+
+  it("shows nothing without the mode, and no event when none is set", () => {
+    const { store, receive } = setup();
+    expect(store.getView().charityEvent).toBeUndefined();
+    receive({ ...welcome, charityEvent: {} });
+    expect(store.getView().charityEvent).toEqual({ state: undefined });
+  });
+
+  it("takes the event of the welcome, then each charityEvent frame", () => {
+    const { store, receive } = setup();
+    receive({ ...welcome, charityEvent: { state: eventState } });
+    expect(store.getView().charityEvent?.state?.isEnabled).toBe(true);
+    receive({ t: "charityEvent", state: { ...eventState, isEnabled: false } });
+    expect(store.getView().charityEvent?.state?.isEnabled).toBe(false);
+  });
+
+  it("resolves a setting on the next charityEvent, and fails it on its error", async () => {
+    const { store, receive, sent } = setup();
+    receive({ ...welcome, charityEvent: {} });
+    const saved = store.setCharityEvent({
+      isEnabled: true,
+      title: "Live caritatif",
+      address: "a",
+      startsAt: eventState.startsAt,
+      endsAt: eventState.endsAt,
+    });
+    expect(sent.at(-1)).toMatchObject({
+      t: "setCharityEvent",
+      isEnabled: true,
+      title: "Live caritatif",
+      address: "a",
+    });
+    receive({ t: "charityEvent", state: eventState });
+    expect(await saved).toEqual({ ok: true, value: true });
+
+    const refused = store.setCharityEvent({ isEnabled: false, title: "Live caritatif", address: "a" });
+    const refusedFrame = sent.at(-1);
+    if (refusedFrame?.t !== "setCharityEvent") throw new Error("aucune frame setCharityEvent");
+    receive({ t: "error", requestId: refusedFrame.requestId, code: "charity_event_unavailable" });
+    expect(await refused).toEqual({ ok: false, error: "charity_event_unavailable" });
+  });
+
+  it("leaves out the dates a setting does not have yet", () => {
+    const { store, sent } = setup();
+    void store.setCharityEvent({ isEnabled: false, title: "Live", address: "" });
+    expect(sent.at(-1)).toEqual({
+      t: "setCharityEvent",
+      requestId: expect.any(String),
+      isEnabled: false,
+      title: "Live",
+      address: "",
+    });
+  });
+
+  it("sends the switch with a setting, and claimCharityBonus", () => {
+    const { store, sent } = setup();
+    void store.setCharityEvent({ isEnabled: true, title: "Live", address: "", startsAt: 1, endsAt: 2 });
+    store.claimCharityBonus();
+    expect(sent.slice(-2)).toEqual([
+      {
+        t: "setCharityEvent",
+        requestId: expect.any(String),
+        isEnabled: true,
+        title: "Live",
+        address: "",
+        startsAt: 1,
+        endsAt: 2,
+      },
+      { t: "claimCharityBonus", requestId: expect.any(String) },
+    ]);
+  });
+
+  it("counts the donations and hands each one to its listeners", () => {
+    const { store, receive } = setup();
+    const donations: string[] = [];
+    store.listenCharityDonations((donation) => donations.push(donation.donationId));
+    receive({ ...welcome, charityEvent: { state: eventState } });
+    receive(donationFrame);
+    expect(donations).toEqual(["d1"]);
+    expect(store.getView().charityEvent?.state?.donationCount).toBe(1);
+  });
+
+  it("keeps the last bonus, and takes the gauge of the claim reply with its reserve", () => {
+    const { store, receive } = setup();
+    receive({ t: "charityBonus", pending: 1_200 });
+    expect(store.getView().charityBonus).toBe(1_200);
+    receive({ t: "charityBonusClaimed", requestId: "r", pixels: 1_200, gauge: { ...gauge, reserve: 1_200 } });
+    expect(store.getView().gauge?.reserve).toBe(1_200);
+    expect(store.getView().charityBonus).toBe(0);
   });
 });

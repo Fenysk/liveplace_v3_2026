@@ -387,7 +387,6 @@ describe("the canvas settings and the archives in English (§9.9)", () => {
   it("says the Canvas section and the resize confirmation in English", () => {
     const section = inEnglish(
       createElement(CanvasSettings, {
-        theme: { status: "ready", value: "", isSaving: false, onInput: doNothing, onCommit: doNothing },
         background: { value: "black", isTouch: false, onPick: doNothing },
         image: {
           imageUrl: "/kalyss/background?v=1760000000000",
@@ -419,7 +418,7 @@ describe("the canvas settings and the archives in English (§9.9)", () => {
       }),
     );
 
-    expect(section).toContain(">Theme</label>");
+    expect(section).not.toContain(">Theme</label>");
     expect(section).toContain("Currently 32 × 32 cells.");
     expect(section).toContain("Landscape 16:9, 64 × 36 cells. Nothing is lost");
     expect(section).toContain("Dynamic size");

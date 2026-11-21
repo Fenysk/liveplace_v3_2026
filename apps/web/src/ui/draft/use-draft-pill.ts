@@ -66,6 +66,7 @@ export const toGaugeProps = (
   const { charges, max, nextRefillAt, claimable } = predictGauge(gauge, params, nowMs);
   // Le brouillon gardé est réservé en Vue aussi (§9.6).
   const reserved = draft.draft.size;
+  const reserve = gauge.reserve;
   const refill =
     charges < max
       ? {
@@ -78,15 +79,17 @@ export const toGaugeProps = (
     charges,
     max,
     draft: reserved,
+    reserve,
     refill,
     label: DRAFT_TEXTS[locale].gaugeLabel({
       charges,
       max,
-      afterPlacement: reserved > 0 ? Math.max(0, charges - reserved) : undefined,
+      afterPlacement: reserved > 0 ? Math.max(0, charges + reserve - reserved) : undefined,
       nextRefill: refill
         ? { charges: params.refillCharges, countdown: formatWait(waitSecondsOf(nextRefillAt - nowMs)) }
         : undefined,
       claimable,
+      reserve,
     }),
     shakeCount: draft.shakeCount,
   };
@@ -148,6 +151,7 @@ const toShownState = (
       kind: "view",
       gauge,
       canClaim,
+      bonus: canvas.charityBonus,
       draftSize: draft.draft.size,
       ...(canvas.isDrawingClosed ? { isDrawingClosed: true } : {}),
       ...(canvas.lastError ? { refusal: canvas.lastError } : {}),
@@ -188,6 +192,7 @@ export function useDraftPillProps(
     actions: {
       onEnter: () => draft.enterDraftMode(),
       onClaim: () => canvas.claimGauge(),
+      onClaimBonus: () => canvas.claimCharityBonus(),
       onExit: () => draft.exitDraftMode(),
       onSubmit: () => submitDraft(draft),
       onDiscard: () => discardWithRestore(draft, toast, DRAFT_TEXTS[locale]),

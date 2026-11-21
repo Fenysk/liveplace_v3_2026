@@ -16,6 +16,11 @@ import {
   type Timestamp,
 } from "@liveplace/domain";
 import { CAPACITY_LINKS, CAPACITY_RESOURCE_IDS, CAPACITY_UNITS } from "@liveplace/domain/capacity";
+import {
+  CHARITY_ADDRESS_MAX_LENGTH,
+  CHARITY_DONOR_NAME_MAX_LENGTH,
+  CHARITY_TITLE_MAX_LENGTH,
+} from "@liveplace/domain/charity-event";
 import type { Result } from "@liveplace/shared";
 import { z } from "zod";
 
@@ -51,7 +56,10 @@ import { z } from "zod";
 // `moderators` et `reports` (CDC des badges, JOURNAL 2026-11-03).
 // 26 : le dessin seulement pendant le live, `setLiveOnly`, `isLiveOnly` dans les `params`, `isDrawingClosed` dans le `welcome`,
 // les frames `liveOnly` et `drawingClosed`, et le code d'erreur `drawing_closed` (JOURNAL 2026-11-12).
-export const PROTOCOL_VERSION = 26;
+// 27 : le mode événement, la réserve dans la `gauge`, `charityEvent` dans le `welcome`, `setCharityEvent` (un réglage à switch, enregistré
+// champ par champ), `claimCharityBonus`, les frames `charityEvent`, `charityDonation`, `charityBonus`, `charityBonusClaimed`, et le code
+// d'erreur `charity_event_unavailable` (CDC 2026 §8, JOURNAL 2026-11-20 et 2026-11-21).
+export const PROTOCOL_VERSION = 27;
 
 // --- Types internes (§4.4) — jamais envoyés tels quels au client -------
 // Event vit dans le Redis Stream et dans l'archive Convex. CellsFrame est
@@ -107,6 +115,7 @@ const GaugeSchema = z.object({
   max: z.number().int().nonnegative(),
   nextRefillAt: TimestampSchema,
   claimable: z.number().int().nonnegative(), // JOURNAL 2026-09-30 : les récompenses à réclamer
+  reserve: z.number().int().nonnegative(), // JOURNAL 2026-11-20 : les pixels réclamés d'un événement, dépensés avant `charges`
 });
 
 // §4.3 : `hide` et `unhide` ne changent que ce que montre le stream.
@@ -186,6 +195,7 @@ const ErrorCodeSchema = z.enum([
   "canvas_archived", // §17.1 : une écriture sur une archive, refusée sans fermer la connexion
   "canvas_recovering", // §7.4 : Convex le connaît, Redis le remet en place ; la page reprend seule
   "drawing_closed", // JOURNAL 2026-11-12 : une pose hors du live du streamer, sur une fresque réservée à son live
+  "charity_event_unavailable", // une fresque sans mode événement, ou un état de l'événement qui n'accepte pas ce geste
   "server_full",
 ]);
 
@@ -336,6 +346,29 @@ const SetLiveOnlyFrameSchema = z.strictObject({
   isLiveOnly: z.boolean(),
 });
 
+// CDC 2026 §8, Mode événement : le streamer seul règle le switch, le titre, la page de dons (facultative) et les dates ; répondu par la
+// frame `charityEvent`. Le serveur garde le réglage tel quel (titre nettoyé) et en calcule l'état : un titre vide ou une adresse qui n'est
+// pas une page Streamlabs Charity ne sont pas refusés, l'événement est alors inactif.
+const CharityTitleSchema = z
+  .string()
+  .refine((title) => Array.from(title).length <= CHARITY_TITLE_MAX_LENGTH, "titre trop long"); // borné par caractères, comme le thème
+const SetCharityEventFrameSchema = z.strictObject({
+  t: z.literal("setCharityEvent"),
+  requestId: RequestIdSchema,
+  isEnabled: z.boolean(),
+  title: CharityTitleSchema,
+  address: z.string().max(CHARITY_ADDRESS_MAX_LENGTH),
+  startsAt: TimestampSchema.optional(),
+  endsAt: TimestampSchema.optional(),
+  isEventOnly: z.boolean().optional(), // JOURNAL 2026-11-21 : le dessin des viewers seulement entre le début et la fin ; absent, faux
+});
+
+// Tout compte réclame tout son bonus en attente, répondu par `charityBonusClaimed`.
+const ClaimCharityBonusFrameSchema = z.strictObject({
+  t: z.literal("claimCharityBonus"),
+  requestId: RequestIdSchema,
+});
+
 // CDC 2026 §1 : le streamer seul, pris aussitôt par les sources ouvertes, comme le délai.
 const SetObsBackgroundFrameSchema = z.strictObject({
   t: z.literal("setObsBackground"),
@@ -404,6 +437,8 @@ const ClientFrameSchema = z.discriminatedUnion("t", [
   SetObsBackgroundFrameSchema,
   SetBackgroundImageOpacityFrameSchema,
   SetLiveOnlyFrameSchema,
+  SetCharityEventFrameSchema,
+  ClaimCharityBonusFrameSchema,
   ClaimGaugeFrameSchema,
   SetGaugeLimitsFrameSchema,
   WatchActivityFrameSchema,
@@ -426,6 +461,23 @@ const ThemeSchema = z
   .string()
   .min(1)
   .refine((theme) => Array.from(theme).length <= THEME_MAX_LENGTH, "thème trop long");
+
+// CDC 2026 §8, Mode événement. `state` absent : aucun réglage n'a jamais été posé. L'état d'un événement (désactivé, inactif, à venir, en
+// cours) n'est pas envoyé : la page le calcule depuis ce réglage et son horloge. `address` absent : un événement sans page de dons,
+// sans lecture, ni toast, ni bonus.
+const CharityEventStateSchema = z.object({
+  isEnabled: z.boolean(),
+  title: CharityTitleSchema,
+  address: z.string().min(1).max(CHARITY_ADDRESS_MAX_LENGTH).optional(),
+  startsAt: TimestampSchema.optional(),
+  endsAt: TimestampSchema.optional(),
+  isEventOnly: z.boolean().optional(), // JOURNAL 2026-11-21 : absent, le dessin n'est pas lié à l'événement
+  donationCount: z.number().int().nonnegative(),
+});
+
+export type CharityEventState = z.infer<typeof CharityEventStateSchema>;
+
+const CharityEventViewSchema = z.object({ state: CharityEventStateSchema.optional() });
 
 const WelcomeFrameSchema = z.object({
   t: z.literal("welcome"),
@@ -467,6 +519,8 @@ const WelcomeFrameSchema = z.object({
   }),
   gauge: GaugeSchema.optional(),
   recent: CellsPayloadSchema.optional(),
+  // JOURNAL 2026-11-20 : présent, le mode événement existe sur cette fresque (absent : jamais de section, jamais de don).
+  charityEvent: CharityEventViewSchema.optional(),
 });
 
 const CellsFrameSchema = CellsPayloadSchema.extend({ t: z.literal("cells") });
@@ -489,6 +543,35 @@ const InspectedFrameSchema = z.object({
 });
 
 const GaugeFrameSchema = GaugeSchema.extend({ t: z.literal("gauge") });
+
+// L'état de l'événement vient de changer (réglage, Terminer, Nouvel événement) : toutes les pages du canvas le prennent aussitôt.
+const CharityEventFrameSchema = CharityEventViewSchema.extend({ t: z.literal("charityEvent") });
+
+// Un nouveau don, à toutes les pages du canvas, vue OBS exceptée. `name` est celui que le donateur a écrit, tel quel (borné à
+// `CHARITY_DONOR_NAME_MAX_LENGTH` caractères). `cents` est le montant converti dans la devise `currency` de la campagne.
+const CharityDonationFrameSchema = z.object({
+  t: z.literal("charityDonation"),
+  donationId: z.string().min(1).max(64),
+  name: z.string().max(CHARITY_DONOR_NAME_MAX_LENGTH),
+  cents: z.number().int().positive(),
+  currency: z.string().min(1).max(8),
+  pixels: z.number().int().positive(),
+  donationCount: z.number().int().positive(), // le nombre de dons de l'événement, ce don compris
+});
+
+// Le bonus en attente de cette page, à son compte seul : à l'arrivée, à chaque don, après chaque réclamation. Jamais à un invité.
+const CharityBonusFrameSchema = z.object({
+  t: z.literal("charityBonus"),
+  pending: z.number().int().nonnegative(),
+});
+
+// La réponse à `claimCharityBonus` : `pixels` entrés dans la réserve (0 : rien n'attendait), et la jauge qui la porte.
+const CharityBonusClaimedFrameSchema = z.object({
+  t: z.literal("charityBonusClaimed"),
+  requestId: RequestIdSchema,
+  pixels: z.number().int().nonnegative(),
+  gauge: GaugeSchema,
+});
 
 const ModeratedFrameSchema = z.object({
   t: z.literal("moderated"),
@@ -915,6 +998,10 @@ const ServerFrameSchema = z.discriminatedUnion("t", [
   ThemeFrameSchema,
   LiveOnlyFrameSchema,
   DrawingClosedFrameSchema,
+  CharityEventFrameSchema,
+  CharityDonationFrameSchema,
+  CharityBonusFrameSchema,
+  CharityBonusClaimedFrameSchema,
   GaugeLimitsFrameSchema,
   ReportedFrameSchema,
   ResizedFrameSchema,

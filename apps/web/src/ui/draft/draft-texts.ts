@@ -15,6 +15,7 @@ type GaugeSentence = {
   afterPlacement?: number | undefined; // ce qu'il resterait en posant le brouillon
   nextRefill?: { charges: number; countdown: string } | undefined; // absent : jauge pleine
   claimable: number;
+  reserve?: number | undefined; // les pixels de réserve (mode événement), dépensés avant les charges
 };
 
 export const DRAFT_TEXTS = defineTexts({
@@ -64,12 +65,22 @@ export const DRAFT_TEXTS = defineTexts({
     fr: (name: string) => `Le dessin s'ouvre quand ${name} est en live`,
     en: (name) => `Drawing opens when ${name} is live`,
   }),
+  // JOURNAL 2026-11-21 : le dessin fermé par l'événement, avant son début puis après sa fin.
+  waitingForEvent: {
+    fr: "Le dessin ouvre au début de l'événement.",
+    en: "Drawing opens when the event starts.",
+  },
+  eventOver: {
+    fr: "L'événement est fini : le dessin est fermé.",
+    en: "The event is over: drawing is closed.",
+  },
   signInToDraw: { fr: "Se connecter pour dessiner", en: "Sign in to draw" },
 
   // Un refus du gateway : il envoie un code (`ErrorCodeSchema`), jamais une phrase.
   // Un `switch` exhaustif : le compilateur signale tout code laissé sans phrase.
   refusal: localized({
     fr: (code: RefusalCode) => {
+      if (code === "charity_event_unavailable") return "Le mode événement n'est pas disponible ici.";
       switch (code) {
         case "protocol_version":
           return "LivePlace a été mis à jour : recharge la page.";
@@ -92,6 +103,7 @@ export const DRAFT_TEXTS = defineTexts({
       }
     },
     en: (code) => {
+      if (code === "charity_event_unavailable") return "Event mode isn't available here.";
       switch (code) {
         case "protocol_version":
           return "LivePlace was updated: reload the page.";
@@ -118,22 +130,27 @@ export const DRAFT_TEXTS = defineTexts({
   // Le client prédit, le serveur tranche : l'infobulle de la jauge, dite d'un trait (§9.4).
   // JOURNAL 2026-09-30 : « 1 récompense à réclamer », au pluriel au-delà. §9.4 : en pixels, durées en « 12 s ».
   gaugeLabel: localized({
-    fr: ({ charges, max, afterPlacement, nextRefill, claimable }: GaugeSentence) => {
-      const placed = afterPlacement === undefined ? "" : `, ${afterPlacement} après ce dessin`;
+    fr: ({ charges, max, afterPlacement, nextRefill, claimable, reserve = 0 }: GaugeSentence) => {
+      const inReserve = reserve > 0 ? `, plus ${reserve.toLocaleString("fr")} en réserve` : "";
+      const after = afterPlacement?.toLocaleString("fr");
+      const placed = after === undefined ? "" : `, ${after} ${reserve > 0 ? "en tout " : ""}après ce dessin`;
       const refill = nextRefill
         ? `, +${nextRefill.charges} pixel${nextRefill.charges > 1 ? "s" : ""} dans ${nextRefill.countdown}`
         : ", jauge pleine";
       const rewards =
         claimable === 0 ? "" : `, ${claimable} récompense${claimable > 1 ? "s" : ""} à réclamer`;
-      return `${charges} / ${max} pixels${placed}${refill}${rewards}`;
+      return `${charges} / ${max} pixels${inReserve}${placed}${refill}${rewards}`;
     },
-    en: ({ charges, max, afterPlacement, nextRefill, claimable }) => {
-      const placed = afterPlacement === undefined ? "" : `, ${afterPlacement} after this drawing`;
+    en: ({ charges, max, afterPlacement, nextRefill, claimable, reserve = 0 }) => {
+      const inReserve = reserve > 0 ? `, plus ${reserve.toLocaleString("en")} in reserve` : "";
+      const after = afterPlacement?.toLocaleString("en");
+      const placed =
+        after === undefined ? "" : `, ${after} ${reserve > 0 ? "in all " : ""}after this drawing`;
       const refill = nextRefill
         ? `, +${nextRefill.charges} pixel${nextRefill.charges > 1 ? "s" : ""} in ${nextRefill.countdown}`
         : ", gauge full";
       const rewards = claimable === 0 ? "" : `, ${claimable} reward${claimable > 1 ? "s" : ""} to claim`;
-      return `${charges} / ${max} pixels${placed}${refill}${rewards}`;
+      return `${charges} / ${max} pixels${inReserve}${placed}${refill}${rewards}`;
     },
   }),
 });

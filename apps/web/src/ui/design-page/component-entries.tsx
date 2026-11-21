@@ -16,6 +16,7 @@ import { Checkbox } from "../design/checkbox";
 import { Chip } from "../design/chip";
 import { ChoiceList } from "../design/choice-list";
 import { CopyButton } from "../design/copy-button";
+import { DateTimeField } from "../design/date-time-field";
 import { DESIGN_TEXTS } from "../design/design-texts";
 import { LocalePicker } from "../design/locale-controls";
 import { SwatchChoice } from "../design/palette";
@@ -35,6 +36,7 @@ import { Segmented, type SegmentedOption } from "../design/segmented";
 import { Slider } from "../design/slider";
 import { StatTable } from "../design/stat-table";
 import { StatTile, StatTiles } from "../design/stat-tile";
+import { Switch } from "../design/switch";
 import { TextField } from "../design/text-field";
 import { TimeCharts } from "../design/time-charts";
 import { TwitchGlyph } from "../design/twitch";
@@ -629,9 +631,9 @@ const SLIDER_STEPS = [
 export const FieldsEntry = () => (
   <Entry
     slug="champs"
-    components={["TextField", "Checkbox", "Slider", "CopyButton"]}
-    file="ui/design/{text-field,checkbox,slider,copy-button}.tsx"
-    note="Un curseur à crans fixes, une case à cocher, et une valeur à copier : tout le champ est le bouton."
+    components={["TextField", "DateTimeField", "Checkbox", "Switch", "Slider", "CopyButton"]}
+    file="ui/design/{text-field,date-time-field,checkbox,switch,slider,copy-button}.tsx"
+    note="Un curseur à crans fixes, une case à cocher, un interrupteur, et une valeur à copier : tout le champ est le bouton."
   >
     <Block title="Champ de texte">
       <StateRow name="Champ de texte" detail="Le thème facultatif d'une fresque.">
@@ -663,6 +665,44 @@ export const FieldsEntry = () => (
         </InSmallWindow>
       </StateRow>
     </Block>
+    <Block title="Date et heure">
+      <StateRow
+        name="Date et heure"
+        detail="Un champ date et un champ heure côte à côte, à l'heure de l'écran ; le vide veut dire pas de date, ou pas d'heure."
+      >
+        <InSmallWindow>
+          <WithValue initial="2026-12-05">
+            {(date, setDate) => (
+              <WithValue initial="20:30">
+                {(time, setTime) => (
+                  <DateTimeField
+                    label="Début"
+                    timeLabel="Heure du début (facultative)"
+                    date={date}
+                    time={time}
+                    onDate={setDate}
+                    onTime={setTime}
+                  />
+                )}
+              </WithValue>
+            )}
+          </WithValue>
+        </InSmallWindow>
+      </StateRow>
+      <StateRow name="Date et heure désactivée">
+        <InSmallWindow>
+          <DateTimeField
+            label="Début"
+            timeLabel="Heure du début (facultative)"
+            date="2026-12-05"
+            time="20:30"
+            onDate={noop}
+            onTime={noop}
+            isDisabled
+          />
+        </InSmallWindow>
+      </StateRow>
+    </Block>
     <Block title="Case à cocher">
       <StateRow
         name="Une case à cocher"
@@ -679,6 +719,43 @@ export const FieldsEntry = () => (
       <StateRow name="Case désactivée, cochée">
         <InSmallWindow>
           <Checkbox label="Effacer tous ses dessins" isChecked onToggle={noop} isDisabled />
+        </InSmallWindow>
+      </StateRow>
+    </Block>
+    <Block title="Interrupteur">
+      <StateRow
+        name="Un interrupteur"
+        detail="Un clic, Espace ou Entrée le bascule. Le libellé d'état est à gauche de la piste, qui passe à l'encre."
+      >
+        <InSmallWindow>
+          <WithValue initial={false}>
+            {(isOn, setIsOn) => (
+              <Switch
+                label="Événement"
+                isOn={isOn}
+                onLabel="Activé"
+                offLabel="Désactivé"
+                onToggle={setIsOn}
+              />
+            )}
+          </WithValue>
+        </InSmallWindow>
+      </StateRow>
+      <StateRow name="Activé">
+        <InSmallWindow>
+          <Switch label="Événement" isOn onLabel="Activé" offLabel="Désactivé" onToggle={noop} />
+        </InSmallWindow>
+      </StateRow>
+      <StateRow name="Désactivé, hors d'atteinte">
+        <InSmallWindow>
+          <Switch
+            label="Événement"
+            isOn={false}
+            onLabel="Activé"
+            offLabel="Désactivé"
+            onToggle={noop}
+            isDisabled
+          />
         </InSmallWindow>
       </StateRow>
     </Block>

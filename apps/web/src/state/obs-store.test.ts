@@ -22,6 +22,7 @@ const viewWithDelay = (obsDelayMs: number): CanvasView => ({
     obsBackground: "transparent",
   },
   gauge: null,
+  charityBonus: 0,
   reportCount: 0,
   lastError: null,
   inspection: null,

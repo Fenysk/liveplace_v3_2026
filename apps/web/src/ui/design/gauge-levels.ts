@@ -15,10 +15,15 @@ const clampShare = (share: number): number => Math.min(1, Math.max(0, share));
 
 const twoDigits = (count: number): string => String(count).padStart(2, "0");
 
-export function gaugeLevels(charges: number, max: number, draft: number): GaugeLevels {
-  const remaining = Math.max(0, charges - draft);
+// La réserve (mode événement) : des pixels au-delà de la capacité, dépensés d'abord. Tant qu'il en reste, le tube est plein,
+// et le fluide réservé par le brouillon ne se distingue qu'une fois la réserve dépassée.
+export function gaugeLevels(charges: number, max: number, draft: number, reserve = 0): GaugeLevels {
   const share = (count: number) => (max > 0 ? clampShare(count / max) : 0);
-  return { remainingLevel: share(remaining), chargesLevel: share(charges) };
+  if (reserve > 0) {
+    const fromCharges = Math.max(0, charges - Math.max(0, draft - reserve));
+    return { remainingLevel: share(fromCharges), chargesLevel: share(max) };
+  }
+  return { remainingLevel: share(Math.max(0, charges - draft)), chargesLevel: share(charges) };
 }
 
 // Le minuteur de l'anneau (§9.4) : « 12 », « 1:05 », puis « 2h05 ». L'unique exception au format des

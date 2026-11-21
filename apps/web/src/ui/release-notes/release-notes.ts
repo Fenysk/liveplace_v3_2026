@@ -33,7 +33,8 @@ export type ReleaseThumbnail =
   | "install"
   | "live"
   | "theme"
-  | "liveOnly";
+  | "liveOnly"
+  | "charity";
 
 export type ReleaseLine = {
   audience: ReleaseAudience;

@@ -125,9 +125,17 @@ describe("the activity in Redis (§16.2)", () => {
     const { store, signups } = stores();
     await store.storeActivityMinute(minute(minuteAt, { people: 1 }));
 
-    await signups.storeSignup({ nowMs: now, discoveredViaUserId: "owner-1" });
-    await signups.storeSignup({ nowMs: now + 1000, discoveredViaUserId: "owner-1" });
-    await signups.storeSignup({ nowMs: now + 2000 });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: now,
+      discoveredViaUserId: "owner-1",
+    });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: now + 1000,
+      discoveredViaUserId: "owner-1",
+    });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs: now + 2000 });
 
     const [day] = await store.listActivityHistory("all", now);
     expect(day).toMatchObject({ people: 1, signups: 3 });
@@ -142,7 +150,7 @@ describe("the activity in Redis (§16.2)", () => {
     const { store, signups } = stores();
     await store.storeActivityMinute(minute(minuteAt - 5 * MINUTE_MS, { people: 1 }));
 
-    await signups.storeSignup({ nowMs: now - MINUTE_MS });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs: now - MINUTE_MS });
 
     expect((await store.listActivityHistory("day", now)).map(({ signups: count }) => count)).toEqual([0]);
     expect(await store.listActivityHistory("month", now)).toEqual([
@@ -157,7 +165,7 @@ describe("the activity in Redis (§16.2)", () => {
     const expiredHour = toActivityPointStarts(now - ACTIVITY_HOURS_RETENTION_MS - HOUR_MS);
     for (const at of [expiredMinute.minute, expiredHour.minute, minuteAt])
       await store.storeActivityMinute(minute(at));
-    await signups.storeSignup({ nowMs: expiredMinute.minute });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs: expiredMinute.minute });
 
     await store.pruneActivity(now);
 
@@ -191,7 +199,11 @@ describe("the activity in Redis (§16.2)", () => {
   it("keeps the signups of a Paris day 31 days, and nothing but a number per provenance", async () => {
     const { keys, signups } = stores();
 
-    await signups.storeSignup({ nowMs: now, discoveredViaUserId: "owner-1" });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: now,
+      discoveredViaUserId: "owner-1",
+    });
 
     const key = keys.signups("2026-10-06");
     expect(await redis.hgetall(key)).toEqual({ "owner-1": "1" });
@@ -533,9 +545,14 @@ describe("the history of a canvas in Redis (§16.2)", () => {
     const { keys, store, signups } = stores();
     const nowMs = now - 2 * MINUTE_MS;
 
-    await signups.storeSignup({ nowMs, discoveredViaUserId: "owner-1", discoveredViaCanvasId: "c1" });
-    await signups.storeSignup({ nowMs, discoveredViaUserId: "owner-2" });
-    await signups.storeSignup({ nowMs });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs,
+      discoveredViaUserId: "owner-1",
+      discoveredViaCanvasId: "c1",
+    });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs, discoveredViaUserId: "owner-2" });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs });
 
     const point = { people: 0, streamedMinutes: 0, pixels: 0, visits: 0, visitMinutes: 0, signups: 1 };
     expect(await store.listCanvasHistory("c1", "day", now)).toEqual([
@@ -617,7 +634,7 @@ describe("the history of a canvas in Redis (§16.2)", () => {
       [now - AUDIENCE_DAYS * DAY_MS, 7],
     ] as const)
       for (let signup = 0; signup < count; signup += 1)
-        await signups.storeSignup({ nowMs, discoveredViaCanvasId: "c1" });
+        await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs, discoveredViaCanvasId: "c1" });
 
     expect(await store.getCanvasAudience("c1", now, new Set())).toEqual({
       today: { visits: 3, phoneVisits: 1, visitMinutes: 10, activePlayers: 2, signups: 2 },
@@ -661,7 +678,11 @@ describe("the history of a canvas in Redis (§16.2)", () => {
     for (const canvasId of ["c1", "c2"])
       for (const at of [expiredMinute.minute, expiredHour.minute, minuteAt])
         await store.storeActivityMinute(inMinute(at, { [canvasId]: canvasMinute({ people: 1 }) }));
-    await signups.storeSignup({ nowMs: expiredMinute.minute, discoveredViaCanvasId: "c1" });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: expiredMinute.minute,
+      discoveredViaCanvasId: "c1",
+    });
 
     await store.pruneActivity(now, ["c1"]);
 
@@ -1071,7 +1092,7 @@ describe("a past day in Redis (§16.1)", () => {
     await store.storeActivityMinute(
       minute(at + MINUTE_MS, { people: 9, pixels: 10, visits: 2, visitMinutes: 5, ...ids(["a2", "a3"]) }),
     );
-    await signups.storeSignup({ nowMs: at });
+    await signups.storeSignup({ userId: harness.uniqueCanvasId(), nowMs: at });
 
     expect(await store.listActivityDay(pastDayAt, now)).toEqual({
       grain: "minute",
@@ -1244,7 +1265,12 @@ describe("a past day in Redis (§16.1)", () => {
     const { keys, store, signups } = stores();
 
     expect(await store.listCanvasDay("c-quiet", pastDayAt, now)).toEqual({ grain: "hour", points: [] });
-    await signups.storeSignup({ nowMs: at, discoveredViaUserId: "owner-1", discoveredViaCanvasId: "c-new" });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: at,
+      discoveredViaUserId: "owner-1",
+      discoveredViaCanvasId: "c-new",
+    });
 
     expect((await store.listCanvasDay("c-new", pastDayAt, now)).point).toEqual({
       at: pastDayAt,
@@ -1272,7 +1298,11 @@ describe("a past day in Redis (§16.1)", () => {
       }),
     );
     await store.storeActivityMinute(inMinute(nextDay + HOUR_MS, { c3: canvasMinute({ people: 6 }) }));
-    await signups.storeSignup({ nowMs: at, discoveredViaCanvasId: "c-signup" });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: at,
+      discoveredViaCanvasId: "c-signup",
+    });
     await other.store.storeActivityMinute(inMinute(at, { c9: canvasMinute({ people: 1 }) }));
 
     const listed = (await store.listDayCanvases(pastDayAt)).sort(byCanvasId);
@@ -1356,7 +1386,11 @@ describe("the activity of a canvas deleted with its streamer (CDC §8, JOURNAL 2
     const { keys, signups } = stores();
     await redis.sadd(keys.gone, "gone");
 
-    await signups.storeSignup({ nowMs: minuteAt, discoveredViaCanvasId: "gone" });
+    await signups.storeSignup({
+      userId: harness.uniqueCanvasId(),
+      nowMs: minuteAt,
+      discoveredViaCanvasId: "gone",
+    });
 
     expect(await redis.hlen(keys.canvas("gone").minutes)).toBe(0);
     expect(await redis.hlen(keys.minutes)).toBeGreaterThan(0);

@@ -78,7 +78,8 @@ if redis.call("SISMEMBER", bansKey, userId) == 1 then
     rejected[#rejected + 1] = { index = index, reason = "banned" }
   end
   -- A4 : un banni ne réclame rien.
-  local gaugeFrame = { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs, claimable = 0 }
+  local gaugeFrame =
+    { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs, claimable = 0, reserve = progress.reserve }
   return { "ack", encodeAck({ t = "ack", requestId = requestId, accepted = 0, rejected = rejected, gauge = gaugeFrame }) }
 end
 
@@ -89,7 +90,7 @@ for index = 0, pixelCount - 1 do
   local x, y, colorIndex = tonumber(ARGV[arg]) + shiftX, tonumber(ARGV[arg + 1]) + shiftY, tonumber(ARGV[arg + 2])
   if x < 0 or x >= width or y < 0 or y >= height or colorIndex < 0 or colorIndex >= paletteSize then
     rejected[#rejected + 1] = { index = index, reason = "invalid" }
-  elseif #accepted >= charges then
+  elseif #accepted >= charges + progress.reserve then
     rejected[#rejected + 1] = { index = index, reason = "gauge" }
   else
     accepted[#accepted + 1] = { x = x, y = y, colorIndex = colorIndex }
@@ -173,7 +174,10 @@ if #accepted > 0 then
       cells[i].obs = pile.streamCell({ entry, unpack(before) }, cells[i], before)
     end
   end
-  charges = charges - #accepted
+  -- La réserve du bonus se dépense en premier : la jauge ne bouge que pour le reste.
+  local fromReserve = math.min(progress.reserve, #accepted)
+  progress.reserve = progress.reserve - fromReserve
+  charges = charges - (#accepted - fromReserve)
 
   -- §5.3 : chaque pixel accepté compte, au plus `countedPixelsPerDay` par jour.
   if progress.day ~= day then
@@ -183,6 +187,9 @@ if #accepted > 0 then
   progress.counted = progress.counted + counted
   progress.dayCounted = progress.dayCounted + counted
   redis.call("HSET", progressKey, "counted", progress.counted, "day", day, "dayCounted", progress.dayCounted)
+  if fromReserve > 0 then
+    redis.call("HSET", progressKey, "reserve", progress.reserve)
+  end
 
   -- §5.1 : le classement compte chaque pixel accepté, sans plafond, la gomme exceptée. À égalité, la plus petite version
   -- (le premier arrivé) reste devant.
@@ -220,6 +227,7 @@ local ack = encodeAck({
     max = gaugeMax,
     nextRefillAt = at + refillMs,
     claimable = claimableOf(limits, progress, growthFactor),
+    reserve = progress.reserve,
   },
 })
 redis.call("SET", reqKey, ack, "EX", reqTtlSeconds)

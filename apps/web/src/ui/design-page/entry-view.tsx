@@ -13,6 +13,7 @@ import { BubbleEntry } from "./bubble-entries";
 import {
   CanvasSettingsEntry,
   CeilingWindowEntry,
+  EventSettingsEntry,
   ObsSettingsEntry,
   ResizeWindowEntry,
 } from "./canvas-window-entries";
@@ -103,6 +104,7 @@ const ENTRY_VIEWS: Record<EntrySlug, ComponentType> = {
   "message-seul": NoticeEntry,
 
   "fenetre-canvas": CanvasSettingsEntry,
+  "fenetre-evenement": EventSettingsEntry,
   archives: ArchivesEntry,
   "vue-obs": ObsSettingsEntry,
   moderation: ModerationEntry,

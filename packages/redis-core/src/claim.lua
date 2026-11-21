@@ -62,7 +62,13 @@ local ack = string.gsub(
     requestId = requestId,
     accepted = accepted,
     rejected = {},
-    gauge = { charges = charges, max = gaugeMax, nextRefillAt = at + refillMs, claimable = claimable },
+    gauge = {
+      charges = charges,
+      max = gaugeMax,
+      nextRefillAt = at + refillMs,
+      claimable = claimable,
+      reserve = progress.reserve,
+    },
   }),
   '"rejected":{}',
   '"rejected":[]'

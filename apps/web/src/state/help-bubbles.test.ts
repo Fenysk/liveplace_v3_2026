@@ -697,20 +697,20 @@ describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Tw
     expect(isLingering("invite-link", inWindow("canvas"), () => true)).toBe(false);
   });
 
-  // Le thème : dans la section Fresque, tant que la fresque n'en a pas, pour le streamer seul
-  it("wishes the theme for the owner in the Canvas section while the canvas has none", () => {
-    expect(windowWished(themeless("canvas"))).toEqual(["obs-tab", "theme"]);
-    expect(windowWished(inWindow("canvas"))).not.toContain("theme");
+  // Le thème : dans la section Événement, tant que la fresque n'en a pas, pour le streamer seul
+  it("wishes the theme for the owner in the Event section while the canvas has none", () => {
+    expect(windowWished(themeless("event"))).toEqual(["obs-tab", "theme"]);
+    expect(windowWished(inWindow("event"))).not.toContain("theme");
     for (const section of ["obs", "canvases", "moderation", "account"])
       expect(windowWished(themeless(section))).not.toContain("theme");
-    expect(windowWished({ ...themeless("canvas"), role: "moderator" })).not.toContain("theme");
+    expect(windowWished({ ...themeless("event"), role: "moderator" })).not.toContain("theme");
     expect(windowWished({ ...resting, role: "owner", isThemeMissing: true })).not.toContain("theme");
   });
 
   // Un thème enregistré, ou la section quittée : la bulle a servi, elle est retenue comme vue
   it("ends the theme once a theme is saved or the section is left", () => {
-    expect(isDone("theme", inWindow("canvas"))).toBe(true);
-    expect(isDone("theme", themeless("canvas"))).toBe(false);
+    expect(isDone("theme", inWindow("event"))).toBe(true);
+    expect(isDone("theme", themeless("event"))).toBe(false);
     expect(isDone("theme", themeless("obs"))).toBe(true);
     expect(isDone("theme", { ...resting, role: "owner", isThemeMissing: true })).toBe(true);
   });
@@ -751,7 +751,7 @@ describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Tw
       return picked;
     };
 
-    expect(walk(everything("canvas"))).toEqual(["obs-tab", "theme", "twitch-sync"]);
+    expect(walk(everything("event"))).toEqual(["obs-tab", "theme", "twitch-sync"]);
     expect(walk(everything("obs"))).toEqual(["obs-address", "invite-link"]);
     expect(walk(everything("account"))).toEqual([]);
   });
@@ -759,15 +759,15 @@ describe("la suite de la chaîne du streamer : le lien, le thème, la synchro Tw
   // Le thème et la synchro passent après la chaîne OBS : tant que l'onglet n'est pas vu, il passe devant
   it("keeps the tab before the theme and the Twitch sync until it is seen", () => {
     expect(pickHelpBubble(everything("canvas"), neverSeen)).toBe("obs-tab");
-    expect(pickHelpBubble(everything("canvas"), (bubble) => bubble === "obs-tab")).toBe("theme");
+    expect(pickHelpBubble(everything("event"), (bubble) => bubble === "obs-tab")).toBe("theme");
     expect(pickHelpBubble(everything("account"), neverSeen)).toBe("obs-tab");
     expect(pickHelpBubble(everything("account"), (bubble) => bubble === "obs-tab")).toBe("twitch-sync");
   });
 
   // Une bulle de la fenêtre ne revient pas une fois vue, où que le streamer soit
   it("never comes back once seen", () => {
-    expect(pickHelpBubble(themeless("canvas"), (bubble) => bubble !== "theme")).toBe("theme");
-    expect(pickHelpBubble(themeless("canvas"), () => true)).toBeUndefined();
+    expect(pickHelpBubble(themeless("event"), (bubble) => bubble !== "theme")).toBe("theme");
+    expect(pickHelpBubble(themeless("event"), () => true)).toBeUndefined();
     expect(pickHelpBubble(unsynced("account"), (bubble) => bubble !== "twitch-sync")).toBe("twitch-sync");
     expect(pickHelpBubble(unsynced("account"), () => true)).toBeUndefined();
   });

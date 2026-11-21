@@ -266,7 +266,6 @@ const SizeChoiceSettings = ({
 };
 
 type CanvasSettingsProps = {
-  theme: ThemeField;
   background: BackgroundField;
   image: BackgroundImageField;
   dynamic: DynamicSizeField;
@@ -279,7 +278,6 @@ type CanvasSettingsProps = {
 };
 
 export const CanvasSettings = ({
-  theme,
   background,
   image,
   dynamic,
@@ -293,7 +291,6 @@ export const CanvasSettings = ({
   const t = useTexts(CANVAS_TEXTS);
   return (
     <>
-      <ThemeSettings theme={theme} />
       <BackgroundSettings background={background} />
       <BackgroundImageSettings image={image} />
       <div className="lp-setting">

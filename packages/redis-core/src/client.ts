@@ -801,10 +801,10 @@ export function createCanvasCore(
     // La formule de gauge.lua, sans jamais écrire : seuls les scripts modifient une jauge.
     async getGauge(canvasId: string, userId: string, nowMs: Timestamp): Promise<AckFrame["gauge"]> {
       const keys = buildCanvasKeys(canvasId);
-      const [fields, [charges, at], [counted, claimed], isBannedUser] = await Promise.all([
+      const [fields, [charges, at], [counted, claimed, reserve], isBannedUser] = await Promise.all([
         redis.hgetall(keys.meta),
         redis.hmget(keys.gauge(userId), "charges", "at"),
-        redis.hmget(keys.progress(userId), "counted", "claimed"),
+        redis.hmget(keys.progress(userId), "counted", "claimed", "reserve"),
         isBanned(canvasId, userId),
       ]);
       const limits: GaugeLimits = {
@@ -824,6 +824,7 @@ export function createCanvasCore(
         max: params.gaugeMax,
         nextRefillAt: gauge.at + params.refillMs,
         claimable: isBannedUser ? 0 : claimableRewards(progress, limits), // A4 : un banni ne réclame rien
+        reserve: Number(reserve ?? 0),
       };
     },
 

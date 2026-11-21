@@ -4,7 +4,7 @@ import type { Pixel } from "@liveplace/domain/ports";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, inject } from "vitest";
 import { createCanvasCore } from "./client";
-import { buildActivityKeys, buildCanvasKeys, buildCapacityKeys } from "./keys";
+import { buildActivityKeys, buildCanvasKeys, buildCapacityKeys, buildCharityKeys } from "./keys";
 
 // Un dessin plein : la couleur d'une case dit sa place dans le dessin, donc une déchirure se voit.
 export const patternAt = (dx: number, dy: number): number => 1 + ((dx + 7 * dy) % 40);
@@ -64,6 +64,8 @@ export function createRedisHarness() {
   const uniqueActivityKeys = () => buildActivityKeys(`activity:${uniqueCanvasId()}-`);
   // La capacité non plus (§16.3).
   const uniqueCapacityKeys = () => buildCapacityKeys(`capacity:${uniqueCanvasId()}-`);
+  // Et l'index des fresques à lire du mode événement.
+  const uniqueCharityKeys = () => buildCharityKeys(`charity:${uniqueCanvasId()}-`);
 
   beforeAll(async () => {
     await redis.connect().catch(() => {
@@ -79,6 +81,7 @@ export function createRedisHarness() {
       "lock:owner",
       "activity",
       "capacity",
+      "charity",
       "twitch:live",
       "twitch:message",
     ])
@@ -158,6 +161,7 @@ export function createRedisHarness() {
     uniqueCanvasId,
     uniqueActivityKeys,
     uniqueCapacityKeys,
+    uniqueCharityKeys,
     readyCanvas,
     colorAt,
     placeInBatches,

@@ -4,6 +4,7 @@ import type { ClientFrame, Event, ServerFrame } from "@liveplace/protocol";
 import type { Result } from "@liveplace/shared";
 import type { SupportMirror } from "./badges";
 import type { CapacityResourceId, GuardMinute, Saturation } from "./capacity";
+import type { CharityDonation, CharityEventSetting, CharitySource } from "./charity-event";
 import type { Chunk, ChunkEntry, ChunkFile, Recovered } from "./chunk";
 import type {
   AccountDeletionTrigger,
@@ -174,6 +175,8 @@ export type LiveControl =
   | { t: "backgroundImageOpacity"; backgroundImageOpacity: number } // l'opacité de l'image du fond (§4.3)
   | { t: "backgroundImage"; at?: Timestamp } // publié par le web : l'image du fond a changé, sans `at` il n'y en a plus (§4.3)
   | { t: "liveOnly"; isLiveOnly: boolean } // le streamer règle le dessin seulement pendant le live (§4.3)
+  | ({ t: "donation" } & Omit<CharityDonationFrame, "t">) // un don de l'événement, publié par le lecteur du worker (JOURNAL 2026-11-20)
+  | { t: "charityEvent"; state?: CharityEventState } // l'événement a changé : un réglage a été posé
   | { t: "theme"; theme?: string }; // publié par le web : le thème du canvas a changé, sans `theme` il n'en a plus (§4.3)
 export type LiveMessage = { e: Event } | { ctl: LiveControl };
 
@@ -266,6 +269,57 @@ export interface CanvasCore {
   subscribe(canvasId: string, onMessage: (message: LiveMessage) => void): Promise<Unsubscribe>;
 }
 
+// --- Le mode événement (CDC 2026 §8, JOURNAL 2026-11-20) -----------------------------------------------------------------------
+export type CharityEventState = NonNullable<Extract<ServerFrame, { t: "charityEvent" }>["state"]>;
+export type CharityDonationFrame = Extract<ServerFrame, { t: "charityDonation" }>;
+export type CharityEventRefusal = "charity_event_unavailable";
+
+// Ce que le gateway lit et règle : l'événement d'une fresque et le bonus de ses comptes. Rien ne s'y passe sur une fresque
+// hors de la liste du mode événement.
+export interface EventCore {
+  // `null` : le mode n'existe pas sur cette fresque. `state` absent : aucun événement n'est réglé.
+  getCharityEvent(canvasId: string): Promise<{ state?: CharityEventState } | null>;
+  // Pose le réglage tel quel, sans refus : le serveur en calcule l'état. Un autre début remet l'événement à zéro (dons, fil, réclamations) ;
+  // le même début, après un arrêt, le reprend là où il en était. Publie le `ctl` `charityEvent`.
+  setCharityEvent(
+    canvasId: string,
+    setting: CharityEventSetting,
+    nowMs: Timestamp,
+  ): Promise<Result<CharityEventState, CharityEventRefusal>>;
+  // Les pixels que ce compte peut réclamer, sans rien écrire.
+  getCharityBonus(canvasId: string, userId: string, nowMs: Timestamp): Promise<number>;
+  // Tout le bonus en attente passe dans la réserve de ce compte, en un seul geste. Rend les pixels réclamés : 0, rien n'attendait.
+  claimCharityBonus(canvasId: string, userId: string, nowMs: Timestamp): Promise<number>;
+}
+
+// Une fresque dont le worker lit les dons : où lire, et jusqu'où l'événement va (sans `endsAt`, jusqu'à son arrêt).
+export type CharityRead = {
+  canvasId: string;
+  source: CharitySource;
+  startsAt: Timestamp;
+  endsAt?: Timestamp | undefined;
+};
+
+// Ce que le lecteur du worker écrit. Un seul lecteur lit un événement à la fois : `lockCharityRead` en est la garde.
+export interface CharityDonationStore {
+  // Les fresques dont l'événement est à lire à cet instant : en cours, ou dans la minute de lecture qui suit sa fin.
+  listCharityReads(nowMs: Timestamp): Promise<CharityRead[]>;
+  // Écrit les dons du temps de l'événement qu'il ne connaît pas encore, puis les publie. Rend le nombre de nouveaux.
+  storeCharityDonations(
+    canvasId: string,
+    donations: readonly CharityDonation[],
+    nowMs: Timestamp,
+  ): Promise<number>;
+  // Pris pour `ttlMs` au plus par `holder` ; `false` : un autre lit déjà. `unlockCharityRead` ne rend que le verrou de `holder`.
+  lockCharityRead(canvasId: string, holder: string, ttlMs: number): Promise<boolean>;
+  unlockCharityRead(canvasId: string, holder: string): Promise<void>;
+}
+
+// Streamlabs Charity, vue du lecteur : les dons d'une page, sans clé. Jette si l'API ne répond pas ou répond autre chose.
+export interface CharityDonationSource {
+  listDonations(source: CharitySource, signal: AbortSignal): Promise<CharityDonation[]>;
+}
+
 // Ce que le web écrit dans Redis à la connexion (§2) : jamais un pixel, donc jamais de script. Un nouveau compte
 // compte aussi dans l'activité (§16.2).
 export type SignInWrites = Pick<CanvasCore, "createCanvas" | "setUser"> & SignupWrites;
@@ -337,6 +391,7 @@ export type ActivityGap = { canvasId: string; minutes: readonly Timestamp[] };
 // Un nouveau compte, à sa première connexion, le streamer depuis la page duquel il s'est connecté (§8.1), et le canvas actif
 // de ce streamer à cet instant : c'est dans ses points que le compte se compte (JOURNAL 2026-10-07).
 export type Signup = {
+  userId: string; // le compte qui naît : son miroir `user:` garde l'heure de sa création (JOURNAL 2026-11-20)
   nowMs: Timestamp;
   discoveredViaUserId?: string | undefined;
   discoveredViaCanvasId?: string | undefined;

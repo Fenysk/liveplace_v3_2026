@@ -39,6 +39,7 @@ const useConfirmation = (start: Scene) => {
 const NO_CONTENT = <span />;
 const OWNER_TABS = {
   canvasTab: NO_CONTENT,
+  eventTab: NO_CONTENT,
   canvasesTab: NO_CONTENT,
   obsTab: NO_CONTENT,
   moderationTab: NO_CONTENT,
