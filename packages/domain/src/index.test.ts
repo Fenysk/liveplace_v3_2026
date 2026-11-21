@@ -558,6 +558,14 @@ describe("the archives (§17.1)", () => {
     expect(toTheme(`${"a".repeat(39)} bbb`)).toBe("a".repeat(39));
   });
 
+  // Les contrôles bidirectionnels sont retirés avant la coupe : ils ne comptent pas dans les 40 caractères, et un thème qui n'en porte que n'en est pas un
+  it("strips the bidirectional control characters before cutting to 40", () => {
+    for (const control of ["؜", "‎", "‏", "‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩"])
+      expect(toTheme(`Fête${control}du 14`)).toBe("Fêtedu 14");
+    expect(toTheme(`‮${"a".repeat(40)}`)).toBe("a".repeat(THEME_MAX_LENGTH));
+    expect(toTheme(" ‮⁦‏ ")).toBeUndefined();
+  });
+
   // Un thème vide ne donne aucun thème, et un caractère hors du plan de base n'est jamais coupé en deux
   it("gives no theme for an empty one, and never cuts a character outside the basic plane in two", () => {
     expect(toTheme("")).toBeUndefined();

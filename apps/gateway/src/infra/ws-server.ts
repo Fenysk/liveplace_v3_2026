@@ -104,6 +104,12 @@ export function startGatewayServer(deps: GatewayServerDeps) {
       });
     });
 
+    // Sans écouteur, une erreur de la socket (trame invalide, reset) fait tomber tout le processus.
+    socket.on("error", (error) => {
+      console.error("gateway: erreur de socket", error.message);
+      socket.terminate();
+    });
+
     socket.on("close", () => {
       clearTimeout(greeting);
       connection.close().catch((error: unknown) => console.error("gateway: fermeture incomplète", error));
@@ -118,18 +124,28 @@ export function startGatewayServer(deps: GatewayServerDeps) {
 
   // La session est vérifiée avant l'upgrade : après, une frame pourrait arriver sans personne pour l'écouter.
   server.on("upgrade", async (request, socket, head) => {
-    // Le chemin exact : `/ws_pseudo` est la page d'un streamer, pas le socket.
-    if (request.url !== "/ws") {
+    // Avant l'upgrade, une erreur sur la socket brute (reset) ferait tomber le processus : on la détruit ici, sans handler global.
+    socket.on("error", (error) => {
+      console.error("gateway: erreur d'upgrade", error.message);
       socket.destroy();
-      return;
+    });
+    try {
+      // Le chemin exact : `/ws_pseudo` est la page d'un streamer, pas le socket.
+      if (request.url !== "/ws") {
+        socket.destroy();
+        return;
+      }
+      if (!isAllowedOrigin(request.headers.origin, deps.publicOrigin)) {
+        socket.end(FORBIDDEN_HANDSHAKE);
+        return;
+      }
+      const session = await deps.verifier.verify(request.headers.cookie);
+      const device = toDevice(request.headers["user-agent"]);
+      sockets.handleUpgrade(request, socket, head, (opened) => serve(opened, session, device));
+    } catch (error) {
+      console.error("gateway: upgrade abandonné", error);
+      socket.destroy();
     }
-    if (!isAllowedOrigin(request.headers.origin, deps.publicOrigin)) {
-      socket.end(FORBIDDEN_HANDSHAKE);
-      return;
-    }
-    const session = await deps.verifier.verify(request.headers.cookie);
-    const device = toDevice(request.headers["user-agent"]);
-    sockets.handleUpgrade(request, socket, head, (opened) => serve(opened, session, device));
   });
 
   server.listen(deps.port);

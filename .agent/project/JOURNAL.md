@@ -311,3 +311,10 @@ Tout y est absorbé par le plan d'architecture du bloc 3, qui fait foi.
 **Contexte.** Après le test sur bêta2, remplacer toute la pill par une phrase déplaisait (CDC §8 mis à jour). Le protocole 26 ne change pas.
 **Décision.** Hors live, la pill Dessin est celle d'un viewer qui peut dessiner ; `Button` gagne `isInactive` (classe `lp-btn--inactive`, `aria-disabled`, jamais `disabled`, le clic arrive). Toutes les entrées en Dessin (bouton, `D`, Entrée, Espace) passent par `enterDraftMode`, qui prévient `listenClosed` quand seul le live manque (ni banni, ni archive, ni invité) ; la fermeture sous un viewer en Dessin le prévient aussi, une fois. `useCanvasToasts` en fait le toast « Le dessin s'ouvre quand {streamer} est en live ». Un refus serveur `drawing_closed` passe par la même fermeture (`drawingClosed` précède l'erreur), donc le même toast, sans second message.
 **Renoncement.** Un état de pill à part avec la phrase (le retour de bêta2). Un toast par refus de pose : deux toasts pour une même fermeture.
+
+
+## 2026-11-21 — `/healthz` : le 503 garde son code et ses en-têtes, mais son corps est `unavailable` ; les noms des parties en échec vont dans les journaux du web (amende la décision du 2026-11-03)
+
+**Contexte.** Audit de sécurité n°12 : le corps du 503 publiait, à toute personne sur Internet, quelles parties internes étaient tombées (`redis`, `gateway`, `worker`). La surveillance externe ne lit que le code (200 / 503) et n'a pas besoin des noms.
+**Décision.** Codes 200 `ok` / 503 et en-têtes (`Cache-Control: no-store`, `X-Robots-Tag: noindex, nofollow`) inchangés. Le corps du 503 est le texte fixe `unavailable`. Les noms des parties en échec s'écrivent par `console.error` dans les journaux du web, à chaque 503.
+**Renoncement.** Un 200 ou un 404 pour cacher l'état : la surveillance se fie au 503. Une page protégée par jeton : une surveillance de plus à configurer pour une information déjà dans les journaux.

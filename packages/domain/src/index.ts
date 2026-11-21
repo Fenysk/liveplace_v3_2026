@@ -259,9 +259,13 @@ export function isLinkCode(code: string): boolean {
   return LINK_CODE_PATTERN.test(code);
 }
 
+// Les contrôles bidirectionnels (ALM, LRM, RLM, LRE à RLO, LRI à PDI) : un thème ne retourne pas le texte autour de lui (audit n°13).
+const BIDI_CONTROLS = /[؜‎‏‪-‮⁦-⁩]/g;
+
 // Le thème d'un canvas, nettoyé : vide = pas de thème. Coupé par caractères, jamais au milieu d'un.
 export function toTheme(raw: string): string | undefined {
   const cleaned = raw
+    .replace(BIDI_CONTROLS, "")
     .replace(/\p{Cc}/gu, " ")
     .replace(/\s+/g, " ")
     .trim();

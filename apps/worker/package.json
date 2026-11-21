@@ -11,7 +11,7 @@
   "dependencies": {
     "convex": "^1.46.0",
     "ioredis": "^6.0.0",
-    "zod": "^4.6.4"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

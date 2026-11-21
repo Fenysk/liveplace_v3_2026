@@ -1,8 +1,15 @@
+import { createServer } from "node:net";
 import { CANVAS_FORMATS, CANVAS_HEIGHT, CANVAS_WIDTH } from "@liveplace/domain";
 import type { ServerFrame } from "@liveplace/protocol";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
-import { isAllowedOrigin, MAX_BUFFERED_BYTES, toClientSocket, toDevice } from "./ws-server";
+import {
+  isAllowedOrigin,
+  MAX_BUFFERED_BYTES,
+  startGatewayServer,
+  toClientSocket,
+  toDevice,
+} from "./ws-server";
 
 const publicOrigin = "https://liveplace.tv";
 
@@ -299,5 +306,86 @@ describe("toDevice (§16.1)", () => {
     expect(toDevice(android)).toBe("phone");
     expect(toDevice(windows)).toBe("desktop");
     expect(toDevice(undefined)).toBe("desktop");
+  });
+});
+
+// Un port libre : `startGatewayServer` ne rend pas l'adresse qu'il écoute.
+const freePort = () =>
+  new Promise<number>((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      probe.close(() => resolve(port));
+    });
+  });
+
+const settle = (client: WebSocket) =>
+  new Promise<void>((resolve) => {
+    client.once("close", () => resolve());
+    client.once("error", () => undefined);
+  });
+
+// Audit de sécurité n°5 : une erreur de socket ne fait pas tomber le gateway, sans handler global.
+describe("startGatewayServer — errors on a socket", () => {
+  const start = async (verify: () => Promise<null>) => {
+    const port = await freePort();
+    const gateway = startGatewayServer({
+      port,
+      publicOrigin,
+      verifier: { verify },
+      openConnection: () => ({ receive: async () => undefined, close: async () => undefined }),
+      onBytesSent: () => undefined,
+      onClosedBehind: () => undefined,
+    });
+    return { port, gateway };
+  };
+
+  // Un vérificateur qui échoue détruit la socket de cette page seule, et le serveur répond encore après
+  it("destroys the socket when the upgrade throws, and keeps serving", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let attempts = 0;
+    const { port, gateway } = await start(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("redis indisponible");
+      return null;
+    });
+    try {
+      await settle(new WebSocket(`ws://127.0.0.1:${port}/ws`));
+      const second = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+      await new Promise<void>((resolve, reject) => {
+        second.once("open", () => resolve());
+        second.once("error", reject);
+      });
+      second.terminate();
+      expect(attempts).toBe(2);
+    } finally {
+      await gateway.close();
+      quiet.mockRestore();
+    }
+  });
+
+  // Une trame trop grosse fait émettre `error` à la socket ouverte : sans écouteur, le processus tomberait
+  it("survives an error emitted on an upgraded socket", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { port, gateway } = await start(async () => null);
+    try {
+      const client = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+      await new Promise<void>((resolve) => client.once("open", () => resolve()));
+      const closed = settle(client);
+      client.send("x".repeat(64 * 1024));
+      await closed;
+      const second = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+      await new Promise<void>((resolve, reject) => {
+        second.once("open", () => resolve());
+        second.once("error", reject);
+      });
+      second.terminate();
+      expect(quiet).toHaveBeenCalled();
+    } finally {
+      await gateway.close();
+      quiet.mockRestore();
+    }
   });
 });
