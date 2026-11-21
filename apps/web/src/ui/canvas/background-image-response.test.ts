@@ -87,6 +87,8 @@ describe("la réponse GET de /{login}/background", () => {
   });
 });
 
+const SITE = "https://liveplace.test";
+
 type Stored = { ownerId: string; canvasId: string; size: number };
 
 const uploadSetup = (
@@ -95,8 +97,9 @@ const uploadSetup = (
 ) => {
   const stored: Stored[] = [];
   const verifier: SessionVerifier = { verify: async () => cookieSession };
-  const deps: BackgroundImageDeps & { verifier: SessionVerifier } = {
+  const deps: BackgroundImageDeps & { verifier: SessionVerifier; publicUrl: string } = {
     verifier,
+    publicUrl: SITE,
     durable: {
       setActiveCanvasBackgroundImage: async (ownerId, canvasId, image) => {
         stored.push({ ownerId, canvasId, size: image.byteLength });
@@ -111,11 +114,12 @@ const uploadSetup = (
 };
 
 // Un corps en flux se poste en `duplex: "half"`, comme le fait le navigateur.
+// Comme le navigateur sur un `POST` de notre page : `Origin` est celle du site.
 const post = (query: string, body: BodyInit | null, headers: Record<string, string> = {}): Request =>
   new Request(`https://liveplace.test/fenysk/background${query}`, {
     method: "POST",
     body,
-    headers,
+    headers: { origin: SITE, ...headers },
     ...(body instanceof ReadableStream ? { duplex: "half" } : {}),
   } as RequestInit);
 
@@ -135,6 +139,43 @@ describe("la réponse POST de /{login}/background", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(stored).toEqual([{ ownerId: "owner-1", canvasId: "canvas-a", size: WEBP.byteLength }]);
+  });
+
+  // Si la requête ne porte pas l'origine du site (autre site, autre bêta, sans en-tête), alors le système doit répondre 403 sans lire le corps ni appeler Convex
+  it("answers 403 and reads nothing when the request does not carry the origin of the site", async () => {
+    for (const origin of ["https://evil.example", "https://beta3.liveplace.test", "null", undefined]) {
+      const { deps, stored } = uploadSetup();
+      const request = post("?canvas=canvas-a", WEBP, origin === undefined ? {} : { origin });
+      if (origin === undefined) request.headers.delete("origin");
+
+      const response = await uploadBackgroundImageResponse(deps, request, "lp_session=ok");
+
+      expect(response.status).toBe(403);
+      expect(await errorOf(response)).toBe("forbidden");
+      expect(request.bodyUsed).toBe(false);
+      expect(stored).toEqual([]);
+    }
+  });
+
+  // Si le site est une bêta, alors le système doit accepter l'origine de cette bêta et elle seule
+  it("accepts the origin of a beta site and only that one", async () => {
+    const beta = "https://beta3.liveplace.test";
+    const { deps, stored } = uploadSetup();
+    const betaDeps = { ...deps, publicUrl: beta };
+
+    const own = await uploadBackgroundImageResponse(
+      betaDeps,
+      post("?canvas=canvas-a", WEBP, { origin: beta }),
+      "lp_session=ok",
+    );
+    const production = await uploadBackgroundImageResponse(
+      betaDeps,
+      post("?canvas=canvas-a", WEBP, { origin: SITE }),
+      "lp_session=ok",
+    );
+
+    expect([own.status, production.status]).toEqual([200, 403]);
+    expect(stored).toHaveLength(1);
   });
 
   // Si le cookie ne désigne personne, alors le système doit répondre 401 et ne rien lire du corps ni appeler Convex
@@ -252,9 +293,11 @@ describe("la route /{login}/background", () => {
       request: new Request("https://liveplace.test/fenysk/background?canvas=canvas-a", {
         method: "POST",
         body: WEBP,
-        headers: { cookie: "lp_session=ok" },
+        headers: { cookie: "lp_session=ok", origin: SITE },
       }),
-      context: { deps: { verifier: deps.verifier, durable: deps.durable, archiveWrites: deps.redis } },
+      context: {
+        deps: { verifier: deps.verifier, durable: deps.durable, archiveWrites: deps.redis, publicUrl: SITE },
+      },
     } as never);
 
     const response = result instanceof Response ? result : undefined;

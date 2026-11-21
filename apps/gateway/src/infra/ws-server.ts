@@ -1,9 +1,11 @@
 // Le serveur WebSocket : upgrade sur /ws, /healthz, et les limites d'entrée (§6.1, §6.3).
 
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import type { Device, Session } from "@liveplace/domain";
 import type { ClientConnection, ClientSocket, SessionVerifier } from "@liveplace/domain/ports";
 import type { ServerFrame } from "@liveplace/protocol";
+import { clientIpOf, ipKeyOf } from "@liveplace/shared";
 import { type WebSocket, WebSocketServer } from "ws";
 
 const MAX_PAYLOAD_BYTES = 8 * 1024;
@@ -19,6 +21,20 @@ const FORBIDDEN_HANDSHAKE = ["HTTP/1.1 403 Forbidden", "Connection: close", "Con
   "\r\n",
 );
 
+// Un plafond de connexions ouvertes par adresse (audit de sécurité n°6, JOURNAL 2026-11-21). À RÉGLER ICI. Une page ouvre 1 connexion,
+// la vue OBS 1 de plus : un streamer avec OBS et plusieurs onglets en tient ~6, une école de 30 élèves sur une même adresse, 30 à 60.
+// 150 laisse cette marge et même deux écoles derrière un même réseau d'opérateur ; une seule adresse ne peut plus en tenir des milliers.
+export const MAX_CONNECTIONS_PER_ADDRESS = 150;
+const RETRY_AFTER_SECONDS = 10;
+const TOO_MANY_HANDSHAKE = [
+  "HTTP/1.1 429 Too Many Requests",
+  `Retry-After: ${RETRY_AFTER_SECONDS}`,
+  "Connection: close",
+  "Content-Length: 0",
+  "",
+  "",
+].join("\r\n");
+
 export type GatewayServerDeps = {
   port: number;
   publicOrigin: string;
@@ -26,6 +42,7 @@ export type GatewayServerDeps = {
   openConnection: (socket: ClientSocket, session: Session | null, device: Device) => ClientConnection;
   onBytesSent: (bytes: number) => void; // §16.3 : le débit sortant, compté à chaque envoi
   onClosedBehind: () => void; // §16.3 : une connexion fermée en 1013, comptée une fois
+  maxConnectionsPerAddress?: number; // par défaut `MAX_CONNECTIONS_PER_ADDRESS` ; les tests le baissent
 };
 
 // Une frame partagée par tout un canvas (le tick) n'est sérialisée qu'une fois (JOURNAL 2026-09-26).
@@ -85,6 +102,42 @@ export function toDevice(userAgent: string | undefined): Device {
 
 export function startGatewayServer(deps: GatewayServerDeps) {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
+  const maxPerAddress = deps.maxConnectionsPerAddress ?? MAX_CONNECTIONS_PER_ADDRESS;
+  const openPerAddress = new Map<string, number>();
+
+  // Une place se prend sans attendre (avant la vérification de session, qui est asynchrone) et se rend une seule fois, à la
+  // fermeture de la socket brute : elle couvre un abandon pendant l'upgrade comme une fermeture normale.
+  const takeSlot = (key: string): (() => void) | null => {
+    const open = openPerAddress.get(key) ?? 0;
+    if (open >= maxPerAddress) return null;
+    openPerAddress.set(key, open + 1);
+    let isReleased = false;
+    return () => {
+      if (isReleased) return;
+      isReleased = true;
+      const left = (openPerAddress.get(key) ?? 1) - 1;
+      if (left > 0) openPerAddress.set(key, left);
+      else openPerAddress.delete(key);
+    };
+  };
+
+  // Derrière Traefik : l'entrée de droite de `X-Forwarded-For`, que Traefik ajoute ; celles de gauche, le client les écrit.
+  // Faux : le plafond est atteint, la poignée de main est déjà refusée.
+  const claimSlot = (request: IncomingMessage, socket: Duplex): boolean => {
+    const forwardedFor = request.headers["x-forwarded-for"];
+    const address = clientIpOf(
+      Array.isArray(forwardedFor) ? forwardedFor.join(", ") : forwardedFor,
+      request.socket.remoteAddress,
+    );
+    if (!address) return true;
+    const release = takeSlot(ipKeyOf(address));
+    if (!release) {
+      socket.end(TOO_MANY_HANDSHAKE);
+      return false;
+    }
+    socket.once("close", release);
+    return true;
+  };
 
   const serve = (socket: WebSocket, session: Session | null, device: Device): void => {
     const connection = deps.openConnection(
@@ -139,6 +192,7 @@ export function startGatewayServer(deps: GatewayServerDeps) {
         socket.end(FORBIDDEN_HANDSHAKE);
         return;
       }
+      if (!claimSlot(request, socket)) return;
       const session = await deps.verifier.verify(request.headers.cookie);
       const device = toDevice(request.headers["user-agent"]);
       sockets.handleUpgrade(request, socket, head, (opened) => serve(opened, session, device));

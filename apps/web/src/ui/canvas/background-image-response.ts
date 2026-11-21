@@ -5,6 +5,7 @@ import { BACKGROUND_IMAGE_MAX_BYTES } from "@liveplace/domain";
 import type { SessionVerifier } from "@liveplace/domain/ports";
 import type { Result } from "@liveplace/shared";
 import { getBoundedBody } from "../../shared/bounded-body";
+import { isFromOurPage } from "../../shared/same-origin";
 import type { BackgroundImages } from "../../usecase/background-images";
 import {
   type BackgroundImageDeps,
@@ -49,15 +50,18 @@ export async function backgroundImageResponse(
   });
 }
 
-export type UploadDeps = BackgroundImageDeps & { verifier: SessionVerifier };
+// `publicUrl` : l'adresse du site, d'où l'origine que seule notre page porte (JOURNAL 2026-11-21).
+export type UploadDeps = BackgroundImageDeps & { verifier: SessionVerifier; publicUrl: string };
 
-type UploadError = BackgroundImageError | "unauthenticated" | "bad_request";
+type UploadError = BackgroundImageError | "unauthenticated" | "bad_request" | "forbidden";
 
 // Un `switch` exhaustif : le compilateur signale toute raison laissée sans statut.
 const statusOf = (error: UploadError): number => {
   switch (error) {
     case "unauthenticated":
       return 401;
+    case "forbidden":
+      return 403;
     case "bad_request":
       return 400;
     case "too_big":
@@ -77,13 +81,15 @@ const answer = (error?: UploadError): Response =>
     headers: { "cache-control": "no-store" },
   });
 
-// Le propriétaire est celui du cookie, jamais un paramètre : sans lui, le corps n'est même pas lu. Le canvas visé est
+// Audit de sécurité n°10 : une autre origine ne poste pas au nom du cookie, et son corps n'est pas lu. Le propriétaire est celui du
+// cookie, jamais un paramètre : sans lui, le corps n'est même pas lu. Le canvas visé est
 // `?canvas=` ; Convex vérifie que c'est l'actif de ce propriétaire.
 export async function uploadBackgroundImageResponse(
   deps: UploadDeps,
   request: Request,
   cookieHeader: string | undefined,
 ): Promise<Response> {
+  if (!isFromOurPage(request, deps.publicUrl)) return answer("forbidden");
   const canvasId = new URL(request.url).searchParams.get("canvas") ?? "";
   const result = await withOwnerSession(
     deps.verifier,

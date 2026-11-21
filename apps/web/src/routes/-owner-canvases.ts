@@ -13,6 +13,7 @@ import { listCanvases } from "../usecase/list-canvases";
 import { withOwnerSession } from "../usecase/owner-session";
 import { reopenCanvas } from "../usecase/reopen-canvas";
 import { setCanvasTheme } from "../usecase/set-canvas-theme";
+import { fromOurPageMiddleware } from "./-from-our-page";
 
 // Les identifiants de canvas sont des UUID : une borne large suffit à refuser ce qui n'en est pas.
 export const CanvasIdSchema = z.string().min(1).max(100);
@@ -53,13 +54,16 @@ const toSwitchDeps = ({
   randomLinkCode,
 });
 
-export const listCanvasesFn = createServerFn({ method: "POST" }).handler(({ context }) =>
-  withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
-    listCanvases({ durable: context.deps.durable, redis: context.deps.archiveWrites }, ownerId),
-  ),
-);
+export const listCanvasesFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
+  .handler(({ context }) =>
+    withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
+      listCanvases({ durable: context.deps.durable, redis: context.deps.archiveWrites }, ownerId),
+    ),
+  );
 
 export const archiveCanvasFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
   .validator(ArchiveRequestSchema)
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
@@ -68,6 +72,7 @@ export const archiveCanvasFn = createServerFn({ method: "POST" })
   );
 
 export const reopenCanvasFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
   .validator(ReopenRequestSchema)
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
@@ -76,6 +81,7 @@ export const reopenCanvasFn = createServerFn({ method: "POST" })
   );
 
 export const discardArchiveFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
   .validator(DiscardRequestSchema)
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
@@ -84,6 +90,7 @@ export const discardArchiveFn = createServerFn({ method: "POST" })
   );
 
 export const setCanvasThemeFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
   .validator(ThemeRequestSchema)
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>
@@ -93,6 +100,7 @@ export const setCanvasThemeFn = createServerFn({ method: "POST" })
 
 // §9.5 : retirer l'image du fond. La poser est la requête `POST /{login}/background`, qui porte les octets.
 export const clearCanvasBackgroundImageFn = createServerFn({ method: "POST" })
+  .middleware([fromOurPageMiddleware])
   .validator(BackgroundImageRequestSchema)
   .handler(({ data, context }) =>
     withOwnerSession(context.deps.verifier, getRequestHeader("cookie"), (ownerId) =>

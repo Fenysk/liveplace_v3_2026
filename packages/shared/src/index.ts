@@ -47,3 +47,5 @@ export function serializeCookie(
   if (isSecure) attributes.push("Secure");
   return attributes.join("; ");
 }
+
+export { clientIpOf, ipKeyOf } from "./client-ip";

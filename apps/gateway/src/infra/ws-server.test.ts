@@ -389,3 +389,117 @@ describe("startGatewayServer — errors on a socket", () => {
     }
   });
 });
+
+// Audit de sécurité n°6 : un plafond de connexions ouvertes par adresse de client, lue dans `X-Forwarded-For`.
+describe("startGatewayServer — connections per address", () => {
+  const start = async (maxConnectionsPerAddress: number, verify: () => Promise<null> = async () => null) => {
+    const port = await freePort();
+    const gateway = startGatewayServer({
+      port,
+      publicOrigin,
+      verifier: { verify },
+      openConnection: () => ({ receive: async () => undefined, close: async () => undefined }),
+      onBytesSent: () => undefined,
+      onClosedBehind: () => undefined,
+      maxConnectionsPerAddress,
+    });
+    return { port, gateway };
+  };
+
+  const connect = (port: number, forwardedFor?: string) =>
+    new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: forwardedFor ? { "x-forwarded-for": forwardedFor } : {},
+    });
+
+  const opened = (client: WebSocket) =>
+    new Promise<WebSocket>((resolve, reject) => {
+      client.once("open", () => resolve(client));
+      client.once("error", reject);
+      client.once("unexpected-response", (_request, response) =>
+        reject(new Error(`refused ${response.statusCode}`)),
+      );
+    });
+
+  const refusedWith = (client: WebSocket) =>
+    new Promise<number | undefined>((resolve) => {
+      client.once("unexpected-response", (_request, response) => resolve(response.statusCode));
+      client.once("open", () => resolve(undefined));
+      client.once("error", () => undefined);
+    });
+
+  // Au plafond, la connexion suivante de la même adresse reçoit un 429 ; une autre adresse passe encore
+  it("refuses the connection over the cap with a 429, and still accepts another address", async () => {
+    const { port, gateway } = await start(2);
+    const clients: WebSocket[] = [];
+    try {
+      clients.push(await opened(connect(port, "203.0.113.7")), await opened(connect(port, "203.0.113.7")));
+      const over = connect(port, "203.0.113.7");
+      expect(await refusedWith(over)).toBe(429);
+      clients.push(await opened(connect(port, "203.0.113.8")));
+    } finally {
+      for (const client of clients) client.terminate();
+      await gateway.close();
+    }
+  });
+
+  // Les entrées de gauche de `X-Forwarded-For` sont écrites par le client : seule celle de droite, posée par Traefik, compte
+  it("counts the rightmost X-Forwarded-For entry and ignores a forged left one", async () => {
+    const { port, gateway } = await start(1);
+    const clients: WebSocket[] = [];
+    try {
+      clients.push(await opened(connect(port, "1.1.1.1, 203.0.113.7")));
+      expect(await refusedWith(connect(port, "2.2.2.2, 203.0.113.7"))).toBe(429);
+    } finally {
+      for (const client of clients) client.terminate();
+      await gateway.close();
+    }
+  });
+
+  // Sans `X-Forwarded-For`, l'adresse de la socket sert : une boucle locale n'échappe pas au plafond
+  it("falls back to the socket address without X-Forwarded-For", async () => {
+    const { port, gateway } = await start(1);
+    const clients: WebSocket[] = [];
+    try {
+      clients.push(await opened(connect(port)));
+      expect(await refusedWith(connect(port))).toBe(429);
+    } finally {
+      for (const client of clients) client.terminate();
+      await gateway.close();
+    }
+  });
+
+  // Une connexion fermée rend sa place : le plafond ne s'use pas, même sur de longues séries d'ouvertures et de fermetures
+  it("frees the slot when a connection closes, with no leak over many cycles", async () => {
+    const { port, gateway } = await start(1);
+    try {
+      for (let cycle = 0; cycle < 20; cycle += 1) {
+        const client = await vi.waitFor(() => opened(connect(port, "203.0.113.7")));
+        const closed = settle(client);
+        client.close();
+        await closed;
+      }
+    } finally {
+      await gateway.close();
+    }
+  });
+
+  // Un upgrade abandonné (session illisible) rend aussi sa place
+  it("frees the slot when the upgrade fails", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let attempts = 0;
+    const { port, gateway } = await start(1, async () => {
+      attempts += 1;
+      if (attempts <= 3) throw new Error("redis indisponible");
+      return null;
+    });
+    const clients: WebSocket[] = [];
+    try {
+      for (let failure = 0; failure < 3; failure += 1) await settle(connect(port, "203.0.113.7"));
+      clients.push(await vi.waitFor(() => opened(connect(port, "203.0.113.7"))));
+    } finally {
+      for (const client of clients) client.terminate();
+      await gateway.close();
+      quiet.mockRestore();
+    }
+  });
+});

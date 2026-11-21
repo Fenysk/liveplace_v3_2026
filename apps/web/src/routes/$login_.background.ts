@@ -22,6 +22,7 @@ export const Route = createFileRoute("/$login_/background")({
             verifier: context.deps.verifier,
             durable: context.deps.durable,
             redis: context.deps.archiveWrites,
+            publicUrl: context.deps.publicUrl,
           },
           request,
           request.headers.get("cookie") ?? undefined,

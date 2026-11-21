@@ -3,6 +3,12 @@
 
 import { createMiddleware, createStart } from "@tanstack/react-start";
 
+// JOURNAL 2026-11-21 : le plafond par adresse sur les routes qui lisent Convex. Premier de la chaîne : un refus ne coûte ni Redis ni Convex.
+const rateLimitMiddleware = createMiddleware({ type: "request" }).server(async ({ request, next }) => {
+  const { limitHotRoutes } = await import("./hot-route-limit");
+  return limitHotRoutes(request) ?? next();
+});
+
 const serverDepsMiddleware = createMiddleware({ type: "request" }).server(async ({ next }) => {
   // Import dynamique : Redis, Convex et jose n'entrent jamais dans le bundle du navigateur.
   const { getServerDeps } = await import("./server-deps");
@@ -33,5 +39,5 @@ const securityMiddleware = createMiddleware({ type: "request" })
   });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [serverDepsMiddleware, securityMiddleware],
+  requestMiddleware: [rateLimitMiddleware, serverDepsMiddleware, securityMiddleware],
 }));
