@@ -44,6 +44,7 @@ export const Avatar = ({ displayName, avatarUrl, hasAccount = true }: AvatarProp
           className="lp-avatar-img"
           src={avatarUrl}
           alt=""
+          referrerPolicy="no-referrer"
           loading="lazy"
           decoding="async"
           onError={() => setBrokenUrl(avatarUrl)}

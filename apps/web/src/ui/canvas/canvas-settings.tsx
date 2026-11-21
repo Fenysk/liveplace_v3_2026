@@ -16,7 +16,7 @@ import {
   THEME_MAX_LENGTH,
 } from "@liveplace/domain";
 import type { Pixel } from "@liveplace/domain/ports";
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { ARCHIVE_TEXTS } from "../archive/archive-texts";
 import { BackgroundPreview } from "../design/background-preview";
 import { Button } from "../design/button";
@@ -57,6 +57,9 @@ export type ThemeField = {
 // Le champ du thème est la cible de la bulle qui invite le streamer à en donner un (§9.11).
 export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
   const t = useTexts(ARCHIVE_TEXTS);
+  const captionId = useId();
+  const errorId = useId();
+  const isUnavailable = theme.status === "unavailable";
   return (
     <div className="lp-setting">
       <TextField
@@ -69,9 +72,16 @@ export const ThemeSettings = ({ theme }: { theme: ThemeField }) => {
         isLoading={theme.status === "loading"}
         onInput={theme.onInput}
         onCommit={theme.onCommit}
+        describedBy={isUnavailable ? `${captionId} ${errorId}` : captionId}
       />
-      <p className="lp-type-caption lp-muted">{t.themeCaption}</p>
-      {theme.status === "unavailable" && <p className="lp-type-caption lp-danger">{t.canvasesUnavailable}</p>}
+      <p id={captionId} className="lp-type-caption lp-muted">
+        {t.themeCaption}
+      </p>
+      {isUnavailable && (
+        <p id={errorId} className="lp-type-caption lp-danger">
+          {t.canvasesUnavailable}
+        </p>
+      )}
     </div>
   );
 };

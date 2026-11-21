@@ -15,6 +15,7 @@ type TextFieldProps = {
   isDisabled?: boolean;
   isLoading?: boolean;
   onCommit?: () => void;
+  describedBy?: string | undefined; // les `id` (séparés par une espace) de l'aide et de l'erreur qui décrivent le champ
   wrapInput?: ((input: ReactNode) => ReactNode) | undefined; // le champ seul, sans son libellé : une bulle d'aide le vise (JOURNAL 2026-10-12)
 };
 
@@ -27,6 +28,7 @@ export const TextField = ({
   isDisabled = false,
   isLoading = false,
   onCommit,
+  describedBy,
   wrapInput = (input) => input,
 }: TextFieldProps) => {
   const id = useId();
@@ -46,6 +48,7 @@ export const TextField = ({
             maxLength={maxLength}
             disabled={isDisabled}
             autoComplete="off"
+            aria-describedby={describedBy}
             onChange={(event) => onInput(event.target.value)}
             onBlur={onCommit}
             onKeyDown={(event) => {

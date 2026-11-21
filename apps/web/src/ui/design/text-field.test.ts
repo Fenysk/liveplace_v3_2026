@@ -60,3 +60,25 @@ describe("le champ de texte dont une bulle vise le champ (§9.11)", () => {
     expect(render(false)).toMatch(/<div class="lp-field"><label[^>]*>Thème<\/label><input/);
   });
 });
+
+describe("le champ de texte relié à ce qui le décrit", () => {
+  const described = (isLoading: boolean): string =>
+    renderToStaticMarkup(
+      createElement(TextField, { label: "Thème", value: "", onInput: noop, isLoading, describedBy: "aide" }),
+    );
+
+  // Les identifiants donnés se posent sur le champ
+  it("puts the given ids on the input", () => {
+    expect(described(false)).toMatch(/<input[^>]*aria-describedby="aide"/);
+  });
+
+  // Sans identifiant, le champ n'a aucun `aria-describedby`
+  it("has no aria-describedby without ids", () => {
+    expect(render(false)).not.toContain("aria-describedby");
+  });
+
+  // Tant que la valeur arrive, il n'y a pas de champ : rien à relier
+  it("has nothing to link while the value loads", () => {
+    expect(described(true)).not.toContain("aria-describedby");
+  });
+});

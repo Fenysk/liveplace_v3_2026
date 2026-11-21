@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Profile, type ProfileUser, type ProfileVariant } from "./profile";
+import { Avatar, Profile, type ProfileUser, type ProfileVariant } from "./profile";
 
 // Un attribut `style` : la CSP de production bloque celui du HTML que le serveur écrit (archive-server-html.test.ts).
 const INLINE_STYLE = /\sstyle=/;
@@ -16,6 +16,17 @@ const render = (profile: ProfileUser, variant?: ProfileVariant) =>
 const twitchLinks = (html: string) => [
   ...html.matchAll(/<a [^>]*href="https:\/\/www\.twitch\.tv\/[^"]*"[^>]*>/g),
 ];
+
+describe("the photo of an avatar", () => {
+  // La photo Twitch se demande sans référent : l'adresse de la page ne part pas chez Twitch
+  it("is requested without a referrer", () => {
+    const html = renderToString(
+      createElement(Avatar, { displayName: "Kalyss", avatarUrl: "https://static-cdn.jtvnw.net/a.png" }),
+    );
+
+    expect(html).toMatch(/<img [^>]*referrerPolicy="no-referrer"/);
+  });
+});
 
 describe("the Twitch button of a profile, when the person is not live", () => {
   // Hors live, rien ne change : le bouton fantôme avec le logo, sur PC seulement, et pas de variante live

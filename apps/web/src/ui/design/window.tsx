@@ -170,7 +170,13 @@ const WindowShell = ({
         <>
           {/* Sur mobile, la fenêtre est une feuille : la glisser vers le bas la ferme. */}
           <div className="lp-window-grabber">
-            <Grabber label={t.close} onUp={doNothing} onDown={onClose} onTap={doNothing} />
+            <Grabber
+              label={t.close}
+              onUp={doNothing}
+              onDown={onClose}
+              onTap={doNothing}
+              onActivate={onClose}
+            />
           </div>
           {children}
           {/* La page est inerte sous une fenêtre modale, sa région de toast avec : la fenêtre redit le toast dans la sienne. */}

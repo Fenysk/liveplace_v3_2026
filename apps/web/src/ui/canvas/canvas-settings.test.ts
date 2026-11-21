@@ -80,3 +80,31 @@ describe("le champ Thème, cible d'une bulle d'aide (§9.11)", () => {
     expect(render("ready")).not.toContain("lp-bubble-target");
   });
 });
+
+describe("le champ Thème relié à son aide et à son erreur", () => {
+  const describedIds = (html: string): string[] =>
+    (/<input[^>]*aria-describedby="([^"]*)"/.exec(html)?.[1] ?? "").split(" ").filter(Boolean);
+  const paragraphIds = (html: string): string[] =>
+    [...html.matchAll(/<p [^>]*id="([^"]*)"/g)].map((match) => match[1] ?? "");
+
+  // Prêt : le champ pointe vers sa légende, et vers elle seule
+  it("points the input at its caption alone when the theme is ready", () => {
+    const html = render("ready");
+
+    expect(describedIds(html)).toHaveLength(1);
+    expect(paragraphIds(html)).toEqual(describedIds(html));
+  });
+
+  // Indisponible : le champ pointe vers sa légende et vers l'erreur, deux paragraphes présents dans le rendu
+  it("points the input at its caption and its error when the theme is unavailable", () => {
+    const html = render("unavailable");
+
+    expect(describedIds(html)).toHaveLength(2);
+    expect(paragraphIds(html)).toEqual(describedIds(html));
+  });
+
+  // Aucun `aria-invalid` : le service est indisponible, la valeur saisie n'est pas refusée
+  it("does not mark the value as invalid", () => {
+    expect(render("unavailable")).not.toContain("aria-invalid");
+  });
+});
